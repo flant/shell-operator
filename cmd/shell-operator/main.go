@@ -1,16 +1,20 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/executor"
 	operator "github.com/flant/shell-operator/pkg/shell-operator"
+	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
 
 func main() {
+
 	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
 
 	// global defaults
@@ -23,15 +27,29 @@ func main() {
 	})
 
 	// start main loop
-	kpApp.
-		Command("start", "Start events processing.").
+	kpApp.Command("start", "Start events processing.").
 		Action(func(c *kingpin.ParseContext) error {
-			err := operator.Start()
+			// Setting flag.Parsed() for glog.
+			flag.CommandLine.Parse([]string{})
+
+			// Be a good parent - clean up after the child processes
+			// in case if shell-operator is a PID1.
+			go executor.Reap()
+
+			operator.InitHttpServer()
+
+			err := operator.Init()
 			if err != nil {
 				os.Exit(1)
 			}
+
+			operator.Run()
+
+			// Block action by waiting signals from OS.
+			utils_signal.WaitForProcessInterruption()
+
 			return nil
-	})
+		})
 
 	kingpin.MustParse(kpApp.Parse(os.Args[1:]))
 }

@@ -64,3 +64,5 @@ Hook should return a json with configuration on stdout. Configuration
 
 #### onKubernetes
 
+
+## LICENSE
