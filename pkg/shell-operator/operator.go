@@ -79,7 +79,7 @@ func Init() (err error) {
 	}
 	rlog.Infof("Use temporary dir: %s", TempDir)
 
-	// Initializing hook manager (load hooks from WorkDir)
+	// Initializing hook manager (load hooks from WorkingDir)
 	HookManager, err = hook.Init(WorkingDir, TempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize hook manager: %s\n", err)

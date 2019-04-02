@@ -93,7 +93,7 @@ func NewMainHookManager() *MainHookManager {
 	}
 }
 
-// loadAllHooks finds executables in WorkDir, execute them with --config argument and add them into indices.
+// loadAllHooks finds executables in WorkingDir, execute them with --config argument and add them into indices.
 func (hm *MainHookManager) loadAllHooks() error {
 	rlog.Info("Search and load hooks ...")
 
