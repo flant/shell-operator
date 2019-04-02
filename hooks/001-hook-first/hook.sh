@@ -7,4 +7,6 @@ fi
 
 echo "001-hook-first onStartup run"
 
-source config
+source $WORKING_DIR/lib/functions
+
+__asd__

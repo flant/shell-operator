@@ -3,6 +3,7 @@ package shell_operator
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"time"
 
@@ -19,8 +20,6 @@ import (
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
-	"net/http"
-	"path"
 )
 
 var (
@@ -214,7 +213,7 @@ func TasksRunner() {
 				err := HookManager.RunHook(t.GetName(), t.GetBinding(), t.GetBindingContext())
 				if err != nil {
 					taskHook, _ := HookManager.GetHook(t.GetName())
-					hookLabel := path.Base(taskHook.Path)
+					hookLabel := taskHook.SafeName()
 
 					if t.GetAllowFailure() {
 						MetricsStorage.SendCounterMetric("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})

@@ -31,7 +31,6 @@ func IsFileExecutable(f os.FileInfo) bool {
 	return f.Mode()&0111 != 0
 }
 
-
 // RecursiveGetExecutablePaths finds recursively all executable files
 // inside a dir directory. Hidden directories and files are ignored.
 func RecursiveGetExecutablePaths(dir string) ([]string, error) {

@@ -2,9 +2,9 @@ package hook
 
 import (
 	"fmt"
-	"sort"
-	"path/filepath"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/romana/rlog"
@@ -21,7 +21,7 @@ type HookManager interface {
 }
 
 type MainHookManager struct {
-	hooksByName map[string]*Hook
+	hooksByName      map[string]*Hook
 	hookNamesInOrder []string
 	// index to search hooks by binding type
 	hooksInOrder map[BindingType][]*Hook
@@ -34,6 +34,7 @@ var (
 )
 
 type EventType string
+
 const (
 	HooksLoaded EventType = "HOOKS_LOADED"
 )
@@ -45,15 +46,15 @@ type Event struct {
 type BindingType string
 
 const (
-	Schedule        BindingType = "SCHEDULE"
-	OnStartup       BindingType = "ON_STARTUP"
-	KubeEvents      BindingType = "KUBE_EVENTS"
+	Schedule   BindingType = "SCHEDULE"
+	OnStartup  BindingType = "ON_STARTUP"
+	KubeEvents BindingType = "KUBE_EVENTS"
 )
 
 var ContextBindingType = map[BindingType]string{
-	Schedule:        "schedule",
-	OnStartup:       "onStartup",
-	KubeEvents:      "onKubernetesEvent",
+	Schedule:   "schedule",
+	OnStartup:  "onStartup",
+	KubeEvents: "onKubernetesEvent",
 }
 
 // Additional info from schedule and kube events
@@ -71,7 +72,6 @@ func Init(workingDir string, tempDir string) (HookManager, error) {
 	TempDir = tempDir
 	WorkingDir = workingDir
 
-
 	hm := NewMainHookManager()
 
 	EventCh = make(chan Event, 2)
@@ -85,12 +85,11 @@ func Init(workingDir string, tempDir string) (HookManager, error) {
 	return hm, nil
 }
 
-
 func NewMainHookManager() *MainHookManager {
 	return &MainHookManager{
-		hooksByName: make(map[string]*Hook, 0),
+		hooksByName:      make(map[string]*Hook, 0),
 		hookNamesInOrder: make([]string, 0),
-		hooksInOrder: make(map[BindingType][]*Hook, 0),
+		hooksInOrder:     make(map[BindingType][]*Hook, 0),
 	}
 }
 
@@ -183,7 +182,6 @@ func execCommandOutput(dir string, entrypoint string, envs []string, args []stri
 	return output, nil
 }
 
-
 // HookManager has no events for now unlike antiopa
 func (hm *MainHookManager) Run() {
 	panic("implement me")
@@ -197,7 +195,6 @@ func (hm *MainHookManager) GetHook(name string) (*Hook, error) {
 		return nil, fmt.Errorf("hook '%s' not found", name)
 	}
 }
-
 
 func (hm *MainHookManager) GetHooksInOrder(bindingType BindingType) []string {
 	hooks, ok := hm.hooksInOrder[bindingType]
@@ -216,7 +213,6 @@ func (hm *MainHookManager) GetHooksInOrder(bindingType BindingType) []string {
 
 	return hooksNames
 }
-
 
 func (hm *MainHookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext) error {
 	hook, err := hm.GetHook(hookName)

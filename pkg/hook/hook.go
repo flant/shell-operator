@@ -14,6 +14,7 @@ import (
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	utils_data "github.com/flant/shell-operator/pkg/utils/data"
+	"path"
 )
 
 type HookConfig struct {
@@ -91,7 +92,21 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext) error {
 		return err
 	}
 
-	return h.exec(contextPath)
+	envs := []string{}
+	envs = append(envs, os.Environ()...)
+	if contextPath != "" {
+		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
+	}
+	envs = append(envs, fmt.Sprintf("WORKING_DIR=%s", WorkingDir))
+
+	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
+
+	err = executor.Run(hookCmd, true)
+	if err != nil {
+		return fmt.Errorf("%s FAILED: %s", h.Name, err)
+	}
+
+	return nil
 }
 
 func (h *Hook) SafeName() string {
@@ -117,21 +132,5 @@ func dumpData(filePath string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (h *Hook) exec(contextPath string) error {
-	envs := []string{}
-	envs = append(envs, os.Environ()...)
-	if contextPath != "" {
-		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
-	}
-	hookCmd := executor.MakeCommand(WorkingDir, h.Path, []string{}, envs)
-
-	err := executor.Run(hookCmd, true)
-	if err != nil {
-		return fmt.Errorf("%s FAILED: %s", h.Name, err)
-	}
-
 	return nil
 }
