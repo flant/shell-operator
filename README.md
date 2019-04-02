@@ -56,7 +56,7 @@ Build image and push it to the Docker registry.
 ### Use image in your cluster
 
 To use the built image in your Kubernetes cluster you need to create a Deployment.
-Somwhere out of the project directory create a `shell-operator.yml` file describing deployment with the following content:
+Somewhere out of the project directory create a `shell-operator.yml` file describing deployment with the following content:
 ```
 #TODO
 
