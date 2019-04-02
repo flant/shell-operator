@@ -23,8 +23,8 @@ func SetupGlobalSettings(kpApp *kingpin.Application) {
 		Default(DebugMessages).
 		StringVar(&DebugMessages)
 
-	kpApp.Flag("work-dir", "a path to a hooks file structure").
-		Envar("SHELL_OPERATOR_WORK_DIR").
+	kpApp.Flag("working-dir", "a path to a hooks file structure").
+		Envar("SHELL_OPERATOR_WORKING_DIR").
 		Default(WorkingDir).
 		StringVar(&WorkingDir)
 

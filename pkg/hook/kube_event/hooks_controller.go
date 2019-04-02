@@ -49,7 +49,6 @@ func (obj *MainKubeEventsHooksController) EnableHooks(hookManager hook.HookManag
 	return nil
 }
 
-
 func (obj *MainKubeEventsHooksController) HandleEvent(kubeEvent kube_events_manager.KubeEvent) (*struct{ Tasks []task.Task }, error) {
 	res := &struct{ Tasks []task.Task }{Tasks: make([]task.Task, 0)}
 	var desc *KubeEventHook
@@ -105,7 +104,6 @@ func MakeKubeEventHookDescriptors(hook *hook.Hook) []*KubeEventHook {
 
 	return res
 }
-
 
 func ConvertOnKubernetesEventToKubeEventHook(hook *hook.Hook, config kube_events_manager.OnKubernetesEventConfig, namespace string) *KubeEventHook {
 	return &KubeEventHook{

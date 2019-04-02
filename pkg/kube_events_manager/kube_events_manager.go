@@ -22,8 +22,8 @@ import (
 	storageV1 "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/flant/shell-operator/pkg/kube"
 	"github.com/flant/shell-operator/pkg/executor"
+	"github.com/flant/shell-operator/pkg/kube"
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 	utils_data "github.com/flant/shell-operator/pkg/utils/data"
 )
