@@ -1,68 +1,74 @@
-# shell-operator
+# Shell-operator
 
-Run your custom cluster-wide scripts in reaction to Kubernetes events or on schedule.
+Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster.
 
-## Getting started
+* Simple configuration
+* Fixed script execution order
+* Run scripts on startup, on schedule or on Kubernetes events
 
-Build image with your hooks
+## Quickstart
 
+> You need to have a Kubernetes cluster, and the kubectl must be configured to communicate with your cluster.
+
+To use Shell-operator you need to:
+- build image with your hook or hooks (script)
+- (optional) setup RBAC
+- run Deployment with built image
+
+### Build image with your hook
+
+Hook is a script with the added events configuration code. Learn [more](HOOKS.md) about hooks.
+
+Create project directory with the following Dockerfile, which use the [shell-operator](https://hub.docker.com/r/flant/shell-operator) image as FROM:
+```
 FROM: flant/shell-operator:..
-ADD: ....  
-
-push image and create a Deployment
-
-
-
-## Installation
-
-```
-kubectl apply scripts/shell-operator.yml
+ADD: hooks /hooks
 ```
 
-## Usage
+In the project directory create `hooks/01-copy-secret` directory and the `hooks/01-copy-secret/hook.sh` file with the following content:
 
 ```
-mkdir shell-operator-config && cd shell-operator-config
-git init
-mkdir 001-first-hook
+#!/usr/bin/env bash
 
-docker run --rm flant/shell-operator:latest mkconfigmap > shell-operator-cm.yml
-
-kubectl apply shell-operator-cm.yml
-
-```
-
-## Hook
-
-Hook is a script that will be executed on some event in Kubernetes cluster.
- 
-### hook configuration
-
-Shell-operator on startup run every hook with `--config` argument.
-Hook should return a json with configuration on stdout. Configuration
- 
-
-### bingings
-
-* onStartup
-* schedule
-* onKubernetesEvent
-
-#### onStartup
-
-```
+if [[ $1 == "--config" ]] ; then
+  cat <<EOF
 {
-  "onStartup": ORDER
+  "onKubernetesEvent": [
+    {
+      "name": "Registry secret copier",
+      "kind": "namespace",
+      "event": ["add"],
+      },
+  ]
 }
+EOF
+  exit 0
+fi
+
+#TODO
+
+
+echo "Finish."
 ```
 
+Build image and push it to the Docker registry.
 
+### Use image in your cluster
 
-#### schedule
+To use the built image in your Kubernetes cluster you need to create a Deployment.
+Somwhere out of the project directory create a `shell-operator.yml` file describing deployment with the following content:
+```
+#TODO
 
+```
 
+Start shell-operator by applying `shell-operator.yml`:
+```
+kubectl apply shell-operator.yml
+```
 
-#### onKubernetes
+## Examples
 
+## License
 
-## LICENSE
+Apache License 2.0, see [LICENSE](LICENSE).
