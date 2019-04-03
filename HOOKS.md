@@ -257,4 +257,4 @@ At 23:59 this hook will be executed with the following context:
 For debugging you can use the following:
 - get logs of a Shell-operator pod by using `kubectl logs <POD_NAME>`
 - get a hook queue content in the `/tmp/shell-operator-queue` file of a Shell-operator pod
-- get a hook queue content by executing CURL to the `POD_IP:9115/queue` (e.g. from the Shell-operator pod itself).
+- get a hook queue content by executing CURL to the `POD_IP:9115/queue` (e.g. from a Shell-operator pod itself).
