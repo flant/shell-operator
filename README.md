@@ -46,7 +46,7 @@ Build image and push it to the Docker registry.
 ### Use image in your cluster
 
 To use the built image in your Kubernetes cluster you need to create a Deployment.
-Somewhere out of the project directory create a `shell-operator.yml` file describing deployment with the following content:
+Create a `shell-operator.yml` file describing deployment with the following content:
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -56,21 +56,15 @@ spec:
   containers:
   - name: shell-operator
     image: registry.mycompany.com/shell-operator:monitor-namespaces
-    imagePullPolicy: Always
-    env:
-    - name: RLOG_LOG_LEVEL
-      value: DEBUG
-  serviceAccount: monitor-namespaces-acc
 ```
-
 Replace `image` with your registry and add credential if necessary.
 
 Start shell-operator by applying `shell-operator.yml`:
 ```
-kubectl apply shell-operator.yml
+kubectl apply -f shell-operator.yml
 ```
 
-Analyse Shell-operator logs with `kubectl get logs POD_NAME` (where POD_NAME is a name of a Shell-operator Pod). You should see logs like the following:
+Analyze Shell-operator logs with `kubectl get logs POD_NAME` (where POD_NAME is a name of a Shell-operator Pod). You should see logs like the following:
 ```
 2019-04-03T12:27:01Z INFO     : Use working dir: /hooks
 2019-04-03T12:27:01Z INFO     : HTTP SERVER Listening on :9115

@@ -1,10 +1,10 @@
 # HOOKs
 
-A Hook is a script in any language you prefer with an added events configuration code. Shell-operator will execute the script in a Kubernetes cluster on events you configured.
+A hook is a script in any language you prefer with an added events configuration code. Shell-operator will execute the script in a Kubernetes cluster on events you configured.
 
-> A corresponding runtime environment (ex. bash) must be added into the image to execute a hook.
+> A corresponding runtime environment must be added into the image to execute a hook.
 
-Every hook must have an argument `--config`. Getting `--config` as an argument, hook have to return to `stdout` its [bindings configuration](#bindings) as a JSON structure.
+Every hook must have an argument `--config`. Getting `--config` as an argument, hook should return to `stdout` its [bindings configuration](#bindings) as a JSON structure.
 
 When one or more events the hook is bound are triggered, Shell-operator executes the hook without arguments but with the following environment variables set:
 - BINDING_CONTEXT_PATH — [execution context](#execution-context), contains a path to a JSON file with information about an event that was triggered.
