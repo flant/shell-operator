@@ -6,6 +6,14 @@ Shell-operator is a tool for running event-driven scripts in a Kubernetes cluste
 * A fixed script execution order
 * Run scripts on startup, on schedule or on Kubernetes events.
 
+This operator is not an operator for a particular software as prometheus-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks for events. Think of it as a Kubernetes operator framework for scripts.
+
+Shell-operator provides:
+- Ease the management of a Kubernetes cluster by using the tools that Ops are familiar with: you can use bash, python, ruby, kubectl, etc.
+- Kubernetes object events: hook can be triggered by add, update or delete events.
+- Object selector and properties filter: Shell-operator can monitor only particular objects and detect changes in their properties.
+- Simple configuration: hook binding definition is a JSON structure on stdout.
+
 ## Quickstart
 
 > You need to have a Kubernetes cluster, and the kubectl must be configured to communicate with your cluster.
