@@ -25,7 +25,7 @@ Shell-operator searches and runs hooks going through the following steps:
     - if there is more than one hook for a triggered event, hooks executed sequentially in the same order they have been found.
 - Export [metrics](METRICS.md) to Prometheus.
 
-Shell operator executes each hook one by one (without concurrency), and executes each hook until it finishes. On that note, you may have a question - "What happens if one of the hooks fails?".
+Shell operator executes each hook one by one (without concurrency), and executes each hook until it finishes. On that note, you may have a question — "What happens if one of the hooks fails?".
 
 ### What happens if hook fails?
 
@@ -99,7 +99,7 @@ The `name` is an optional parameter. It specifies a binding name, which hook can
 The `CRON_EXPRESSION` is a crontab syntax with 6 values separated by spaces, each of them can be:
 - a number
 - a set of numbers separated by commas
-- a range, - two numbers separated by a hyphen
+- a range, — two numbers separated by a hyphen
 - an asterisk `*` or a slash `/`
 - [predefined values](https://godoc.org/github.com/robfig/cron#hdr-Predefined_schedules)
 - [intervals](https://godoc.org/github.com/robfig/cron#hdr-Intervals)
@@ -257,4 +257,4 @@ At 23:59 this hook will be executed with the following context:
 For debugging you can use the following:
 - get logs of a Shell-operator pod by using `kubectl logs <POD_NAME>`
 - get a hook queue content in the `/tmp/shell-operator-queue` file of a Shell-operator pod
-- get a hook queue content by executing curl to the `/queue` (@TODO) ???  IP?
+- get a hook queue content by executing CURL to the `POD_IP:9115/queue` (e.g. from the Shell-operator pod itself).
