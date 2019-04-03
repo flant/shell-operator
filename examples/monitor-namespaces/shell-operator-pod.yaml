@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shell-operator
+spec:
+  containers:
+  - name: shell-operator
+    image: registry.mycompany.com/shell-operator:monitor-namespaces
+    imagePullPolicy: Always
+    env:
+    - name: RLOG_LOG_LEVEL
+      value: DEBUG
+  serviceAccount: monitor-namespaces-acc
