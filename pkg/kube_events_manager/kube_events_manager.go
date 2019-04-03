@@ -72,7 +72,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 						eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 				}
 
-				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, "ADDED", kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd), debug)
+				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnAdd), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd), debug)
 				if err != nil {
 					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
@@ -98,7 +98,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 						eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 				}
 
-				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, "MODIFIED", kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnUpdate), debug)
+				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnUpdate), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnUpdate), debug)
 				if err != nil {
 					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
@@ -115,7 +115,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 					rlog.Debugf("Kube events manager: %+v informer %s: delete %s object %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId)
 				}
 
-				err = kubeEventsInformer.HandleKubeEvent(obj, kind, "", "DELETED", kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnDelete), debug)
+				err = kubeEventsInformer.HandleKubeEvent(obj, kind, "", string(KubernetesEventOnDelete), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnDelete), debug)
 				if err != nil {
 					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
