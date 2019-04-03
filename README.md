@@ -11,7 +11,7 @@ Shell-operator is a tool for running event-driven scripts in a Kubernetes cluste
 > You need to have a Kubernetes cluster, and the kubectl must be configured to communicate with your cluster.
 
 To use Shell-operator you need to:
-- build an image with your hook or hooks (script)
+- build an image with your hooks (scripts)
 - (optional) setup RBAC
 - run Deployment with a built image.
 
