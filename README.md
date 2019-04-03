@@ -21,8 +21,8 @@ A hook is a script with the added events configuration code. Learn [more](HOOKS.
 
 Create project directory with the following Dockerfile, which use the [shell-operator](https://hub.docker.com/r/flant/shell-operator) image as FROM:
 ```
-FROM: flant/shell-operator:..
-ADD: hooks /hooks
+FROM flant/shell-operator:latest
+ADD hooks /hooks
 ```
 
 In the project directory create `hooks/002-hook-schedule-example` directory and the `hooks/002-hook-schedule-example/hook.sh` file with the following content:
@@ -47,10 +47,23 @@ Build image and push it to the Docker registry.
 
 To use the built image in your Kubernetes cluster you need to create a Deployment.
 Somewhere out of the project directory create a `shell-operator.yml` file describing deployment with the following content:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shell-operator
+spec:
+  containers:
+  - name: shell-operator
+    image: registry.mycompany.com/shell-operator:monitor-namespaces
+    imagePullPolicy: Always
+    env:
+    - name: RLOG_LOG_LEVEL
+      value: DEBUG
+  serviceAccount: monitor-namespaces-acc
 ```
-#TODO
 
-```
+Replace `image` with your registry and add credential if necessary.
 
 Start shell-operator by applying `shell-operator.yml`:
 ```
@@ -99,7 +112,7 @@ Binding context:
 
 ## Examples
 
-You can find more examples [here](hooks/).
+You can find more examples [here](examples/).
 
 ## License
 
