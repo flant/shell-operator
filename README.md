@@ -2,59 +2,55 @@
 
 Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster.
 
-* Simple configuration
-* A fixed script execution order
-* Run scripts on startup, on schedule or on Kubernetes events.
-
-This operator is not an operator for a particular software as prometheus-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks for events. Think of it as a Kubernetes operator framework for scripts.
+This operator is not an operator for a particular software as prometheus-operator or kafka-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an operator-sdk but for scripts.
 
 Shell-operator provides:
-- Ease the management of a Kubernetes cluster by using the tools that Ops are familiar with: you can use bash, python, ruby, kubectl, etc.
-- Kubernetes object events: hook can be triggered by add, update or delete events.
-- Object selector and properties filter: Shell-operator can monitor only particular objects and detect changes in their properties.
-- Simple configuration: hook binding definition is a JSON structure on stdout.
+- __Ease the management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, ruby, kubectl, etc.
+- __Kubernetes object events__: hook can be triggered by add, update or delete events.
+- __Object selector and properties filter__: Shell-operator can monitor only particular objects and detect changes in their properties.
+- __Simple configuration__: hook binding definition is a JSON structure on stdout.
 
 ## Quickstart
 
 > You need to have a Kubernetes cluster, and the kubectl must be configured to communicate with your cluster.
 
-To use Shell-operator you need to:
+Steps to setup Shell-operator in your cluster are:
 - build an image with your hooks (scripts)
-- (optional) setup RBAC
-- run Deployment with a built image.
+- create necessary RBAC objects (for onKubernetesEvent binding)
+- run Pod with a built image
 
 ### Build an image with your hooks
 
-A hook is a script with the added events configuration code. Learn [more](HOOKS.md) about hooks.
+A hook is a script with the added events configuration code. Learn [more](HOOKS.md) about hooks. Here is a simple hook with `onStartup` binding:
 
-Create project directory with the following Dockerfile, which use the [shell-operator](https://hub.docker.com/r/flant/shell-operator) image as FROM:
-```
-FROM flant/shell-operator:latest
-ADD hooks /hooks
-```
-
-In the project directory create `hooks/002-hook-schedule-example` directory and the `hooks/002-hook-schedule-example/hook.sh` file with the following content:
 ```bash
 #!/usr/bin/env bash
 
 if [[ $1 == "--config" ]] ; then
-  echo '{"onStartup": 10, "schedule":[{"name":"every 10sec", "crontab":"*/10 * * * * *"}]}'
-  exit 0
+  echo '{"onStartup": 10}'
+else
+  echo "SIMPLE: Run simple onStartup hook"
 fi
-
-echo "002-hook-schedule-example onStartup run"
-echo "Binding context:"
-cat "${BINDING_CONTEXT_PATH}"
-echo
-echo "002-hook-schedule-example Stop"
 ```
 
-Build image and push it to the Docker registry.
 
-### Use image in your cluster
+You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with bash, kubectl and shell-operator binaries to build you own image. You just need to ADD your hook into /hooks:
+```dockerfile
+# Dockerfile
+FROM flant/shell-operator:latest
+ADD hook.sh /hooks
+```
 
-To use the built image in your Kubernetes cluster you need to create a Deployment.
-Create a `shell-operator.yml` file describing deployment with the following content:
+Build image and push it to the Docker registry accessible by Kubernetes cluster.
+```
+docker build -t "my.registry.url/shell-operator:simple-hook" .
+docker push my.registry.url/shell-operator:simple-hook
+```
+
+### Install shell-operator in a cluster
+
+This simple image can be deployed as a Pod. Put this manifest into shell-operator-pod.yaml:
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -63,58 +59,38 @@ metadata:
 spec:
   containers:
   - name: shell-operator
-    image: registry.mycompany.com/shell-operator:monitor-namespaces
+    image: my.registry.url/shell-operator:simple-hook
 ```
-Replace `image` with your registry and add credential if necessary.
 
 Start shell-operator by applying `shell-operator.yml`:
 ```
 kubectl apply -f shell-operator.yml
 ```
 
-Analyze Shell-operator logs with `kubectl get logs POD_NAME` (where POD_NAME is a name of a Shell-operator Pod). You should see logs like the following:
+Run `kubectl logs po/shell-operator` and see that hook.sh was ran at startup:
 ```
-2019-04-03T12:27:01Z INFO     : Use working dir: /hooks
-2019-04-03T12:27:01Z INFO     : HTTP SERVER Listening on :9115
-2019-04-03T12:27:01Z INFO     : Use temporary dir: /tmp/shell-operator
-2019-04-03T12:27:01Z INFO     : Initialize hooks manager ...
-2019-04-03T12:27:01Z INFO     : Search and load hooks ...
-2019-04-03T12:27:01Z INFO     : Load hook config from '/hooks/002-hook-schedule-example/hook.sh'
-2019-04-03T12:27:01Z INFO     : Initializing schedule manager ...
-2019-04-03T12:27:01Z INFO     : KUBE Init Kubernetes client
-2019-04-03T12:27:01Z INFO     : KUBE-INIT Kubernetes client is configured successfully
-2019-04-03T12:27:01Z INFO     : MAIN: run main loop
-2019-04-03T12:27:01Z INFO     : MAIN: add onStartup tasks
-2019-04-03T12:27:01Z INFO     : Running schedule manager ...
-2019-04-03T12:27:01Z INFO     : MSTOR Create new metric shell_operator_live_ticks
-2019-04-03T12:27:01Z INFO     : MSTOR Create new metric shell_operator_tasks_queue_length
-2019-04-03T12:27:01Z INFO     : QUEUE add all HookRun@OnStartup
-2019-04-03T12:27:04Z INFO     : TASK_RUN HookRun@ON_STARTUP 002-hook-schedule-example/hook.sh
-2019-04-03T12:27:04Z INFO     : Running hook '002-hook-schedule-example/hook.sh' binding 'ON_STARTUP' ...
-002-hook-schedule-example onStartup run
-Binding context:
-[{"binding":"onStartup"}]
-002-hook-schedule-example Stop
-2019-04-03T12:27:10Z INFO     : Running schedule manager entry '*/10 * * * * *' ...
-2019-04-03T12:27:10Z INFO     : TASK_RUN HookRun@SCHEDULE 002-hook-schedule-example/hook.sh
-2019-04-03T12:27:10Z INFO     : Running hook '002-hook-schedule-example/hook.sh' binding 'SCHEDULE' ...
-002-hook-schedule-example onStartup run
-Binding context:
-[{"binding":"every 10sec"}]
-002-hook-schedule-example Stop
-2019-04-03T12:27:20Z INFO     : Running schedule manager entry '*/10 * * * * *' ...
-2019-04-03T12:27:22Z INFO     : TASK_RUN HookRun@SCHEDULE 002-hook-schedule-example/hook.sh
-2019-04-03T12:27:22Z INFO     : Running hook '002-hook-schedule-example/hook.sh' binding 'SCHEDULE' ...
-002-hook-schedule-example onStartup run
-Binding context:
-[{"binding":"every 10sec"}]
-002-hook-schedule-example Stop
+INFO     : QUEUE add all HookRun@OnStartup
+INFO     : TASK_RUN HookRun@ON_STARTUP hook.sh
+INFO     : Running hook 'hook.sh' binding 'ON_STARTUP' ...
+SIMPLE: Run simple onStartup hook
 ...
 ```
 
+## Hook binding types
+
+- onStartup
+
+- schedule
+
+- onKubernetesEvent
+
+## Prometheus target
+
+Shell-operator provides /metrics endpoint. More on this in [METRICS](METRICS.md) document.
+
 ## Examples
 
-You can find more examples [here](examples/).
+More examples can be found in [examples](examples/) directory.
 
 ## License
 
