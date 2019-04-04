@@ -21,8 +21,9 @@ Steps to setup Shell-operator in your cluster are:
 
 ### Build an image with your hooks
 
-A hook is a script with the added events configuration code. Learn [more](HOOKS.md) about hooks. Here is a simple hook with `onStartup` binding:
+A hook is a script with the added events configuration code. Learn [more](HOOKS.md) about hooks.
 
+Here is a simple hook with `onStartup` binding. Create the `hook.sh` file with the following content:
 ```bash
 #!/usr/bin/env bash
 
@@ -33,10 +34,10 @@ else
 fi
 ```
 
+You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with bash, kubectl and shell-operator binaries to build you own image. You just need to ADD your hook into `/hooks` folder in the Dockerfile.
 
-You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with bash, kubectl and shell-operator binaries to build you own image. You just need to ADD your hook into /hooks:
+Create the following Dockerfile in the folder you created the `hook.sh` file:
 ```dockerfile
-# Dockerfile
 FROM flant/shell-operator:latest
 ADD hook.sh /hooks
 ```
@@ -49,7 +50,7 @@ docker push my.registry.url/shell-operator:simple-hook
 
 ### Install shell-operator in a cluster
 
-This simple image can be deployed as a Pod. Put this manifest into shell-operator-pod.yaml:
+This simple image can be deployed as a Pod. Put this manifest into the `shell-operator-pod.yaml` file:
 
 ```yaml
 apiVersion: v1
@@ -62,12 +63,12 @@ spec:
     image: my.registry.url/shell-operator:simple-hook
 ```
 
-Start shell-operator by applying `shell-operator.yml`:
+Start shell-operator by creating a Deployment based on the `shell-operator.yml` file:
 ```
 kubectl apply -f shell-operator.yml
 ```
 
-Run `kubectl logs po/shell-operator` and see that hook.sh was ran at startup:
+Run `kubectl logs po/shell-operator` and see that the `hook.sh` file was ran at startup:
 ```
 INFO     : QUEUE add all HookRun@OnStartup
 INFO     : TASK_RUN HookRun@ON_STARTUP hook.sh
@@ -78,7 +79,7 @@ SIMPLE: Run simple onStartup hook
 
 ## Hook binding types
 
-[__onStartup__](HOOKS.md)
+[__onStartup__](HOOKS.md#onstartup)
 
 This binding has only one parameter: order of execution. Hooks are loaded at start and then hooks with onStartup binding are executed in order defined by parameter.
 
@@ -110,7 +111,7 @@ Example `hook --config` with 2 schedules:
 
 [__onKubernetesEvent__](HOOKS.md#onKubernetesEvent)
 
-This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a jq filter for their properties.
+This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) filter for their properties.
 
 Example of `hook --config`:
 
@@ -127,7 +128,7 @@ Example of `hook --config`:
 
 ## Prometheus target
 
-Shell-operator provides /metrics endpoint. More on this in [METRICS](METRICS.md) document.
+Shell-operator provides `/metrics` endpoint. More on this in [METRICS](METRICS.md) document.
 
 ## Examples
 

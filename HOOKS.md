@@ -11,15 +11,15 @@ Hooks are executable files lying under `$SHELL_OPERATOR_WORKING_DIR` path and ea
 ## How hooks are run
 
 Shell-operator searches and runs hooks going through the following steps:
-- On start it recursively searches hooks in a working directory. A working directory is `"/hooks"` by default and can be specified with a SHELL_OPERATOR_WORKING_DIR environment variable or with a `--working-dir` argument:
+- On start it recursively searches hooks in a working directory. A working directory is `/hooks` by default and can be specified with a `SHELL_OPERATOR_WORKING_DIR` environment variable or with a `--working-dir` argument:
     - directories and files starting with the dot symbol are excluded
     - directories and files are sorted alphabetically
     - every **executable** file counts as a hook.
 - Every found hook is executed to get a binding configuration:
     - hooks are executed in alphabetical order
-    - each hook is executed in the hook directory in which it is located with the `--config` argument and the WORKING_DIR environment variable set
-    - hook should print a JSON definition of its [bindings](#bindings) to stdout
-- Shell-operator start its main loop:
+    - each hook is executed in the hook directory in which it is located with the `--config` argument and the `WORKING_DIR` environment variable set
+    - hook should print a JSON definition of its [bindings](#bindings) to stdout.
+- Shell-operator starts its main loop:
     - schedule and Kubernetes events triggers hook execution
     - hooks are added to the working queue to execute them sequentially
     - if there is more than one hook bound to an event, hooks are added in alphabetical order
@@ -29,22 +29,24 @@ Shell-operator searches and runs hooks going through the following steps:
 
 ### What happens if hook fails?
 
-Hook fail is a common UNIX execution error when script exits with code not equal to 0. In this case Shell-operator has this scenario:
+Hook fail is a common UNIX execution error when the script exits with code not equal to 0. In this case Shell-operator has this scenario:
 - writes the corresponding message to stdout (use e.g. `kubectl logs` to see it)
 - increases the `shell_operator_hook_errors` counter
-- re-add hook into working queue
+- re-adds hook into a working queue
 - waits for 3 seconds
-- execute the hook again
+- executes the hook again.
 
 If you want to skip failed hooks, use the `allowFailure: yes` option of `schedule` and `onKubernetesEvent` binding types. This is a simple scenario:
 
 - writes the corresponding message to stdout (use e.g. `kubectl logs` to see it)
-- increases the `shell_operator_hook_allowed_errors` counter
+- increases the `shell_operator_hook_allowed_errors` counter.
 
 
 ## Hook configuration
 
-Hook must print to stdout its binding configuration when the hook is executed with the `--config` argument. Binding configuration is the following JSON structure:
+Hook must print to stdout its binding configuration when the hook is executed with the `--config` argument.
+
+Binding configuration is the following JSON structure:
 
 ```
 {
@@ -59,15 +61,15 @@ Hook must print to stdout its binding configuration when the hook is executed wi
 ```
 
 Where:
-- BINDING_TYPE is one of `onStartup`, `schedule`, `onKubernetesEvent`.
-- BINDING_PARAMETERS is a simple parameter for binding or a JSON array with binding parameters
+- `BINDING_TYPE` is one of `onStartup`, `schedule`, `onKubernetesEvent`.
+- `BINDING_PARAMETERS` is a simple parameter for binding or a JSON array with binding parameters
 
 ### Bindings
 
 Shell-operator provides three types of bindings:
 - **onStartup** to run hooks on start
 - **schedule** to run hooks periodically
-- **onKubernetesEvent** to run hooks on changes of Kubernetes objects or their properties
+- **onKubernetesEvent** to run hooks on changes of Kubernetes objects or their properties.
 
 #### onStartup
 
@@ -110,7 +112,7 @@ The `CRON_EXPRESSION` is a string with advanced crontab syntax: 6 values separat
 - a range: two numbers separated by a hyphen
 - expression with a [special characters](https://godoc.org/github.com/robfig/cron#hdr-Special_Characters): `*`, `/`
 - [predefined values](https://godoc.org/github.com/robfig/cron#hdr-Predefined_schedules)
-- [intervals](https://godoc.org/github.com/robfig/cron#hdr-Intervals)
+- [intervals](https://godoc.org/github.com/robfig/cron#hdr-Intervals).
 
 
 Fields meaning:
@@ -132,7 +134,7 @@ Examples:
 
 * 30 12 * * *    Everyday at 12:30
 
-* * * * * 1      Every Monday 
+* * * * * 1      Every Monday
 ```
 
 The `allowFailure` is an optional field, it is false by default. When set to true, Shell-operator will not try to re-execute hook if it fails and will skip it. See [what happens if hook fails](#what-happens-if-hook-fails).
@@ -283,12 +285,12 @@ At 23:59 this hook will be executed with the following binding context:
 ## Debug
 
 For debugging purposes you can use the following:
-- get logs of a Shell-operator pod by using `kubectl logs <POD_NAME>`
+- get logs of a Shell-operator pod by using `kubectl logs POD_NAME`
 - get a hook queue content in the `/tmp/shell-operator-queue` file of a Shell-operator pod
-- get a hook queue content by requesting a `/queue` endpoint:
-```
-kubectl port-forward po/shell-operator 9115:9115
-curl localhost:9115/queue
-```
 - set RLOG_LOG_LEVEL=DEBUG environment to get DEBUG messages in log
 - use `--debug=yes` argument to get even more messages
+- get a hook queue content by requesting a `/queue` endpoint:
+   ```
+   kubectl port-forward po/shell-operator 9115:9115
+   curl localhost:9115/queue
+   ```
