@@ -2,7 +2,7 @@
 
 Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster.
 
-This operator is not an operator for a particular software as prometheus-operator or kafka-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an operator-sdk but for scripts.
+This operator is not an operator for a _particular software product_ as prometheus-operator or kafka-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an operator-sdk but for scripts.
 
 Shell-operator provides:
 - __Ease the management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, ruby, kubectl, etc.
@@ -78,11 +78,52 @@ SIMPLE: Run simple onStartup hook
 
 ## Hook binding types
 
-- onStartup
+[__onStartup__](HOOKS.md)
 
-- schedule
+This binding has only one parameter: order of execution. Hooks are loaded at start and then hooks with onStartup binding are executed in order defined by parameter.
 
-- onKubernetesEvent
+Example `hook --config`:
+
+```
+{"onStartup":10}
+```
+
+[__schedule__](HOOKS.md#schedule)
+
+This binding is for periodical running of hooks. Schedule can be defined with granularity of seconds.
+
+Example `hook --config` with 2 schedules:
+
+```
+{
+  "schedule": [
+   {"name":"every 10 min",
+    "schedule":"*/10 * * * * *",
+    "allowFailure":true
+   },
+   {"name":"Every Monday at 8:05",
+    "schedule":"* 5 8 * * 1"
+    }
+  ]
+}
+```
+
+[__onKubernetesEvent__](HOOKS.md#onKubernetesEvent)
+
+This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a jq filter for their properties.
+
+Example of `hook --config`:
+
+```
+{
+  "onKubernetesEvent": [
+  {"name":"Execute on changes of namespace labels",
+   "kind": "namespace",
+   "event":["update"],
+   "jqFilter":".metadata.labels"
+  }]
+}
+```
 
 ## Prometheus target
 
