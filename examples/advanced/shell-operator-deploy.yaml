@@ -1,0 +1,25 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: shell-operator-2
+  labels:
+    shell-operator-example: advanced
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shell-operator
+  template:
+    metadata:
+      labels:
+        app: shell-operator
+    spec:
+      containers:
+      - name: shell-operator
+        image: localhost:5000/shell-operator:advanced
+        imagePullPolicy: Always
+        env:
+        - name: RLOG_LOG_LEVEL
+          value: DEBUG
+      serviceAccountName: advanced-acc

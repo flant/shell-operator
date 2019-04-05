@@ -1,5 +1,7 @@
 ## onStartup shell example
 
+Example of a hook written as bash script.
+
 ### run
 
 Build shell-operator image with custom scripts:
@@ -16,7 +18,7 @@ kubectl create ns example-startup-shell
 kubectl -n example-startup-shell apply -f shell-operator-pod.yaml
 ```
 
-See in logs that shell-hook.sh was ran:
+See in logs that shell-hook.sh was run:
 
 ```
 kubectl -n example-startup-shell logs -f po/shell-operator
