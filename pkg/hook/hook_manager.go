@@ -124,10 +124,14 @@ func (hm *MainHookManager) loadAllHooks() error {
 	return nil
 }
 
+// TODO move --config execution to a Hook method
 func (hm *MainHookManager) loadHook(hookPath string) (err error) {
 	rlog.Infof("Load hook config from '%s'", hookPath)
 
-	configOutput, err := execCommandOutput(WorkingDir, hookPath, []string{}, []string{"--config"})
+	envs := []string{}
+	envs = append(envs, fmt.Sprintf("WORKING_DIR=%s", WorkingDir))
+
+	configOutput, err := execCommandOutput(WorkingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
 		return fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
 	}
