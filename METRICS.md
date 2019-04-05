@@ -10,10 +10,9 @@ These metrics are counters of hook execution errors. There is a label `hook` wit
 
 __shell_operator_tasks_queue_length__
 
-A gauge with a length of a working queue. Can be used for alerting about long running hooks. 
+A gauge with a length of a working queue. Can be used for alerting about long running hooks.
 
 
 __shell_operator_live_ticks__
 
 A counter that increments every 10 seconds. Can be used for alerting about shell-operator malfunctioning.
->>>>>>> 0e81ffa... doc: METRICS.md

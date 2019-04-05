@@ -50,7 +50,7 @@ docker push my.registry.url/shell-operator:simple-hook
 
 ### Install shell-operator in a cluster
 
-This simple image can be deployed as a Pod. Put this manifest into the `shell-operator-pod.yaml` file:
+This simple image can be deployed as a Pod. Put this manifest into the `shell-operator.yaml` file:
 
 ```yaml
 apiVersion: v1
