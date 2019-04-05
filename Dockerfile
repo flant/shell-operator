@@ -7,7 +7,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o shell-operator ./cmd/s
 
 FROM alpine:3.9
 RUN apk --no-cache add ca-certificates jq bash && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.10.12/bin/linux/amd64/kubectl -O /bin/kubectl && \
+    wget https://storage.googleapis.com/kubernetes-release/release/v1.13.5/bin/linux/amd64/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 COPY --from=0 /go/src/github.com/flant/shell-operator/shell-operator /
