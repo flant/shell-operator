@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shell-operator
+spec:
+  containers:
+  - name: shell-operator
+    image: localhost:5000/shell-operator:1
+    #image: registry.mycompany.com/shell-operator:common-library
+    imagePullPolicy: Always

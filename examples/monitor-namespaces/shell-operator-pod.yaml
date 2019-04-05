@@ -11,4 +11,4 @@ spec:
     env:
     - name: RLOG_LOG_LEVEL
       value: DEBUG
-  serviceAccount: monitor-namespaces-acc
+  serviceAccountName: monitor-namespaces-acc

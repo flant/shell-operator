@@ -1,5 +1,7 @@
 ## monitor-namespaces-hook example
 
+Example of jqFilter usage to triggered a hook on changing namespace labels.
+
 
 ### Run 
 
@@ -24,7 +26,7 @@ Create ns to trigget onKuberneteEvent:
 $ kubectl create ns foobar
 ```
 
-See in logs that hook was ran:
+See in logs that hook was run:
 
 ```
 $ kubectl -n example-monitor-namespaces logs po/shell-operator
