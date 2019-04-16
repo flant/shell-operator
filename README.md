@@ -1,12 +1,15 @@
 # Shell-operator
+[![docker pull flant/shell-operator](https://img.shields.io/badge/docker-shell--operator-informational.svg?logo=docker)](https://hub.docker.com/r/flant/shell-operator)
+[![Slack chat EN](https://img.shields.io/badge/%23shell--operator-EN-informational.svg?logo=slack)](https://cloud-native.slack.com/messages/CJ13K3HFG)
+[![Telegram chat RU](https://img.shields.io/badge/@shelloperator-RU-informational.svg?logo=telegram)](https://t.me/shelloperator)
 
 Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster.
 
 This operator is not an operator for a _particular software product_ as prometheus-operator or kafka-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an operator-sdk but for scripts.
 
 Shell-operator provides:
-- __Ease the management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, ruby, kubectl, etc.
-- __Kubernetes object events__: hook can be triggered by add, update or delete events.
+- __Ease the management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, kubectl, etc.
+- __Kubernetes object events__: hook can be triggered by add, update or delete events. **Learn [more](HOOKS.md) about hooks.**
 - __Object selector and properties filter__: Shell-operator can monitor only particular objects and detect changes in their properties.
 - __Simple configuration__: hook binding definition is a JSON structure on stdout.
 
@@ -21,7 +24,7 @@ Steps to setup Shell-operator in your cluster are:
 
 ### Build an image with your hooks
 
-A hook is a script with the added events configuration code. Learn [more](HOOKS.md) about hooks.
+A hook is a script that, when executed with --config option, returns configuration in JSON. Learn [more](HOOKS.md) about hooks.
 
 Let's create a small operator that will watch for all Pods in all Namespaces and simply log a name of a new Pod.
 
