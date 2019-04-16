@@ -8,7 +8,4 @@ spec:
   - name: shell-operator
     image: registry.mycompany.com/shell-operator:monitor-namespaces
     imagePullPolicy: Always
-    env:
-    - name: RLOG_LOG_LEVEL
-      value: DEBUG
   serviceAccountName: monitor-namespaces-acc

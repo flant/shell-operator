@@ -1,7 +1,7 @@
 # Shell-operator
 
-[![Telegram chat RU](https://img.shields.io/badge/@statusmap_ru-RU-informational.svg?logo=telegram)](https://t.me/shelloperator)
-[![Slack chat EN](https://img.shields.io/badge/%23grafana--statusmap-EN-informational.svg?logo=slack)](https://cloud-native.slack.com/messages/CJ13K3HFG)
+[![Slack chat EN](https://img.shields.io/badge/%23shell--operator-EN-informational.svg?logo=slack)](https://cloud-native.slack.com/messages/CJ13K3HFG)
+[![Telegram chat RU](https://img.shields.io/badge/@shelloperator-RU-informational.svg?logo=telegram)](https://t.me/shelloperator)
 
 Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster.
 
@@ -26,34 +26,54 @@ Steps to setup Shell-operator in your cluster are:
 
 A hook is a script that, when executed with --config option, returns configuration in JSON. Learn [more](HOOKS.md) about hooks.
 
-Here is a simple hook with `onStartup` binding. Create the `hook.sh` file with the following content:
+Let's create a small operator that will watch for all Pods in all Namespaces and simply log a name of a new Pod.
+
+"onKubernetesEvent" binding is used to tell shell-operator about what objects we want to watch. Create the `hook.sh` file with the following content:
 ```bash
 #!/usr/bin/env bash
 
 if [[ $1 == "--config" ]] ; then
-  echo '{"onStartup": 10}'
+  cat <<EOF
+  {"onKubernetesEvent": [
+    {"kind":"Pod",
+     "event":["add"]
+  }
+  ]}
+EOF
 else
-  echo "SIMPLE: Run simple onStartup hook"
+  podName=$(jq -r .[0].resourceName $BINDING_CONTEXT_PATH)
+  echo "Pod '${podName}' added"
 fi
 ```
 
-You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with bash, kubectl and shell-operator binaries to build you own image. You just need to ADD your hook into `/hooks` folder in the Dockerfile.
+You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with bash, kubectl, jq and shell-operator binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the Dockerfile.
 
-Create the following Dockerfile in the folder you created the `hook.sh` file:
+Create the following Dockerfile in the directory where you created the `hook.sh` file:
 ```dockerfile
 FROM flant/shell-operator:latest
 ADD hook.sh /hooks
 ```
 
-Build image and push it to the Docker registry accessible by Kubernetes cluster.
+Build image and push it to the Docker registry accessible by Kubernetes cluster:
 ```
-docker build -t "my.registry.url/shell-operator:simple-hook" .
-docker push my.registry.url/shell-operator:simple-hook
+$ docker build -t "my.registry.url/shell-operator:simple-hook" .
+$ docker push my.registry.url/shell-operator:simple-hook
 ```
 
 ### Install shell-operator in a cluster
 
-This simple image can be deployed as a Pod. Put this manifest into the `shell-operator.yaml` file:
+We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator. For testing purposes we can allow all read actions with clusterrole/view:
+
+```
+$ kubectl create namespace shell-operator
+$ kubectl create serviceaccount shell-operator \
+  --namespace shell-operator
+$ kubectl create clusterrolebinding shell-operator-view \
+  --clusterrole=view \
+  --serviceaccount=shell-operator:shell-operator
+```
+
+Shell-operator can be deployed as a Pod. Put this manifest into the `shell-operator.yaml` file:
 
 ```yaml
 apiVersion: v1
@@ -64,21 +84,30 @@ spec:
   containers:
   - name: shell-operator
     image: my.registry.url/shell-operator:simple-hook
+  serviceAccountName: shell-operator-acc
 ```
 
-Start shell-operator by creating a Deployment based on the `shell-operator.yml` file:
+Start shell-operator by applying a `shell-operator.yml` file:
 ```
 kubectl apply -f shell-operator.yml
 ```
 
-Run `kubectl logs po/shell-operator` and see that the `hook.sh` file was ran at startup:
+Run `kubectl logs -f po/shell-operator` and see that the hook will print new pod names:
 ```
-INFO     : QUEUE add all HookRun@OnStartup
-INFO     : TASK_RUN HookRun@ON_STARTUP hook.sh
-INFO     : Running hook 'hook.sh' binding 'ON_STARTUP' ...
-SIMPLE: Run simple onStartup hook
+... deploy/kubernetes-dashboard replicas increased by 2 ...
+...
+INFO     : QUEUE add TASK_HOOK_RUN@KUBE_EVENTS pods-hook.sh
+INFO     : QUEUE add TASK_HOOK_RUN@KUBE_EVENTS pods-hook.sh
+INFO     : TASK_RUN HookRun@KUBE_EVENTS pods-hook.sh
+INFO     : Running hook 'pods-hook.sh' binding 'KUBE_EVENTS' ...
+Pod 'kubernetes-dashboard-769df5545f-4wnb4' added
+INFO     : TASK_RUN HookRun@KUBE_EVENTS pods-hook.sh
+INFO     : Running hook 'pods-hook.sh' binding 'KUBE_EVENTS' ...
+Pod 'kubernetes-dashboard-769df5545f-99xsb' added
 ...
 ```
+
+This example is also available in /examples: [monitor-pods](examples/101-monitor-pods).
 
 ## Hook binding types
 
