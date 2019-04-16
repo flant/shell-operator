@@ -1,5 +1,5 @@
 # Shell-operator
-
+[![docker pull flant/shell-operator](https://img.shields.io/badge/docker-shell--operator-informational.svg?logo=docker)](https://hub.docker.com/r/flant/shell-operator)
 [![Slack chat EN](https://img.shields.io/badge/%23shell--operator-EN-informational.svg?logo=slack)](https://cloud-native.slack.com/messages/CJ13K3HFG)
 [![Telegram chat RU](https://img.shields.io/badge/@shelloperator-RU-informational.svg?logo=telegram)](https://t.me/shelloperator)
 
