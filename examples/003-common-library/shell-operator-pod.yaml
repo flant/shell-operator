@@ -6,6 +6,5 @@ metadata:
 spec:
   containers:
   - name: shell-operator
-    image: localhost:5000/shell-operator:1
-    #image: registry.mycompany.com/shell-operator:common-library
+    image: registry.mycompany.com/shell-operator:common-library
     imagePullPolicy: Always
