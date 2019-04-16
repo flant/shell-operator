@@ -1,12 +1,15 @@
 # Shell-operator
 
+[![Telegram chat RU](https://img.shields.io/badge/@statusmap_ru-RU-informational.svg?logo=telegram)](https://t.me/shelloperator)
+[![Slack chat EN](https://img.shields.io/badge/%23grafana--statusmap-EN-informational.svg?logo=slack)](https://cloud-native.slack.com/messages/CJ13K3HFG)
+
 Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster.
 
 This operator is not an operator for a _particular software product_ as prometheus-operator or kafka-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an operator-sdk but for scripts.
 
 Shell-operator provides:
-- __Ease the management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, ruby, kubectl, etc.
-- __Kubernetes object events__: hook can be triggered by add, update or delete events.
+- __Ease the management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, kubectl, etc.
+- __Kubernetes object events__: hook can be triggered by add, update or delete events. **Learn [more](HOOKS.md) about hooks.**
 - __Object selector and properties filter__: Shell-operator can monitor only particular objects and detect changes in their properties.
 - __Simple configuration__: hook binding definition is a JSON structure on stdout.
 
@@ -21,7 +24,7 @@ Steps to setup Shell-operator in your cluster are:
 
 ### Build an image with your hooks
 
-A hook is a script with the added events configuration code. Learn [more](HOOKS.md) about hooks.
+A hook is a script that, when executed with --config option, returns configuration in JSON. Learn [more](HOOKS.md) about hooks.
 
 Here is a simple hook with `onStartup` binding. Create the `hook.sh` file with the following content:
 ```bash
