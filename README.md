@@ -1,6 +1,6 @@
 # Shell-operator [![docker pull flant/shell-operator](https://img.shields.io/docker/pulls/flant/shell-operator.svg?logo=docker)](https://hub.docker.com/r/flant/shell-operator) [![Slack chat EN](https://img.shields.io/badge/slack-EN%20chat-611f69.svg?logo=slack)](https://cloud-native.slack.com/messages/CJ13K3HFG) [![Telegram chat RU](https://img.shields.io/badge/telegram-RU%20chat-179cde.svg?logo=telegram)](https://t.me/shelloperator)
 
-<img width="70" height="70" src="logo-shell.png" alt="Shell-operator logo" style="float: left; margin-right: 20px" >
+<img width="70" height="70" src="logo-shell.png" alt="Shell-operator logo" />
 
 Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster.
 
@@ -168,5 +168,3 @@ More examples can be found in [examples](examples/) directory.
 ## License
 
 Apache License 2.0, see [LICENSE](LICENSE).
-
-<p align="center"><img src="logo-shell.png" /></p>
