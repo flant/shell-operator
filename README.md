@@ -149,11 +149,11 @@ Example `hook --config` with 2 schedules:
 {
   "schedule": [
    {"name":"every 10 min",
-    "schedule":"*/10 * * * * *",
+    "schedule":"0 */10 * * * *",
     "allowFailure":true
    },
    {"name":"Every Monday at 8:05",
-    "schedule":"* 5 8 * * 1"
+    "schedule":"0 5 8 * * 1"
     }
   ]
 }
@@ -161,7 +161,7 @@ Example `hook --config` with 2 schedules:
 
 __onKubernetesEvent__
 
-This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) filter for their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#onKubernetesEvent).
+This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) expression to filter their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#onKubernetesEvent).
 
 Example of `hook --config`:
 

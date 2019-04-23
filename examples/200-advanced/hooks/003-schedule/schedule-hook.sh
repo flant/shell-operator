@@ -3,8 +3,8 @@
 if [[ $1 == "--config" ]] ; then
   cat <<EOF
 {"schedule": [
-{ "name":"every 10 min",
-  "crontab":"* */10 * * * *"
+{ "name":"every 15 min",
+  "crontab":"0 */15 * * * *"
 }
 ]}
 EOF
