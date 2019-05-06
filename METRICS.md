@@ -1,25 +1,19 @@
 # Shell-operator metrics
 
-Shell-operator implement prometheus target at /metrics endpoint. Default port is 9115.
-
+Shell-operator exports Prometheus metrics to the /metrics path. The default port is 9115.
 
 __shell_operator_hook_errors{hook="hook-name"}__
 
-A counter of hook execution errors. It counts errors for hooks with disabled `allowFailure` (no key in configuration or with explicit `allowFailure: false`).
-This metric has label `hook` with a name of erroneous hook.
-
+This is the counter of hooks’ execution errors. It only tracks errors of hooks with the disabled allowFailure (i.e. respective key is omitted in the configuration or the allowFailure: false parameter is set). This metric has a “hook” label with the name of a failed hook.
 
 __shell_operator_hook_allowed_errors{hook="hook-name"}__
 
-A counter of hook execution errors. It counts errors for hooks that allowed to fail (`allowFailure: true`               ).
-This metric has label `hook` with a name of erroneous hook.
-
+This is the counter of hooks’ execution errors. It only tracks errors of hooks that are allowed to exit with an error (the parameter allowFailure: true is set in the configuration). The metric has a “hook” label with the name of a failed hook.
 
 __shell_operator_tasks_queue_length__
 
-A gauge with a length of a working queue. Can be used for alerting about long running hooks. This metric has no labels.
-
+As a gauge of a working queue length, this metric can be used to warn about stuck hooks. It has no labels.
 
 __shell_operator_live_ticks__
 
-A counter that increments every 10 seconds. Can be used for alerting about shell-operator malfunctioning. This metric has no labels.
+As a counter that increases every 10 seconds, this metric can be used for alerting about a hung Shell-operator. It has no labels.
