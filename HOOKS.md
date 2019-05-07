@@ -152,9 +152,9 @@ Parameters:
 
 - `namespaceSelector` — specifies the filter for selecting namespaces. If you omit it, the events from all namespaces will be monitored.
 
-- `jqFilter` —  [jq](https://stedolan.github.io/jq/manual/) — an optional parameter that specifies additional event filtering. The hook will be triggered only when the properties of an object change after the filter is applied (see example [102-monitor-namespaces](examples/102-monitor-namespaces)).
+- `jqFilter` —  an optional parameter that specifies additional event filtering with [jq syntax](https://stedolan.github.io/jq/manual/). The hook will be triggered only when the properties of an object are changed after the filter is applied. See example [102-monitor-namespaces](examples/102-monitor-namespaces).
 
-- `allowFailure` —  if true, then skip the hook execution errors. Otherwise, the hook is re-executed cyclically after 5 seconds’ delay.
+- `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
 Example:
 ```
