@@ -8,13 +8,12 @@ The hook receives the data and returns the result via files. Paths to files are 
 
 At startup Shell-operator initializes the hooks:
 
-The recursive search for hook files is performed in the working directory. You can specify it with `--working-dir` command-line argument or with the `SHELL_OPERATOR_WORKING_DIR` environment variable (the default path is `/hooks`).
+- The recursive search for hook files is performed in the working directory. You can specify it with `--working-dir` command-line argument or with the `SHELL_OPERATOR_WORKING_DIR` environment variable (the default path is `/hooks`).
+  - The executable files found in the path are considered hooks.
 
-The executable files found in the path are considered hooks.
+- The found hooks are sorted alphabetically according to the directories’ and hooks’ names. Then they are executed with the `--config` flag to get bindings to events in JSON format.
 
-The found hooks are sorted alphabetically according to the directories’ and hooks’ names. Then they are executed with the `--config` flag to get bindings to events in JSON format.
-
-Shell-operator subscribes to events using received bindings.
+- Shell-operator subscribes to events using received bindings.
 
 ## Hook configuration
 
