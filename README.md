@@ -79,11 +79,12 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: shell-operator
+  namespace: shell-operator
 spec:
   containers:
   - name: shell-operator
     image: my.registry.url/shell-operator:simple-hook
-  serviceAccountName: shell-operator-acc
+  serviceAccountName: shell-operator
 ```
 
 Start shell-operator by applying a `shell-operator.yml` file:
