@@ -45,34 +45,44 @@ else
 fi
 ```
 
+Make the `hook.sh` executable:
+```
+chmod +x hook.sh
+```
+
 You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with bash, kubectl, jq and shell-operator binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the Dockerfile.
 
-Create the following Dockerfile in the directory where you created the `hook.sh` file:
+Create the following `Dockerfile` in the directory where you created the `hook.sh` file:
 ```dockerfile
 FROM flant/shell-operator:latest
 ADD hook.sh /hooks
 ```
 
-Build image and push it to the Docker registry accessible by Kubernetes cluster:
+Build image:
+```shell
+docker build -t "my.registry.url/shell-operator:simple-hook" .
 ```
-$ docker build -t "my.registry.url/shell-operator:simple-hook" .
-$ docker push my.registry.url/shell-operator:simple-hook
+
+Push image to the Docker registry accessible by Kubernetes cluster:
+```shell
+docker push my.registry.url/shell-operator:simple-hook
 ```
 
 ### Install shell-operator in a cluster
 
-We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator. For testing purposes we can allow all read actions with clusterrole/view:
+We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator:
 
-```
-$ kubectl create namespace shell-operator
-$ kubectl create serviceaccount shell-operator \
-  --namespace shell-operator
-$ kubectl create clusterrolebinding shell-operator-view \
-  --clusterrole=view \
+```shell
+kubectl create namespace shell-operator &&
+kubectl create serviceaccount shell-operator \
+  --namespace shell-operator &&
+kubectl create clusterrole watch-pods --verb=get,watch,list --resource=pods &&
+kubectl create clusterrolebinding shell-operator-view \
+  --clusterrole=watch-pods \
   --serviceaccount=shell-operator:shell-operator
 ```
 
-Shell-operator can be deployed as a Pod. Put this manifest into the `shell-operator.yaml` file:
+Shell-operator can be deployed as a Pod. Put this manifest into the `shell-operator.yml` file:
 
 ```yaml
 apiVersion: v1
@@ -88,8 +98,14 @@ spec:
 ```
 
 Start shell-operator by applying a `shell-operator.yml` file:
-```
+```shell
 kubectl apply -f shell-operator.yml
+```
+
+For instance, deploy [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) to trigger `onKuberneteEvent`:
+
+```shell
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml
 ```
 
 Run `kubectl logs -f po/shell-operator` and see that the hook will print new pod names:
