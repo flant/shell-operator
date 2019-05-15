@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+if [[ $1 == "--config" ]] ; then
+  cat <<EOF
+{
+   "onKubernetesEvent": [
+      {
+         "kind": "namespace",
+         "event": [
+            "add"
+         ]
+      }
+   ]
+}
+EOF
+else
+  for namespace in $(hook::context_jq -r '.[] | select(.resourceName == "default" | not ) | .resourceName');
+  do
+    for secret in $(kubectl -n default get secret -l secret-copier=yes -o name);
+    do
+      kubectl -n default get $secret -o json | \
+        jq -r ".metadata.namespace=\"${namespace}\" |
+                .metadata |= with_entries(select([.key] | inside([\"name\", \"namespace\", \"labels\"])))" \
+        | kubectl::replace_or_create
+    done
+  done
+fi
