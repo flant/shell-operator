@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-if [[ $1 == "--config" ]] ; then
+source $WORKING_DIR/common/functions.sh
+
+hook::config() {
   cat <<EOF
 {
    "onKubernetesEvent": [
@@ -13,8 +15,10 @@ if [[ $1 == "--config" ]] ; then
    ]
 }
 EOF
-else
-  for namespace in $(hook::context_jq -r '.[] | select(.resourceName == "default" | not ) | .resourceName');
+}
+
+hook::trigger() {
+  for namespace in $(jq -r '.[] | select(.resourceName == "default" | not ) | .resourceName' $BINDING_CONTEXT_PATH);
   do
     for secret in $(kubectl -n default get secret -l secret-copier=yes -o name);
     do
@@ -24,4 +28,6 @@ else
         | kubectl::replace_or_create
     done
   done
-fi
+}
+
+common::run_hook "$@"
