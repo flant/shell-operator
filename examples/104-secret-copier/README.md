@@ -2,12 +2,12 @@
 
 This example shows how to organize copying secrets to new namespaces after creation.
 
-The source secrets having label 'secret-copier: yes' are copying from the 'default' namespace to the others namespaces in the Kubernetes cluster. This will occur in the following cases:
-* after a secret with the lable 'secret-copier: yes' is created or changed in the 'default' namespace
+The source secrets labeled `secret-copier: yes` are copied from the `default` namespace to other namespaces in the Kubernetes cluster in the following cases:
+* after a secret with the label `secret-copier: yes` is created or changed in the namespace `default`
 * after a new namespace is created
-* every night at 3 am (you can change it in the `hook/schedule_sync_secret` hook file)
+* every night at 3 o'clock (you can change this in the `hook/schedule_sync_secret` file)
 
-When the secret having label 'secret-copier: yes' is deleted from the 'default' namespace, this secret is also deleted from other namespaces.
+When the secret with labeled `secret-copier: yes` is deleted from the `default` namespace, this secret is also deleted from other namespaces.
 
 ### Using
 
@@ -25,23 +25,23 @@ kubectl -n secret-copier apply -f shell-operator-rbac.yaml &&
 kubectl -n secret-copier apply -f shell-operator-pod.yaml
 ```
 
-Create a secret in the 'default' namespaces, e.g. `myregistrysecret` secret with an access to your private Docker registry (replace necessary values):
+Create a secret in the `default` namespace, for example, the secret `myregistrysecret` with access to your private Docker registry (replace necessary values):
 ```shell
 kubectl create secret docker-registry myregistrysecret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER \
 --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
 ```
 
-Label the `myregistrysecret` with the 'secret-copier: yes' label:
+Label the `myregistrysecret` secret with the label `secret-copier: yes`:
 ```shell
 kubectl label secret myregistrysecret secret-copier=yes
 ```
 
-Check, that the `myregistrysecret` secret was copied to other namespaces:
+Check the secret `myregistrysecret` was copied to other namespaces:
 ```shell
 kubectl get secret  --all-namespaces | grep myregistrysecret
 ```
 
-There will be result depending on namespaces in the cluster, like this:
+The result will depend on the namespaces in the cluster, for example:
 ```
 default           myregistrysecret                                 kubernetes.io/dockerconfigjson        1      91s
 kube-node-lease   myregistrysecret                                 kubernetes.io/dockerconfigjson        1      35s
@@ -56,7 +56,7 @@ Create any namespace, for instance:
 kubectl create ns foobar
 ```
 
-See in logs that hook was run:
+Check in the logs that hook was run:
 
 ```
 kubectl -n secret-copier logs po/shell-operator
@@ -69,7 +69,7 @@ kubectl -n secret-copier logs po/shell-operator
 ...
 ```
 
-Get secret from the new namespace to check it was created by your hook:
+Get the secret from the new namespace to verify it was created by your hook:
 
 ```
 kubectl get secret myregistrysecret -n foobar
@@ -77,7 +77,7 @@ kubectl get secret myregistrysecret -n foobar
 
 ### cleanup
 
-Delete created kubernetes object:
+Delete the created Kubernetes objects:
 ```
 kubectl delete secret myregistrysecret &&
 sleep 10 &&
@@ -87,7 +87,7 @@ kubectl delete serviceaccounts secret-copier-acc &&
 kubectl delete clusterrole secret-copier
 ```
 
-Delete docker image:
+Delete the Docker image:
 ```
 docker rmi registry.mycompany.com/shell-operator:secret-copier
 ```
