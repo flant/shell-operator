@@ -50,7 +50,7 @@ Make the `pods-hook.sh` executable:
 chmod +x pods-hook.sh
 ```
 
-You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with bash, kubectl, jq and shell-operator binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the Dockerfile.
+You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the `Dockerfile`.
 
 Create the following `Dockerfile` in the directory where you created the `pods-hook.sh` file:
 ```dockerfile
@@ -58,7 +58,7 @@ FROM flant/shell-operator:latest
 ADD pods-hook.sh /hooks
 ```
 
-Build image:
+Build image (change image tag according your Docker registry):
 ```shell
 docker build -t "registry.mycompany.com/shell-operator:monitor-pods" .
 ```
@@ -75,7 +75,7 @@ We need to watch for Pods in all Namespaces. That means that we need specific RB
 ```shell
 kubectl create namespace example-monitor-pods &&
 kubectl create serviceaccount monitor-pods-acc \
-  --namespace monitor-pods &&
+  --namespace example-monitor-pods &&
 kubectl create clusterrole monitor-pods --verb=get,watch,list --resource=pods &&
 kubectl create clusterrolebinding monitor-pods \
   --clusterrole=monitor-pods \
@@ -108,19 +108,21 @@ For instance, deploy [kubernetes-dashboard](https://kubernetes.io/docs/tasks/acc
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml
 ```
 
-Run `kubectl logs -f po/shell-operator` and see that the hook will print new pod names:
+Run `kubectl -n example-monitor-pods logs po/shell-operator` and see that the hook will print dashboard pod names:
 ```
-... deploy/kubernetes-dashboard replicas increased by 2 ...
 ...
 INFO     : QUEUE add TASK_HOOK_RUN@KUBE_EVENTS pods-hook.sh
-INFO     : QUEUE add TASK_HOOK_RUN@KUBE_EVENTS pods-hook.sh
-INFO     : TASK_RUN HookRun@KUBE_EVENTS pods-hook.sh
-INFO     : Running hook 'pods-hook.sh' binding 'KUBE_EVENTS' ...
-Pod 'kubernetes-dashboard-769df5545f-4wnb4' added
 INFO     : TASK_RUN HookRun@KUBE_EVENTS pods-hook.sh
 INFO     : Running hook 'pods-hook.sh' binding 'KUBE_EVENTS' ...
 Pod 'kubernetes-dashboard-769df5545f-99xsb' added
 ...
+```
+
+To delete created objects execute:
+```
+kubectl delete ns example-monitor-pods &&
+kubectl delete clusterrole monitor-pods &&
+kubectl delete clusterrolebinding monitor-pods
 ```
 
 This example is also available in /examples: [monitor-pods](examples/101-monitor-pods).
