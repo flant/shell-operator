@@ -1,6 +1,6 @@
 ## Copying secrets to a created namespace
 
-This example shows how to organize copying secrets to new namespaces after creation.
+This example shows how to organize copying secrets to new namespaces after it's creation.
 
 The source secrets labeled `secret-copier: yes` are copied from the `default` namespace to other namespaces in the Kubernetes cluster in the following cases:
 * after a secret with the label `secret-copier: yes` is created or changed in the namespace `default`
