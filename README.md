@@ -23,11 +23,11 @@ Steps to setup Shell-operator in your cluster are:
 
 ### Build an image with your hooks
 
-A hook is a script that, when executed with --config option, returns configuration in JSON. Learn [more](HOOKS.md) about hooks.
+A hook is a script that, when executed with `--config` option, returns configuration in JSON. Learn [more](HOOKS.md) about hooks.
 
 Let's create a small operator that will watch for all Pods in all Namespaces and simply log a name of a new Pod.
 
-"onKubernetesEvent" binding is used to tell shell-operator about what objects we want to watch. Create the `hook.sh` file with the following content:
+"onKubernetesEvent" binding is used to tell shell-operator about what objects we want to watch. Create the `pods-hook.sh` file with the following content:
 ```bash
 #!/usr/bin/env bash
 
@@ -45,34 +45,44 @@ else
 fi
 ```
 
-You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with bash, kubectl, jq and shell-operator binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the Dockerfile.
+Make the `pods-hook.sh` executable:
+```
+chmod +x pods-hook.sh
+```
 
-Create the following Dockerfile in the directory where you created the `hook.sh` file:
+You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the `Dockerfile`.
+
+Create the following `Dockerfile` in the directory where you created the `pods-hook.sh` file:
 ```dockerfile
 FROM flant/shell-operator:latest
-ADD hook.sh /hooks
+ADD pods-hook.sh /hooks
 ```
 
-Build image and push it to the Docker registry accessible by Kubernetes cluster:
+Build image (change image tag according your Docker registry):
+```shell
+docker build -t "registry.mycompany.com/shell-operator:monitor-pods" .
 ```
-$ docker build -t "my.registry.url/shell-operator:simple-hook" .
-$ docker push my.registry.url/shell-operator:simple-hook
+
+Push image to the Docker registry accessible by Kubernetes cluster:
+```shell
+docker push registry.mycompany.com/shell-operator:monitor-pods
 ```
 
 ### Install shell-operator in a cluster
 
-We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator. For testing purposes we can allow all read actions with clusterrole/view:
+We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator:
 
-```
-$ kubectl create namespace shell-operator
-$ kubectl create serviceaccount shell-operator \
-  --namespace shell-operator
-$ kubectl create clusterrolebinding shell-operator-view \
-  --clusterrole=view \
-  --serviceaccount=shell-operator:shell-operator
+```shell
+kubectl create namespace example-monitor-pods &&
+kubectl create serviceaccount monitor-pods-acc \
+  --namespace example-monitor-pods &&
+kubectl create clusterrole monitor-pods --verb=get,watch,list --resource=pods &&
+kubectl create clusterrolebinding monitor-pods \
+  --clusterrole=monitor-pods \
+  --serviceaccount=example-monitor-pods:monitor-pods-acc
 ```
 
-Shell-operator can be deployed as a Pod. Put this manifest into the `shell-operator.yaml` file:
+Shell-operator can be deployed as a Pod. Put this manifest into the `shell-operator-pod.yaml` file:
 
 ```yaml
 apiVersion: v1
@@ -82,37 +92,46 @@ metadata:
 spec:
   containers:
   - name: shell-operator
-    image: my.registry.url/shell-operator:simple-hook
-  serviceAccountName: shell-operator-acc
+    image: registry.mycompany.com/shell-operator:monitor-pods
+    imagePullPolicy: Always
+  serviceAccountName: monitor-pods-acc
 ```
 
-Start shell-operator by applying a `shell-operator.yml` file:
-```
-kubectl apply -f shell-operator.yml
+Start shell-operator by applying a `shell-operator-pod.yaml` file:
+```shell
+kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
 ```
 
-Run `kubectl logs -f po/shell-operator` and see that the hook will print new pod names:
+For instance, deploy [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) to trigger `onKuberneteEvent`:
+
+```shell
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml
 ```
-... deploy/kubernetes-dashboard replicas increased by 2 ...
+
+Run `kubectl -n example-monitor-pods logs po/shell-operator` and see that the hook will print dashboard pod names:
+```
 ...
 INFO     : QUEUE add TASK_HOOK_RUN@KUBE_EVENTS pods-hook.sh
-INFO     : QUEUE add TASK_HOOK_RUN@KUBE_EVENTS pods-hook.sh
-INFO     : TASK_RUN HookRun@KUBE_EVENTS pods-hook.sh
-INFO     : Running hook 'pods-hook.sh' binding 'KUBE_EVENTS' ...
-Pod 'kubernetes-dashboard-769df5545f-4wnb4' added
 INFO     : TASK_RUN HookRun@KUBE_EVENTS pods-hook.sh
 INFO     : Running hook 'pods-hook.sh' binding 'KUBE_EVENTS' ...
 Pod 'kubernetes-dashboard-769df5545f-99xsb' added
 ...
 ```
 
+To delete created objects execute:
+```
+kubectl delete ns example-monitor-pods &&
+kubectl delete clusterrole monitor-pods &&
+kubectl delete clusterrolebinding monitor-pods
+```
+
 This example is also available in /examples: [monitor-pods](examples/101-monitor-pods).
 
 ## Hook binding types
 
-[__onStartup__](HOOKS.md#onstartup)
+__onStartup__
 
-This binding has only one parameter: order of execution. Hooks are loaded at start and then hooks with onStartup binding are executed in order defined by parameter.
+This binding has only one parameter: order of execution. Hooks are loaded at start and then hooks with onStartup binding are executed in order defined by parameter. Read more about `onStartup` bindings [here](HOOKS.md#onstartup).
 
 Example `hook --config`:
 
@@ -120,9 +139,9 @@ Example `hook --config`:
 {"onStartup":10}
 ```
 
-[__schedule__](HOOKS.md#schedule)
+__schedule__
 
-This binding is for periodical running of hooks. Schedule can be defined with granularity of seconds.
+This binding is for periodical running of hooks. Schedule can be defined with granularity of seconds. Read more about `schedule` bindings [here](HOOKS.md#schedule).
 
 Example `hook --config` with 2 schedules:
 
@@ -140,9 +159,9 @@ Example `hook --config` with 2 schedules:
 }
 ```
 
-[__onKubernetesEvent__](HOOKS.md#onKubernetesEvent)
+__onKubernetesEvent__
 
-This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) filter for their properties.
+This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) filter for their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#onKubernetesEvent).
 
 Example of `hook --config`:
 

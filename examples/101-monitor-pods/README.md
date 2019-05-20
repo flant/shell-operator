@@ -2,7 +2,7 @@
 
 Example of monitoring new Pods.
 
-### Run 
+### Run
 
 Build shell-operator image with custom script:
 

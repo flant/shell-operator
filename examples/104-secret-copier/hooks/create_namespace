@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+source $WORKING_DIR/common/functions.sh
+
+hook::config() {
+  cat <<EOF
+{
+   "onKubernetesEvent": [
+      {
+         "kind": "namespace",
+         "event": [
+            "add"
+         ]
+      }
+   ]
+}
+EOF
+}
+
+hook::trigger() {
+  for namespace in $(jq -r '.[] | select(.resourceName == "default" | not ) | .resourceName' $BINDING_CONTEXT_PATH);
+  do
+    for secret in $(kubectl -n default get secret -l secret-copier=yes -o name);
+    do
+      kubectl -n default get $secret -o json | \
+        jq -r ".metadata.namespace=\"${namespace}\" |
+                .metadata |= with_entries(select([.key] | inside([\"name\", \"namespace\", \"labels\"])))" \
+        | kubectl::replace_or_create
+    done
+  done
+}
+
+common::run_hook "$@"
