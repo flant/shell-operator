@@ -172,6 +172,8 @@ __onKubernetesEvent__
 
 This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) expression to filter their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#onKubernetesEvent).
 
+> Note: No custom resources monitoring for now, see issue #14.
+
 Example of `hook --config`:
 
 ```
