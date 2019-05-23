@@ -1,10 +1,19 @@
-# Shell-operator [![docker pull flant/shell-operator](https://img.shields.io/docker/pulls/flant/shell-operator.svg?logo=docker)](https://hub.docker.com/r/flant/shell-operator) [![Slack chat EN](https://img.shields.io/badge/slack-EN%20chat-611f69.svg?logo=slack)](https://cloud-native.slack.com/messages/CJ13K3HFG) [![Telegram chat RU](https://img.shields.io/badge/telegram-RU%20chat-179cde.svg?logo=telegram)](https://t.me/kubeoperator)
+<p align="center">
+<img width="485" height="121" src="docs/shell-operator-logo.png" alt="Addon-operator logo" />
+</p>
 
-<img width="70" height="70" src="logo-shell.png" alt="Shell-operator logo" />
+<p align="center">
+<a href="https://hub.docker.com/r/flant/shell-operator"><img src="https://img.shields.io/docker/pulls/flant/shell-operator.svg?logo=docker" alt="docker pull flant/shell-operator"/></a>
+<a href="https://cloud-native.slack.com/messages/CJ13K3HFG"><img src="https://img.shields.io/badge/slack-EN%20chat-611f69.svg?logo=slack" alt="Slack chat EN"/></a>
+<a href="https://t.me/kubeoperator"><img src="https://img.shields.io/badge/telegram-RU%20chat-179cde.svg?logo=telegram" alt="Telegram chat RU"/></a>
+</p>
 
-Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster.
+
+**Shell-operator** is a tool for running event-driven scripts in a Kubernetes cluster.
 
 This operator is not an operator for a _particular software product_ as prometheus-operator or kafka-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an operator-sdk but for scripts.
+
+Shell-operator is used as a base for more advanced [Addon-operator](https://github.com/flant/addon-operator) that supports helm charts and value storages.
 
 Shell-operator provides:
 - __Ease the management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, kubectl, etc.
