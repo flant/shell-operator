@@ -31,19 +31,19 @@ See in logs that startup hooks are run in order and all other hooks are triggere
 ```
 $ kubectl -n example-advanced logs deploy/shell-operator
 ...
-2019-04-05T12:10:33Z INFO     : TASK_RUN HookRun@ON_STARTUP namespace-hook.sh
+INFO     : TASK_RUN HookRun@ON_STARTUP namespace-hook.sh
 007-onstartup-2 hook is triggered
 ...
-2019-04-05T12:10:33Z INFO     : TASK_RUN HookRun@ON_STARTUP namespace-hook.sh
+INFO     : TASK_RUN HookRun@ON_STARTUP namespace-hook.sh
 namespace-hook is triggered on startup.
 ...
-2019-04-05T12:10:33Z INFO     : TASK_RUN HookRun@ON_STARTUP 001-onstartup-10/shell-hook.sh
+INFO     : TASK_RUN HookRun@ON_STARTUP 001-onstartup-10/shell-hook.sh
 001-onstartup-10 hook is triggered
 ...
-2019-04-05T12:10:36Z INFO     : TASK_RUN HookRun@SCHEDULE 003-schedule/schedule-hook.sh
+INFO     : TASK_RUN HookRun@SCHEDULE 003-schedule/schedule-hook.sh
 Message from Schedule hook!
 ...
-2019-04-05T12:14:52Z INFO     : TASK_RUN HookRun@KUBE_EVENTS namespace-hook.sh
+INFO     : TASK_RUN HookRun@KUBE_EVENTS namespace-hook.sh
 Namespace qweqwe was created
 ...
 ```
