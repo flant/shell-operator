@@ -15,6 +15,7 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	appsV1 "k8s.io/client-go/informers/apps/v1"
+	autoscalingV2beta1 "k8s.io/client-go/informers/autoscaling/v2beta1"
 	batchV1 "k8s.io/client-go/informers/batch/v1"
 	batchV2Alpha1 "k8s.io/client-go/informers/batch/v2alpha1"
 	coreV1 "k8s.io/client-go/informers/core/v1"
@@ -234,6 +235,10 @@ func (em *MainKubeEventsManager) addKubeEventsInformer(kind, namespace string, l
 	case "serviceaccount":
 		sharedInformer = coreV1.NewFilteredServiceAccountInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
 		resourceList, err = kube.Kubernetes.CoreV1().ServiceAccounts(namespace).List(listOptions)
+
+	case "autoscaling":
+		sharedInformer = autoscalingV2beta1.NewFilteredHorizontalPodAutoscalerInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
+		resourceList, err = kube.Kubernetes.AutoscalingV2beta1().HorizontalPodAutoscalers(namespace).List(listOptions)
 
 	default:
 		return nil, fmt.Errorf("kind '%s' isn't supported", kind)
