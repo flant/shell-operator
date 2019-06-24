@@ -125,25 +125,15 @@ Parameters:
 
 - `name` is an optional identifier. It is used to distinguish different bindings during runtime. For more info see [binding context](#binding-context).
 
-- `kind` is the case-insensitive type of a monitored Kubernetes object from the list:
-    - namespace
-    - cronjob
-    - daemonset
-    - deployment
-    - job
-    - pod
-    - replicaset
-    - replicationcontroller
-    - statefulset
-    - endpoints
-    - ingress
-    - service
-    - configmap
-    - secret
-    - persistentvolumeclaim
-    - storageclass
-    - node
-    - serviceaccount
+- `kind` is the type of a monitored Kubernetes resource. CRDs are supported, but resource should be registered in cluster before shell-operator starts. This can be checked with `kubectl api-resources` command. You can specify case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:
+```
+"kind": "DaemonSet"
+"kind": "Daemonset"
+"kind": "daemonsets"
+"kind": "DaemonSets"
+"kind": "ds" 
+```  
+
 - `event` — the list of monitored events (add, update, delete). By default all events will be monitored.
 
 - `selector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#labelselector-v1-meta) selector of objects (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).

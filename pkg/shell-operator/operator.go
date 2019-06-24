@@ -66,8 +66,8 @@ func Init() (err error) {
 			rlog.Errorf("MAIN Fatal: Cannot determine a working dir: %s", err)
 			return err
 		}
+		rlog.Infof("Working dir: %s", WorkingDir)
 	}
-	rlog.Infof("Use working dir: %s", WorkingDir)
 
 	TempDir = app.TempDir
 	if exists, _ := utils_file.DirExists(TempDir); !exists {

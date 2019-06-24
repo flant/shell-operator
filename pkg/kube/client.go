@@ -5,12 +5,18 @@ package kube
 import (
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/romana/rlog"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	// load the gcp plugin (only required to authenticate against GKE clusters)
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 )
@@ -22,6 +28,7 @@ const (
 
 var (
 	Kubernetes       kubernetes.Interface
+	DynamicClient    dynamic.Interface
 	DefaultNamespace string
 	Context          string
 )
@@ -71,6 +78,12 @@ func Init(opts InitOptions) error {
 		return err
 	}
 	Kubernetes = clientset
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	DynamicClient = dynamicClient
 
 	rlog.Info("KUBE-INIT Kubernetes client is configured successfully")
 
@@ -223,4 +236,79 @@ func getInClusterContext() (context kubernetes.Interface, err error) {
 	}
 
 	return
+}
+
+// GroupVersionResourceByKind returns GroupVersionResource object to use with dynamic informer.
+//
+// This method is borrowed from kubectl and kubedog. The difference are:
+// - comparison with kind, name and shortnames
+// - debug message
+func GroupVersionResourceByKind(kind string) (schema.GroupVersionResource, error) {
+	lists, err := Kubernetes.Discovery().ServerPreferredResources()
+	if err != nil {
+		return schema.GroupVersionResource{}, err
+	}
+
+	// List of available CRDs
+	for _, list := range lists {
+		if len(list.APIResources) == 0 {
+			continue
+		}
+
+		gv, err := schema.ParseGroupVersion(list.GroupVersion)
+		if err != nil {
+			continue
+		}
+
+		for _, resource := range list.APIResources {
+			if len(resource.Verbs) == 0 {
+				continue
+			}
+
+			rlog.Debugf("GVR: %20s %20s %20s %20s", gv.Version, gv.Group, resource.Name, resource.Kind)
+		}
+	}
+
+	for _, list := range lists {
+		if len(list.APIResources) == 0 {
+			continue
+		}
+
+		gv, err := schema.ParseGroupVersion(list.GroupVersion)
+		if err != nil {
+			continue
+		}
+
+		for _, resource := range list.APIResources {
+			if len(resource.Verbs) == 0 {
+				continue
+			}
+
+			if equalToOneOf(kind, resource.Kind, resource.Name) || equalToOneOf(kind, resource.ShortNames...) {
+				groupVersionResource := schema.GroupVersionResource{
+					Resource: resource.Name,
+					Group:    gv.Group,
+					Version:  gv.Version,
+				}
+
+				return groupVersionResource, nil
+			}
+		}
+	}
+
+	return schema.GroupVersionResource{}, fmt.Errorf("kind %s is not supported", kind)
+}
+
+func equalToOneOf(term string, choices ...string) bool {
+	if len(choices) == 0 {
+		return false
+	}
+	lTerm := strings.ToLower(term)
+	for _, choice := range choices {
+		if lTerm == strings.ToLower(choice) {
+			return true
+		}
+	}
+
+	return false
 }
