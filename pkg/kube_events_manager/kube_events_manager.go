@@ -57,7 +57,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				filtered, err := resourceFilter(obj, jqFilter, debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 
@@ -70,7 +70,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnAdd), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd), debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 			},
@@ -83,7 +83,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				filtered, err := resourceFilter(obj, jqFilter, debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 
@@ -96,7 +96,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnUpdate), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnUpdate), debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 			},
@@ -113,7 +113,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				err = kubeEventsInformer.HandleKubeEvent(obj, kind, "", string(KubernetesEventOnDelete), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnDelete), debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 			},
