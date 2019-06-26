@@ -150,7 +150,13 @@ func ManagersEventsHandler() {
 				// add schedules to schedule manager
 				ScheduledHooks = UpdateScheduledHooks(ScheduledHooks)
 				// start informers for kube events
-				KubeEventsHooks.EnableHooks(HookManager, KubeEventsManager)
+				err := KubeEventsHooks.EnableHooks(HookManager, KubeEventsManager)
+				if err != nil {
+					// Something wrong with hooks configs...
+					rlog.Errorf("Enable kube events for hooks error: %v", err)
+					TasksQueue.Add(task.NewTask(task.Exit, "exit"))
+					return
+				}
 			}
 		case crontab := <-schedule_manager.ScheduleCh:
 			scheduleHooks := ScheduledHooks.GetHooksForSchedule(crontab)
@@ -237,6 +243,10 @@ func TasksRunner() {
 				rlog.Infof("TASK_RUN Stop: Exiting TASK_RUN loop.")
 				TasksQueue.Pop()
 				return
+			case task.Exit:
+				rlog.Infof("TASK_RUN Exit: program halts.")
+				TasksQueue.Pop()
+				os.Exit(1)
 			}
 
 			// Breaking, if the task queue is empty to prevent the infinite loop.

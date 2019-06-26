@@ -42,7 +42,7 @@ func (obj *MainKubeEventsHooksController) EnableHooks(hookManager hook.HookManag
 			}
 			obj.KubeHooks[configId] = desc
 
-			rlog.Debugf("MAIN: run informer %s for global hook %s", configId, hmHook.Name)
+			rlog.Debugf("MAIN: run informer %s for hook %s on kind=%s, events=%+v", configId, desc.Kind, desc.EventTypes, hmHook.Name)
 		}
 	}
 

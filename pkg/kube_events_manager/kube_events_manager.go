@@ -57,15 +57,15 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				filtered, err := resourceFilter(obj, jqFilter, debug)
 				if err != nil {
-					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %s/%+v informer %s got %s of object kind=%s %s", kind, eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 
 				checksum := utils_checksum.CalculateChecksum(filtered)
 
-				if debug {
-					rlog.Debugf("Kube events manager: %+v informer %s: add %s object %s: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
-						eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
+				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd) {
+					rlog.Debugf("Kube events manager: %s/%+v informer %s: add %s object %s: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
+						kind, eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 				}
 
 				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnAdd), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd), debug)
@@ -89,7 +89,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				checksum := utils_checksum.CalculateChecksum(filtered)
 
-				if debug {
+				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnUpdate) {
 					rlog.Debugf("Kube events manager: %+v informer %s: update %s object %s: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
 						eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 				}
@@ -107,7 +107,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 					return
 				}
 
-				if debug {
+				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnDelete) {
 					rlog.Debugf("Kube events manager: %+v informer %s: delete %s object %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId)
 				}
 
