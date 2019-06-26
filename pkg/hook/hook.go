@@ -115,16 +115,15 @@ func (h *Hook) SafeName() string {
 
 func (h *Hook) prepareBindingContextJsonFile(context []BindingContext) (string, error) {
 	data, _ := json.Marshal(context)
-	//data := utils.MustDump(utils.DumpValuesJson(context))
-	path := filepath.Join(TempDir, fmt.Sprintf("global-hook-%s-binding-context.json", h.SafeName()))
-	err := dumpData(path, data)
+	bindingContextPath := filepath.Join(TempDir, fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
+	err := dumpData(bindingContextPath, data)
 	if err != nil {
 		return "", err
 	}
 
-	rlog.Debugf("Prepared global hook %s binding context:\n%s", h.Name, utils_data.YamlToString(context))
+	rlog.Debugf("Prepared hook '%s' binding context:\n%s", h.Name, utils_data.YamlToString(context))
 
-	return path, nil
+	return bindingContextPath, nil
 }
 
 func dumpData(filePath string, data []byte) error {

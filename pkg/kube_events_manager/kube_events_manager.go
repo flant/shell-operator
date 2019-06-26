@@ -10,17 +10,11 @@ import (
 
 	"github.com/romana/rlog"
 	"gopkg.in/satori/go.uuid.v1"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	appsV1 "k8s.io/client-go/informers/apps/v1"
-	autoscalingV2beta1 "k8s.io/client-go/informers/autoscaling/v2beta1"
-	batchV1 "k8s.io/client-go/informers/batch/v1"
-	batchV2Alpha1 "k8s.io/client-go/informers/batch/v2alpha1"
-	coreV1 "k8s.io/client-go/informers/core/v1"
-	extensionsV1Beta1 "k8s.io/client-go/informers/extensions/v1beta1"
-	storageV1 "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/flant/shell-operator/pkg/executor"
@@ -35,6 +29,7 @@ type KubeEventsManager interface {
 }
 
 type MainKubeEventsManager struct {
+	// all created kube informers. Informers are addressed by config id — uuid
 	KubeEventsInformersByConfigId map[string]*KubeEventsInformer
 }
 
@@ -62,20 +57,20 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				filtered, err := resourceFilter(obj, jqFilter, debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %s/%+v informer %s got %s of object kind=%s %s", kind, eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 
 				checksum := utils_checksum.CalculateChecksum(filtered)
 
-				if debug {
-					rlog.Debugf("Kube events manager: %+v informer %s: add %s object %s: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
-						eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
+				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd) {
+					rlog.Debugf("Kube events manager: %s/%+v informer %s: add %s object %s: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
+						kind, eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 				}
 
 				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnAdd), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd), debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 			},
@@ -88,20 +83,20 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 
 				filtered, err := resourceFilter(obj, jqFilter, debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 
 				checksum := utils_checksum.CalculateChecksum(filtered)
 
-				if debug {
+				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnUpdate) {
 					rlog.Debugf("Kube events manager: %+v informer %s: update %s object %s: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
 						eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 				}
 
 				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnUpdate), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnUpdate), debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 			},
@@ -112,13 +107,13 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 					return
 				}
 
-				if debug {
+				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnDelete) {
 					rlog.Debugf("Kube events manager: %+v informer %s: delete %s object %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId)
 				}
 
 				err = kubeEventsInformer.HandleKubeEvent(obj, kind, "", string(KubernetesEventOnDelete), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnDelete), debug)
 				if err != nil {
-					rlog.Error("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
 					return
 				}
 			},
@@ -154,104 +149,36 @@ func (em *MainKubeEventsManager) addKubeEventsInformer(kind, namespace string, l
 		}
 	}
 
-	listOptions := metaV1.ListOptions{}
-	if formatSelector != "" {
-		listOptions.LabelSelector = formatSelector
-	}
-
 	var sharedInformer cache.SharedIndexInformer
-	var resourceList runtime.Object
-	var listErr error
+	var objects []runtime.Object
 
-	switch strings.ToLower(kind) {
-	case "namespace":
-		sharedInformer = coreV1.NewFilteredNamespaceInformer(kube.Kubernetes, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().Namespaces().List(listOptions)
-
-	case "cronjob":
-		sharedInformer = batchV2Alpha1.NewFilteredCronJobInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.BatchV2alpha1().CronJobs(namespace).List(listOptions)
-
-	case "daemonset":
-		sharedInformer = appsV1.NewFilteredDaemonSetInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.AppsV1().DaemonSets(namespace).List(listOptions)
-
-	case "deployment":
-		sharedInformer = appsV1.NewFilteredDeploymentInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.AppsV1().Deployments(namespace).List(listOptions)
-
-	case "job":
-		sharedInformer = batchV1.NewFilteredJobInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.BatchV1().Jobs(namespace).List(listOptions)
-
-	case "pod":
-		sharedInformer = coreV1.NewFilteredPodInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().Pods(namespace).List(listOptions)
-
-	case "replicaset":
-		sharedInformer = appsV1.NewFilteredReplicaSetInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.AppsV1().ReplicaSets(namespace).List(listOptions)
-
-	case "replicationcontroller":
-		sharedInformer = coreV1.NewFilteredReplicationControllerInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().ReplicationControllers(namespace).List(listOptions)
-
-	case "statefulset":
-		sharedInformer = appsV1.NewFilteredStatefulSetInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.AppsV1().StatefulSets(namespace).List(listOptions)
-
-	case "endpoints":
-		sharedInformer = coreV1.NewFilteredEndpointsInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().Endpoints(namespace).List(listOptions)
-
-	case "ingress":
-		sharedInformer = extensionsV1Beta1.NewFilteredIngressInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.ExtensionsV1beta1().Ingresses(namespace).List(listOptions)
-
-	case "service":
-		sharedInformer = coreV1.NewFilteredServiceInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().Services(namespace).List(listOptions)
-
-	case "configmap":
-		sharedInformer = coreV1.NewFilteredConfigMapInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().ConfigMaps(namespace).List(listOptions)
-
-	case "secret":
-		sharedInformer = coreV1.NewFilteredSecretInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().Secrets(namespace).List(listOptions)
-
-	case "persistentvolumeclaim":
-		sharedInformer = coreV1.NewFilteredPersistentVolumeClaimInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().PersistentVolumeClaims(namespace).List(listOptions)
-
-	case "storageclass":
-		sharedInformer = storageV1.NewFilteredStorageClassInformer(kube.Kubernetes, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.StorageV1().StorageClasses().List(listOptions)
-
-	case "node":
-		sharedInformer = coreV1.NewFilteredNodeInformer(kube.Kubernetes, resyncPeriod, indexers, tweakListOptions)
-		resourceList, listErr = kube.Kubernetes.CoreV1().Nodes().List(listOptions)
-
-	case "serviceaccount":
-		sharedInformer = coreV1.NewFilteredServiceAccountInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, err = kube.Kubernetes.CoreV1().ServiceAccounts(namespace).List(listOptions)
-
-	case "autoscaling":
-		sharedInformer = autoscalingV2beta1.NewFilteredHorizontalPodAutoscalerInformer(kube.Kubernetes, namespace, resyncPeriod, indexers, tweakListOptions)
-		resourceList, err = kube.Kubernetes.AutoscalingV2beta1().HorizontalPodAutoscalers(namespace).List(listOptions)
-
-	default:
-		return nil, fmt.Errorf("kind '%s' isn't supported", kind)
+	rlog.Debugf("Discover GVR for %s...", kind)
+	kubeEventsInformer.Kind = "pod"
+	gvr, err := kube.GroupVersionResourceByKind(kind)
+	if err != nil {
+		rlog.Errorf("error getting GVR for kind '%s': %v", kind, err)
+		return nil, err
 	}
-
-	if listErr != nil {
-		return nil, fmt.Errorf("failed to list '%s' resources: %v", kind, err)
-	}
+	rlog.Infof("GVR for kind '%s' is %+v", kind, gvr)
+	informer := dynamicinformer.NewFilteredDynamicInformer(kube.DynamicClient, gvr, namespace, resyncPeriod, indexers, tweakListOptions)
+	sharedInformer = informer.Informer()
 
 	// Save already existed resources to IGNORE watch.Added events about them
-	err = kubeEventsInformer.InitializeItemsList(resourceList, debug)
+	selector, err := metaV1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
+		rlog.Infof("error creating labelSelector: %v", err)
 		return nil, err
+	}
+	objects, err = informer.Lister().List(selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list '%s' resources: %v", kind, err)
+	}
+	rlog.Debugf("Got %d objects for kind '%s': %+v", len(objects), kind, objects)
+	if len(objects) > 0 {
+		err = kubeEventsInformer.InitializeItemsList(objects, debug)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	kubeEventsInformer.SharedInformer = sharedInformer
@@ -317,12 +244,7 @@ func NewKubeEventsInformer() *KubeEventsInformer {
 	return kubeEventsInformer
 }
 
-func (ei *KubeEventsInformer) InitializeItemsList(list runtime.Object, debug bool) error {
-	objects, err := meta.ExtractList(list)
-	if err != nil {
-		rlog.Errorf("InitializeItemsList got invalid List of type %T from API: %v", list, err)
-	}
-
+func (ei *KubeEventsInformer) InitializeItemsList(objects []runtime.Object, debug bool) error {
 	for _, obj := range objects {
 		resourceId, err := runtimeResourceId(obj)
 		if err != nil {

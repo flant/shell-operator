@@ -17,6 +17,9 @@ const (
 	// queue control tasks
 	Delay TaskType = "TASK_DELAY"
 	Stop  TaskType = "TASK_STOP"
+
+	// Exit a program
+	Exit TaskType = "TASK_EXIT"
 )
 
 type Task interface {

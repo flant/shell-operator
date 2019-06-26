@@ -37,7 +37,7 @@ func TestCmdRun(t *testing.T) {
 		"ls -la; /bin/bash -c 'sleep 0.2; exit 1';  exit 2",
 		// "ls -la; sleep 1; exit 2", // no waitid error
 	}
-	rlog.Infof("run command:", name, args)
+	rlog.Infof("run command: %s %+v", name, args)
 	var outbuf, errbuf bytes.Buffer
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = &outbuf
