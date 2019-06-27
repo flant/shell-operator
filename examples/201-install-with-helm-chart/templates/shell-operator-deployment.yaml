@@ -1,0 +1,32 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shell-operator
+  labels:
+    app: shell-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shell-operator
+  template:
+    metadata:
+      labels:
+        app: shell-operator
+      annotations:
+        checksum/hook: {{ .Files.Get "hooks/namespace-hook.sh" | sha256sum }}
+    spec:
+      containers:
+      - name: shell-operator
+        image: "flant/shell-operator:latest"
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: example-helm-hooks
+          mountPath: /hooks/
+      serviceAccountName: example-helm-acc
+      volumes:
+      - name: example-helm-hooks
+        configMap:
+          name: example-helm-hooks
+          defaultMode: 0777
