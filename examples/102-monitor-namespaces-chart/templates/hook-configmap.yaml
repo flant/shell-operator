@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hook-{{ template "unit.name" . }}
+data:
+  hook.sh: |+
+{{ .Files.Get "hooks/namespace-hook.sh" | indent 4 }}

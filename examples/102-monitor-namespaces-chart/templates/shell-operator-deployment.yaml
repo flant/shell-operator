@@ -1,0 +1,34 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "unit.name" . }}
+  labels:
+    app: shell-operator
+    function: {{ template "unit.name" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shell-operator
+      function: {{ template "unit.name" . }}
+  template:
+    metadata:
+      labels:
+        app: shell-operator
+        function: {{ template "unit.name" . }}
+        deployment-rand: {{ randAlphaNum 10 | quote }}
+    spec:
+      containers:
+      - name: shell-operator
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        volumeMounts:
+        - name: hook-{{ template "unit.name" . }}
+          mountPath: /hooks/
+      serviceAccountName: {{ template "unit.name" . }}
+      volumes:
+      - name: hook-{{ template "unit.name" . }}
+        configMap:
+          name: hook-{{ template "unit.name" . }}
+          defaultMode: 0777
