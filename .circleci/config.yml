@@ -18,16 +18,25 @@ jobs:
       # TODO fix tests
       #- run: go test -v ./...
 
+  build_image_branch:
+    machine: true
+    steps:
+    - checkout
+    - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+    # build and push only alpine version
+    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev -f Dockerfile-alpine3.9 .
+    - run: docker push flant/shell-operator:dev
+
   build_image_latest:
     machine: true
     steps:
     - checkout
     - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
     # build and push ubuntu version
-    - run: docker build -t flant/shell-operator:latest .
+    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:latest .
     - run: docker push flant/shell-operator:latest
     # build and push alpine version
-    - run: docker build -t flant/shell-operator:latest-alpine3.9 -f Dockerfile-alpine3.9 .
+    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:latest-alpine3.9 -f Dockerfile-alpine3.9 .
     - run: docker push flant/shell-operator:latest-alpine3.9
 
   build_image_on_tag:
@@ -36,10 +45,10 @@ jobs:
     - checkout
     - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
     # build and push ubuntu version
-    - run: docker build -t flant/shell-operator:$CIRCLE_TAG .
+    - run: docker build --build-arg appVersion=$CIRCLE_TAG -t flant/shell-operator:$CIRCLE_TAG .
     - run: docker push flant/shell-operator:$CIRCLE_TAG
     # build and push alpine version
-    - run: docker build -t flant/shell-operator:$CIRCLE_TAG-alpine3.9 -f Dockerfile-alpine3.9 .
+    - run: docker build --build-arg appVersion=$CIRCLE_TAG -t flant/shell-operator:$CIRCLE_TAG-alpine3.9 -f Dockerfile-alpine3.9 .
     - run: docker push flant/shell-operator:$CIRCLE_TAG-alpine3.9
 
 
@@ -74,3 +83,25 @@ workflows:
             only: /^v[0-9]+(\.[0-9]+){2}([-+].+|[^-.]*)$/
           branches:
             ignore: /.*/
+    # test, build and publish a dev image for branches
+    - hold_build_image_branch:
+        type: approval
+        requires:
+          - test
+        filters:
+          tags:
+            ignore: /.*/
+          branches:
+            ignore: master
+
+    # test, build and publish a dev image for branches
+    - build_image_branch:
+        context: hub.docker.com-flant
+        requires:
+          - hold_build_image_branch
+        filters:
+          tags:
+            ignore: /.*/
+          branches:
+            ignore: master
+

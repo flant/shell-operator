@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMainScheduleManager_Add(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/romana/rlog"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -37,6 +38,8 @@ func main() {
 			go executor.Reap()
 
 			operator.InitHttpServer()
+
+			rlog.Infof("%s %s", app.AppName, app.Version)
 
 			err := operator.Init()
 			if err != nil {
