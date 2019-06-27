@@ -84,11 +84,21 @@ workflows:
           branches:
             ignore: /.*/
     # test, build and publish a dev image for branches
-    - build_image_branch:
-        context: hub.docker.com-flant
+    - hold_build_image_branch:
         type: approval
         requires:
           - test
+        filters:
+          tags:
+            ignore: /.*/
+          branches:
+            ignore: master
+
+    # test, build and publish a dev image for branches
+    - build_image_branch:
+        context: hub.docker.com-flant
+        requires:
+          - hold_build_image_branch
         filters:
           tags:
             ignore: /.*/
