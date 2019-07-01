@@ -37,7 +37,7 @@ func main() {
 			// in case if shell-operator is a PID1.
 			go executor.Reap()
 
-			operator.InitHttpServer()
+			operator.InitHttpServer(app.ListenAddress)
 
 			rlog.Infof("%s %s", app.AppName, app.Version)
 

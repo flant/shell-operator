@@ -2,6 +2,7 @@ package app
 
 import (
 	"gopkg.in/alecthomas/kingpin.v2"
+	"net"
 )
 
 var AppName = "shell-operator"
@@ -15,6 +16,7 @@ var WorkingDir = ""
 var TempDir = "/tmp/shell-operator"
 var KubeContext = ""
 var KubeConfig = ""
+var ListenAddress, _ = net.ResolveTCPAddr("tcp", "0.0.0.0:9115")
 
 // SetupGlobalSettings init global flags with default values
 func SetupGlobalSettings(kpApp *kingpin.Application) {
@@ -43,4 +45,8 @@ func SetupGlobalSettings(kpApp *kingpin.Application) {
 		Default(KubeConfig).
 		StringVar(&KubeConfig)
 
+	kpApp.Flag("listen-address", "Address and port to use for HTTP serving.").
+		Envar("SHELL_OPERATOR_LISTEN_ADDRESS").
+		Default(ListenAddress.String()).
+		TCPVar(&ListenAddress)
 }

@@ -3,6 +3,7 @@ package shell_operator
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -342,7 +343,7 @@ func RunMetrics() {
 	}()
 }
 
-func InitHttpServer() {
+func InitHttpServer(listenAddr *net.TCPAddr) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`<html>
     <head><title>Shell operator</title></head>
@@ -360,8 +361,8 @@ func InitHttpServer() {
 	})
 
 	go func() {
-		rlog.Info("HTTP SERVER Listening on :9115")
-		if err := http.ListenAndServe(":9115", nil); err != nil {
+		rlog.Infof("HTTP SERVER Listening on %s", listenAddr.String())
+		if err := http.ListenAndServe(listenAddr.String(), nil); err != nil {
 			rlog.Errorf("Error starting HTTP server: %s", err)
 		}
 	}()
