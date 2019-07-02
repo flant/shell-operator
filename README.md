@@ -158,11 +158,11 @@ Example `hook --config` with 2 schedules:
 {
   "schedule": [
    {"name":"every 10 min",
-    "schedule":"0 */10 * * * *",
+    "crontab":"0 */10 * * * *",
     "allowFailure":true
    },
    {"name":"Every Monday at 8:05",
-    "schedule":"0 5 8 * * 1"
+    "crontab":"0 5 8 * * 1"
     }
   ]
 }
