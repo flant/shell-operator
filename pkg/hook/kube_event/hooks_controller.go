@@ -36,7 +36,7 @@ func (obj *MainKubeEventsHooksController) EnableHooks(hookManager hook.HookManag
 		hmHook, _ := hookManager.GetHook(hookName)
 
 		for _, desc := range MakeKubeEventHookDescriptors(hmHook) {
-			configId, err := eventsManager.Run(desc.EventTypes, desc.Kind, desc.Namespace, desc.Selector, desc.JqFilter, desc.Debug)
+			configId, err := eventsManager.Run(desc.EventTypes, desc.Kind, desc.Namespace, desc.Selector, desc.ObjectName, desc.JqFilter, desc.Debug)
 			if err != nil {
 				return err
 			}
@@ -113,6 +113,7 @@ func ConvertOnKubernetesEventToKubeEventHook(hook *hook.Hook, config kube_events
 		Kind:         config.Kind,
 		Namespace:    namespace,
 		Selector:     config.Selector,
+		ObjectName:   config.ObjectName,
 		JqFilter:     config.JqFilter,
 		AllowFailure: config.AllowFailure,
 		Debug:        !config.DisableDebug,

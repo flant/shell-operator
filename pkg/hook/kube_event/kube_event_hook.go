@@ -15,6 +15,7 @@ type KubeEventHook struct {
 	Kind         string
 	Namespace    string
 	Selector     *metav1.LabelSelector
+	ObjectName   string
 	JqFilter     string
 	AllowFailure bool
 	Debug        bool

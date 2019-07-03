@@ -17,6 +17,7 @@ type OnKubernetesEventConfig struct {
 	EventTypes        []OnKubernetesEventType `json:"event"`
 	Kind              string                  `json:"kind"`
 	Selector          *metav1.LabelSelector   `json:"selector"`
+	ObjectName        string                  `json:"objectName"`
 	NamespaceSelector *KubeNamespaceSelector  `json:"namespaceSelector"`
 	JqFilter          string                  `json:"jqFilter"`
 	AllowFailure      bool                    `json:"allowFailure"`

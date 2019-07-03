@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/fields"
 	"os/exec"
 	"strings"
 	"time"
@@ -24,7 +25,7 @@ import (
 )
 
 type KubeEventsManager interface {
-	Run(eventTypes []OnKubernetesEventType, kind, namespace string, labelSelector *metaV1.LabelSelector, jqFilter string, debug bool) (string, error)
+	Run(eventTypes []OnKubernetesEventType, kind, namespace string, labelSelector *metaV1.LabelSelector, objectName string, jqFilter string, debug bool) (string, error)
 	Stop(configId string) error
 }
 
@@ -45,8 +46,8 @@ func Init() (KubeEventsManager, error) {
 	return em, nil
 }
 
-func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, namespace string, labelSelector *metaV1.LabelSelector, jqFilter string, debug bool) (string, error) {
-	kubeEventsInformer, err := em.addKubeEventsInformer(kind, namespace, labelSelector, eventTypes, jqFilter, debug, func(kubeEventsInformer *KubeEventsInformer) cache.ResourceEventHandlerFuncs {
+func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, namespace string, labelSelector *metaV1.LabelSelector, objectName string, jqFilter string, debug bool) (string, error) {
+	kubeEventsInformer, err := em.addKubeEventsInformer(kind, namespace, labelSelector, objectName, eventTypes, jqFilter, debug, func(kubeEventsInformer *KubeEventsInformer) cache.ResourceEventHandlerFuncs {
 		return cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				objectId, err := runtimeResourceId(obj)
@@ -129,7 +130,7 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 	return kubeEventsInformer.ConfigId, nil
 }
 
-func (em *MainKubeEventsManager) addKubeEventsInformer(kind, namespace string, labelSelector *metaV1.LabelSelector, eventTypes []OnKubernetesEventType, jqFilter string, debug bool, resourceEventHandlerFuncs func(kubeEventsInformer *KubeEventsInformer) cache.ResourceEventHandlerFuncs) (*KubeEventsInformer, error) {
+func (em *MainKubeEventsManager) addKubeEventsInformer(kind, namespace string, labelSelector *metaV1.LabelSelector, objectName string, eventTypes []OnKubernetesEventType, jqFilter string, debug bool, resourceEventHandlerFuncs func(kubeEventsInformer *KubeEventsInformer) cache.ResourceEventHandlerFuncs) (*KubeEventsInformer, error) {
 	kubeEventsInformer := NewKubeEventsInformer()
 	kubeEventsInformer.ConfigId = uuid.NewV4().String()
 	kubeEventsInformer.Kind = kind
@@ -144,6 +145,9 @@ func (em *MainKubeEventsManager) addKubeEventsInformer(kind, namespace string, l
 	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 	resyncPeriod := time.Duration(2) * time.Hour
 	tweakListOptions := func(options *metaV1.ListOptions) {
+		if objectName != "" {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", objectName).String()
+		}
 		if formatSelector != "" {
 			options.LabelSelector = formatSelector
 		}

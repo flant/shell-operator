@@ -107,6 +107,7 @@ Syntax:
           ...
         ],
       },
+      "objectName": "backend-7zxyf",
       "namespaceSelector": {
         "matchNames": ["somenamespace", "proj-production", "proj-stage"],
         "any": true|false,
@@ -138,6 +139,8 @@ Parameters:
 
 - `selector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#labelselector-v1-meta) selector of objects (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).
   If the selector is not set, then all objects are selected.
+
+- `objectName` — allows to specify a concrete Kubernetes object name. Can be used with or without `selector`.
 
 - `namespaceSelector` — specifies the filter for selecting namespaces. If you omit it, the events from all namespaces will be monitored.
 
