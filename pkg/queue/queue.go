@@ -41,7 +41,9 @@ func (q *Queue) Add(task interface{}) {
 
 // Peek examines the first element (get without delete).
 func (q *Queue) Peek() (task interface{}, err error) {
-	if q.IsEmpty() {
+	q.m.Lock()
+	defer q.m.Unlock()
+	if q.isEmpty() {
 		return nil, err
 	}
 	return q.items[0], err
