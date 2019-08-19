@@ -128,7 +128,7 @@ func TestExecutorCmdRun(t *testing.T) {
 			cmd.Stdout = &outbuf
 			cmd.Stderr = &errbuf
 
-			err := Run(cmd, true)
+			err := Run(cmd)
 
 			stdout := outbuf.String()
 			stderr := errbuf.String()

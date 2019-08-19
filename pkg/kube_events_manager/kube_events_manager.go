@@ -24,8 +24,18 @@ import (
 	utils_data "github.com/flant/shell-operator/pkg/utils/data"
 )
 
+type KubeEventInformerConfig struct {
+	Name          string
+	EventTypes    []OnKubernetesEventType
+	Kind          string
+	Namespace     string
+	LabelSelector *metaV1.LabelSelector
+	ObjectName    string
+	JqFilter      string
+}
+
 type KubeEventsManager interface {
-	Run(eventTypes []OnKubernetesEventType, kind, namespace string, labelSelector *metaV1.LabelSelector, objectName string, jqFilter string, debug bool) (string, error)
+	Run(informerConfig KubeEventInformerConfig) (string, error)
 	Stop(configId string) error
 }
 
@@ -46,76 +56,70 @@ func Init() (KubeEventsManager, error) {
 	return em, nil
 }
 
-func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, namespace string, labelSelector *metaV1.LabelSelector, objectName string, jqFilter string, debug bool) (string, error) {
-	kubeEventsInformer, err := em.addKubeEventsInformer(kind, namespace, labelSelector, objectName, eventTypes, jqFilter, debug, func(kubeEventsInformer *KubeEventsInformer) cache.ResourceEventHandlerFuncs {
+func (em *MainKubeEventsManager) Run(informerConfig KubeEventInformerConfig) (string, error) {
+	kubeEventsInformer, err := em.addKubeEventsInformer(informerConfig, func(informer *KubeEventsInformer) cache.ResourceEventHandlerFuncs {
 		return cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				objectId, err := runtimeResourceId(obj)
+				objectId, err := runtimeResourceId(obj, informer.Config.Kind)
 				if err != nil {
-					rlog.Errorf("failed to get object id: %s", err)
+					rlog.Errorf("KUBE_EVENTS %s informer: add: get object id: %s", informer.ConfigId, err)
 					return
 				}
 
-				filtered, err := resourceFilter(obj, jqFilter, debug)
+				filtered, err := resourceFilter(obj, informer.Config.JqFilter)
 				if err != nil {
-					rlog.Errorf("Kube events manager: %s/%+v informer %s got %s of object kind=%s %s", kind, eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("KUBE_EVENTS %s informer: add: apply jqFilter on %s: %s",
+						informer.ConfigId, objectId, err)
 					return
 				}
 
 				checksum := utils_checksum.CalculateChecksum(filtered)
 
-				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd) {
-					rlog.Debugf("Kube events manager: %s/%+v informer %s: add %s object %s: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
-						kind, eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				}
-
-				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnAdd), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnAdd), debug)
-				if err != nil {
-					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
-					return
+				if informer.ShouldHandleEvent(KubernetesEventOnAdd) {
+					rlog.Debugf("KUBE_EVENTS %s informer: add: %s object: jqFilter '%s' output:\n%s",
+						informer.ConfigId,
+						objectId,
+						informer.Config.JqFilter,
+						utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
+					informer.HandleKubeEvent(obj, objectId, checksum, KubernetesEventOnAdd)
 				}
 			},
 			UpdateFunc: func(_ interface{}, obj interface{}) {
-				objectId, err := runtimeResourceId(obj)
+				objectId, err := runtimeResourceId(obj, informer.Config.Kind)
 				if err != nil {
-					rlog.Errorf("failed to get object id: %s", err)
+					rlog.Errorf("KUBE_EVENTS %s informer: update: get object id: %s", informer.ConfigId, err)
 					return
 				}
 
-				filtered, err := resourceFilter(obj, jqFilter, debug)
+				filtered, err := resourceFilter(obj, informer.Config.JqFilter)
 				if err != nil {
-					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
+					rlog.Errorf("KUBE_EVENTS %s informer: update: apply jqFilter on %s: %s",
+						informer.ConfigId, objectId, err)
 					return
 				}
 
 				checksum := utils_checksum.CalculateChecksum(filtered)
 
-				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnUpdate) {
-					rlog.Debugf("Kube events manager: %+v informer %s: update %s object %s: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
-						eventTypes, kubeEventsInformer.ConfigId, kind, objectId, jqFilter, checksum, utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
+				if informer.ShouldHandleEvent(KubernetesEventOnUpdate) {
+					rlog.Debugf("KUBE_EVENTS %s informer: update: %s object: jqFilter '%s' output:\n%s",
+						informer.ConfigId,
+						objectId,
+						informer.Config.JqFilter,
+						utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
+					informer.HandleKubeEvent(obj, objectId, checksum, KubernetesEventOnUpdate)
 				}
 
-				err = kubeEventsInformer.HandleKubeEvent(obj, kind, checksum, string(KubernetesEventOnUpdate), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnUpdate), debug)
-				if err != nil {
-					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
-					return
-				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				objectId, err := runtimeResourceId(obj)
+				objectId, err := runtimeResourceId(obj, informer.Config.Kind)
 				if err != nil {
-					rlog.Errorf("failed to get object id: %s", err)
+					rlog.Errorf("KUBE_EVENTS %s informer: delete: get object id: %s", informer.ConfigId, err)
 					return
 				}
 
-				if debug && kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnDelete) {
-					rlog.Debugf("Kube events manager: %+v informer %s: delete %s object %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId)
-				}
-
-				err = kubeEventsInformer.HandleKubeEvent(obj, kind, "", string(KubernetesEventOnDelete), kubeEventsInformer.ShouldHandleEvent(KubernetesEventOnDelete), debug)
-				if err != nil {
-					rlog.Errorf("Kube events manager: %+v informer %s: %s object %s: %s", eventTypes, kubeEventsInformer.ConfigId, kind, objectId, err)
-					return
+				if informer.ShouldHandleEvent(KubernetesEventOnDelete) {
+					rlog.Debugf("KUBE_EVENTS %s informer: delete: %s", informer.ConfigId, objectId)
+					informer.HandleKubeEvent(obj, objectId, "", KubernetesEventOnDelete)
 				}
 			},
 		}
@@ -130,23 +134,22 @@ func (em *MainKubeEventsManager) Run(eventTypes []OnKubernetesEventType, kind, n
 	return kubeEventsInformer.ConfigId, nil
 }
 
-func (em *MainKubeEventsManager) addKubeEventsInformer(kind, namespace string, labelSelector *metaV1.LabelSelector, objectName string, eventTypes []OnKubernetesEventType, jqFilter string, debug bool, resourceEventHandlerFuncs func(kubeEventsInformer *KubeEventsInformer) cache.ResourceEventHandlerFuncs) (*KubeEventsInformer, error) {
+func (em *MainKubeEventsManager) addKubeEventsInformer(informerConfig KubeEventInformerConfig, resourceEventHandlerFuncs func(kubeEventsInformer *KubeEventsInformer) cache.ResourceEventHandlerFuncs) (*KubeEventsInformer, error) {
 	kubeEventsInformer := NewKubeEventsInformer()
-	kubeEventsInformer.ConfigId = uuid.NewV4().String()
-	kubeEventsInformer.Kind = kind
-	kubeEventsInformer.EventTypes = eventTypes
-	kubeEventsInformer.JqFilter = jqFilter
+	kubeEventsInformer.Config = informerConfig
+	// if informer config has name, set it as prefix of configId
+	kubeEventsInformer.ConfigId = informerConfig.Name + "-" + uuid.NewV4().String()[len(informerConfig.Name)+1:]
 
-	formatSelector, err := formatLabelSelector(labelSelector)
+	formatSelector, err := formatLabelSelector(informerConfig.LabelSelector)
 	if err != nil {
-		return nil, fmt.Errorf("failed format label selector '%s'", labelSelector.String())
+		return nil, fmt.Errorf("failed format label selector '%s'", informerConfig.LabelSelector.String())
 	}
 
 	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 	resyncPeriod := time.Duration(2) * time.Hour
 	tweakListOptions := func(options *metaV1.ListOptions) {
-		if objectName != "" {
-			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", objectName).String()
+		if informerConfig.ObjectName != "" {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", informerConfig.ObjectName).String()
 		}
 		if formatSelector != "" {
 			options.LabelSelector = formatSelector
@@ -156,30 +159,29 @@ func (em *MainKubeEventsManager) addKubeEventsInformer(kind, namespace string, l
 	var sharedInformer cache.SharedIndexInformer
 	var objects []runtime.Object
 
-	rlog.Debugf("Discover GVR for %s...", kind)
-	kubeEventsInformer.Kind = "pod"
-	gvr, err := kube.GroupVersionResourceByKind(kind)
+	rlog.Debugf("Discover GVR for kind '%s'...", informerConfig.Kind)
+	gvr, err := kube.GroupVersionResourceByKind(informerConfig.Kind)
 	if err != nil {
-		rlog.Errorf("error getting GVR for kind '%s': %v", kind, err)
+		rlog.Errorf("error getting GVR for kind '%s': %v", informerConfig.Kind, err)
 		return nil, err
 	}
-	rlog.Infof("GVR for kind '%s' is %+v", kind, gvr)
-	informer := dynamicinformer.NewFilteredDynamicInformer(kube.DynamicClient, gvr, namespace, resyncPeriod, indexers, tweakListOptions)
+	rlog.Infof("GVR for kind '%s' is %+v", informerConfig.Kind, gvr)
+	informer := dynamicinformer.NewFilteredDynamicInformer(kube.DynamicClient, gvr, informerConfig.Namespace, resyncPeriod, indexers, tweakListOptions)
 	sharedInformer = informer.Informer()
 
 	// Save already existed resources to IGNORE watch.Added events about them
-	selector, err := metaV1.LabelSelectorAsSelector(labelSelector)
+	selector, err := metaV1.LabelSelectorAsSelector(informerConfig.LabelSelector)
 	if err != nil {
 		rlog.Infof("error creating labelSelector: %v", err)
 		return nil, err
 	}
 	objects, err = informer.Lister().List(selector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list '%s' resources: %v", kind, err)
+		return nil, fmt.Errorf("failed to list '%s' resources: %v", informerConfig.Kind, err)
 	}
-	rlog.Debugf("Got %d objects for kind '%s': %+v", len(objects), kind, objects)
+	rlog.Debugf("Got %d objects for kind '%s': %+v", len(objects), informerConfig.Kind, objects)
 	if len(objects) > 0 {
-		err = kubeEventsInformer.InitializeItemsList(objects, debug)
+		err = kubeEventsInformer.InitializeItemsList(objects)
 		if err != nil {
 			return nil, err
 		}
@@ -202,14 +204,14 @@ func formatLabelSelector(selector *metaV1.LabelSelector) (string, error) {
 	return res.String(), nil
 }
 
-func resourceFilter(obj interface{}, jqFilter string, debug bool) (res string, err error) {
+func resourceFilter(obj interface{}, jqFilter string) (res string, err error) {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return "", err
 	}
 
 	if jqFilter != "" {
-		stdout, stderr, err := execJq(jqFilter, data, debug)
+		stdout, stderr, err := execJq(jqFilter, data)
 		if err != nil {
 			return "", fmt.Errorf("failed exec jq: \nerr: '%s'\nstderr: '%s'", err, stderr)
 		}
@@ -232,10 +234,10 @@ func (em *MainKubeEventsManager) Stop(configId string) error {
 }
 
 type KubeEventsInformer struct {
-	ConfigId           string
-	Kind               string
-	EventTypes         []OnKubernetesEventType
-	JqFilter           string
+	Config KubeEventInformerConfig
+
+	ConfigId string
+
 	Checksum           map[string]string
 	SharedInformer     cache.SharedInformer
 	SharedInformerStop chan struct{}
@@ -248,30 +250,28 @@ func NewKubeEventsInformer() *KubeEventsInformer {
 	return kubeEventsInformer
 }
 
-func (ei *KubeEventsInformer) InitializeItemsList(objects []runtime.Object, debug bool) error {
+func (ei *KubeEventsInformer) InitializeItemsList(objects []runtime.Object) error {
 	for _, obj := range objects {
-		resourceId, err := runtimeResourceId(obj)
+		resourceId, err := runtimeResourceId(obj, ei.Config.Kind)
 		if err != nil {
 			return err
 		}
 
-		filtered, err := resourceFilter(obj, ei.JqFilter, debug)
+		filtered, err := resourceFilter(obj, ei.Config.JqFilter)
 		if err != nil {
 			return err
 		}
 
 		ei.Checksum[resourceId] = utils_checksum.CalculateChecksum(filtered)
 
-		if debug {
-			rlog.Debugf("Kube events manager: %+v informer %s: %s object %s initialization: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
-				ei.EventTypes,
-				ei.ConfigId,
-				ei.Kind,
-				resourceId,
-				ei.JqFilter,
-				ei.Checksum[resourceId],
-				utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-		}
+		rlog.Debugf("Kube events manager: %+v informer %s: %s object %s initialization: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
+			ei.Config.EventTypes,
+			ei.ConfigId,
+			ei.Config.Kind,
+			resourceId,
+			ei.Config.JqFilter,
+			ei.Checksum[resourceId],
+			utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 	}
 
 	return nil
@@ -281,39 +281,33 @@ func (ei *KubeEventsInformer) InitializeItemsList(objects []runtime.Object, debu
 // obj doesn't contains Kind information, so kind is passed from Run() argument.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modifed is enough)
-func (ei *KubeEventsInformer) HandleKubeEvent(obj interface{}, kind string, newChecksum string, eventType string, sendSignal bool, debug bool) error {
-	objectId, err := runtimeResourceId(obj.(runtime.Object))
-	if err != nil {
-		return fmt.Errorf("failed to get object id: %s", err)
-	}
-
+func (ei *KubeEventsInformer) HandleKubeEvent(obj interface{}, objectId string, newChecksum string, eventType OnKubernetesEventType) {
 	if ei.Checksum[objectId] != newChecksum {
-		oldChecksum := ei.Checksum[objectId]
 		ei.Checksum[objectId] = newChecksum
 
-		if debug {
-			rlog.Debugf("Kube events manager: %+v informer %s: %s object %s: checksum has changed: '%s' -> '%s'", ei.EventTypes, ei.ConfigId, ei.Kind, objectId, oldChecksum, newChecksum)
+		rlog.Debugf("KUBE_EVENTS %s informer for %+v: handle %s of %s: checksum changed, send KubeEvent",
+			ei.ConfigId,
+			eventType,
+			objectId,
+		)
+		// Safe to ignore an error because of previous call to runtimeResourceId()
+		namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
+		KubeEventCh <- KubeEvent{
+			ConfigId:  ei.ConfigId,
+			Events:    []string{string(eventType)},
+			Namespace: namespace,
+			Kind:      ei.Config.Kind,
+			Name:      name,
 		}
-
-		if sendSignal {
-			if debug {
-				rlog.Debugf("Kube events manager: %+v informer %s: %s object %s: sending EVENT", ei.EventTypes, ei.ConfigId, ei.Kind, objectId)
-			}
-			// Safe to ignore an error because of previous call to runtimeResourceId()
-			namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
-			KubeEventCh <- KubeEvent{
-				ConfigId:  ei.ConfigId,
-				Events:    []string{eventType},
-				Namespace: namespace,
-				Kind:      kind,
-				Name:      name,
-			}
-		}
-	} else if debug {
-		rlog.Debugf("Kube events manager: %+v informer %s: %s object %s: checksum '%s' has not changed", ei.EventTypes, ei.ConfigId, ei.Kind, objectId, newChecksum)
+	} else {
+		rlog.Debugf("KUBE_EVENTS %s informer: handle %s of %s: checksum has not changed",
+			ei.ConfigId,
+			eventType,
+			objectId,
+		)
 	}
 
-	return nil
+	return
 }
 
 // metaFromEventObject returns name and namespace from api object
@@ -327,21 +321,17 @@ func metaFromEventObject(obj interface{}) (namespace string, name string, err er
 	return
 }
 
-func runtimeResourceId(obj interface{}) (string, error) {
+func runtimeResourceId(obj interface{}, kind string) (string, error) {
 	namespace, name, err := metaFromEventObject(obj)
 	if err != nil {
 		return "", err
 	}
 
-	return generateChecksumId(name, namespace), nil
-}
-
-func generateChecksumId(name, namespace string) string {
-	return fmt.Sprintf("name=%s namespace=%s", name, namespace)
+	return fmt.Sprintf("%s/%s/%s", namespace, kind, name), nil
 }
 
 func (ei *KubeEventsInformer) ShouldHandleEvent(checkEvent OnKubernetesEventType) bool {
-	for _, event := range ei.EventTypes {
+	for _, event := range ei.Config.EventTypes {
 		if event == checkEvent {
 			return true
 		}
@@ -359,7 +349,7 @@ func (ei *KubeEventsInformer) Stop() {
 	close(ei.SharedInformerStop)
 }
 
-func execJq(jqFilter string, jsonData []byte, debug bool) (stdout string, stderr string, err error) {
+func execJq(jqFilter string, jsonData []byte) (stdout string, stderr string, err error) {
 	cmd := exec.Command("/usr/bin/jq", jqFilter)
 
 	var stdinBuf bytes.Buffer
@@ -373,7 +363,7 @@ func execJq(jqFilter string, jsonData []byte, debug bool) (stdout string, stderr
 	var stderrBuf bytes.Buffer
 	cmd.Stderr = &stderrBuf
 
-	err = executor.Run(cmd, debug)
+	err = executor.Run(cmd)
 	stdout = strings.TrimSpace(stdoutBuf.String())
 	stderr = strings.TrimSpace(stderrBuf.String())
 

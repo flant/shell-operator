@@ -11,17 +11,11 @@ import (
 
 var ExecutorLock = &sync.Mutex{}
 
-func Run(cmd *exec.Cmd, debug bool) error {
+func Run(cmd *exec.Cmd) error {
 	ExecutorLock.Lock()
 	defer ExecutorLock.Unlock()
 
-	if debug {
-		dir := ""
-		if cmd.Dir != "" {
-			dir = " in '" + cmd.Dir + "'"
-		}
-		rlog.Debugf("Executing command%s: '%s'", dir, strings.Join(cmd.Args, " "))
-	}
+	rlog.Debugf("Executing command %q in %q dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
 	return cmd.Run()
 }

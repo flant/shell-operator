@@ -186,13 +186,13 @@ func ManagersEventsHandler() {
 		case kubeEvent := <-kube_events_manager.KubeEventCh:
 			rlog.Infof("EVENT Kube event '%s'", kubeEvent.ConfigId)
 
-			res, err := KubeEventsHooks.HandleEvent(kubeEvent)
+			tasks, err := KubeEventsHooks.HandleEvent(kubeEvent)
 			if err != nil {
 				rlog.Errorf("MAIN_LOOP error handling kube event '%s': %s", kubeEvent.ConfigId, err)
 				break
 			}
 
-			for _, resTask := range res.Tasks {
+			for _, resTask := range tasks {
 				TasksQueue.Add(resTask)
 				rlog.Infof("QUEUE add %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
 			}

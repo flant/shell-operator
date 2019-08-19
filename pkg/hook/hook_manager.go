@@ -146,12 +146,12 @@ func (hm *MainHookManager) loadHook(hookPath string) (err error) {
 		return fmt.Errorf("creating hook '%s' failed: %s", hookName, err.Error())
 	}
 
-	hm.addHook(hook)
+	hm.registerHook(hook)
 
 	return nil
 }
 
-func (hm *MainHookManager) addHook(hook *Hook) {
+func (hm *MainHookManager) registerHook(hook *Hook) {
 	if hook.Config.OnStartup != nil {
 		hm.hooksInOrder[OnStartup] = append(hm.hooksInOrder[OnStartup], hook)
 	}

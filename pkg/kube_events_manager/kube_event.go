@@ -13,15 +13,14 @@ const (
 )
 
 type OnKubernetesEventConfig struct {
-	Name              string                  `json:"name"`
-	EventTypes        []OnKubernetesEventType `json:"event"`
-	Kind              string                  `json:"kind"`
-	Selector          *metav1.LabelSelector   `json:"selector"`
-	ObjectName        string                  `json:"objectName"`
-	NamespaceSelector *KubeNamespaceSelector  `json:"namespaceSelector"`
-	JqFilter          string                  `json:"jqFilter"`
-	AllowFailure      bool                    `json:"allowFailure"`
-	DisableDebug      bool                    `json:"disableDebug"`
+	Name              string                  `json:"name,omitempty"`
+	EventTypes        []OnKubernetesEventType `json:"event,omitempty"`
+	Kind              string                  `json:"kind,omitempty"`
+	Selector          *metav1.LabelSelector   `json:"selector,omitempty"`
+	ObjectName        string                  `json:"objectName,omitempty"`
+	NamespaceSelector *KubeNamespaceSelector  `json:"namespaceSelector,omitempty"`
+	JqFilter          string                  `json:"jqFilter,omitempty"`
+	AllowFailure      bool                    `json:"allowFailure,omitempty"`
 }
 
 type KubeNamespaceSelector struct {

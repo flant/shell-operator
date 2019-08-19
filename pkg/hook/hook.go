@@ -101,7 +101,7 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext) error {
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
-	err = executor.Run(hookCmd, true)
+	err = executor.Run(hookCmd)
 	if err != nil {
 		return fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
