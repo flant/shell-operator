@@ -4,19 +4,18 @@ version: 2.1
 executors:
   golang:
     docker:
-    - image: circleci/golang:1.11
+    - image: circleci/golang:1.12
 
 jobs:
   test:
     executor: golang
-    working_directory: /go/src/github.com/flant/shell-operator
+    working_directory: /tmp/flant/shell-operator
     steps:
       - checkout
-      - run: go get -v -t -d ./...
+      - run: go mod download
       - run: go build -v ./cmd/shell-operator
+      - run: go test -race -v ./...
       # TODO add vet, lint, speller
-      # TODO fix tests
-      #- run: go test -v ./...
 
   build_image_branch:
     machine: true
