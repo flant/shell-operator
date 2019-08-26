@@ -101,7 +101,7 @@ Syntax:
         "matchExpressions": [
           {
             "key": "tier",
-            "operation": "In",
+            "operator": "In",
             "values": ["cache"],
           },
           ...
