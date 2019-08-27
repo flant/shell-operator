@@ -27,9 +27,6 @@ var (
 	WorkingDir string
 	TempDir    string
 
-	// The hostname is the same as the pod name. Can be used for API requests.
-	Hostname string
-
 	TasksQueue *task.TasksQueue
 
 	HookManager hook.HookManager
@@ -42,8 +39,8 @@ var (
 
 	MetricsStorage *metrics_storage.MetricStorage
 
-	// ManagersEventsHandlerStopCh is the channel object for stopping infinite loop of the ManagersEventsHandler.
-	ManagersEventsHandlerStopCh chan struct{}
+	// StopHandleEventsFromManagersCh channel is used to stop loop of the HandleEventsFromManagers.
+	StopHandleEventsFromManagersCh chan struct{}
 )
 
 var (
@@ -126,11 +123,11 @@ func Run() {
 	//go HookManager.Run()
 	go ScheduleManager.Run()
 
-	// Metric add handler
+	// Metric storage
 	go MetricsStorage.Run()
 
-	// Managers events handler adds task to the queue on every received event/
-	go ManagersEventsHandler()
+	// Managers are generating event. This go-routine handles all events and converts them into queued tasks.
+	go HandleEventsFromManagers()
 
 	// TasksRunner runs tasks from the queue.
 	go TasksRunner()
@@ -138,7 +135,7 @@ func Run() {
 	RunMetrics()
 }
 
-func ManagersEventsHandler() {
+func HandleEventsFromManagers() {
 	for {
 		select {
 		case hooksEvent := <-hook.EventCh:
@@ -164,24 +161,17 @@ func ManagersEventsHandler() {
 			for _, schHook := range scheduleHooks {
 				var getHookErr error
 
-				_, getHookErr = HookManager.GetHook(schHook.Name)
+				_, getHookErr = HookManager.GetHook(schHook.HookName)
 				if getHookErr == nil {
-					for _, scheduleConfig := range schHook.Schedule {
-						bindingName := scheduleConfig.Name
-						if bindingName == "" {
-							bindingName = hook.ContextBindingType[hook.Schedule]
-						}
-						newTask := task.NewTask(task.HookRun, schHook.Name).
-							WithBinding(hook.Schedule).
-							AppendBindingContext(hook.BindingContext{Binding: bindingName}).
-							WithAllowFailure(scheduleConfig.AllowFailure)
-						TasksQueue.Add(newTask)
-						rlog.Debugf("QUEUE add HookRun@Schedule '%s'", schHook.Name)
-					}
-					continue
+					newTask := task.NewTask(task.HookRun, schHook.HookName).
+						WithBinding(hook.Schedule).
+						AppendBindingContext(hook.BindingContext{Binding: schHook.ConfigName}).
+						WithAllowFailure(schHook.AllowFailure)
+					TasksQueue.Add(newTask)
+					rlog.Debugf("QUEUE add HookRun@Schedule '%s'", schHook.HookName)
 				}
 
-				rlog.Errorf("MAIN_LOOP hook '%s' scheduled but not found by hook_manager", schHook.Name)
+				rlog.Errorf("MAIN_LOOP hook '%s' scheduled but not found by hook_manager", schHook.HookName)
 			}
 		case kubeEvent := <-kube_events_manager.KubeEventCh:
 			rlog.Infof("EVENT Kube event '%s'", kubeEvent.ConfigId)
@@ -196,7 +186,7 @@ func ManagersEventsHandler() {
 				TasksQueue.Add(resTask)
 				rlog.Infof("QUEUE add %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
 			}
-		case <-ManagersEventsHandlerStopCh:
+		case <-StopHandleEventsFromManagersCh:
 			rlog.Infof("EVENT Stop")
 			return
 		}
@@ -280,6 +270,7 @@ func UpdateScheduledHooks(storage schedule_hook.ScheduledHooksStorage) schedule_
 		return nil
 	}
 
+	// map of crontabs that should be stopped in scheduleManager
 	oldCrontabs := map[string]bool{}
 	if storage != nil {
 		for _, crontab := range storage.GetCrontabs() {
@@ -287,33 +278,33 @@ func UpdateScheduledHooks(storage schedule_hook.ScheduledHooksStorage) schedule_
 		}
 	}
 
-	newScheduledTasks := schedule_hook.ScheduledHooksStorage{}
+	newStorage := schedule_hook.ScheduledHooksStorage{}
 
 	hooks := HookManager.GetHooksInOrder(hook.Schedule)
 
 	for _, hookName := range hooks {
 		hmHook, _ := HookManager.GetHook(hookName)
-		for _, schedule := range hmHook.Config.Schedule {
+		for _, schedule := range hmHook.Config.Schedules {
 			_, err := ScheduleManager.Add(schedule.Crontab)
 			if err != nil {
 				rlog.Errorf("Schedule: cannot add '%s' for hook '%s': %s", schedule.Crontab, hookName, err)
 				continue
 			}
 			rlog.Debugf("Schedule: add '%s' for hook '%s'", schedule.Crontab, hookName)
+			newStorage.AddHook(hmHook.Name, schedule)
 		}
-		newScheduledTasks.AddHook(hmHook.Name, hmHook.Config.Schedule)
 	}
 
 	if len(oldCrontabs) > 0 {
-		// Creates a new set of schedules. If the schedule is in oldCrontabs, then sets it to true.
-		newCrontabs := newScheduledTasks.GetCrontabs()
+		// Creates a new set of schedules. If the schedule is in oldCrontabs, then set it to true.
+		newCrontabs := newStorage.GetCrontabs()
 		for _, crontab := range newCrontabs {
 			if _, has_crontab := oldCrontabs[crontab]; has_crontab {
 				oldCrontabs[crontab] = true
 			}
 		}
 
-		// Goes through the old set of schedules and removes from processing schedules with false.
+		// Stop crontabs that was not added to new storage.
 		for crontab, _ := range oldCrontabs {
 			if !oldCrontabs[crontab] {
 				ScheduleManager.Remove(crontab)
@@ -321,7 +312,7 @@ func UpdateScheduledHooks(storage schedule_hook.ScheduledHooksStorage) schedule_
 		}
 	}
 
-	return newScheduledTasks
+	return newStorage
 }
 
 func RunMetrics() {

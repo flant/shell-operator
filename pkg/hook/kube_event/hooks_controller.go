@@ -9,14 +9,12 @@ import (
 )
 
 type KubeEventsHooksController interface {
-	//	EnableGlobalHooks(moduleManager module_manager.ModuleManager, eventsManager kube_events_manager.KubeEventsManager) error
-	//	EnableModuleHooks(moduleName string, moduleManager module_manager.ModuleManager, eventsManager kube_events_manager.KubeEventsManager) error
-	//	DisableModuleHooks(moduleName string, moduleManager module_manager.ModuleManager, eventsManager kube_events_manager.KubeEventsManager) error
 	EnableHooks(hookManager hook.HookManager, eventsManager kube_events_manager.KubeEventsManager) error
-	HandleEvent(kubeEvent kube_events_manager.KubeEvent) (*struct{ Tasks []task.Task }, error)
+	HandleEvent(kubeEvent kube_events_manager.KubeEvent) ([]task.Task, error)
 }
 
 type MainKubeEventsHooksController struct {
+	// All hooks with OnKubernetesEvent bindings
 	KubeHooks map[string]*KubeEventHook
 }
 
@@ -26,108 +24,53 @@ func NewMainKubeEventsHooksController() *MainKubeEventsHooksController {
 	}
 }
 
-func (obj *MainKubeEventsHooksController) EnableHooks(hookManager hook.HookManager, eventsManager kube_events_manager.KubeEventsManager) error {
-	hooks := hookManager.GetHooksInOrder(hook.KubeEvents)
+func (ctrl *MainKubeEventsHooksController) EnableHooks(hookManager hook.HookManager, kubeEventsMgr kube_events_manager.KubeEventsManager) error {
+	hooks := hookManager.GetHooksInOrder(hook.OnKubernetesEvent)
 
 	for _, hookName := range hooks {
 		hmHook, _ := hookManager.GetHook(hookName)
 
-		for _, config := range hmHook.Config.OnKubernetesEvent {
-			if config.NamespaceSelector.Any {
-				informerConfig := kube_events_manager.KubeEventInformerConfig{
-					Name:          fmt.Sprintf("%s-%s", hmHook.Name, config.Name),
-					Kind:          config.Kind,
-					Namespace:     "",
-					ObjectName:    config.ObjectName,
-					EventTypes:    config.EventTypes,
-					JqFilter:      config.JqFilter,
-					LabelSelector: config.Selector,
-				}
-				configId, err := eventsManager.Run(informerConfig)
-				if err != nil {
-					return err
-				}
-				obj.KubeHooks[configId] = &KubeEventHook{
-					HookName: hmHook.Name,
-					Config:   config,
-					ConfigId: configId,
-				}
-			} else if len(config.NamespaceSelector.MatchNames) > 0 {
-				for _, ns := range config.NamespaceSelector.MatchNames {
-					informerConfig := kube_events_manager.KubeEventInformerConfig{
-						Name:          fmt.Sprintf("%s-%s", hmHook.Name, config.Name),
-						Kind:          config.Kind,
-						Namespace:     ns,
-						ObjectName:    config.ObjectName,
-						EventTypes:    config.EventTypes,
-						JqFilter:      config.JqFilter,
-						LabelSelector: config.Selector,
-					}
-					configId, err := eventsManager.Run(informerConfig)
-					if err != nil {
-						return err
-					}
-					obj.KubeHooks[configId] = &KubeEventHook{
-						HookName: hmHook.Name,
-						Config:   config,
-						ConfigId: configId,
-					}
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (obj *MainKubeEventsHooksController) DisableHook(name string, configId string, hookManager hook.HookManager, eventsManager kube_events_manager.KubeEventsManager) error {
-	//hook, err := hookManager.GetHook(name)
-	//if err != nil {
-	//	return err
-	//}
-
-	for configId, desc := range obj.KubeHooks {
-		if desc.HookName == name {
-			err := eventsManager.Stop(configId)
+		for _, config := range hmHook.Config.OnKubernetesEvents {
+			configId, err := kubeEventsMgr.Run(config.Monitor)
 			if err != nil {
-				return err
+				return fmt.Errorf("run kube monitor for onKubernetesEvent binding '%s': %s", config.ConfigName, err)
 			}
-			delete(obj.KubeHooks, configId)
+			ctrl.KubeHooks[configId] = &KubeEventHook{
+				HookName:     hmHook.Name,
+				ConfigName:   config.ConfigName,
+				AllowFailure: config.AllowFailure,
+			}
 		}
+
 	}
 
 	return nil
 }
 
-// HandleEvent
+// HandleEvent receives event from kube_event_manager and generate a new task to run a hook.
 func (obj *MainKubeEventsHooksController) HandleEvent(kubeEvent kube_events_manager.KubeEvent) ([]task.Task, error) {
 	res := make([]task.Task, 0)
 
-	desc, hasKey := obj.KubeHooks[kubeEvent.ConfigId]
+	kubeHook, hasKey := obj.KubeHooks[kubeEvent.ConfigId]
 	if !hasKey {
 		return nil, fmt.Errorf("Unknown kube event: no such config id '%s' registered", kubeEvent.ConfigId)
-	}
-
-	bindingName := desc.Config.Name
-	if desc.Config.Name == "" {
-		bindingName = hook.ContextBindingType[hook.KubeEvents]
 	}
 
 	bindingContext := make([]hook.BindingContext, 0)
 	for _, kEvent := range kubeEvent.Events {
 		bindingContext = append(bindingContext, hook.BindingContext{
-			Binding:           bindingName,
-			ResourceEvent:     kEvent,
+			Binding:           kubeHook.ConfigName,
+			ResourceEvent:     string(kEvent),
 			ResourceNamespace: kubeEvent.Namespace,
 			ResourceKind:      kubeEvent.Kind,
 			ResourceName:      kubeEvent.Name,
 		})
 	}
 
-	newTask := task.NewTask(task.HookRun, desc.HookName).
-		WithBinding(hook.KubeEvents).
+	newTask := task.NewTask(task.HookRun, kubeHook.HookName).
+		WithBinding(hook.OnKubernetesEvent).
 		WithBindingContext(bindingContext).
-		WithAllowFailure(desc.Config.AllowFailure)
+		WithAllowFailure(kubeHook.AllowFailure)
 
 	res = append(res, newTask)
 
