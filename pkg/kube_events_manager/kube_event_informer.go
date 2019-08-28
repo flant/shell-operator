@@ -8,6 +8,7 @@ import (
 	uuid "gopkg.in/satori/go.uuid.v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
@@ -68,7 +69,6 @@ func (ei *KubeEventsInformer) CreateSharedInformer() error {
 	}
 
 	var sharedInformer cache.SharedIndexInformer
-	var objects []runtime.Object
 
 	rlog.Debugf("Discover GVR for kind '%s'...", ei.Monitor.Kind)
 	gvr, err := kube.GroupVersionResourceByKind(ei.Monitor.Kind)
@@ -80,22 +80,17 @@ func (ei *KubeEventsInformer) CreateSharedInformer() error {
 	informer := dynamicinformer.NewFilteredDynamicInformer(kube.DynamicClient, gvr, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
 	sharedInformer = informer.Informer()
 
-	// Save already existed resources to IGNORE watch.Added events about them
-	selector, err := metav1.LabelSelectorAsSelector(ei.Monitor.LabelSelector)
+	listOptions := metav1.ListOptions{}
+	tweakListOptions(&listOptions)
+
+	objList, err := kube.DynamicClient.Resource(gvr).Namespace(ei.Namespace).List(listOptions)
 	if err != nil {
-		rlog.Infof("error creating labelSelector: %v", err)
+		rlog.Errorf("KUBE_EVENTS %s informer: initial list resources of kind '%s': %v", ei.ConfigId, ei.Monitor.Kind, err)
 		return err
 	}
-	objects, err = informer.Lister().List(selector)
+	err = ei.CalculateChecksumFromExistingObjects(objList)
 	if err != nil {
-		return fmt.Errorf("failed to list '%s' resources: %v", ei.Monitor.Kind, err)
-	}
-	rlog.Debugf("Got %d objects for kind '%s': %+v", len(objects), ei.Monitor.Kind, objects)
-	if len(objects) > 0 {
-		err = ei.InitializeItemsList(objects)
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	ei.SharedInformer = sharedInformer
@@ -172,27 +167,34 @@ func SharedInformerEventHandler(informer *KubeEventsInformer) cache.ResourceEven
 	}
 }
 
-func (ei *KubeEventsInformer) InitializeItemsList(objects []runtime.Object) error {
-	for _, obj := range objects {
-		resourceId, err := runtimeResourceId(obj, ei.Monitor.Kind)
+// CalculateChecksumFromExistingObjects fills Checksum map with checksum of existing objects to ignore ADD
+// events from them.
+func (ei *KubeEventsInformer) CalculateChecksumFromExistingObjects(objList *unstructured.UnstructuredList) error {
+	if objList == nil || len(objList.Items) == 0 {
+		rlog.Debugf("KUBE_EVENTS %s informer: Got no existing '%s' resources", ei.ConfigId, ei.Monitor.Kind)
+		return nil
+	}
+
+	rlog.Debugf("KUBE_EVENTS %s informer: Got %d existing '%s' resources: %+v", ei.ConfigId, len(objList.Items), ei.Monitor.Kind, objList.Items)
+
+	for _, obj := range objList.Items {
+		resourceId, err := runtimeResourceId(&obj, ei.Monitor.Kind)
 		if err != nil {
 			return err
 		}
 
-		filtered, err := resourceFilter(obj, ei.Monitor.JqFilter)
+		filtered, err := resourceFilter(&obj, ei.Monitor.JqFilter)
 		if err != nil {
 			return err
 		}
 
 		ei.Checksum[resourceId] = utils_checksum.CalculateChecksum(filtered)
 
-		rlog.Debugf("Kube events manager: %+v informer %s: %s object %s initialization: jqFilter '%s': calculated checksum '%s' of object being watched:\n%s",
-			ei.Monitor.EventTypes,
+		rlog.Debugf("KUBE_EVENTS %s informer: initial checksum of %s is %s. jqFilter '%s' output:\n%s",
 			ei.ConfigId,
-			ei.Monitor.Kind,
 			resourceId,
-			ei.Monitor.JqFilter,
 			ei.Checksum[resourceId],
+			ei.Monitor.JqFilter,
 			utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 	}
 
