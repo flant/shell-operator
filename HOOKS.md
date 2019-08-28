@@ -21,6 +21,7 @@ Shell-operator runs the hook with the `--config` flag. In response the hook shou
 
 ```
 {
+  "configVersion": "v1",
   "onStartup": ORDER,
   "schedule": [
     {SCHEDULE_PARAMETERS},
@@ -33,6 +34,8 @@ Shell-operator runs the hook with the `--config` flag. In response the hook shou
 }
 ```
 
+`configVersion` field specifies a version of configuration schema. The latest schema version is "v1" and it is described below.
+
 Event binding is an event type (onStartup, schedule, and onKubernetesEvent) plus parameters required for a subscription.
 
 #### onStartup
@@ -42,6 +45,7 @@ The execution at the Shell-operator’ startup.
 Syntax:
 ```
 {
+  "configVersion": "v1",
   "onStartup": ORDER
 }
 ```
@@ -57,6 +61,7 @@ Scheduled execution. You can bind a hook to any number of schedules.
 Syntax:
 ```
 {
+  "configVersion": "v1",
   "schedule": [
      {
       "name": "Every 20 minutes",
@@ -64,7 +69,7 @@ Syntax:
       "allowFailure": true|false,
     },
     {
-      "crontab": "* * * * * *,
+      "crontab": "* * * * * *",
       "allowFailure": true|false,
     },
     ...
@@ -87,12 +92,13 @@ Run a hook on a Kubernetes object changes.
 Syntax:
 ```
 {
+  "configVersion": "v1",
   "onKubernetesEvent": [
     {
       "name": "Monitor labeled pods in cache tier",
       "kind": "Pod",
       "event": [ "add", "update", "delete" ],
-      "selector": {
+      "labelSelector": {
         "matchLabels": {
           "myLabel": "myLabelValue",
           "someKey": "someValue",
@@ -107,10 +113,20 @@ Syntax:
           ...
         ],
       },
-      "objectName": "backend-7zxyf",
-      "namespaceSelector": {
-        "matchNames": ["somenamespace", "proj-production", "proj-stage"],
-        "any": true|false,
+      "fieldSelector": { 
+        "matchExpressions": [
+          {
+            "field": "status.phase",
+            "operator": "Equal",
+            "value": "Pending",
+          },
+          ...
+        ],
+      },
+      "namespace": {
+        "nameSelector": {
+          "matchNames": ["somenamespace", "proj-production", proj-stage"],
+        }
       },
       "jqFilter": ".metadata.labels",
       "allowFailure": true|false,
@@ -127,42 +143,44 @@ Parameters:
 - `name` is an optional identifier. It is used to distinguish different bindings during runtime. For more info see [binding context](#binding-context).
 
 - `kind` is the type of a monitored Kubernetes resource. CRDs are supported, but resource should be registered in cluster before shell-operator starts. This can be checked with `kubectl api-resources` command. You can specify case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:
+
 ```
 "kind": "DaemonSet"
 "kind": "Daemonset"
 "kind": "daemonsets"
 "kind": "DaemonSets"
-"kind": "ds" 
+"kind": "ds"
 ```  
 
 - `event` — the list of monitored events (add, update, delete). By default all events will be monitored.
 
-- `selector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#labelselector-v1-meta) selector of objects (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).
+- `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).
   If the selector is not set, then all objects are selected.
 
-- `objectName` — allows to specify a concrete Kubernetes object name. Can be used with or without `selector`.
+- `fieldSelector` — selector of objects by their fields, works like `--field-selector=''` flag of `kubectl`. Due to limits of API, supported operators are Equal and NotEqual and all expressions are combined with AND.
 
-- `namespaceSelector` — specifies the filter for selecting namespaces. If you omit it, the events from all namespaces will be monitored.
+- `namespace` — a filter to choose namespaces. If omitted, then the events from all namespaces will be monitored. Currently supported only `nameSelector` filter which can monitor event from particular list of namespaces. 
 
 - `jqFilter` —  an optional parameter that specifies additional event filtering with [jq syntax](https://stedolan.github.io/jq/manual/). The hook will be triggered only when the properties of an object are changed after the filter is applied. See example [102-monitor-namespaces](examples/102-monitor-namespaces).
 
 - `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
 Example:
-```
+```json
 {
+  "configVersion": "v1",
   "onKubernetesEvent": [
     {
       "name": "Trigger on labels changes of Pods with myLabel:myLabelValue in any namespace",
       "kind": "pod",
       "event": ["update"],
-      "selector": {
+      "labelSelector": {
         "matchLabels": {
           "myLabel": "myLabelValue"
         }
       },
-      "namespaceSelector": {
-        "any": true
+      "namespace": {
+        "nameSelector": ["default"]
       },
       "jqFilter": ".metadata.labels",
       "allowFailure": true
@@ -170,6 +188,10 @@ Example:
   ]
 }
 ```
+
+This hook configuration will execute hook on each change in labels of pods labeled with myLabel=myLabelValue in default namespace.  
+
+> Note: unlike `kubectl` you should explicitly define namespace.nameSelector to monitor events from `default` namespace.
 
 > Note: Shell-operator requires a ServiceAccount with the appropriate [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) permissions. See examples with RBAC: [monitor-pods](examples/101-monitor-pods) and [monitor-namespaces](examples/102-monitor-namespaces).
 
@@ -212,6 +234,7 @@ For example, if you have the following binding configuration of a hook:
 
 ```json
 {
+  "configVersion": "v1",
   "schedule": [
     {
       "name": "incremental",
