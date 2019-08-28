@@ -11,12 +11,13 @@ import (
 	"github.com/romana/rlog"
 )
 
-// ошибка waitid: no child process приходит от bash, который запускается основным процессом,
-// если reaper почистил дочерний процесс этого bash-а.
-// Нельзя запускать reaper параллельно с работающими cmd.Run или cmd.Output, потому что
-// даже если отловить ECHILD, то не получится узнать exitCode — его уже собрал reaper :(
-func TestCmdRun(t *testing.T) {
-	//t.SkipNow()
+// Not really a test, more like a proof of concept.
+//
+// Reaper should not work in parallel with cmd.Run or cmd.Output:
+// - cmd.Run do wait children, but reaper will clean them
+// - reaper prevent to get real exitCode from cmd.Run
+func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
+	t.SkipNow()
 	os.Setenv("RLOG_LOG_LEVEL", "DEBUG")
 	rlog.UpdateEnv()
 
@@ -95,9 +96,9 @@ func TestCmdRun(t *testing.T) {
 	return
 }
 
-// Проверка блокировок между reaper и вызовом cmd.Run
-// Запуск 10 горутин с вызовом bash и рипера
-func TestExecutorCmdRun(t *testing.T) {
+// Check that reaper and cmd.Run are locked.
+// Run 10 go-routines that execute bash.
+func Test_Executor_Reaper_And_CmdRun_AreLocked(t *testing.T) {
 	t.SkipNow()
 	os.Setenv("RLOG_LOG_LEVEL", "DEBUG")
 	rlog.UpdateEnv()
@@ -154,7 +155,7 @@ func TestExecutorCmdRun(t *testing.T) {
 				ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
 				exitCode = ws.ExitStatus()
 			}
-			rlog.Debugf("command result, stdout: %v, stderr: %v, exitCode: %v, echild: %v", stdout, stderr, exitCode)
+			rlog.Debugf("command result, stdout: %v, stderr: %v, exitCode: %v", stdout, stderr, exitCode)
 			stopCh <- true
 		}()
 

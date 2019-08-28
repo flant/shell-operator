@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMainScheduleManager_Add(t *testing.T) {
+func Test_MainScheduleManager_Add(t *testing.T) {
 	sm := NewMainScheduleManager()
 
 	expectations := []struct {
@@ -69,7 +69,7 @@ func TestMainScheduleManager_Add(t *testing.T) {
 	})
 }
 
-func TestMainScheduleManager_Run(t *testing.T) {
+func Test_MainScheduleManager_Run(t *testing.T) {
 	sm := NewMainScheduleManager()
 	ScheduleCh = make(chan string)
 
@@ -114,7 +114,7 @@ infinity:
 	}
 }
 
-func TestMainScheduleManager_Remove(t *testing.T) {
+func Test_MainScheduleManager_Remove(t *testing.T) {
 	t.Run("base", func(t *testing.T) {
 		sm := NewMainScheduleManager()
 

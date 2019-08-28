@@ -3,49 +3,94 @@ package kube_event
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/stretchr/testify/assert"
 )
 
-func Test_MakeKubeEventHookDescriptors(t *testing.T) {
-	hookSh := &hook.Hook{
-		Name:     "hook",
-		Path:     "/hooks/hook.sh",
-		Bindings: []hook.BindingType{},
-		Config: &hook.HookConfig{
-			OnKubernetesEvent: []kube_events_manager.OnKubernetesEventConfig{
-				{Kind: "pod", NamespaceSelector: &kube_events_manager.KubeNamespaceSelector{Any: true}},
-			},
-		},
-	}
-
-	evs := MakeKubeEventHookDescriptors(hookSh)
-
-	assert.Equal(t, len(evs), 1)
+type MockKubeEventsManager struct {
 }
 
-func Test_MakeKubeEventHookDescriptors_Two(t *testing.T) {
-	hookSh := hook.NewHook("hook2", "/hooks/hook-2.sh")
-	config := `{"onStartup": 10,
-  "onKubernetesEvent":[
-  {"kind": "pod",
-   "event":["add"],
-   "namespaceSelector": {"matchNames":["example-monitor-pods"]}
-  },
-  {"kind": "Crontab",
-   "event":["add", "update"]
-  }
-]}
-`
-	h, err := hookSh.WithConfig([]byte(config))
+func (MockKubeEventsManager) Run(monitorConfig *kube_events_manager.MonitorConfig) (string, error) {
+	return monitorConfig.Kind, nil
+}
 
-	assert.NoError(t, err)
+func (MockKubeEventsManager) Stop(configId string) error {
+	return nil
+}
 
-	assert.Equal(t, len(h.Config.OnKubernetesEvent), 2)
+type MockHookManager struct {
+}
 
-	evs := MakeKubeEventHookDescriptors(h)
+func (*MockHookManager) Run() {
+	panic("implement me")
+}
 
-	assert.Equal(t, len(evs), 2)
+func (*MockHookManager) GetHook(name string) (*hook.Hook, error) {
+	switch name {
+	case "hook-1":
+		return &hook.Hook{
+			Name: "hook-1",
+			Path: "/hooks/hook-1",
+			Config: &hook.HookConfig{
+				Version: "v1",
+				OnKubernetesEvents: []hook.OnKubernetesEventConfig{
+					{
+						CommonBindingConfig: hook.CommonBindingConfig{
+							ConfigName:   "monitor configmaps",
+							AllowFailure: false,
+						},
+						Monitor: &kube_events_manager.MonitorConfig{
+							ConfigIdPrefix: "monitor-configmaps",
+							Kind:           "ConfigMap",
+							EventTypes:     []kube_events_manager.KubeEventType{kube_events_manager.KubeEventUpdate},
+						},
+					},
+				},
+			},
+		}, nil
+	case "second":
+		return &hook.Hook{
+			Name: "second",
+			Path: "/hooks/second",
+			Config: &hook.HookConfig{
+				Version: "v1",
+				OnKubernetesEvents: []hook.OnKubernetesEventConfig{
+					{
+						CommonBindingConfig: hook.CommonBindingConfig{
+							ConfigName:   "monitor pods",
+							AllowFailure: false,
+						},
+						Monitor: &kube_events_manager.MonitorConfig{
+							ConfigIdPrefix: "monitor-pods",
+							Kind:           "pod",
+							EventTypes:     []kube_events_manager.KubeEventType{kube_events_manager.KubeEventAdd},
+						},
+					},
+				},
+			},
+		}, nil
+	}
+	return nil, nil
+}
+
+func (*MockHookManager) GetHooksInOrder(bindingType hook.BindingType) []string {
+	return []string{
+		"hook-1",
+		"second",
+	}
+}
+
+func (*MockHookManager) RunHook(hookName string, binding hook.BindingType, bindingContext []hook.BindingContext) error {
+	panic("implement me")
+}
+
+func Test_KubeHooksController_EnableHooks(t *testing.T) {
+	ctrl := NewMainKubeEventsHooksController()
+
+	err := ctrl.EnableHooks(&MockHookManager{}, MockKubeEventsManager{})
+
+	if assert.NoError(t, err) {
+		assert.Len(t, ctrl.KubeHooks, 2)
+	}
 }
