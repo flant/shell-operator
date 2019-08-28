@@ -150,9 +150,10 @@ func HandleEventsFromManagers() {
 				// start informers for kube events
 				err := KubeEventsHooks.EnableHooks(HookManager, KubeEventsManager)
 				if err != nil {
-					// Something wrong with hooks configs...
-					rlog.Errorf("Enable kube events for hooks error: %v", err)
-					TasksQueue.Add(task.NewTask(task.Exit, "exit"))
+					// Something wrong with hooks configs, cannot start informers.
+					rlog.Errorf("Enable OnKubernetesEvent hooks: %v", err)
+					// add exit task as first element
+					TasksQueue.Push(task.NewTask(task.Exit, "exit"))
 					return
 				}
 			}

@@ -2,6 +2,7 @@ package kube_events_manager
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/romana/rlog"
@@ -70,13 +71,14 @@ func (ei *KubeEventsInformer) CreateSharedInformer() error {
 
 	var sharedInformer cache.SharedIndexInformer
 
-	rlog.Debugf("Discover GVR for kind '%s'...", ei.Monitor.Kind)
+	rlog.Debugf("KUBE_EVENTS %s informer: discover GVR for kind '%s'...", ei.ConfigId, ei.Monitor.Kind)
 	gvr, err := kube.GroupVersionResourceByKind(ei.Monitor.Kind)
 	if err != nil {
-		rlog.Errorf("error getting GVR for kind '%s': %v", ei.Monitor.Kind, err)
+		rlog.Errorf("KUBE_EVENTS %s informer: Cannot get GroupVersionResource info for kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.ConfigId, ei.Monitor.Kind, err)
 		return err
 	}
-	rlog.Infof("GVR for kind '%s' is %+v", ei.Monitor.Kind, gvr)
+	rlog.Debugf("KUBE_EVENTS %s informer: GVR for kind '%s' is '%s'", ei.ConfigId, ei.Monitor.Kind, gvr.String())
+
 	informer := dynamicinformer.NewFilteredDynamicInformer(kube.DynamicClient, gvr, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
 	sharedInformer = informer.Informer()
 
@@ -209,9 +211,9 @@ func (ei *KubeEventsInformer) HandleKubeEvent(obj interface{}, objectId string, 
 	if ei.Checksum[objectId] != newChecksum {
 		ei.Checksum[objectId] = newChecksum
 
-		rlog.Debugf("KUBE_EVENTS %s informer for %+v: handle %s of %s: checksum changed, send KubeEvent",
+		rlog.Debugf("KUBE_EVENTS %s informer: %+v %s: checksum changed, send KubeEvent",
 			ei.ConfigId,
-			eventType,
+			strings.ToUpper(string(eventType)),
 			objectId,
 		)
 		// Safe to ignore an error because of previous call to runtimeResourceId()
@@ -224,9 +226,9 @@ func (ei *KubeEventsInformer) HandleKubeEvent(obj interface{}, objectId string, 
 			Name:      name,
 		}
 	} else {
-		rlog.Debugf("KUBE_EVENTS %s informer: handle %s of %s: checksum has not changed",
+		rlog.Debugf("KUBE_EVENTS %s informer: %+v %s: checksum has not changed",
 			ei.ConfigId,
-			eventType,
+			strings.ToUpper(string(eventType)),
 			objectId,
 		)
 	}
@@ -244,11 +246,11 @@ func (ei *KubeEventsInformer) ShouldHandleEvent(checkEvent KubeEventType) bool {
 }
 
 func (ei *KubeEventsInformer) Run() {
-	rlog.Debugf("Kube events manager: run informer %s", ei.ConfigId)
+	rlog.Debugf("KUBE_EVENTS %s informer: RUN", ei.ConfigId)
 	ei.SharedInformer.Run(ei.SharedInformerStop)
 }
 
 func (ei *KubeEventsInformer) Stop() {
-	rlog.Debugf("Kube events manager: stop informer %s", ei.ConfigId)
+	rlog.Debugf("KUBE_EVENTS %s informer: STOP", ei.ConfigId)
 	close(ei.SharedInformerStop)
 }

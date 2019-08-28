@@ -58,6 +58,7 @@ func execJq(jqFilter string, jsonData []byte) (stdout string, stderr string, err
 func metaFromEventObject(obj interface{}) (namespace string, name string, err error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
+		err = fmt.Errorf("get ns and name from Object: %s", err)
 		return
 	}
 	namespace = accessor.GetNamespace()
@@ -84,6 +85,10 @@ func formatLabelSelector(selector *metav1.LabelSelector) (string, error) {
 }
 
 func formatFieldSelector(selector *FieldSelector) (string, error) {
+	if selector == nil || selector.MatchExpressions == nil {
+		return "", nil
+	}
+
 	requirements := []fields.Selector{}
 
 	for _, req := range selector.MatchExpressions {

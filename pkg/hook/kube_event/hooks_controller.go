@@ -33,7 +33,7 @@ func (ctrl *MainKubeEventsHooksController) EnableHooks(hookManager hook.HookMana
 		for _, config := range hmHook.Config.OnKubernetesEvents {
 			configId, err := kubeEventsMgr.Run(config.Monitor)
 			if err != nil {
-				return fmt.Errorf("run kube monitor for onKubernetesEvent binding '%s': %s", config.ConfigName, err)
+				return fmt.Errorf("run kube monitor for hook %s: %s", hmHook.Name, err)
 			}
 			ctrl.KubeHooks[configId] = &KubeEventHook{
 				HookName:     hmHook.Name,
