@@ -116,3 +116,42 @@ func Test_HookConfig_V1(t *testing.T) {
 		assert.Len(t, hc.OnKubernetesEvents, 1)
 	}
 }
+
+func Test_HookConfig_Convert_v1(t *testing.T) {
+
+	var hookConfig *HookConfig
+	var err error
+
+	tests := []struct {
+		name     string
+		jsonText string
+		testFn   func()
+	}{
+		{
+			"empty nameSelector.matchNames",
+			`{"configVersion":"v1", "onKubernetesEvent": [{"kind":"pod", "nameSelector":{}}]}`,
+			func() {
+				if assert.NoError(t, err) {
+					assert.Len(t, hookConfig.OnKubernetesEvents, 1)
+					assert.NotNil(t, hookConfig.OnKubernetesEvents[0].Monitor)
+					assert.NotNil(t, hookConfig.OnKubernetesEvents[0].Monitor.NameSelector)
+					// MatchNames array is nil
+					//assert.NotNil(t, hookConfig.OnKubernetesEvents[0].Monitor.NameSelector.MatchNames)
+					assert.Len(t, hookConfig.OnKubernetesEvents[0].Monitor.NameSelector.MatchNames, 0)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hookConfig = &HookConfig{}
+			err = nil
+			err = json.Unmarshal([]byte(test.jsonText), hookConfig)
+			if assert.NoError(t, err) {
+				err = hookConfig.Convert()
+				test.testFn()
+			}
+		})
+	}
+}

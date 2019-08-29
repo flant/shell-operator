@@ -196,7 +196,9 @@ func (c *HookConfig) ConvertV0() (err error) {
 		monitor.ApiVersion = config.ApiVersion
 		monitor.Kind = config.Kind
 		if config.ObjectName != "" {
-			monitor.AddFieldSelectorRequirement("metadata.name", "=", config.ObjectName)
+			monitor.WithNameSelector(&kubemgr.NameSelector{
+				MatchNames: []string{config.ObjectName},
+			})
 		}
 		if config.NamespaceSelector != nil && !config.NamespaceSelector.Any {
 			monitor.WithNamespaceSelector(&kubemgr.NamespaceSelector{
@@ -245,6 +247,7 @@ func (c *HookConfig) ConvertV1() (err error) {
 		monitor.WithEventTypes(config.EventTypes)
 		monitor.ApiVersion = config.ApiVersion
 		monitor.Kind = config.Kind
+		monitor.WithNameSelector((*kubemgr.NameSelector)(config.NameSelector))
 		monitor.WithFieldSelector((*kubemgr.FieldSelector)(config.FieldSelector))
 		monitor.WithNamespaceSelector((*kubemgr.NamespaceSelector)(config.Namespace))
 		monitor.WithLabelSelector(config.LabelSelector)

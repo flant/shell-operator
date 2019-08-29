@@ -98,6 +98,9 @@ Syntax:
       "name": "Monitor labeled pods in cache tier",
       "kind": "Pod",
       "event": [ "add", "update", "delete" ],
+      "nameSelector": {
+        "matchNames": ["pod-0", "pod-1"],
+      },
       "labelSelector": {
         "matchLabels": {
           "myLabel": "myLabelValue",
@@ -150,9 +153,11 @@ Parameters:
 "kind": "daemonsets"
 "kind": "DaemonSets"
 "kind": "ds"
-```  
+```
 
 - `event` — the list of monitored events (add, update, delete). By default all events will be monitored.
+
+- `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of specified kind are selected.
 
 - `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).
   If the selector is not set, then all objects are selected.
