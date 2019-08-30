@@ -96,6 +96,7 @@ Syntax:
   "onKubernetesEvent": [
     {
       "name": "Monitor labeled pods in cache tier",
+      "apiVersion": "v1",
       "kind": "Pod",
       "event": [ "add", "update", "delete" ],
       "nameSelector": {

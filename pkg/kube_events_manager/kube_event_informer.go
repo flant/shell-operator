@@ -7,7 +7,6 @@ import (
 
 	"github.com/romana/rlog"
 	uuid "gopkg.in/satori/go.uuid.v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,19 +63,31 @@ func (ei *MainKubeEventsInformer) WithNamespace(ns string) {
 	ei.Namespace = ns
 }
 
-func (ei *MainKubeEventsInformer) CreateSharedInformer() error {
-	formatSelector, err := formatLabelSelector(ei.Monitor.LabelSelector)
+func (ei *MainKubeEventsInformer) CreateSharedInformer() (err error) {
+	// define GroupVersionResource for informer
+	rlog.Debugf("KUBE_EVENTS %s informer: discover GVR for kind '%s'...", ei.ConfigId, ei.Monitor.Kind)
+	gvr, err := kube.GroupVersionResourceByKind(ei.Monitor.Kind)
+	if err != nil {
+		rlog.Errorf("KUBE_EVENTS %s informer: Cannot get GroupVersionResource info for kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.ConfigId, ei.Monitor.Kind, err)
+		return err
+	}
+	rlog.Debugf("KUBE_EVENTS %s informer: GVR for kind '%s' is '%s'", ei.ConfigId, ei.Monitor.Kind, gvr.String())
+
+	// define resyncPeriod for informer
+	resyncPeriod := time.Duration(2) * time.Hour
+
+	// define indexers for informer
+	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
+
+	// define tweakListOptions for informer
+	formatSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
 	if err != nil {
 		return fmt.Errorf("format label selector '%s': %s", ei.Monitor.LabelSelector.String(), err)
 	}
-
-	fieldSelector, err := formatFieldSelector(ei.Monitor.FieldSelector)
+	fieldSelector, err := FormatFieldSelector(ei.Monitor.FieldSelector)
 	if err != nil {
-		return fmt.Errorf("format field selector '%s': %s", ei.Monitor.LabelSelector.String(), err)
+		return fmt.Errorf("format field selector '%+v': %s", ei.Monitor.FieldSelector, err)
 	}
-
-	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
-	resyncPeriod := time.Duration(2) * time.Hour
 	tweakListOptions := func(options *metav1.ListOptions) {
 		if fieldSelector != "" {
 			options.FieldSelector = fieldSelector
@@ -86,19 +97,12 @@ func (ei *MainKubeEventsInformer) CreateSharedInformer() error {
 		}
 	}
 
-	var sharedInformer cache.SharedIndexInformer
-
-	rlog.Debugf("KUBE_EVENTS %s informer: discover GVR for kind '%s'...", ei.ConfigId, ei.Monitor.Kind)
-	gvr, err := kube.GroupVersionResourceByKind(ei.Monitor.Kind)
-	if err != nil {
-		rlog.Errorf("KUBE_EVENTS %s informer: Cannot get GroupVersionResource info for kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.ConfigId, ei.Monitor.Kind, err)
-		return err
-	}
-	rlog.Debugf("KUBE_EVENTS %s informer: GVR for kind '%s' is '%s'", ei.ConfigId, ei.Monitor.Kind, gvr.String())
-
+	// create informer with add, update, delete callbacks
 	informer := dynamicinformer.NewFilteredDynamicInformer(kube.DynamicClient, gvr, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
-	sharedInformer = informer.Informer()
+	informer.Informer().AddEventHandler(SharedInformerEventHandler(ei))
+	ei.SharedInformer = informer.Informer()
 
+	// initialize ei.Checksum
 	listOptions := metav1.ListOptions{}
 	tweakListOptions(&listOptions)
 
@@ -111,9 +115,6 @@ func (ei *MainKubeEventsInformer) CreateSharedInformer() error {
 	if err != nil {
 		return err
 	}
-
-	ei.SharedInformer = sharedInformer
-	ei.SharedInformer.AddEventHandler(SharedInformerEventHandler(ei))
 
 	return nil
 }

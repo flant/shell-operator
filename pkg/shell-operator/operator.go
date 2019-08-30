@@ -1,7 +1,6 @@
 package shell_operator
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -48,12 +47,12 @@ var (
 	FailedHookDelay   = 5 * time.Second
 )
 
-// Start is an implementation of a start command
+// Init does some basic checks and instantiate managers
+//
+// - check settings: directories, kube config
+// - initialize managers: hook manager, kube events manager, schedule manager
+// - create an empty task queue
 func Init() (err error) {
-	// Init phase
-	// Collecting the settings: directories, kube config
-	// Initializing all necessary objects: hook manager,kube events manager, schedule manager
-	// Creating an empty queue with onStartup tasks.
 	rlog.Debug("MAIN Init")
 
 	if app.WorkingDir != "" {
@@ -72,7 +71,7 @@ func Init() (err error) {
 		err = os.Mkdir(TempDir, os.FileMode(0777))
 		if err != nil {
 			rlog.Errorf("MAIN Fatal: Cannot create a temporary dir: %s", err)
-			os.Exit(1)
+			return err
 		}
 	}
 	rlog.Infof("Use temporary dir: %s", TempDir)
@@ -80,7 +79,7 @@ func Init() (err error) {
 	// Initializing hook manager (load hooks from WorkingDir)
 	HookManager, err = hook.Init(WorkingDir, TempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to initialize hook manager: %s\n", err)
+		rlog.Errorf("MAIN Fatal: initialize hook manager: %s\n", err)
 		return err
 	}
 
@@ -90,22 +89,22 @@ func Init() (err error) {
 	// Initializing the hooks schedule.
 	ScheduleManager, err = schedule_manager.Init()
 	if err != nil {
-		rlog.Errorf("MAIN Fatal: Cannot initialize schedule manager: %s", err)
-		os.Exit(1)
+		rlog.Errorf("MAIN Fatal: initialize schedule manager: %s", err)
+		return err
 	}
 
 	// Initialize kube client and kube events informers for kube events hooks.
 
 	err = kube.Init(kube.InitOptions{KubeContext: app.KubeContext, KubeConfig: app.KubeConfig})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to initialize kube client: %s\n", err)
+		rlog.Errorf("MAIN Fatal: initialize kube client: %s\n", err)
 		return err
 	}
 
 	KubeEventsManager, err = kube_events_manager.Init()
 	if err != nil {
-		rlog.Errorf("MAIN Fatal: Cannot initialize kube events manager: %s", err)
-		os.Exit(1)
+		rlog.Errorf("MAIN Fatal: initialize kube events manager: %s", err)
+		return err
 	}
 	KubeEventsHooks = kube_event_hook.NewMainKubeEventsHooksController()
 
@@ -153,6 +152,9 @@ func HandleEventsFromManagers() {
 					// Something wrong with hooks configs, cannot start informers.
 					rlog.Errorf("Enable OnKubernetesEvent hooks: %v", err)
 					// add exit task as first element
+					// FIXME implement strict order between onStartup and running informers issue #42
+					TasksQueue.Push(task.NewTask(task.Exit, "exit"))
+					// FIXME hack: TaskRunner pops below task and runs the above task.
 					TasksQueue.Push(task.NewTask(task.Exit, "exit"))
 					return
 				}

@@ -76,6 +76,9 @@ func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, val
 			[]FieldSelectorRequirement{},
 		}
 	}
+	if c.FieldSelector.MatchExpressions == nil {
+		c.FieldSelector.MatchExpressions = make([]FieldSelectorRequirement, 0)
+	}
 
 	req := FieldSelectorRequirement{
 		field,
