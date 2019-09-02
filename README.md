@@ -42,11 +42,15 @@ Let's create a small operator that will watch for all Pods in all Namespaces and
 
 if [[ $1 == "--config" ]] ; then
   cat <<EOF
-  {"onKubernetesEvent": [
-    {"kind":"Pod",
-     "event":["add"]
+  {
+    "configVersion":"v1",
+    "onKubernetesEvent": [
+      {
+        "kind":"Pod",
+        "event":["add"]
+      }
+    ]
   }
-  ]}
 EOF
 else
   podName=$(jq -r .[0].resourceName $BINDING_CONTEXT_PATH)
@@ -145,7 +149,10 @@ This binding has only one parameter: order of execution. Hooks are loaded at sta
 Example `hook --config`:
 
 ```
-{"onStartup":10}
+{
+  "configVersion": "v1",
+  "onStartup":10
+}
 ```
 
 __schedule__
@@ -156,6 +163,7 @@ Example `hook --config` with 2 schedules:
 
 ```
 {
+  "configVersion": "v1",
   "schedule": [
    {"name":"every 10 min",
     "crontab":"0 */10 * * * *",
@@ -178,6 +186,7 @@ Example of `hook --config`:
 
 ```
 {
+  "configVersion": "v1",
   "onKubernetesEvent": [
   {"name":"Execute on changes of namespace labels",
    "kind": "namespace",

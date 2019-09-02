@@ -43,20 +43,6 @@ type Event struct {
 	Type EventType
 }
 
-type BindingType string
-
-const (
-	Schedule   BindingType = "SCHEDULE"
-	OnStartup  BindingType = "ON_STARTUP"
-	KubeEvents BindingType = "KUBE_EVENTS"
-)
-
-var ContextBindingType = map[BindingType]string{
-	Schedule:   "schedule",
-	OnStartup:  "onStartup",
-	KubeEvents: "onKubernetesEvent",
-}
-
 // Additional info from schedule and kube events
 type BindingContext struct {
 	Binding           string `json:"binding"`
@@ -116,16 +102,24 @@ func (hm *MainHookManager) loadAllHooks() error {
 	rlog.Debugf("  Hook paths: %+v", hooksRelativePaths)
 
 	for _, hookPath := range hooksRelativePaths {
-		if err := hm.loadHook(hookPath); err != nil {
+		hook, err := hm.loadHook(hookPath)
+		if err != nil {
 			return err
 		}
+
+		// register hook in indexes
+		for _, binding := range hook.Config.Bindings() {
+			hm.hooksInOrder[binding] = append(hm.hooksInOrder[binding], hook)
+		}
+		hm.hooksByName[hook.Name] = hook
+		hm.hookNamesInOrder = append(hm.hookNamesInOrder, hook.Name)
 	}
 
 	return nil
 }
 
 // TODO move --config execution to a Hook method
-func (hm *MainHookManager) loadHook(hookPath string) (err error) {
+func (hm *MainHookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	rlog.Infof("Load hook config from '%s'", hookPath)
 
 	envs := []string{}
@@ -133,40 +127,20 @@ func (hm *MainHookManager) loadHook(hookPath string) (err error) {
 
 	configOutput, err := execCommandOutput(WorkingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
-		return fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
+		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
 	}
 
 	hookName, err := filepath.Rel(WorkingDir, hookPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	hook, err := NewHook(hookName, hookPath).WithConfig(configOutput)
+	hook, err = NewHook(hookName, hookPath).WithConfig(configOutput)
 	if err != nil {
-		return fmt.Errorf("creating hook '%s' failed: %s", hookName, err.Error())
+		return nil, fmt.Errorf("creating hook '%s' failed: %s", hookName, err.Error())
 	}
 
-	hm.addHook(hook)
-
-	return nil
-}
-
-func (hm *MainHookManager) addHook(hook *Hook) {
-	if hook.Config.OnStartup != nil {
-		hm.hooksInOrder[OnStartup] = append(hm.hooksInOrder[OnStartup], hook)
-	}
-
-	if len(hook.Config.Schedule) != 0 {
-		hm.hooksInOrder[Schedule] = append(hm.hooksInOrder[Schedule], hook)
-	}
-
-	if len(hook.Config.OnKubernetesEvent) != 0 {
-		hm.hooksInOrder[KubeEvents] = append(hm.hooksInOrder[KubeEvents], hook)
-	}
-
-	hm.hooksByName[hook.Name] = hook
-	hm.hookNamesInOrder = append(hm.hookNamesInOrder, hook.Name)
-	return
+	return hook, nil
 }
 
 func execCommandOutput(dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
@@ -186,7 +160,7 @@ func execCommandOutput(dir string, entrypoint string, envs []string, args []stri
 	return output, nil
 }
 
-// HookManager has no events for now unlike antiopa
+// HookManager has no events for now unlike addon-operator
 func (hm *MainHookManager) Run() {
 	panic("implement me")
 }
@@ -206,9 +180,19 @@ func (hm *MainHookManager) GetHooksInOrder(bindingType BindingType) []string {
 		return []string{}
 	}
 
-	sort.Slice(hooks[:], func(i, j int) bool {
-		return hooks[i].OrderByBinding[bindingType] < hooks[j].OrderByBinding[bindingType]
-	})
+	// OnStartup hooks are sorted by onStartup config value
+	if bindingType == OnStartup {
+		sort.Slice(hooks[:], func(i, j int) bool {
+			if !hooks[i].Config.HasBinding(OnStartup) {
+				rlog.Errorf("hook '%s' is registered as OnStartup but has no onStartup value", hooks[i].Name)
+			}
+			if !hooks[j].Config.HasBinding(OnStartup) {
+				rlog.Errorf("hook '%s' is registered as OnStartup but has no onStartup value", hooks[j].Name)
+			}
+
+			return hooks[i].Config.OnStartup.Order < hooks[j].Config.OnStartup.Order
+		})
+	}
 
 	var hooksNames []string
 	for _, hook := range hooks {

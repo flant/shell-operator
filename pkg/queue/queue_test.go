@@ -24,15 +24,13 @@ func (t *QueueTestItem) ToString() string {
 }
 
 func FillQueue(q *Queue) {
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 5; i++ {
 		t := QueueTestItem{Name: fmt.Sprintf("test_task_%04d", i)}
 		q.Push(&t)
 	}
 	fmt.Println("Queue filled")
 }
 
-// TODO Кривая обработка очереди, специально, чтобы в одной go-рутине
-// делался Peek, а во второй Pop того же элемента
 func HandleQueue(q *Queue, ch chan int, name string) {
 	for !q.IsEmpty() {
 		for i := 0; i < 10; i++ {
@@ -57,13 +55,14 @@ func HandleQueue(q *Queue, ch chan int, name string) {
 			}
 		}
 		q.Pop()
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 	}
 
 	ch <- 1
 }
 
-func TestTaskQueue_PeekAndPopInDifferentGoRoutines(t *testing.T) {
+// Test of parallel handling of one queue
+func Test_Queue_PeekAndPopInDifferentGoRoutines(t *testing.T) {
 	q := NewQueue()
 
 	task := QueueTestItem{Name: "First one"}
@@ -86,5 +85,5 @@ func TestTaskQueue_PeekAndPopInDifferentGoRoutines(t *testing.T) {
 	<-stopCh
 	<-stopCh
 
-	assert.Equalf(t, true, q.IsEmpty(), "queue not empty after handling")
+	assert.Truef(t, q.IsEmpty(), "queue not empty after handling")
 }
