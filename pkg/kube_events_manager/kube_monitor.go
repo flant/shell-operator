@@ -11,6 +11,7 @@ type MonitorConfig struct {
 	EventTypes        []KubeEventType
 	ApiVersion        string
 	Kind              string
+	NameSelector      *NameSelector
 	NamespaceSelector *NamespaceSelector
 	LabelSelector     *metav1.LabelSelector
 	FieldSelector     *FieldSelector
@@ -31,6 +32,15 @@ func (c *MonitorConfig) WithEventTypes(types []KubeEventType) *MonitorConfig {
 		}
 	}
 	return c
+}
+
+// WithNamespaceSelector copies input NamespaceSelector into monitor.NamespaceSelector
+func (c *MonitorConfig) WithNameSelector(nSel *NameSelector) {
+	if nSel != nil {
+		c.NameSelector = &NameSelector{
+			nSel.MatchNames,
+		}
+	}
 }
 
 // WithNamespaceSelector copies input NamespaceSelector into monitor.NamespaceSelector
@@ -66,6 +76,9 @@ func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, val
 			[]FieldSelectorRequirement{},
 		}
 	}
+	if c.FieldSelector.MatchExpressions == nil {
+		c.FieldSelector.MatchExpressions = make([]FieldSelectorRequirement, 0)
+	}
 
 	req := FieldSelectorRequirement{
 		field,
@@ -90,4 +103,44 @@ func (c *MonitorConfig) IsAnyNamespace() bool {
 	return c.NamespaceSelector == nil ||
 		(c.NamespaceSelector.NameSelector == nil && c.NamespaceSelector.LabelSelector == nil) ||
 		(c.NamespaceSelector.NameSelector != nil && len(c.NamespaceSelector.NameSelector.MatchNames) == 0)
+}
+
+// Names returns names of monitored objects if nameSelector.matchNames is defined in config.
+func (c *MonitorConfig) Names() []string {
+	res := []string{}
+
+	if c.NameSelector != nil {
+		res = c.NameSelector.MatchNames
+	}
+
+	return res
+}
+
+// Namespaces returns names of namespaces if namescpace.nameSelector
+// is defined in config.
+//
+// If no namespace specified or no namespace.nameSelector or
+// length of namespace.nameSeletor.matchNames is 0
+// then empty string is returned to monitor all namespaces.
+//
+// If namespace.labelSelector is specified, then return empty array.
+func (c *MonitorConfig) Namespaces() (nsNames []string) {
+	if c.NamespaceSelector == nil {
+		return []string{""}
+	}
+
+	if c.NamespaceSelector.LabelSelector != nil {
+		return []string{}
+	}
+
+	if c.NamespaceSelector.NameSelector == nil {
+		return []string{""}
+	}
+
+	if len(c.NamespaceSelector.NameSelector.MatchNames) == 0 {
+		return []string{""}
+	}
+
+	nsNames = c.NamespaceSelector.NameSelector.MatchNames
+	return nsNames
 }

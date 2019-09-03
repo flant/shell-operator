@@ -2,7 +2,9 @@ package hook
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -48,7 +50,6 @@ type ScheduleConfigV0 struct {
 type OnKubernetesEventConfigV0 struct {
 	Name              string                   `json:"name,omitempty"`
 	EventTypes        []kubemgr.KubeEventType  `json:"event,omitempty"`
-	ApiVersion        string                   `json:"apiVersion"`
 	Kind              string                   `json:"kind,omitempty"`
 	Selector          *metav1.LabelSelector    `json:"selector,omitempty"`
 	ObjectName        string                   `json:"objectName,omitempty"`
@@ -193,10 +194,11 @@ func (c *HookConfig) ConvertV0() (err error) {
 		monitor := &kubemgr.MonitorConfig{}
 		monitor.ConfigIdPrefix = config.Name
 		monitor.WithEventTypes(config.EventTypes)
-		monitor.ApiVersion = config.ApiVersion
 		monitor.Kind = config.Kind
 		if config.ObjectName != "" {
-			monitor.AddFieldSelectorRequirement("metadata.name", "=", config.ObjectName)
+			monitor.WithNameSelector(&kubemgr.NameSelector{
+				MatchNames: []string{config.ObjectName},
+			})
 		}
 		if config.NamespaceSelector != nil && !config.NamespaceSelector.Any {
 			monitor.WithNamespaceSelector(&kubemgr.NamespaceSelector{
@@ -239,12 +241,18 @@ func (c *HookConfig) ConvertV1() (err error) {
 	}
 
 	c.OnKubernetesEvents = []OnKubernetesEventConfig{}
-	for _, config := range c.V1.OnKubernetesEvent {
+	for i, config := range c.V1.OnKubernetesEvent {
+		err := c.ValidateOnKubernetesEventV1(config)
+		if err != nil {
+			return fmt.Errorf("invalid onKubernetesEvent config [%d]: %v", i, err)
+		}
+
 		monitor := &kubemgr.MonitorConfig{}
 		monitor.ConfigIdPrefix = config.Name
 		monitor.WithEventTypes(config.EventTypes)
 		monitor.ApiVersion = config.ApiVersion
 		monitor.Kind = config.Kind
+		monitor.WithNameSelector((*kubemgr.NameSelector)(config.NameSelector))
 		monitor.WithFieldSelector((*kubemgr.FieldSelector)(config.FieldSelector))
 		monitor.WithNamespaceSelector((*kubemgr.NamespaceSelector)(config.Namespace))
 		monitor.WithLabelSelector(config.LabelSelector)
@@ -316,4 +324,41 @@ func (c *HookConfig) ValidateScheduleV0(schedule ScheduleConfigV0) (ScheduleConf
 	res.Crontab = schedule.Crontab
 
 	return res, nil
+}
+
+func (c *HookConfig) ValidateOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1) error {
+	msgs := []string{}
+
+	if kubeCfg.Kind == "" {
+		msgs = append(msgs, "kind field is required")
+	}
+
+	if kubeCfg.NameSelector != nil && len(kubeCfg.NameSelector.MatchNames) > 0 {
+		if kubeCfg.FieldSelector != nil && len(kubeCfg.FieldSelector.MatchExpressions) > 0 {
+			for _, expr := range kubeCfg.FieldSelector.MatchExpressions {
+				if expr.Field == "metadata.name" {
+					msgs = append(msgs, "fieldSelector 'metadata.name' and nameSelector.matchNames are mutually exclusive")
+				}
+			}
+		}
+	}
+
+	if kubeCfg.LabelSelector != nil {
+		_, err := kubemgr.FormatLabelSelector(kubeCfg.LabelSelector)
+		if err != nil {
+			msgs = append(msgs, fmt.Sprintf("labelSelector is invalid: %v", err))
+		}
+	}
+
+	if kubeCfg.FieldSelector != nil {
+		_, err := kubemgr.FormatFieldSelector((*kubemgr.FieldSelector)(kubeCfg.FieldSelector))
+		if err != nil {
+			msgs = append(msgs, fmt.Sprintf("fieldSelector is invalid: %s", err))
+		}
+	}
+
+	if len(msgs) > 0 {
+		return errors.New(strings.Join(msgs, ", "))
+	}
+	return nil
 }

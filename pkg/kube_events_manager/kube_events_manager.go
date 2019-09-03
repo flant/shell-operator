@@ -13,12 +13,12 @@ type KubeEventsManager interface {
 
 type MainKubeEventsManager struct {
 	// all created kube informers. Informers are addressed by config id — uuid
-	InformersStore map[string][]*KubeEventsInformer
+	InformersStore map[string][]KubeEventsInformer
 }
 
-func NewMainKubeEventsManager() *MainKubeEventsManager {
+var NewMainKubeEventsManager = func() *MainKubeEventsManager {
 	em := &MainKubeEventsManager{
-		InformersStore: map[string][]*KubeEventsInformer{},
+		InformersStore: map[string][]KubeEventsInformer{},
 	}
 	return em
 }
@@ -31,51 +31,47 @@ func Init() (KubeEventsManager, error) {
 
 // Run launches informer for each namespace in MonitorConfig.NamespaceSelector.MatchNames or
 // for one informer for any namespace if NamespaceSelector is nil
+// TODO cleanup informers in case of error
+// TODO use Context to stop informers
 func (mgr *MainKubeEventsManager) Run(monitorConfig *MonitorConfig) (string, error) {
-	if monitorConfig.IsAnyNamespace() {
-		informer := NewKubeEventsInformer(monitorConfig)
-		informer.UpdateConfigId()
-		err := informer.CreateSharedInformer()
-		if err != nil {
-			return "", err
-		}
-
-		mgr.AddInformer(informer)
-
-		go informer.Run()
-		return informer.ConfigId, nil
+	nsNames := monitorConfig.Namespaces()
+	if len(nsNames) == 0 {
+		return "", fmt.Errorf("unsupported namespace selector %+v", monitorConfig.NamespaceSelector)
 	}
 
-	// TODO cleanup informers in case of error
-	if monitorConfig.NamespaceSelector != nil {
-		configId := NewKubeEventsInformer(monitorConfig).UpdateConfigId()
-		for _, ns := range monitorConfig.NamespaceSelector.NameSelector.MatchNames {
+	// Generate new config id
+	configId := NewKubeEventsInformer(monitorConfig).UpdateConfigId()
+	// create informers for each specified object name in each specified namespace
+	for _, nsName := range nsNames {
+		objNames := monitorConfig.Names()
+		if len(objNames) == 0 {
+			objNames = []string{""}
+		}
+
+		for _, objName := range objNames {
+			if objName != "" {
+				monitorConfig.AddFieldSelectorRequirement("metadata.name", "=", objName)
+			}
 			informer := NewKubeEventsInformer(monitorConfig)
-			informer.ConfigId = configId
-			informer.Namespace = ns
+			informer.WithConfigId(configId)
+			informer.WithNamespace(nsName)
 			err := informer.CreateSharedInformer()
 			if err != nil {
 				return "", err
 			}
-
-			mgr.AddInformer(informer)
+			mgr.AddInformer(informer, configId)
 		}
-
-		for _, informer := range mgr.InformersStore[configId] {
-			go informer.Run()
-		}
-
-		return configId, nil
 	}
 
-	return "", fmt.Errorf("unsupported namespace selector %+v", monitorConfig.NamespaceSelector)
+	for _, informer := range mgr.InformersStore[configId] {
+		go informer.Run()
+	}
+	return configId, nil
 }
 
-func (mgr *MainKubeEventsManager) AddInformer(informer *KubeEventsInformer) {
-	configId := informer.ConfigId
-
+func (mgr *MainKubeEventsManager) AddInformer(informer KubeEventsInformer, configId string) {
 	if _, has := mgr.InformersStore[configId]; !has {
-		mgr.InformersStore[configId] = make([]*KubeEventsInformer, 0)
+		mgr.InformersStore[configId] = make([]KubeEventsInformer, 0)
 	}
 
 	mgr.InformersStore[configId] = append(mgr.InformersStore[configId], informer)

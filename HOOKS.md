@@ -96,8 +96,12 @@ Syntax:
   "onKubernetesEvent": [
     {
       "name": "Monitor labeled pods in cache tier",
+      "apiVersion": "v1",
       "kind": "Pod",
       "event": [ "add", "update", "delete" ],
+      "nameSelector": {
+        "matchNames": ["pod-0", "pod-1"],
+      },
       "labelSelector": {
         "matchLabels": {
           "myLabel": "myLabelValue",
@@ -117,7 +121,7 @@ Syntax:
         "matchExpressions": [
           {
             "field": "status.phase",
-            "operator": "Equal",
+            "operator": "Equals",
             "value": "Pending",
           },
           ...
@@ -142,7 +146,7 @@ Parameters:
 
 - `name` is an optional identifier. It is used to distinguish different bindings during runtime. For more info see [binding context](#binding-context).
 
-- `kind` is the type of a monitored Kubernetes resource. CRDs are supported, but resource should be registered in cluster before shell-operator starts. This can be checked with `kubectl api-resources` command. You can specify case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:
+- `kind` is the type of a monitored Kubernetes resource. This field is required. CRDs are supported, but resource should be registered in cluster before shell-operator starts. This can be checked with `kubectl api-resources` command. You can specify case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:
 
 ```
 "kind": "DaemonSet"
@@ -150,14 +154,16 @@ Parameters:
 "kind": "daemonsets"
 "kind": "DaemonSets"
 "kind": "ds"
-```  
+```
 
 - `event` — the list of monitored events (add, update, delete). By default all events will be monitored.
+
+- `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of specified kind are selected.
 
 - `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).
   If the selector is not set, then all objects are selected.
 
-- `fieldSelector` — selector of objects by their fields, works like `--field-selector=''` flag of `kubectl`. Due to limits of API, supported operators are Equal and NotEqual and all expressions are combined with AND.
+- `fieldSelector` — selector of objects by their fields, works like `--field-selector=''` flag of `kubectl`. Due to limits of API, supported operators are Equals (or `=`, `==`) and NotEquals (or `!=`) and all expressions are combined with AND. Note that fieldSelector with 'metadata.name' field is mutually exclusive with nameSelector. 
 
 - `namespace` — a filter to choose namespaces. If omitted, then the events from all namespaces will be monitored. Currently supported only `nameSelector` filter which can monitor event from particular list of namespaces. 
 
@@ -213,7 +219,7 @@ Events may happen at any time, so the working queue for hooks is provided in the
 
 When an event associated with a hook is triggered, Shell-operator executes the hook without arguments and sets the following environment variables:
 
-- `BINDING_CONTEXT_PATH` — a path to a file containing data about an event that was triggered (binding context);
+- `BINDING_CONTEXT_PATH` — a path to a temporary file containing data about an event that was triggered (binding context);
 
 - `WORKING_DIR` — a path to a hooks directory (see [an example](examples/003-common-library) — using libraries via `WORKING_DIR`).
 

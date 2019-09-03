@@ -242,32 +242,14 @@ func getInClusterContext() (context kubernetes.Interface, err error) {
 //
 // This method is borrowed from kubectl and kubedog. The difference are:
 // - comparison with kind, name and shortnames
-// - debug message
+// - debug messages
 func GroupVersionResourceByKind(kind string) (schema.GroupVersionResource, error) {
 	lists, err := Kubernetes.Discovery().ServerPreferredResources()
 	if err != nil {
 		return schema.GroupVersionResource{}, err
 	}
 
-	// List of available CRDs
-	for _, list := range lists {
-		if len(list.APIResources) == 0 {
-			continue
-		}
-
-		gv, err := schema.ParseGroupVersion(list.GroupVersion)
-		if err != nil {
-			continue
-		}
-
-		for _, resource := range list.APIResources {
-			if len(resource.Verbs) == 0 {
-				continue
-			}
-
-			rlog.Debugf("GVR: %20s %20s %20s %20s", gv.Version, gv.Group, resource.Name, resource.Kind)
-		}
-	}
+	var gvrForKind *schema.GroupVersionResource
 
 	for _, list := range lists {
 		if len(list.APIResources) == 0 {
@@ -284,19 +266,26 @@ func GroupVersionResourceByKind(kind string) (schema.GroupVersionResource, error
 				continue
 			}
 
-			if equalToOneOf(kind, resource.Kind, resource.Name) || equalToOneOf(kind, resource.ShortNames...) {
-				groupVersionResource := schema.GroupVersionResource{
+			// Debug mode will list all available CRDs
+			rlog.Debugf("GVR: %30s %30s %30s", gv.String(), resource.Kind,
+				fmt.Sprintf("%+v", append([]string{resource.Name}, resource.ShortNames...)),
+			)
+
+			if gvrForKind == nil && equalToOneOf(kind, append(resource.ShortNames, resource.Kind, resource.Name)...) {
+				gvrForKind = &schema.GroupVersionResource{
 					Resource: resource.Name,
 					Group:    gv.Group,
 					Version:  gv.Version,
 				}
-
-				return groupVersionResource, nil
 			}
 		}
 	}
 
-	return schema.GroupVersionResource{}, fmt.Errorf("kind %s is not supported", kind)
+	if gvrForKind == nil {
+		return schema.GroupVersionResource{}, fmt.Errorf("kind %s is not supported by cluster", kind)
+	}
+
+	return *gvrForKind, nil
 }
 
 func equalToOneOf(term string, choices ...string) bool {

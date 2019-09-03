@@ -75,7 +75,7 @@ func runtimeResourceId(obj interface{}, kind string) (string, error) {
 	return fmt.Sprintf("%s/%s/%s", namespace, kind, name), nil
 }
 
-func formatLabelSelector(selector *metav1.LabelSelector) (string, error) {
+func FormatLabelSelector(selector *metav1.LabelSelector) (string, error) {
 	res, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
 		return "", err
@@ -84,21 +84,21 @@ func formatLabelSelector(selector *metav1.LabelSelector) (string, error) {
 	return res.String(), nil
 }
 
-func formatFieldSelector(selector *FieldSelector) (string, error) {
+func FormatFieldSelector(selector *FieldSelector) (string, error) {
 	if selector == nil || selector.MatchExpressions == nil {
 		return "", nil
 	}
 
-	requirements := []fields.Selector{}
+	requirements := make([]fields.Selector, 0)
 
 	for _, req := range selector.MatchExpressions {
 		switch req.Operator {
-		case "=", "==":
+		case "=", "==", "Equals":
 			requirements = append(requirements, fields.OneTermEqualSelector(req.Field, req.Value))
-		case "!=":
+		case "!=", "NotEquals":
 			requirements = append(requirements, fields.OneTermNotEqualSelector(req.Field, req.Value))
 		default:
-			return "", fmt.Errorf("%s%s%s: operator %s is not supported", req.Field, req.Operator, req.Value, req.Operator)
+			return "", fmt.Errorf("%s%s%s: operator '%s' is not recognized", req.Field, req.Operator, req.Value, req.Operator)
 		}
 	}
 
