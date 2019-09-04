@@ -98,7 +98,7 @@ Syntax:
       "name": "Monitor labeled pods in cache tier",
       "apiVersion": "v1",
       "kind": "Pod",
-      "event": [ "add", "update", "delete" ],
+      "event": [ "Added", "Modified", "Deleted" ],
       "nameSelector": {
         "matchNames": ["pod-0", "pod-1"],
       },
@@ -156,7 +156,7 @@ Parameters:
 "kind": "ds"
 ```
 
-- `event` — the list of monitored events (add, update, delete). By default all events will be monitored.
+- `event` — the list of monitored events (Added, Modified, Deleted). By default all events will be monitored. Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta).
 
 - `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of specified kind are selected.
 
@@ -179,7 +179,7 @@ Example:
     {
       "name": "Trigger on labels changes of Pods with myLabel:myLabelValue in any namespace",
       "kind": "pod",
-      "event": ["update"],
+      "event": ["Modified"],
       "labelSelector": {
         "matchLabels": {
           "myLabel": "myLabelValue"
@@ -233,10 +233,12 @@ The `BINDING_CONTEXT_PATH` environment variable contains the path to a file with
 
 There are some extra fields for `onKubernetesEvent`-type events:
 
-- `resourceEvent` — the event type is identical to the values in the `event` parameter: “add”, “update” or “delete”.
+- `watchEvent` — the event type is identical to the values in the `event` parameter: “Added”, “Modified” or “Deleted”.
 - `resourceNamespace`, `resourceKind`, `resourceName` — the information about the Kubernetes object associated with an event.
 
-For example, if you have the following binding configuration of a hook:
+#### schedule binding context example
+
+Let's hook have this schedule configuration:
 
 ```json
 {
@@ -246,7 +248,8 @@ For example, if you have the following binding configuration of a hook:
       "name": "incremental",
       "crontab": "0 2 */3 * * *",
       "allowFailure": true
-    }  ]
+    }
+  ]
 }
 ```
 
@@ -254,6 +257,33 @@ For example, if you have the following binding configuration of a hook:
 
 ```json
 [{ "binding": "incremental"}]
+```
+
+#### onKubernetesEvent binding context example
+
+A hook can monitor Pods in all namespaces with this simple configuration:
+
+```json
+{
+  "configVersion": "v1",
+  "onKubernetesEvent": [
+  {"kind": "Pod"}
+  ]
+}
+```
+
+If pod pod-321d12 will be added into namespace 'default', then hook will be executed with following binding context file:
+
+```json
+[
+  {
+    "binding": "onKubernetesEvent",
+    "watchEvent": "Added",
+    "resourceKind": "Pod",
+    "resourceName":  "pod-321d12",
+    "resourceNamespace": "default"
+  }
+]
 ```
 
 ## Debugging

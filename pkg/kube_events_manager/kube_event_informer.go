@@ -137,13 +137,13 @@ var SharedInformerEventHandler = func(informer *MainKubeEventsInformer) cache.Re
 
 			checksum := utils_checksum.CalculateChecksum(filtered)
 
-			if informer.ShouldHandleEvent(KubeEventAdd) {
+			if informer.ShouldHandleEvent(WatchEventAdded) {
 				rlog.Debugf("KUBE_EVENTS %s informer: add: %s object: jqFilter '%s' output:\n%s",
 					informer.ConfigId,
 					objectId,
 					informer.Monitor.JqFilter,
 					utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				informer.HandleKubeEvent(obj, objectId, checksum, KubeEventAdd)
+				informer.HandleKubeEvent(obj, objectId, filtered, checksum, WatchEventAdded)
 			}
 		},
 		UpdateFunc: func(_ interface{}, obj interface{}) {
@@ -162,13 +162,13 @@ var SharedInformerEventHandler = func(informer *MainKubeEventsInformer) cache.Re
 
 			checksum := utils_checksum.CalculateChecksum(filtered)
 
-			if informer.ShouldHandleEvent(KubeEventUpdate) {
+			if informer.ShouldHandleEvent(WatchEventModified) {
 				rlog.Debugf("KUBE_EVENTS %s informer: update: %s object: jqFilter '%s' output:\n%s",
 					informer.ConfigId,
 					objectId,
 					informer.Monitor.JqFilter,
 					utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				informer.HandleKubeEvent(obj, objectId, checksum, KubeEventUpdate)
+				informer.HandleKubeEvent(obj, objectId, filtered, checksum, WatchEventModified)
 			}
 
 		},
@@ -179,9 +179,9 @@ var SharedInformerEventHandler = func(informer *MainKubeEventsInformer) cache.Re
 				return
 			}
 
-			if informer.ShouldHandleEvent(KubeEventDelete) {
+			if informer.ShouldHandleEvent(WatchEventDeleted) {
 				rlog.Debugf("KUBE_EVENTS %s informer: delete: %s", informer.ConfigId, objectId)
-				informer.HandleKubeEvent(obj, objectId, "", KubeEventDelete)
+				informer.HandleKubeEvent(obj, objectId, "", "", WatchEventDeleted)
 			}
 		},
 	}
@@ -225,7 +225,7 @@ func (ei *MainKubeEventsInformer) CalculateChecksumFromExistingObjects(objList *
 // obj doesn't contains Kind information, so kind is passed from Run() argument.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modifed is enough)
-func (ei *MainKubeEventsInformer) HandleKubeEvent(obj interface{}, objectId string, newChecksum string, eventType KubeEventType) {
+func (ei *MainKubeEventsInformer) HandleKubeEvent(obj interface{}, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 	if ei.Checksum[objectId] != newChecksum {
 		ei.Checksum[objectId] = newChecksum
 
@@ -237,11 +237,13 @@ func (ei *MainKubeEventsInformer) HandleKubeEvent(obj interface{}, objectId stri
 		// Safe to ignore an error because of previous call to runtimeResourceId()
 		namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
 		KubeEventCh <- KubeEvent{
-			ConfigId:  ei.ConfigId,
-			Events:    []KubeEventType{eventType},
-			Namespace: namespace,
-			Kind:      ei.Monitor.Kind,
-			Name:      name,
+			ConfigId:     ei.ConfigId,
+			Events:       []WatchEventType{eventType},
+			Namespace:    namespace,
+			Kind:         ei.Monitor.Kind,
+			Name:         name,
+			Object:       obj,
+			FilterResult: filterResult,
 		}
 	} else {
 		rlog.Debugf("KUBE_EVENTS %s informer: %+v %s: checksum has not changed",
@@ -254,7 +256,7 @@ func (ei *MainKubeEventsInformer) HandleKubeEvent(obj interface{}, objectId stri
 	return
 }
 
-func (ei *MainKubeEventsInformer) ShouldHandleEvent(checkEvent KubeEventType) bool {
+func (ei *MainKubeEventsInformer) ShouldHandleEvent(checkEvent WatchEventType) bool {
 	for _, event := range ei.Monitor.EventTypes {
 		if event == checkEvent {
 			return true

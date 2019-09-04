@@ -43,15 +43,6 @@ type Event struct {
 	Type EventType
 }
 
-// Additional info from schedule and kube events
-type BindingContext struct {
-	Binding           string `json:"binding"`
-	ResourceEvent     string `json:"resourceEvent,omitempty"`
-	ResourceNamespace string `json:"resourceNamespace,omitempty"`
-	ResourceKind      string `json:"resourceKind,omitempty"`
-	ResourceName      string `json:"resourceName,omitempty"`
-}
-
 func Init(workingDir string, tempDir string) (HookManager, error) {
 	rlog.Info("Initialize hooks manager ...")
 
