@@ -2,6 +2,7 @@ package kube_event
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -60,7 +61,8 @@ func (obj *MainKubeEventsHooksController) HandleEvent(kubeEvent kube_events_mana
 	for _, kEvent := range kubeEvent.Events {
 		bindingContext = append(bindingContext, hook.BindingContext{
 			Binding:           kubeHook.ConfigName,
-			ResourceEvent:     string(kEvent),
+			WatchEvent:        string(kEvent),
+			ResourceEvent:     strings.ToLower(string(kEvent)),
 			ResourceNamespace: kubeEvent.Namespace,
 			ResourceKind:      kubeEvent.Kind,
 			ResourceName:      kubeEvent.Name,

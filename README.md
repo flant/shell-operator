@@ -47,7 +47,7 @@ if [[ $1 == "--config" ]] ; then
     "onKubernetesEvent": [
       {
         "kind":"Pod",
-        "event":["add"]
+        "event":["Add"]
       }
     ]
   }
@@ -59,7 +59,7 @@ fi
 ```
 
 Make the `pods-hook.sh` executable:
-```
+```shell
 chmod +x pods-hook.sh
 ```
 
@@ -148,7 +148,7 @@ This binding has only one parameter: order of execution. Hooks are loaded at sta
 
 Example `hook --config`:
 
-```
+```json
 {
   "configVersion": "v1",
   "onStartup":10
@@ -161,7 +161,7 @@ This binding is for periodical running of hooks. Schedule can be defined with gr
 
 Example `hook --config` with 2 schedules:
 
-```
+```json
 {
   "configVersion": "v1",
   "schedule": [
@@ -184,13 +184,13 @@ This binding defines a subset of Kubernetes objects that Shell-operator will mon
 
 Example of `hook --config`:
 
-```
+```json
 {
   "configVersion": "v1",
   "onKubernetesEvent": [
   {"name":"Execute on changes of namespace labels",
    "kind": "namespace",
-   "event":["update"],
+   "event":["Update"],
    "jqFilter":".metadata.labels"
   }]
 }

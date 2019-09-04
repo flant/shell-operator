@@ -45,8 +45,11 @@ type Event struct {
 
 // Additional info from schedule and kube events
 type BindingContext struct {
-	Binding           string `json:"binding"`
-	ResourceEvent     string `json:"resourceEvent,omitempty"`
+	Binding string `json:"binding"`
+	// event type from kube API
+	WatchEvent string `json:"watchEvent,omitempty"`
+	// lower cased event type
+	ResourceEvent     string `json:"resourceEvent,omitempty"` // deprecated
 	ResourceNamespace string `json:"resourceNamespace,omitempty"`
 	ResourceKind      string `json:"resourceKind,omitempty"`
 	ResourceName      string `json:"resourceName,omitempty"`

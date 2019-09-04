@@ -43,7 +43,7 @@ func (*MockHookManager) GetHook(name string) (*hook.Hook, error) {
 						Monitor: &kube_events_manager.MonitorConfig{
 							ConfigIdPrefix: "monitor-configmaps",
 							Kind:           "ConfigMap",
-							EventTypes:     []kube_events_manager.KubeEventType{kube_events_manager.KubeEventUpdate},
+							EventTypes:     []kube_events_manager.WatchEventType{kube_events_manager.WatchEventModified},
 						},
 					},
 				},
@@ -64,7 +64,7 @@ func (*MockHookManager) GetHook(name string) (*hook.Hook, error) {
 						Monitor: &kube_events_manager.MonitorConfig{
 							ConfigIdPrefix: "monitor-pods",
 							Kind:           "pod",
-							EventTypes:     []kube_events_manager.KubeEventType{kube_events_manager.KubeEventAdd},
+							EventTypes:     []kube_events_manager.WatchEventType{kube_events_manager.WatchEventAdded},
 						},
 					},
 				},

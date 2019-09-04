@@ -49,7 +49,7 @@ type ScheduleConfigV0 struct {
 // Legacy version of kubernetes event configuration
 type OnKubernetesEventConfigV0 struct {
 	Name              string                   `json:"name,omitempty"`
-	EventTypes        []kubemgr.KubeEventType  `json:"event,omitempty"`
+	EventTypes        []string                 `json:"event,omitempty"`
 	Kind              string                   `json:"kind,omitempty"`
 	Selector          *metav1.LabelSelector    `json:"selector,omitempty"`
 	ObjectName        string                   `json:"objectName,omitempty"`
@@ -66,7 +66,7 @@ type KubeNamespaceSelectorV0 struct {
 // version 1 of kubernetes event configuration
 type OnKubernetesEventConfigV1 struct {
 	Name          string                   `json:"name,omitempty"`
-	EventTypes    []kubemgr.KubeEventType  `json:"event,omitempty"`
+	EventTypes    []kubemgr.WatchEventType `json:"event,omitempty"`
 	ApiVersion    string                   `json:"apiVersion,omitempty"`
 	Kind          string                   `json:"kind,omitempty"`
 	NameSelector  *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
@@ -193,7 +193,23 @@ func (c *HookConfig) ConvertV0() (err error) {
 	for _, config := range c.V0.OnKubernetesEvent {
 		monitor := &kubemgr.MonitorConfig{}
 		monitor.ConfigIdPrefix = config.Name
-		monitor.WithEventTypes(config.EventTypes)
+
+		// a quick fix for legacy version.
+		eventTypes := []kubemgr.WatchEventType{}
+		for _, eventName := range config.EventTypes {
+			switch eventName {
+			case "add":
+				eventTypes = append(eventTypes, kubemgr.WatchEventAdded)
+			case "update":
+				eventTypes = append(eventTypes, kubemgr.WatchEventModified)
+			case "delete":
+				eventTypes = append(eventTypes, kubemgr.WatchEventDeleted)
+			default:
+				return fmt.Errorf("event '%s' is unsupported")
+			}
+		}
+		monitor.WithEventTypes(eventTypes)
+
 		monitor.Kind = config.Kind
 		if config.ObjectName != "" {
 			monitor.WithNameSelector(&kubemgr.NameSelector{
