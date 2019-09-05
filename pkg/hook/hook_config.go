@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	kubemgr "github.com/flant/shell-operator/pkg/kube_events_manager"
 )
@@ -344,6 +345,13 @@ func (c *HookConfig) ValidateScheduleV0(schedule ScheduleConfigV0) (ScheduleConf
 
 func (c *HookConfig) ValidateOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1) error {
 	msgs := []string{}
+
+	if kubeCfg.ApiVersion != "" {
+		_, err := schema.ParseGroupVersion(kubeCfg.ApiVersion)
+		if err != nil {
+			msgs = append(msgs, "apiVersion is invalid")
+		}
+	}
 
 	if kubeCfg.Kind == "" {
 		msgs = append(msgs, "kind is required")

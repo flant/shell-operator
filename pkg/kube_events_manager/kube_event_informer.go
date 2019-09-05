@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 
@@ -64,11 +65,13 @@ func (ei *MainKubeEventsInformer) WithNamespace(ns string) {
 }
 
 func (ei *MainKubeEventsInformer) CreateSharedInformer() (err error) {
-	// define GroupVersionResource for informer
-	rlog.Debugf("KUBE_EVENTS %s informer: discover GVR for kind '%s'...", ei.ConfigId, ei.Monitor.Kind)
-	gvr, err := kube.GroupVersionResourceByKind(ei.Monitor.Kind)
+	// discover GroupVersionResource for informer
+	var gvr schema.GroupVersionResource
+
+	rlog.Debugf("KUBE_EVENTS %s informer: discover GVR for apiVersion '%s' kind '%s'...", ei.ConfigId, ei.Monitor.ApiVersion, ei.Monitor.Kind)
+	gvr, err = kube.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind)
 	if err != nil {
-		rlog.Errorf("KUBE_EVENTS %s informer: Cannot get GroupVersionResource info for kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.ConfigId, ei.Monitor.Kind, err)
+		rlog.Errorf("KUBE_EVENTS %s informer: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.ConfigId, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 		return err
 	}
 	rlog.Debugf("KUBE_EVENTS %s informer: GVR for kind '%s' is '%s'", ei.ConfigId, ei.Monitor.Kind, gvr.String())
