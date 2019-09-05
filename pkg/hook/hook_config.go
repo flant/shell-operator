@@ -67,7 +67,7 @@ type KubeNamespaceSelectorV0 struct {
 // version 1 of kubernetes event configuration
 type OnKubernetesEventConfigV1 struct {
 	Name          string                   `json:"name,omitempty"`
-	EventTypes    []kubemgr.WatchEventType `json:"event,omitempty"`
+	EventTypes    []kubemgr.WatchEventType `json:"watchEvent,omitempty"`
 	ApiVersion    string                   `json:"apiVersion,omitempty"`
 	Kind          string                   `json:"kind,omitempty"`
 	NameSelector  *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
@@ -206,7 +206,7 @@ func (c *HookConfig) ConvertV0() (err error) {
 			case "delete":
 				eventTypes = append(eventTypes, kubemgr.WatchEventDeleted)
 			default:
-				return fmt.Errorf("event '%s' is unsupported")
+				return fmt.Errorf("event '%s' is unsupported", eventName)
 			}
 		}
 		monitor.WithEventTypes(eventTypes)

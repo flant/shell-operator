@@ -47,7 +47,7 @@ if [[ $1 == "--config" ]] ; then
     "onKubernetesEvent": [
       {
         "kind":"Pod",
-        "event":["Add"]
+        "watchEvent":["Added"]
       }
     ]
   }
@@ -190,7 +190,7 @@ Example of `hook --config`:
   "onKubernetesEvent": [
   {"name":"Execute on changes of namespace labels",
    "kind": "namespace",
-   "event":["Update"],
+   "watchEvent":["Modified"],
    "jqFilter":".metadata.labels"
   }]
 }

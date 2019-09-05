@@ -140,13 +140,18 @@ var SharedInformerEventHandler = func(informer *MainKubeEventsInformer) cache.Re
 
 			checksum := utils_checksum.CalculateChecksum(filtered)
 
+			filteredResult := ""
+			if informer.Monitor.JqFilter != "" {
+				filteredResult = filtered
+			}
+
 			if informer.ShouldHandleEvent(WatchEventAdded) {
 				rlog.Debugf("KUBE_EVENTS %s informer: add: %s object: jqFilter '%s' output:\n%s",
 					informer.ConfigId,
 					objectId,
 					informer.Monitor.JqFilter,
 					utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				informer.HandleKubeEvent(obj, objectId, filtered, checksum, WatchEventAdded)
+				informer.HandleKubeEvent(obj, objectId, filteredResult, checksum, WatchEventAdded)
 			}
 		},
 		UpdateFunc: func(_ interface{}, obj interface{}) {
@@ -165,13 +170,18 @@ var SharedInformerEventHandler = func(informer *MainKubeEventsInformer) cache.Re
 
 			checksum := utils_checksum.CalculateChecksum(filtered)
 
+			filteredResult := ""
+			if informer.Monitor.JqFilter != "" {
+				filteredResult = filtered
+			}
+
 			if informer.ShouldHandleEvent(WatchEventModified) {
 				rlog.Debugf("KUBE_EVENTS %s informer: update: %s object: jqFilter '%s' output:\n%s",
 					informer.ConfigId,
 					objectId,
 					informer.Monitor.JqFilter,
 					utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				informer.HandleKubeEvent(obj, objectId, filtered, checksum, WatchEventModified)
+				informer.HandleKubeEvent(obj, objectId, filteredResult, checksum, WatchEventModified)
 			}
 
 		},

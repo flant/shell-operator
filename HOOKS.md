@@ -98,7 +98,7 @@ Syntax:
       "name": "Monitor labeled pods in cache tier",
       "apiVersion": "v1",
       "kind": "Pod",
-      "event": [ "Added", "Modified", "Deleted" ],
+      "watchEvent": [ "Added", "Modified", "Deleted" ],
       "nameSelector": {
         "matchNames": ["pod-0", "pod-1"],
       },
@@ -146,6 +146,8 @@ Parameters:
 
 - `name` is an optional identifier. It is used to distinguish different bindings during runtime. For more info see [binding context](#binding-context).
 
+- `apiVersion` is an optional group and version of object API.
+
 - `kind` is the type of a monitored Kubernetes resource. This field is required. CRDs are supported, but resource should be registered in cluster before shell-operator starts. This can be checked with `kubectl api-resources` command. You can specify case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:
 
 ```
@@ -156,7 +158,7 @@ Parameters:
 "kind": "ds"
 ```
 
-- `event` — the list of monitored events (Added, Modified, Deleted). By default all events will be monitored. Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta).
+- `watchEvent` — the list of monitored events (Added, Modified, Deleted). By default all events will be monitored. Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta).
 
 - `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of specified kind are selected.
 
@@ -179,7 +181,7 @@ Example:
     {
       "name": "Trigger on labels changes of Pods with myLabel:myLabelValue in any namespace",
       "kind": "pod",
-      "event": ["Modified"],
+      "watchEvent": ["Modified"],
       "labelSelector": {
         "matchLabels": {
           "myLabel": "myLabelValue"
@@ -234,7 +236,8 @@ The `BINDING_CONTEXT_PATH` environment variable contains the path to a file with
 There are some extra fields for `onKubernetesEvent`-type events:
 
 - `watchEvent` — the event type is identical to the values in the `event` parameter: “Added”, “Modified” or “Deleted”.
-- `resourceNamespace`, `resourceKind`, `resourceName` — the information about the Kubernetes object associated with an event.
+- `object` — an object related to event.
+- `filterResult` — result of jq execution with specified `jqFilter` expression. If `jqFilter` is not specified, then filterResult is omitted.
 
 #### schedule binding context example
 
@@ -272,16 +275,20 @@ A hook can monitor Pods in all namespaces with this simple configuration:
 }
 ```
 
-If pod pod-321d12 will be added into namespace 'default', then hook will be executed with following binding context file:
+If pod `pod-321d12` will be added into namespace 'default', then hook will be executed with following binding context file:
 
-```json
+```
 [
   {
     "binding": "onKubernetesEvent",
     "watchEvent": "Added",
-    "resourceKind": "Pod",
-    "resourceName":  "pod-321d12",
-    "resourceNamespace": "default"
+    "object": {
+      "kind": "Pod",
+      "name": "pod-321d12",
+      "metadata": {
+      ...
+      }, ...
+    }
   }
 ]
 ```
