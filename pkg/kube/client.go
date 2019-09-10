@@ -238,6 +238,49 @@ func getInClusterContext() (context kubernetes.Interface, err error) {
 	return
 }
 
+func GroupVersionResource(apiVersion string, kind string) (schema.GroupVersionResource, error) {
+	if apiVersion == "" {
+		return GroupVersionResourceByKind(kind)
+	}
+
+	// Get only desired group
+	gv, err := schema.ParseGroupVersion(apiVersion)
+	if err != nil {
+		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s' is invalid", apiVersion)
+	}
+
+	list, err := Kubernetes.Discovery().ServerResourcesForGroupVersion(gv.String())
+	if err != nil {
+		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s' has no supported resources in cluster: %v", apiVersion, err)
+	}
+
+	var gvrForKind *schema.GroupVersionResource
+	for _, resource := range list.APIResources {
+		if len(resource.Verbs) == 0 {
+			continue
+		}
+
+		// Debug mode will list all available CRDs for apiVersion
+		rlog.Debugf("GVR: %30s %30s %30s", gv.String(), resource.Kind,
+			fmt.Sprintf("%+v", append([]string{resource.Name}, resource.ShortNames...)),
+		)
+
+		if gvrForKind == nil && equalToOneOf(kind, append(resource.ShortNames, resource.Kind, resource.Name)...) {
+			gvrForKind = &schema.GroupVersionResource{
+				Resource: resource.Name,
+				Group:    gv.Group,
+				Version:  gv.Version,
+			}
+		}
+	}
+
+	if gvrForKind == nil {
+		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s', kind '%s' is not supported by cluster", apiVersion, kind)
+	}
+
+	return *gvrForKind, nil
+}
+
 // GroupVersionResourceByKind returns GroupVersionResource object to use with dynamic informer.
 //
 // This method is borrowed from kubectl and kubedog. The difference are:

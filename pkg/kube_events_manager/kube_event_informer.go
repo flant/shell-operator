@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 
@@ -64,11 +65,13 @@ func (ei *MainKubeEventsInformer) WithNamespace(ns string) {
 }
 
 func (ei *MainKubeEventsInformer) CreateSharedInformer() (err error) {
-	// define GroupVersionResource for informer
-	rlog.Debugf("KUBE_EVENTS %s informer: discover GVR for kind '%s'...", ei.ConfigId, ei.Monitor.Kind)
-	gvr, err := kube.GroupVersionResourceByKind(ei.Monitor.Kind)
+	// discover GroupVersionResource for informer
+	var gvr schema.GroupVersionResource
+
+	rlog.Debugf("KUBE_EVENTS %s informer: discover GVR for apiVersion '%s' kind '%s'...", ei.ConfigId, ei.Monitor.ApiVersion, ei.Monitor.Kind)
+	gvr, err = kube.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind)
 	if err != nil {
-		rlog.Errorf("KUBE_EVENTS %s informer: Cannot get GroupVersionResource info for kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.ConfigId, ei.Monitor.Kind, err)
+		rlog.Errorf("KUBE_EVENTS %s informer: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.ConfigId, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 		return err
 	}
 	rlog.Debugf("KUBE_EVENTS %s informer: GVR for kind '%s' is '%s'", ei.ConfigId, ei.Monitor.Kind, gvr.String())
@@ -137,13 +140,18 @@ var SharedInformerEventHandler = func(informer *MainKubeEventsInformer) cache.Re
 
 			checksum := utils_checksum.CalculateChecksum(filtered)
 
-			if informer.ShouldHandleEvent(KubeEventAdd) {
+			filteredResult := ""
+			if informer.Monitor.JqFilter != "" {
+				filteredResult = filtered
+			}
+
+			if informer.ShouldHandleEvent(WatchEventAdded) {
 				rlog.Debugf("KUBE_EVENTS %s informer: add: %s object: jqFilter '%s' output:\n%s",
 					informer.ConfigId,
 					objectId,
 					informer.Monitor.JqFilter,
 					utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				informer.HandleKubeEvent(obj, objectId, checksum, KubeEventAdd)
+				informer.HandleKubeEvent(obj, objectId, filteredResult, checksum, WatchEventAdded)
 			}
 		},
 		UpdateFunc: func(_ interface{}, obj interface{}) {
@@ -162,13 +170,18 @@ var SharedInformerEventHandler = func(informer *MainKubeEventsInformer) cache.Re
 
 			checksum := utils_checksum.CalculateChecksum(filtered)
 
-			if informer.ShouldHandleEvent(KubeEventUpdate) {
+			filteredResult := ""
+			if informer.Monitor.JqFilter != "" {
+				filteredResult = filtered
+			}
+
+			if informer.ShouldHandleEvent(WatchEventModified) {
 				rlog.Debugf("KUBE_EVENTS %s informer: update: %s object: jqFilter '%s' output:\n%s",
 					informer.ConfigId,
 					objectId,
 					informer.Monitor.JqFilter,
 					utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				informer.HandleKubeEvent(obj, objectId, checksum, KubeEventUpdate)
+				informer.HandleKubeEvent(obj, objectId, filteredResult, checksum, WatchEventModified)
 			}
 
 		},
@@ -179,9 +192,9 @@ var SharedInformerEventHandler = func(informer *MainKubeEventsInformer) cache.Re
 				return
 			}
 
-			if informer.ShouldHandleEvent(KubeEventDelete) {
+			if informer.ShouldHandleEvent(WatchEventDeleted) {
 				rlog.Debugf("KUBE_EVENTS %s informer: delete: %s", informer.ConfigId, objectId)
-				informer.HandleKubeEvent(obj, objectId, "", KubeEventDelete)
+				informer.HandleKubeEvent(obj, objectId, "", "", WatchEventDeleted)
 			}
 		},
 	}
@@ -225,7 +238,7 @@ func (ei *MainKubeEventsInformer) CalculateChecksumFromExistingObjects(objList *
 // obj doesn't contains Kind information, so kind is passed from Run() argument.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modifed is enough)
-func (ei *MainKubeEventsInformer) HandleKubeEvent(obj interface{}, objectId string, newChecksum string, eventType KubeEventType) {
+func (ei *MainKubeEventsInformer) HandleKubeEvent(obj interface{}, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 	if ei.Checksum[objectId] != newChecksum {
 		ei.Checksum[objectId] = newChecksum
 
@@ -237,11 +250,13 @@ func (ei *MainKubeEventsInformer) HandleKubeEvent(obj interface{}, objectId stri
 		// Safe to ignore an error because of previous call to runtimeResourceId()
 		namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
 		KubeEventCh <- KubeEvent{
-			ConfigId:  ei.ConfigId,
-			Events:    []KubeEventType{eventType},
-			Namespace: namespace,
-			Kind:      ei.Monitor.Kind,
-			Name:      name,
+			ConfigId:     ei.ConfigId,
+			Events:       []WatchEventType{eventType},
+			Namespace:    namespace,
+			Kind:         ei.Monitor.Kind,
+			Name:         name,
+			Object:       obj,
+			FilterResult: filterResult,
 		}
 	} else {
 		rlog.Debugf("KUBE_EVENTS %s informer: %+v %s: checksum has not changed",
@@ -254,7 +269,7 @@ func (ei *MainKubeEventsInformer) HandleKubeEvent(obj interface{}, objectId stri
 	return
 }
 
-func (ei *MainKubeEventsInformer) ShouldHandleEvent(checkEvent KubeEventType) bool {
+func (ei *MainKubeEventsInformer) ShouldHandleEvent(checkEvent WatchEventType) bool {
 	for _, event := range ei.Monitor.EventTypes {
 		if event == checkEvent {
 			return true

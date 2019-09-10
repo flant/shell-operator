@@ -59,11 +59,15 @@ func (obj *MainKubeEventsHooksController) HandleEvent(kubeEvent kube_events_mana
 	bindingContext := make([]hook.BindingContext, 0)
 	for _, kEvent := range kubeEvent.Events {
 		bindingContext = append(bindingContext, hook.BindingContext{
-			Binding:           kubeHook.ConfigName,
-			ResourceEvent:     string(kEvent),
-			ResourceNamespace: kubeEvent.Namespace,
-			ResourceKind:      kubeEvent.Kind,
-			ResourceName:      kubeEvent.Name,
+			Binding:    kubeHook.ConfigName,
+			WatchEvent: kEvent,
+
+			Namespace: kubeEvent.Namespace,
+			Kind:      kubeEvent.Kind,
+			Name:      kubeEvent.Name,
+
+			Object:       kubeEvent.Object,
+			FilterResult: kubeEvent.FilterResult,
 		})
 	}
 

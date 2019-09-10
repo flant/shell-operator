@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	kubemgr "github.com/flant/shell-operator/pkg/kube_events_manager"
 )
@@ -49,7 +50,7 @@ type ScheduleConfigV0 struct {
 // Legacy version of kubernetes event configuration
 type OnKubernetesEventConfigV0 struct {
 	Name              string                   `json:"name,omitempty"`
-	EventTypes        []kubemgr.KubeEventType  `json:"event,omitempty"`
+	EventTypes        []string                 `json:"event,omitempty"`
 	Kind              string                   `json:"kind,omitempty"`
 	Selector          *metav1.LabelSelector    `json:"selector,omitempty"`
 	ObjectName        string                   `json:"objectName,omitempty"`
@@ -66,7 +67,7 @@ type KubeNamespaceSelectorV0 struct {
 // version 1 of kubernetes event configuration
 type OnKubernetesEventConfigV1 struct {
 	Name          string                   `json:"name,omitempty"`
-	EventTypes    []kubemgr.KubeEventType  `json:"event,omitempty"`
+	EventTypes    []kubemgr.WatchEventType `json:"watchEvent,omitempty"`
 	ApiVersion    string                   `json:"apiVersion,omitempty"`
 	Kind          string                   `json:"kind,omitempty"`
 	NameSelector  *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
@@ -193,7 +194,23 @@ func (c *HookConfig) ConvertV0() (err error) {
 	for _, config := range c.V0.OnKubernetesEvent {
 		monitor := &kubemgr.MonitorConfig{}
 		monitor.ConfigIdPrefix = config.Name
-		monitor.WithEventTypes(config.EventTypes)
+
+		// a quick fix for legacy version.
+		eventTypes := []kubemgr.WatchEventType{}
+		for _, eventName := range config.EventTypes {
+			switch eventName {
+			case "add":
+				eventTypes = append(eventTypes, kubemgr.WatchEventAdded)
+			case "update":
+				eventTypes = append(eventTypes, kubemgr.WatchEventModified)
+			case "delete":
+				eventTypes = append(eventTypes, kubemgr.WatchEventDeleted)
+			default:
+				return fmt.Errorf("event '%s' is unsupported", eventName)
+			}
+		}
+		monitor.WithEventTypes(eventTypes)
+
 		monitor.Kind = config.Kind
 		if config.ObjectName != "" {
 			monitor.WithNameSelector(&kubemgr.NameSelector{
@@ -329,18 +346,15 @@ func (c *HookConfig) ValidateScheduleV0(schedule ScheduleConfigV0) (ScheduleConf
 func (c *HookConfig) ValidateOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1) error {
 	msgs := []string{}
 
-	if kubeCfg.Kind == "" {
-		msgs = append(msgs, "kind field is required")
+	if kubeCfg.ApiVersion != "" {
+		_, err := schema.ParseGroupVersion(kubeCfg.ApiVersion)
+		if err != nil {
+			msgs = append(msgs, "apiVersion is invalid")
+		}
 	}
 
-	if kubeCfg.NameSelector != nil && len(kubeCfg.NameSelector.MatchNames) > 0 {
-		if kubeCfg.FieldSelector != nil && len(kubeCfg.FieldSelector.MatchExpressions) > 0 {
-			for _, expr := range kubeCfg.FieldSelector.MatchExpressions {
-				if expr.Field == "metadata.name" {
-					msgs = append(msgs, "fieldSelector 'metadata.name' and nameSelector.matchNames are mutually exclusive")
-				}
-			}
-		}
+	if kubeCfg.Kind == "" {
+		msgs = append(msgs, "kind is required")
 	}
 
 	if kubeCfg.LabelSelector != nil {
@@ -354,6 +368,16 @@ func (c *HookConfig) ValidateOnKubernetesEventV1(kubeCfg OnKubernetesEventConfig
 		_, err := kubemgr.FormatFieldSelector((*kubemgr.FieldSelector)(kubeCfg.FieldSelector))
 		if err != nil {
 			msgs = append(msgs, fmt.Sprintf("fieldSelector is invalid: %s", err))
+		}
+	}
+
+	if kubeCfg.NameSelector != nil && len(kubeCfg.NameSelector.MatchNames) > 0 {
+		if kubeCfg.FieldSelector != nil && len(kubeCfg.FieldSelector.MatchExpressions) > 0 {
+			for _, expr := range kubeCfg.FieldSelector.MatchExpressions {
+				if expr.Field == "metadata.name" {
+					msgs = append(msgs, "fieldSelector 'metadata.name' and nameSelector.matchNames are mutually exclusive")
+				}
+			}
 		}
 	}
 

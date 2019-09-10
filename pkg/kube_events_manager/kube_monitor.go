@@ -8,7 +8,7 @@ import (
 // version of OnKuberneteEventConfig.
 type MonitorConfig struct {
 	ConfigIdPrefix    string
-	EventTypes        []KubeEventType
+	EventTypes        []WatchEventType
 	ApiVersion        string
 	Kind              string
 	NameSelector      *NameSelector
@@ -18,15 +18,15 @@ type MonitorConfig struct {
 	JqFilter          string
 }
 
-func (c *MonitorConfig) WithEventTypes(types []KubeEventType) *MonitorConfig {
-	if types == nil {
-		c.EventTypes = []KubeEventType{
-			KubeEventAdd,
-			KubeEventUpdate,
-			KubeEventDelete,
+func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
+	if types == nil || len(types) == 0 {
+		c.EventTypes = []WatchEventType{
+			WatchEventAdded,
+			WatchEventModified,
+			WatchEventDeleted,
 		}
 	} else {
-		c.EventTypes = []KubeEventType{}
+		c.EventTypes = []WatchEventType{}
 		for _, eventType := range types {
 			c.EventTypes = append(c.EventTypes, eventType)
 		}

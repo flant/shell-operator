@@ -98,7 +98,7 @@ Syntax:
       "name": "Monitor labeled pods in cache tier",
       "apiVersion": "v1",
       "kind": "Pod",
-      "event": [ "add", "update", "delete" ],
+      "watchEvent": [ "Added", "Modified", "Deleted" ],
       "nameSelector": {
         "matchNames": ["pod-0", "pod-1"],
       },
@@ -146,6 +146,8 @@ Parameters:
 
 - `name` is an optional identifier. It is used to distinguish different bindings during runtime. For more info see [binding context](#binding-context).
 
+- `apiVersion` is an optional group and version of object API. For example, it is `v1` for core objects (Pod, etc.), `rbac.authorization.k8s.io/v1beta1` for ClusterRole and `monitoring.coreos.com/v1` for prometheus-operator.
+
 - `kind` is the type of a monitored Kubernetes resource. This field is required. CRDs are supported, but resource should be registered in cluster before shell-operator starts. This can be checked with `kubectl api-resources` command. You can specify case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:
 
 ```
@@ -156,7 +158,7 @@ Parameters:
 "kind": "ds"
 ```
 
-- `event` — the list of monitored events (add, update, delete). By default all events will be monitored.
+- `watchEvent` — the list of monitored events (Added, Modified, Deleted). By default all events will be monitored. Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta).
 
 - `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of specified kind are selected.
 
@@ -179,7 +181,7 @@ Example:
     {
       "name": "Trigger on labels changes of Pods with myLabel:myLabelValue in any namespace",
       "kind": "pod",
-      "event": ["update"],
+      "watchEvent": ["Modified"],
       "labelSelector": {
         "matchLabels": {
           "myLabel": "myLabelValue"
@@ -233,8 +235,11 @@ The `BINDING_CONTEXT_PATH` environment variable contains the path to a file with
 
 There are some extra fields for `onKubernetesEvent`-type events:
 
-- `resourceEvent` — the event type is identical to the values in the `event` parameter: “add”, “update” or “delete”.
-- `resourceNamespace`, `resourceKind`, `resourceName` — the information about the Kubernetes object associated with an event.
+- `watchEvent` — the possible value is one of the values you can pass in `watchEvent` binding parameter: “Added”, “Modified” or “Deleted”.
+- `object` — the whole object related to the event. It contains the exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta), so it's the object state **at the moment of the event** (not at the moment of the hook execution).
+- `filterResult` — the result of jq execution with specified `jqFilter` on the abovementioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
+
+#### schedule binding context example
 
 For example, if you have the following binding configuration of a hook:
 
@@ -246,7 +251,8 @@ For example, if you have the following binding configuration of a hook:
       "name": "incremental",
       "crontab": "0 2 */3 * * *",
       "allowFailure": true
-    }  ]
+    }
+  ]
 }
 ```
 
@@ -254,6 +260,37 @@ For example, if you have the following binding configuration of a hook:
 
 ```json
 [{ "binding": "incremental"}]
+```
+
+#### onKubernetesEvent binding context example
+
+A hook can monitor Pods in all namespaces with this simple configuration:
+
+```json
+{
+  "configVersion": "v1",
+  "onKubernetesEvent": [
+  {"kind": "Pod"}
+  ]
+}
+```
+
+If pod `pod-321d12` will be added into namespace 'default', then hook will be executed with following binding context file:
+
+```
+[
+  {
+    "binding": "onKubernetesEvent",
+    "watchEvent": "Added",
+    "object": {
+      "kind": "Pod",
+      "name": "pod-321d12",
+      "metadata": {
+      ...
+      }, ...
+    }
+  }
+]
 ```
 
 ## Debugging

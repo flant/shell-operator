@@ -4,12 +4,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type KubeEventType string
+type WatchEventType string
 
 const (
-	KubeEventAdd    KubeEventType = "add"
-	KubeEventUpdate KubeEventType = "update"
-	KubeEventDelete KubeEventType = "delete"
+	WatchEventAdded    WatchEventType = "Added"
+	WatchEventModified WatchEventType = "Modified"
+	WatchEventDeleted  WatchEventType = "Deleted"
 )
 
 var (
@@ -19,11 +19,13 @@ var (
 // KubeEvent contains Config id returned from Run method, event types
 // and k8s object identification
 type KubeEvent struct {
-	ConfigId  string
-	Events    []KubeEventType
-	Namespace string
-	Kind      string
-	Name      string
+	ConfigId     string
+	Events       []WatchEventType
+	Namespace    string
+	Kind         string
+	Name         string
+	Object       interface{}
+	FilterResult interface{}
 }
 
 type NameSelector struct {

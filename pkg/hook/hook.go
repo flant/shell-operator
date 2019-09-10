@@ -47,7 +47,9 @@ func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
 func (h *Hook) Run(bindingType BindingType, context []BindingContext) error {
 	rlog.Infof("Running hook '%s' binding '%s' ...", h.Name, bindingType)
 
-	contextPath, err := h.prepareBindingContextJsonFile(context)
+	var versionedContext = ConvertBindingContextList(h.Config.Version, context)
+
+	contextPath, err := h.prepareBindingContextJsonFile(versionedContext)
 	if err != nil {
 		return err
 	}
@@ -73,7 +75,7 @@ func (h *Hook) SafeName() string {
 	return sanitize.BaseName(h.Name)
 }
 
-func (h *Hook) prepareBindingContextJsonFile(context []BindingContext) (string, error) {
+func (h *Hook) prepareBindingContextJsonFile(context interface{}) (string, error) {
 	data, _ := json.Marshal(context)
 	bindingContextPath := filepath.Join(TempDir, fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
 
