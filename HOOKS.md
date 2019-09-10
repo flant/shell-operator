@@ -146,7 +146,7 @@ Parameters:
 
 - `name` is an optional identifier. It is used to distinguish different bindings during runtime. For more info see [binding context](#binding-context).
 
-- `apiVersion` is an optional group and version of object API.
+- `apiVersion` is an optional group and version of object API. For example, it is `v1` for core objects (Pod, etc.), `rbac.authorization.k8s.io/v1beta1` for ClusterRole and `monitoring.coreos.com/v1` for prometheus-operator.
 
 - `kind` is the type of a monitored Kubernetes resource. This field is required. CRDs are supported, but resource should be registered in cluster before shell-operator starts. This can be checked with `kubectl api-resources` command. You can specify case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:
 
@@ -235,13 +235,13 @@ The `BINDING_CONTEXT_PATH` environment variable contains the path to a file with
 
 There are some extra fields for `onKubernetesEvent`-type events:
 
-- `watchEvent` — the event type is identical to the values in the `event` parameter: “Added”, “Modified” or “Deleted”.
-- `object` — an object related to event.
-- `filterResult` — result of jq execution with specified `jqFilter` expression. If `jqFilter` is not specified, then filterResult is omitted.
+- `watchEvent` — the possible value is one of the values you can pass in `watchEvent` binding parameter: “Added”, “Modified” or “Deleted”.
+- `object` — the whole object related to the event. It contains the exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta), so it's the object state **at the moment of the event** (not at the moment of the hook execution).
+- `filterResult` — the result of jq execution with specified `jqFilter` on the abovementioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
 
 #### schedule binding context example
 
-Let's hook have this schedule configuration:
+For example, if you have the following binding configuration of a hook:
 
 ```json
 {
