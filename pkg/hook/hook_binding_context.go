@@ -5,6 +5,7 @@ import "github.com/flant/shell-operator/pkg/kube_events_manager"
 // Additional info from schedule and kube events
 type BindingContext struct {
 	Binding string `json:"binding"`
+	Type    string
 	// event type from kube API
 	WatchEvent kube_events_manager.WatchEventType `json:"watchEvent,omitempty"`
 
@@ -12,8 +13,10 @@ type BindingContext struct {
 	Kind      string `json:"resourceKind,omitempty"`
 	Name      string `json:"resourceName,omitempty"`
 
-	Object       interface{}
-	FilterResult interface{}
+	Object       map[string]interface{}
+	FilterResult string
+
+	Objects []interface{}
 }
 
 // Additional info from schedule and kube events
@@ -29,11 +32,14 @@ type BindingContextV0 struct {
 // Additional info from schedule and kube events
 type BindingContextV1 struct {
 	Binding string `json:"binding"`
+	Type    string `json:"type"`
 	// event type from kube API
 	WatchEvent string `json:"watchEvent,omitempty"`
 	// lower cased event type
-	Object       interface{} `json:"object,omitempty"`
-	FilterResult interface{} `json:"filterResult,omitempty"`
+	Object       map[string]interface{} `json:"object,omitempty"`
+	FilterResult string                 `json:"filterResult,omitempty"`
+
+	Objects []interface{} `json:"objects,omitempty"`
 }
 
 func ConvertBindingContextList(version string, contexts []BindingContext) interface{} {
@@ -77,11 +83,25 @@ func ConvertBindingContextListV0(contexts []BindingContext) []BindingContextV0 {
 func ConvertBindingContextListV1(contexts []BindingContext) []BindingContextV1 {
 	res := make([]BindingContextV1, 0)
 	for _, context := range contexts {
-		ctx := BindingContextV1{
-			Binding:      context.Binding,
-			WatchEvent:   string(context.WatchEvent),
-			Object:       context.Object,
-			FilterResult: context.FilterResult,
+		var ctx BindingContextV1
+		switch context.Type {
+		case "Synchronization":
+			ctx = BindingContextV1{
+				Binding:      context.Binding,
+				Type:         context.Type,
+				Objects:      context.Objects,
+				Object:       nil,
+				FilterResult: "",
+			}
+		default:
+			ctx = BindingContextV1{
+				Binding:      context.Binding,
+				Type:         "Event",
+				WatchEvent:   string(context.WatchEvent),
+				Object:       context.Object,
+				FilterResult: context.FilterResult,
+				Objects:      nil,
+			}
 		}
 		res = append(res, ctx)
 	}

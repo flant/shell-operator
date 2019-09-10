@@ -1,77 +1,107 @@
 package schedule
 
 import (
+	"fmt"
+
 	"github.com/flant/shell-operator/pkg/hook"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
+	"github.com/romana/rlog"
 )
 
 type ScheduleHooksController interface {
-	EnableHooks(hookManager hook.HookManager, eventsManager schedule_manager.ScheduleManager) error
+	WithHookManager(hook.HookManager)
+	WithScheduleManager(schedule_manager.ScheduleManager)
 
-	HandleEvent(kubeEvent kube_events_manager.KubeEvent) ([]task.Task, error)
+	UpdateScheduleHooks()
+	HandleEvent(crontab string) ([]task.Task, error)
 }
 
-type MainScheduleHooksController struct {
-	ScheduleHooks []*ScheduleHook
+type scheduleHooksController struct {
+	Hooks scheduleHooksStorage
+
+	// dependencies
+	hookManager     hook.HookManager
+	scheduleManager schedule_manager.ScheduleManager
 }
 
-type ScheduledHooksStorage []*ScheduleHook
+var NewScheduleHooksController = func() ScheduleHooksController {
+	return &scheduleHooksController{
+		Hooks: make(scheduleHooksStorage, 0),
+	}
+}
 
-// GetCrontabs returns uniq crontabs from the storage.
-func (s ScheduledHooksStorage) GetCrontabs() []string {
-	resMap := map[string]bool{}
-	for _, scheduleHook := range s {
-		resMap[scheduleHook.Crontab] = true
+func (c *scheduleHooksController) WithHookManager(hookManager hook.HookManager) {
+	c.hookManager = hookManager
+}
+
+func (c *scheduleHooksController) WithScheduleManager(scheduleManager schedule_manager.ScheduleManager) {
+	c.scheduleManager = scheduleManager
+}
+
+// UpdateScheduledHooks recreates a new Hooks array
+func (c *scheduleHooksController) UpdateScheduleHooks() {
+	// map of crontabs that should be stopped in scheduleManager
+	oldCrontabs := map[string]bool{}
+	for _, crontab := range c.Hooks.GetCrontabs() {
+		oldCrontabs[crontab] = false
 	}
 
-	res := make([]string, len(resMap))
-	for k := range resMap {
-		res = append(res, k)
-	}
-	return res
-}
+	newStorage := make(scheduleHooksStorage, 0)
 
-// GetHooksForSchedule returns new array of ScheduleHook objects for specific crontab.
-func (s ScheduledHooksStorage) GetHooksForSchedule(crontab string) []ScheduleHook {
-	res := make([]ScheduleHook, 0)
+	hooks := c.hookManager.GetHooksInOrder(hook.Schedule)
 
-	for _, scheduleHook := range s {
-		if scheduleHook.Crontab == crontab {
-			newHook := ScheduleHook{
-				HookName:     scheduleHook.HookName,
-				Crontab:      scheduleHook.Crontab,
-				ConfigName:   scheduleHook.ConfigName,
-				AllowFailure: scheduleHook.AllowFailure,
+	for _, hookName := range hooks {
+		hmHook, _ := c.hookManager.GetHook(hookName)
+		for _, schedule := range hmHook.Config.Schedules {
+			_, err := c.scheduleManager.Add(schedule.Crontab)
+			if err != nil {
+				rlog.Errorf("Schedule: cannot add '%s' for hook '%s': %s", schedule.Crontab, hookName, err)
+				continue
 			}
-			res = append(res, newHook)
+			rlog.Debugf("Schedule: add '%s' for hook '%s'", schedule.Crontab, hookName)
+			newStorage.AddHook(hmHook.Name, schedule)
 		}
 	}
 
-	return res
-}
-
-// AddHook adds hook to the storage.
-func (s *ScheduledHooksStorage) AddHook(hookName string, schedule hook.ScheduleConfig) {
-	newHook := &ScheduleHook{
-		HookName:     hookName,
-		Crontab:      schedule.Crontab,
-		ConfigName:   schedule.ConfigName,
-		AllowFailure: schedule.AllowFailure,
-	}
-	*s = append(*s, newHook)
-}
-
-// RemoveHook removes all hooks from storage by hook name.
-func (s *ScheduledHooksStorage) RemoveHook(hookName string) {
-	newStorage := ScheduledHooksStorage{}
-	for _, scheduleHook := range *s {
-		if scheduleHook.HookName == hookName {
-			continue
+	if len(oldCrontabs) > 0 {
+		// Creates a new set of schedules. If the schedule is in oldCrontabs, then set it to true.
+		newCrontabs := newStorage.GetCrontabs()
+		for _, crontab := range newCrontabs {
+			if _, has_crontab := oldCrontabs[crontab]; has_crontab {
+				oldCrontabs[crontab] = true
+			}
 		}
-		newStorage = append(newStorage, scheduleHook)
+
+		// Stop crontabs that was not added to new storage.
+		for crontab, _ := range oldCrontabs {
+			if !oldCrontabs[crontab] {
+				c.scheduleManager.Remove(crontab)
+			}
+		}
+	}
+}
+
+func (c *scheduleHooksController) HandleEvent(crontab string) ([]task.Task, error) {
+	res := make([]task.Task, 0)
+
+	scheduleHooks := c.Hooks.GetHooksForSchedule(crontab)
+	if len(scheduleHooks) == 0 {
+		return nil, fmt.Errorf("Unknown schedule event: no such crontab '%s' is registered", crontab)
 	}
 
-	*s = newStorage
+	for _, schHook := range scheduleHooks {
+		_, err := c.hookManager.GetHook(schHook.HookName)
+		if err == nil {
+			newTask := task.NewTask(task.HookRun, schHook.HookName).
+				WithBinding(hook.Schedule).
+				AppendBindingContext(hook.BindingContext{Binding: schHook.ConfigName}).
+				WithAllowFailure(schHook.AllowFailure)
+			res = append(res, newTask)
+		}
+
+		rlog.Errorf("MAIN_LOOP hook '%s' scheduled but not found by hook_manager", schHook.HookName)
+	}
+
+	return res, nil
 }

@@ -6,40 +6,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type MockKubeEventsInformer struct {
+type MockResourceInformer struct {
 }
 
-func (i *MockKubeEventsInformer) UpdateConfigId() string {
-	return "ConfigId"
-}
-
-func (i *MockKubeEventsInformer) WithConfigId(string) {
+func (*MockResourceInformer) WithDebugName(string) {
 	return
 }
 
-func (i *MockKubeEventsInformer) WithNamespace(string) {
+func (*MockResourceInformer) WithNamespace(string) {
 	return
 }
 
-func (i *MockKubeEventsInformer) CreateSharedInformer() error {
+func (*MockResourceInformer) CreateSharedInformer() error {
 	return nil
 }
 
-func (i *MockKubeEventsInformer) Run() {
+func (*MockResourceInformer) Run(stopCh <-chan struct{}) {
 	return
 }
 
-func (i *MockKubeEventsInformer) Stop() {
+func (*MockResourceInformer) Stop() {
 	return
 }
 
 func Test_MainKubeEventsManager_Run(t *testing.T) {
 	// Init() replacement
-	mgr := NewMainKubeEventsManager()
+	mgr := NewKubeEventsManager()
 
 	// Mock KubeEventInformer constructor method
-	NewKubeEventsInformer = func(monitor *MonitorConfig) KubeEventsInformer {
-		return &MockKubeEventsInformer{}
+	NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
+		return &MockResourceInformer{}
 	}
 
 	// TODO make more test cases
@@ -57,9 +53,14 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 		},
 	}
 
-	cfgId, err := mgr.Run(monitor)
+	monitor.Metadata.ConfigId = "ConfigId"
+	err := mgr.AddMonitor("test", monitor)
 	if assert.NoError(t, err) {
-		assert.Equal(t, "ConfigId", cfgId)
-		assert.Len(t, mgr.InformersStore[cfgId], 12)
+		assert.Len(t, mgr.Monitors["ConfigId"], 12)
 	}
 }
+
+//func Test_MainKubeEventsManager_Life(t *testing.T) {
+//	client := fake.NewSimpleClientset()
+//
+//}

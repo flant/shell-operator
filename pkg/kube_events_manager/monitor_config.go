@@ -7,7 +7,10 @@ import (
 // KubeEventMonitorConfig is a config that suits the latest
 // version of OnKuberneteEventConfig.
 type MonitorConfig struct {
-	ConfigIdPrefix    string
+	Metadata struct {
+		ConfigId  string
+		DebugName string
+	}
 	EventTypes        []WatchEventType
 	ApiVersion        string
 	Kind              string

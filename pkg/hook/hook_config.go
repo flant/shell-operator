@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/romana/rlog"
+	uuid "gopkg.in/satori/go.uuid.v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -37,7 +39,7 @@ type HookConfigV1 struct {
 	ConfigVersion     string                      `json:"configVersion"`
 	OnStartup         interface{}                 `json:"onStartup"`
 	Schedule          []ScheduleConfigV0          `json:"schedule"`
-	OnKubernetesEvent []OnKubernetesEventConfigV1 `json:"onKubernetesEvent"`
+	OnKubernetesEvent []OnKubernetesEventConfigV1 `json:"kubernetes"`
 }
 
 // Schedule configuration
@@ -66,16 +68,18 @@ type KubeNamespaceSelectorV0 struct {
 
 // version 1 of kubernetes event configuration
 type OnKubernetesEventConfigV1 struct {
-	Name          string                   `json:"name,omitempty"`
-	EventTypes    []kubemgr.WatchEventType `json:"watchEvent,omitempty"`
-	ApiVersion    string                   `json:"apiVersion,omitempty"`
-	Kind          string                   `json:"kind,omitempty"`
-	NameSelector  *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
-	LabelSelector *metav1.LabelSelector    `json:"labelSelector,omitempty"`
-	FieldSelector *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
-	Namespace     *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
-	JqFilter      string                   `json:"jqFilter,omitempty"`
-	AllowFailure  bool                     `json:"allowFailure,omitempty"`
+	Name                    string                   `json:"name,omitempty"`
+	WatchEventTypes         []kubemgr.WatchEventType `json:"watchEvent,omitempty"`
+	ApiVersion              string                   `json:"apiVersion,omitempty"`
+	Kind                    string                   `json:"kind,omitempty"`
+	NameSelector            *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
+	LabelSelector           *metav1.LabelSelector    `json:"labelSelector,omitempty"`
+	FieldSelector           *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
+	Namespace               *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
+	JqFilter                string                   `json:"jqFilter,omitempty"`
+	AllowFailure            bool                     `json:"allowFailure,omitempty"`
+	EventType               []string                 `json:"event,omitempty"`
+	ResynchronizationPeriod string                   `json:"resynchronizationPeriod,omitempty"`
 }
 
 type KubeNameSelectorV1 kubemgr.NameSelector
@@ -191,9 +195,10 @@ func (c *HookConfig) ConvertV0() (err error) {
 	}
 
 	c.OnKubernetesEvents = []OnKubernetesEventConfig{}
-	for _, config := range c.V0.OnKubernetesEvent {
+	for i, config := range c.V0.OnKubernetesEvent {
 		monitor := &kubemgr.MonitorConfig{}
-		monitor.ConfigIdPrefix = config.Name
+		monitor.Metadata.DebugName = c.MonitorDebugName(config.Name, i)
+		monitor.Metadata.ConfigId = c.MonitorConfigId()
 
 		// a quick fix for legacy version.
 		eventTypes := []kubemgr.WatchEventType{}
@@ -231,7 +236,7 @@ func (c *HookConfig) ConvertV0() (err error) {
 		kubeConfig.Monitor = monitor
 		kubeConfig.AllowFailure = config.AllowFailure
 		if config.Name == "" {
-			kubeConfig.ConfigName = ContextBindingType[OnKubernetesEvent]
+			kubeConfig.ConfigName = "onKubernetesEvent"
 		} else {
 			kubeConfig.ConfigName = config.Name
 		}
@@ -261,12 +266,13 @@ func (c *HookConfig) ConvertV1() (err error) {
 	for i, config := range c.V1.OnKubernetesEvent {
 		err := c.ValidateOnKubernetesEventV1(config)
 		if err != nil {
-			return fmt.Errorf("invalid onKubernetesEvent config [%d]: %v", i, err)
+			return fmt.Errorf("invalid kubernetes config [%d]: %v", i, err)
 		}
 
 		monitor := &kubemgr.MonitorConfig{}
-		monitor.ConfigIdPrefix = config.Name
-		monitor.WithEventTypes(config.EventTypes)
+		monitor.Metadata.DebugName = c.MonitorDebugName(config.Name, i)
+		monitor.Metadata.ConfigId = c.MonitorConfigId()
+		monitor.WithEventTypes(config.WatchEventTypes)
 		monitor.ApiVersion = config.ApiVersion
 		monitor.Kind = config.Kind
 		monitor.WithNameSelector((*kubemgr.NameSelector)(config.NameSelector))
@@ -283,6 +289,8 @@ func (c *HookConfig) ConvertV1() (err error) {
 		} else {
 			kubeConfig.ConfigName = config.Name
 		}
+
+		rlog.Debugf("kubernetes[%d]: %+v", i, kubeConfig)
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}
@@ -385,4 +393,21 @@ func (c *HookConfig) ValidateOnKubernetesEventV1(kubeCfg OnKubernetesEventConfig
 		return errors.New(strings.Join(msgs, ", "))
 	}
 	return nil
+}
+
+func (c *HookConfig) MonitorDebugName(configName string, configIndex int) string {
+	if configName == "" {
+		return fmt.Sprintf("kubernetes[%d]", configIndex)
+	} else {
+		return fmt.Sprintf("kubernetes[%d]{%s}", configIndex, configName)
+	}
+}
+
+func (c *HookConfig) MonitorConfigId() string {
+	return uuid.NewV4().String()
+	//ei.DebugName = uuid.NewV4().String()
+	//if ei.Monitor.ConfigIdPrefix != "" {
+	//	ei.DebugName = ei.Monitor.ConfigIdPrefix + "-" + ei.DebugName[len(ei.Monitor.ConfigIdPrefix)+1:]
+	//}
+	//return ei.DebugName
 }

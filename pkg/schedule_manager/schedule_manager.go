@@ -16,19 +16,19 @@ type ScheduleManager interface {
 	Run()
 }
 
-type MainScheduleManager struct {
+type scheduleManager struct {
 	cron    *cron.Cron
 	entries map[string]cron.EntryID
 }
 
-func NewMainScheduleManager() *MainScheduleManager {
-	sm := &MainScheduleManager{}
+var NewScheduleManager = func() *scheduleManager {
+	sm := &scheduleManager{}
 	sm.cron = cron.New()
 	sm.entries = make(map[string]cron.EntryID)
 	return sm
 }
 
-func (sm *MainScheduleManager) Add(crontab string) (string, error) {
+func (sm *scheduleManager) Add(crontab string) (string, error) {
 	_, ok := sm.entries[crontab]
 	if !ok {
 		entryId, err := sm.cron.AddFunc(crontab, func() {
@@ -47,7 +47,7 @@ func (sm *MainScheduleManager) Add(crontab string) (string, error) {
 	return crontab, nil
 }
 
-func (sm *MainScheduleManager) Remove(crontab string) error {
+func (sm *scheduleManager) Remove(crontab string) error {
 	entryID, ok := sm.entries[crontab]
 	if !ok {
 		return fmt.Errorf("schedule manager entry '%s' not found", crontab)
@@ -59,12 +59,12 @@ func (sm *MainScheduleManager) Remove(crontab string) error {
 	return nil
 }
 
-func (sm *MainScheduleManager) Run() {
+func (sm *scheduleManager) Run() {
 	rlog.Info("Running schedule manager ...")
 	sm.cron.Start()
 }
 
-func (sm *MainScheduleManager) stop() {
+func (sm *scheduleManager) stop() {
 	sm.cron.Stop()
 }
 
@@ -73,7 +73,7 @@ func Init() (ScheduleManager, error) {
 
 	ScheduleCh = make(chan string, 1)
 
-	sm := NewMainScheduleManager()
+	sm := NewScheduleManager()
 
 	return sm, nil
 }

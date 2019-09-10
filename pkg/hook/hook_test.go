@@ -8,7 +8,7 @@ import (
 )
 
 func Test_Hook_SafeName(t *testing.T) {
-	WorkingDir = "/hooks"
+	WorkingDir := "/hooks"
 	hookPath := "/hooks/002-cool-hooks/monitor-namespaces.py"
 
 	hookName, err := filepath.Rel(WorkingDir, hookPath)
