@@ -284,6 +284,7 @@ func (ei *resourceInformer) HandleKubeEvent(obj interface{}, objectId string, fi
 
 		KubeEventCh <- KubeEvent{
 			ConfigId:     ei.Monitor.Metadata.ConfigId,
+			Type:         "Event",
 			WatchEvents:  []WatchEventType{eventType},
 			Namespace:    namespace,
 			Kind:         ei.Monitor.Kind,
@@ -312,7 +313,6 @@ func (ei *resourceInformer) ShouldHandleEvent(checkEvent WatchEventType) bool {
 }
 
 func (ei *resourceInformer) Run(stopCh <-chan struct{}) {
-
 	err := ei.ListExistedObjects()
 	// FIXME do something with this error
 	if err != nil {
@@ -325,15 +325,8 @@ func (ei *resourceInformer) Run(stopCh <-chan struct{}) {
 	// Send KubeEvent with Synchronization type
 	KubeEventCh <- KubeEvent{
 		ConfigId: ei.Monitor.Metadata.ConfigId,
-		// WatchEvents:  []WatchEventType{WatchEventAdded},
-		Type:    "Synchronization",
-		Objects: ei.ExistedObjects,
-		//	Namespace:    namespace,
-		//	Kind:         ei.Monitor.Kind,
-		//	Name:         name,
-		//	Object:       obj,
-		//	FilterResult: filterResult,
-
+		Type:     "Synchronization",
+		Objects:  ei.ExistedObjects,
 	}
 	rlog.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
 	ei.SharedInformer.Run(stopCh)
@@ -341,5 +334,4 @@ func (ei *resourceInformer) Run(stopCh <-chan struct{}) {
 
 func (ei *resourceInformer) Stop() {
 	rlog.Debugf("%s: STOP resource informer", ei.Monitor.Metadata.DebugName)
-	//	close(ei.SharedInformerStop)
 }

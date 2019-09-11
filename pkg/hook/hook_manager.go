@@ -95,7 +95,6 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	rlog.Infof("Load hook config from '%s'", hookPath)
 
 	envs := []string{}
-	envs = append(envs, fmt.Sprintf("WORKING_DIR=%s", hm.workingDir))
 
 	configOutput, err := execCommandOutput(hm.workingDir, hookPath, envs, []string{"--config"})
 	if err != nil {

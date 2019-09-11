@@ -87,7 +87,6 @@ func (mgr *kubeEventsManager) Ch() chan KubeEvent {
 }
 
 func (mgr *kubeEventsManager) StopAll() {
-	//
 	mgr.cancel()
 	// wait?
 	//

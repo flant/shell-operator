@@ -4,20 +4,34 @@ A hook is an executable file that Shell-operator runs when some event occurs. It
 
 The hook receives the data and returns the result via files. Paths to files are passed to the hook via environment variables.
 
-## Initialization: search for and configuration of hooks
+## Shell-operator lifecycle
 
 At startup Shell-operator initializes the hooks:
 
 - The recursive search for hook files is performed in the working directory. You can specify it with `--working-dir` command-line argument or with the `SHELL_OPERATOR_WORKING_DIR` environment variable (the default path is `/hooks`).
-  - The executable files found in the path are considered hooks.
+  - Every executable file found in the path is considered a hook.
 
 - The found hooks are sorted alphabetically according to the directories’ and hooks’ names. Then they are executed with the `--config` flag to get bindings to events in JSON format.
 
-- Shell-operator subscribes to events using received bindings.
+- If hooks configuring is successful, then working queue is filled with `onStartup` hooks.
+
+After initialization, Shell-operator subscribes to `kubernetes` events. To prevent multiple hook execution with "Added" event, Shell-operator lists existing objects and creates just one task per hook (see [binding context](#binding-context)).
+
+Next the main cycle is started:
+
+- Hooks are adding to the queue on events:
+  - `onStartup` hooks are added to the queue during initialization,
+  - `kubernetes` hooks are added to the queue with existing objects and  when events occur in Kubernetes,
+  - `schedule` hooks are added according to the schedule.
+
+- Queue handler executes hooks strictly sequentially. If hook fails with an error (non-zero exit code), Shell-operator restarts it (every 5 seconds) until success. In case of an erroneous execution of some hook, when other events occur, the queue will be filled with new tasks, but their execution will be blocked.
+  - You can change this behavior for a specific hook by adding `allowFailure: true` to the binding configuration (not available for `onStartup` hooks).
+
+- Several metrics are available for monitoring the activity of a queue: queue size, number of execution errors for specific hooks, etc. See [METRICS](METRICS.md) for more details.
 
 ## Hook configuration
 
-Shell-operator runs the hook with the `--config` flag. In response the hook should print out its event binding configuration to stdout:
+Shell-operator runs the hook with the `--config` flag. In response the hook should print its event binding configuration to stdout. For example:
 
 ```
 {
@@ -27,7 +41,7 @@ Shell-operator runs the hook with the `--config` flag. In response the hook shou
     {SCHEDULE_PARAMETERS},
     {SCHEDULE_PARAMETERS}
   ],
-  "onKubernetesEvent": [
+  "kubernetes": [
        {ON_KUBERNETES_EVENT_PARAMETERS},
        {ON_KUBERNETES_EVENT_PARAMETERS}
   ]
@@ -36,9 +50,9 @@ Shell-operator runs the hook with the `--config` flag. In response the hook shou
 
 `configVersion` field specifies a version of configuration schema. The latest schema version is "v1" and it is described below.
 
-Event binding is an event type (onStartup, schedule, and onKubernetesEvent) plus parameters required for a subscription.
+Event binding is an event type ("onStartup", "schedule" or "kubernetes") plus parameters required for a subscription.
 
-#### onStartup
+### onStartup
 
 The execution at the Shell-operator’ startup.
 
@@ -85,7 +99,7 @@ Parameters:
 
 `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
-#### onKubernetesEvent
+### kubernetes
 
 Run a hook on a Kubernetes object changes.
 
@@ -93,7 +107,7 @@ Syntax:
 ```
 {
   "configVersion": "v1",
-  "onKubernetesEvent": [
+  "kubernetes": [
     {
       "name": "Monitor labeled pods in cache tier",
       "apiVersion": "v1",
@@ -144,7 +158,7 @@ Syntax:
 
 Parameters:
 
-- `name` is an optional identifier. It is used to distinguish different bindings during runtime. For more info see [binding context](#binding-context).
+- `name` is an optional identifier. It is used to distinguish different bindings during runtime. See also [binding context](#binding-context).
 
 - `apiVersion` is an optional group and version of object API. For example, it is `v1` for core objects (Pod, etc.), `rbac.authorization.k8s.io/v1beta1` for ClusterRole and `monitoring.coreos.com/v1` for prometheus-operator.
 
@@ -160,14 +174,18 @@ Parameters:
 
 - `watchEvent` — the list of monitored events (Added, Modified, Deleted). By default all events will be monitored. Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta).
 
-- `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of specified kind are selected.
+- `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of specified kind are monitored.
 
 - `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).
-  If the selector is not set, then all objects are selected.
+  If the selector is not set, then all objects of specified kind are monitored.
 
 - `fieldSelector` — selector of objects by their fields, works like `--field-selector=''` flag of `kubectl`. Due to limits of API, supported operators are Equals (or `=`, `==`) and NotEquals (or `!=`) and all expressions are combined with AND. Note that fieldSelector with 'metadata.name' field is mutually exclusive with nameSelector. 
 
-- `namespace` — a filter to choose namespaces. If omitted, then the events from all namespaces will be monitored. Currently supported only `nameSelector` filter which can monitor event from particular list of namespaces. 
+- `namespace` — a filters to choose namespaces. If omitted, then the events from all namespaces will be monitored. 
+
+- `namespace.nameSelector` — this filter can be used to monitor events from objects in a particular list of namespaces.
+
+- `namespace.labelSelector` — this filter works like `labelSelector` but for namespaces and Shell-operator dynamically subscribes to events from matched namespaces.
 
 - `jqFilter` —  an optional parameter that specifies additional event filtering with [jq syntax](https://stedolan.github.io/jq/manual/). The hook will be triggered only when the properties of an object are changed after the filter is applied. See example [102-monitor-namespaces](examples/102-monitor-namespaces).
 
@@ -177,7 +195,7 @@ Example:
 ```json
 {
   "configVersion": "v1",
-  "onKubernetesEvent": [
+  "kubernetes": [
     {
       "name": "Trigger on labels changes of Pods with myLabel:myLabelValue in any namespace",
       "kind": "pod",
@@ -203,41 +221,28 @@ This hook configuration will execute hook on each change in labels of pods label
 
 > Note: Shell-operator requires a ServiceAccount with the appropriate [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) permissions. See examples with RBAC: [monitor-pods](examples/101-monitor-pods) and [monitor-namespaces](examples/102-monitor-namespaces).
 
-## Main cycle: events tracking and hooks execution
-
-Events may happen at any time, so the working queue for hooks is provided in the Shell-operator:
-
-- Adding events to the queue:
-  - `onStartup` hooks are added to the queue during initialization,
-  - `onKubernetesEvent` hooks are added to the queue when events occur in Kubernetes,
-  - `schedule` hooks are added according to the schedule.
-
-- Queue handler executes hooks strictly sequentially. If hook fails with an error (non-zero exit code), Shell-operator restarts it (every 5 seconds) until success. In case of an erroneous execution of some hook, when other events occur, the queue will be filled with new tasks, but their execution will be blocked.
-  - You can change this behavior for a specific hook by adding `allowFailure: true` to the binding configuration (not available for `onStartup` hooks).
-
-- Several metrics are available for monitoring the activity of a queue: queue size, number of execution errors for specific hooks, etc. See [METRICS](METRICS.md) for more details.
+> Note: consider that "Added" event is not always equal to "Object created" if labelSelector, fieldSelector or namespace.labelSelector is specified. Object or namespace is updated and labels are matched the selector, but API returns "Added" event in this case. The same with "Deleted" event: "Deleted" is not always equal to "Object removed", the object can just become out of scope.
 
 ## Event triggered execution
 
-When an event associated with a hook is triggered, Shell-operator executes the hook without arguments and sets the following environment variables:
+When an event associated with a hook is triggered, Shell-operator executes the hook without arguments and sets the following environment variable:
 
 - `BINDING_CONTEXT_PATH` — a path to a temporary file containing data about an event that was triggered (binding context);
 
-- `WORKING_DIR` — a path to a hooks directory (see [an example](examples/003-common-library) — using libraries via `WORKING_DIR`).
-
 ### Binding context
 
-Binding context is the information about the event that led to the hook execution.
+When an event associated with a hook is triggered, Shell-operator  executes this hook without arguments. The information about the event that led to the hook execution is called a binding context and is written to a temporary file. `BINDING_CONTEXT_PATH` environment variable contains the path to this file with JSON-array of structures with the following fields:
 
-The `BINDING_CONTEXT_PATH` environment variable contains the path to a file with JSON-array of structures with the following fields:
+- `binding` is a string from the `name` parameter. If the parameter has not been set in the binding configuration, then strings `schedule` or `kubernetes` are used. For a hook executed at startup, this value is always `onStartup`.
 
-- `binding` is a string from the `name` parameter. If the parameter has not been set in the binding configuration, then `schedule` or `onKubernetesEvent` binding types are used. For a hook executed at startup, the binding type is always `onStartup`.
+There are some extra fields for `kubernetes`-type events:
 
-There are some extra fields for `onKubernetesEvent`-type events:
+- `type` - "Synchronization" or "Event". "Synchronization" binding context contains all objects that matches selectors in a hook's configuration. "Event" binding context contains a watch event type, an event related object and a jq filter result.
 
-- `watchEvent` — the possible value is one of the values you can pass in `watchEvent` binding parameter: “Added”, “Modified” or “Deleted”.
-- `object` — the whole object related to the event. It contains the exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta), so it's the object state **at the moment of the event** (not at the moment of the hook execution).
+- `watchEvent` — the possible value is one of the values you can pass in `watchEvent` binding parameter: “Added”, “Modified” or “Deleted”. This value is set if type is "Event".
+- `object` — the whole object related to the event. It contains the exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta) response, so it's the object state **at the moment of the event** (not at the moment of the hook execution).
 - `filterResult` — the result of jq execution with specified `jqFilter` on the abovementioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
+- `objects` — list of existing objects that matches selectors. Each item of this list contains `object` and `filterResult` fields.
 
 #### schedule binding context example
 
@@ -262,17 +267,51 @@ For example, if you have the following binding configuration of a hook:
 [{ "binding": "incremental"}]
 ```
 
-#### onKubernetesEvent binding context example
+#### kubernetes binding context example
 
 A hook can monitor Pods in all namespaces with this simple configuration:
 
 ```json
 {
   "configVersion": "v1",
-  "onKubernetesEvent": [
+  "kubernetes": [
   {"kind": "Pod"}
   ]
 }
+```
+
+During startup, hook will be executed with following binding context file:
+
+```
+[
+  {
+    "binding": "kubernetes",
+    "type": "Synchronization",
+    "objects": [
+      {
+        "object": {
+          "kind": "Pod,
+          "metadata":{
+            "name":"etcd-...",
+            "namespace":"kube-system",
+            ...
+          },
+        }
+      },
+      {
+        "object": {
+          "kind": "Pod,
+          "metadata":{
+            "name":"kube-proxy-...",
+            "namespace":"kube-system",
+            ...
+          },
+        }
+      },
+      ... 
+    ]
+  }
+]
 ```
 
 If pod `pod-321d12` will be added into namespace 'default', then hook will be executed with following binding context file:
@@ -280,14 +319,21 @@ If pod `pod-321d12` will be added into namespace 'default', then hook will be ex
 ```
 [
   {
-    "binding": "onKubernetesEvent",
+    "binding": "kubernetes",
+    "type": "Event",
     "watchEvent": "Added",
     "object": {
+      "apiVersion": "v1",
       "kind": "Pod",
-      "name": "pod-321d12",
       "metadata": {
+        "name": "pod-321d12",
+        "namespace": "default",
+        ...
+      },
+      "spec": {
+        ...
+      },
       ...
-      }, ...
     }
   }
 ]
@@ -299,7 +345,6 @@ The following tools for debugging and fine-tuning of Shell-operator and hooks ar
 
 - Analysis of logs of a Shell-operator’s pod (enter `kubectl logs -f po/POD_NAME` in terminal),
 - The environment variable can be set to `RLOG_LOG_LEVEL=DEBUG` to include the detailed debugging information into logs,
-- You can run the Shell-operator with the `--debug=yes` flag to obtain even more detailed debugging information and save it to logs,
 - You can view the contents of the working queue via the HTTP request `/queue` (`queue` endpoint):
    ```
    kubectl port-forward po/shell-operator 9115:9115

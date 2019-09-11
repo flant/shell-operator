@@ -62,7 +62,6 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext) error {
 	if contextPath != "" {
 		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
 	}
-	envs = append(envs, fmt.Sprintf("WORKING_DIR=%s", h.hookManager.WorkingDir()))
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
