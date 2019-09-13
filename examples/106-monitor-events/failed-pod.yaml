@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: failed-pod
+spec:
+  containers:
+    - name: failed-pod
+      image: alpine:3.9
+      command: ["/bin/ash", "sleep 2; exit 1"]

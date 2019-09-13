@@ -2,13 +2,19 @@
 
 if [[ $1 == "--config" ]] ; then
   cat <<EOF
-{"onKubernetesEvent":[
-  {"kind": "Pod",
-  "event":["add"]
-  }
-]}
+{
+  "configVersion":"v1",
+  "kubernetes":[{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "watchEvent":["Added"]
+  }]
+}
 EOF
 else
-  podName=$(jq -r '.[0].resourceName' $BINDING_CONTEXT_PATH)
-  echo "Pod '${podName}' added"
+  type=$(jq -r '.[0].type' $BINDING_CONTEXT_PATH)
+  if [[ $type == "Event" ]] ; then
+    podName=$(jq -r '.[0].object.metadata.name' $BINDING_CONTEXT_PATH)
+    echo "Pod '${podName}' added"
+  fi
 fi

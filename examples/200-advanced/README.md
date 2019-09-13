@@ -1,6 +1,6 @@
 ## advanced example
 
-Use Deployment to install shell-operator. with several hooks.
+Use Deployment to install shell-operator with several hooks.
 
 
 ### Run 
@@ -43,7 +43,7 @@ INFO     : TASK_RUN HookRun@ON_STARTUP 001-onstartup-10/shell-hook.sh
 INFO     : TASK_RUN HookRun@SCHEDULE 003-schedule/schedule-hook.sh
 Message from Schedule hook!
 ...
-INFO     : TASK_RUN HookRun@KUBE_EVENTS namespace-hook.sh
+INFO     : TASK_RUN HookRun@KUBERNETES namespace-hook.sh
 Namespace qweqwe was created
 ...
 ```

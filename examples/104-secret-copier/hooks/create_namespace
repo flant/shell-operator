@@ -1,24 +1,34 @@
 #!/usr/bin/env bash
 
-source $WORKING_DIR/common/functions.sh
+source /hooks/common/functions.sh
 
 hook::config() {
   cat <<EOF
 {
-   "onKubernetesEvent": [
-      {
-         "kind": "namespace",
-         "event": [
-            "add"
-         ]
-      }
-   ]
+  "configVersion":"v1",
+  "kubernetes": [
+    {
+      "kind": "namespace",
+      "watchEvent": [
+        "Added"
+      ]
+    }
+  ]
 }
 EOF
 }
 
 hook::trigger() {
-  for namespace in $(jq -r '.[] | select(.resourceName == "default" | not ) | .resourceName' $BINDING_CONTEXT_PATH);
+  # ignore Synchronization for simplicity
+  # TODO: check each namespace in .[0].objects
+  type=$(jq -r '.[0].type' $BINDING_CONTEXT_PATH)
+  if [[ $type == "Synchronization" ]] ; then
+    echo Got Synchronization event
+    exit 0
+  fi
+
+
+  for namespace in $(jq -r '.[] | .object.metadata | select(.name == "default" | not ) | .name' $BINDING_CONTEXT_PATH);
   do
     for secret in $(kubectl -n default get secret -l secret-copier=yes -o name);
     do

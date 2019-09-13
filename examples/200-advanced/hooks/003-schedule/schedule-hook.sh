@@ -2,11 +2,15 @@
 
 if [[ $1 == "--config" ]] ; then
   cat <<EOF
-{"schedule": [
-{ "name":"every 15 min",
-  "crontab":"0 */15 * * * *"
+{
+  "configVersion":"v1",
+  "schedule": [
+    {
+      "name":"every 15 min",
+      "crontab":"0 */15 * * * *"
+    }
+  ]
 }
-]}
 EOF
 else
   echo "Message from Schedule hook!"
