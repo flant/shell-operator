@@ -55,35 +55,31 @@ func reapChildren(config Config) {
 	go sigChildHandler(notifications)
 
 	pid := config.Pid
-	opts := config.Options
+	opts := config.Options|syscall.WNOHANG
+
 
 	for {
-		<-notifications
+		si := <-notifications
+		rlog.Debugf("REAP: got %v signal", si)
 		func() {
 			// Acquire lock
 			ExecutorLock.Lock()
 			defer ExecutorLock.Unlock()
 
-			for {
-				var wstatus syscall.WaitStatus
+			var wstatus syscall.WaitStatus
 
-				/*
-				 *  Reap 'em, so that zombies don't accumulate.
-				 *  Plants vs. Zombies!!
-				 */
-				pid, err := syscall.Wait4(pid, &wstatus, opts, nil)
-				for syscall.EINTR == err {
-					pid, err = syscall.Wait4(pid, &wstatus, opts, nil)
-				}
-
-				if syscall.ECHILD == err {
-					break
-				}
-
-				rlog.Debugf(" - Grim reaper cleanup: pid=%d, wstatus=%+v\n",
-					pid, wstatus)
-
+			/*
+			 *  Reap 'em, so that zombies don't accumulate.
+			 *  Plants vs. Zombies!!
+			 */
+			pid, err := syscall.Wait4(pid, &wstatus, opts, nil)
+			for syscall.EINTR == err {
+				pid, err = syscall.Wait4(pid, &wstatus, opts, nil)
 			}
+
+			rlog.Debugf(" - Grim reaper cleanup: pid=%d, wstatus=%+v\n",
+				pid, wstatus)
+
 		}()
 	}
 
