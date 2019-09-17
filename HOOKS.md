@@ -13,18 +13,17 @@ At startup Shell-operator initializes the hooks:
 
 - The found hooks are sorted alphabetically according to the directories’ and hooks’ names. Then they are executed with the `--config` flag to get bindings to events in JSON format.
 
-- If hooks configuring is successful, then working queue is filled with `onStartup` hooks.
+- If hook's configuration is successful, the workqueue is filled with `onStartup` hooks.
 
-After initialization, Shell-operator subscribes to `kubernetes` events. To prevent multiple hook execution with "Added" event, Shell-operator lists existing objects and creates just one task per hook (see [binding context](#binding-context)).
+ - Than, Shell-operator subscribes to Kubernetes events according to configured `kubernetes` bindings.
 
 Next the main cycle is started:
 
 - Hooks are adding to the queue on events:
-  - `onStartup` hooks are added to the queue during initialization,
-  - `kubernetes` hooks are added to the queue with existing objects and  when events occur in Kubernetes,
+  - `kubernetes` hooks are added to the queue from existing objects and from events that occur in Kubernetes,
   - `schedule` hooks are added according to the schedule.
 
-- Queue handler executes hooks strictly sequentially. If hook fails with an error (non-zero exit code), Shell-operator restarts it (every 5 seconds) until success. In case of an erroneous execution of some hook, when other events occur, the queue will be filled with new tasks, but their execution will be blocked.
+- Queue handler executes hooks strictly sequentially. If hook fails with an error (non-zero exit code), Shell-operator restarts it (every 5 seconds) until success. In case of an erroneous execution of some hook, when other events occur, the queue will be filled with new tasks, but their execution will be blocked until the failing hook succeeds.
   - You can change this behavior for a specific hook by adding `allowFailure: true` to the binding configuration (not available for `onStartup` hooks).
 
 - Several metrics are available for monitoring the activity of a queue: queue size, number of execution errors for specific hooks, etc. See [METRICS](METRICS.md) for more details.
@@ -145,6 +144,20 @@ Syntax:
         "nameSelector": {
           "matchNames": ["somenamespace", "proj-production", proj-stage"],
         }
+        "labelSelector": {
+          "matchLabels": {
+            "myLabel": "myLabelValue",
+            "someKey": "someValue",
+            ...
+          },
+          "matchExpressions": [
+            {
+              "key": "env",
+              "operator": "In",
+              "values": ["production"],
+            },
+            ...
+          ],
       },
       "jqFilter": ".metadata.labels",
       "allowFailure": true|false,
@@ -181,7 +194,7 @@ Parameters:
 
 - `fieldSelector` — selector of objects by their fields, works like `--field-selector=''` flag of `kubectl`. Due to limits of API, supported operators are Equals (or `=`, `==`) and NotEquals (or `!=`) and all expressions are combined with AND. Note that fieldSelector with 'metadata.name' field is mutually exclusive with nameSelector. 
 
-- `namespace` — a filters to choose namespaces. If omitted, then the events from all namespaces will be monitored. 
+- `namespace` — filters to choose namespaces. If omitted, events from all namespaces will be monitored.
 
 - `namespace.nameSelector` — this filter can be used to monitor events from objects in a particular list of namespaces.
 
@@ -221,7 +234,7 @@ This hook configuration will execute hook on each change in labels of pods label
 
 > Note: Shell-operator requires a ServiceAccount with the appropriate [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) permissions. See examples with RBAC: [monitor-pods](examples/101-monitor-pods) and [monitor-namespaces](examples/102-monitor-namespaces).
 
-> Note: consider that "Added" event is not always equal to "Object created" if labelSelector, fieldSelector or namespace.labelSelector is specified. Object or namespace is updated and labels are matched the selector, but API returns "Added" event in this case. The same with "Deleted" event: "Deleted" is not always equal to "Object removed", the object can just become out of scope.
+> Note: consider that "Added" event is not always equal to "Object created" if labelSelector, fieldSelector or namespace.labelSelector is specified in the `binding`. If objects and/or namespace are updated in Kubernetes, the `binding` may suddenly start matching them, with the "Added" event. The same with "Deleted" event: "Deleted" is not always equal to "Object removed", the object can just move out of scope.
 
 ## Event triggered execution
 
@@ -231,13 +244,13 @@ When an event associated with a hook is triggered, Shell-operator executes the h
 
 ### Binding context
 
-When an event associated with a hook is triggered, Shell-operator  executes this hook without arguments. The information about the event that led to the hook execution is called a binding context and is written to a temporary file. `BINDING_CONTEXT_PATH` environment variable contains the path to this file with JSON-array of structures with the following fields:
+When an event associated with a hook is triggered, Shell-operator executes this hook without arguments. The information about the event that led to the hook execution is called the **binding context** and is written to a temporary file. `BINDING_CONTEXT_PATH` environment variable contains the path to this file with JSON-array of structures with the following fields:
 
 - `binding` is a string from the `name` parameter. If the parameter has not been set in the binding configuration, then strings `schedule` or `kubernetes` are used. For a hook executed at startup, this value is always `onStartup`.
 
 There are some extra fields for `kubernetes`-type events:
 
-- `type` - "Synchronization" or "Event". "Synchronization" binding context contains all objects that matches selectors in a hook's configuration. "Event" binding context contains a watch event type, an event related object and a jq filter result.
+- `type` - "Synchronization" or "Event". "Synchronization" binding context contains all objects that match selectors in a hook's configuration. "Event" binding context contains a watch event type, an event related object and a jq filter result.
 
 - `watchEvent` — the possible value is one of the values you can pass in `watchEvent` binding parameter: “Added”, “Modified” or “Deleted”. This value is set if type is "Event".
 - `object` — the whole object related to the event. It contains the exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta) response, so it's the object state **at the moment of the event** (not at the moment of the hook execution).

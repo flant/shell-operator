@@ -1,6 +1,6 @@
 ## crd-simple example
 
-Example of monitoring CRD objects.
+Example of monitoring custom resources.
 
 ### Run
 

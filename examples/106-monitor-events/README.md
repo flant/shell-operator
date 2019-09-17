@@ -25,7 +25,7 @@ Create faulty pod to get scary Event:
 $ kubectl -n example-monitor-events apply -f failed-pod.yaml
 ```
 
-Events are appeared in logs (the output is greatly reduced):
+Events start to appear in logs (the output is greatly reduced):
 
 ```
 $ kubectl -n example-monitor-events logs po/shell-operator

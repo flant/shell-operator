@@ -36,7 +36,7 @@ A hook is a script that, when executed with `--config` option, returns configura
 
 Let's create a small operator that will watch for all Pods in all Namespaces and simply log a name of a new Pod.
 
-"kubernetes" binding is used to tell Shell-operator about what objects we want to watch. Create the `pods-hook.sh` file with the following content:
+"kubernetes" binding is used to tell Shell-operator about objects that we want to watch. Create the `pods-hook.sh` file with the following content:
 ```bash
 #!/usr/bin/env bash
 
@@ -195,7 +195,7 @@ Example of `hook --config`:
 }
 ```
 
-> Note: watch for CRD objects is also possible, just use proper values for `apiVersion` and `kind` fields.
+> Note: it is possible to watch custom resources, just use proper values for `apiVersion` and `kind` fields.
 
 ## Prometheus target
 
