@@ -1,91 +1,103 @@
 package kube_events_manager
 
 import (
-	"fmt"
+	"context"
 
 	"github.com/romana/rlog"
 )
 
 type KubeEventsManager interface {
-	Run(monitorConfig *MonitorConfig) (string, error)
-	Stop(configId string) error
+	WithContext(ctx context.Context)
+	AddMonitor(name string, monitorConfig *MonitorConfig) error
+	Start()
+
+	StopMonitor(configId string) error
+	Ch() chan KubeEvent
 }
 
-type MainKubeEventsManager struct {
-	// all created kube informers. Informers are addressed by config id — uuid
-	InformersStore map[string][]KubeEventsInformer
+// kubeEventsManager is a main implementation of KubeEventsManager.
+type kubeEventsManager struct {
+	// Array of monitors
+	Monitors map[string]Monitor
+	// channel to emit KubeEvent objects
+	//KubeEventCh chan KubeEvent
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
-var NewMainKubeEventsManager = func() *MainKubeEventsManager {
-	em := &MainKubeEventsManager{
-		InformersStore: map[string][]KubeEventsInformer{},
+// kubeEventsManager should implement KubeEventsManager.
+var _ KubeEventsManager = &kubeEventsManager{}
+
+// NewKubeEventsManager returns an implementation of KubeEventsManager.
+var NewKubeEventsManager = func() *kubeEventsManager {
+	em := &kubeEventsManager{
+		Monitors: make(map[string]Monitor, 0),
+		//KubeEventCh: make(chan KubeEvent, 1),
 	}
+
+	KubeEventCh = make(chan KubeEvent, 1)
+
 	return em
 }
 
-func Init() (KubeEventsManager, error) {
-	em := NewMainKubeEventsManager()
-	KubeEventCh = make(chan KubeEvent, 1)
-	return em, nil
+func (mgr *kubeEventsManager) WithContext(ctx context.Context) {
+	mgr.ctx, mgr.cancel = context.WithCancel(ctx)
 }
 
-// Run launches informer for each namespace in MonitorConfig.NamespaceSelector.MatchNames or
-// for one informer for any namespace if NamespaceSelector is nil
+// AddMonitor creates a monitor with informers
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
-func (mgr *MainKubeEventsManager) Run(monitorConfig *MonitorConfig) (string, error) {
-	nsNames := monitorConfig.Namespaces()
-	if len(nsNames) == 0 {
-		return "", fmt.Errorf("unsupported namespace selector %+v", monitorConfig.NamespaceSelector)
+func (mgr *kubeEventsManager) AddMonitor(name string, monitorConfig *MonitorConfig) error {
+	rlog.Debugf("Add MOINITOR %+v", monitorConfig)
+	monitor := NewMonitor()
+	monitor.WithName(name)
+	monitor.WithConfig(monitorConfig)
+
+	err := monitor.CreateInformers()
+	if err != nil {
+		return err
 	}
 
-	// Generate new config id
-	configId := NewKubeEventsInformer(monitorConfig).UpdateConfigId()
-	// create informers for each specified object name in each specified namespace
-	for _, nsName := range nsNames {
-		objNames := monitorConfig.Names()
-		if len(objNames) == 0 {
-			objNames = []string{""}
-		}
+	mgr.Monitors[monitorConfig.Metadata.ConfigId] = monitor
 
-		for _, objName := range objNames {
-			if objName != "" {
-				monitorConfig.AddFieldSelectorRequirement("metadata.name", "=", objName)
-			}
-			informer := NewKubeEventsInformer(monitorConfig)
-			informer.WithConfigId(configId)
-			informer.WithNamespace(nsName)
-			err := informer.CreateSharedInformer()
-			if err != nil {
-				return "", err
-			}
-			mgr.AddInformer(informer, configId)
-		}
-	}
-
-	for _, informer := range mgr.InformersStore[configId] {
-		go informer.Run()
-	}
-	return configId, nil
+	return nil
 }
 
-func (mgr *MainKubeEventsManager) AddInformer(informer KubeEventsInformer, configId string) {
-	if _, has := mgr.InformersStore[configId]; !has {
-		mgr.InformersStore[configId] = make([]KubeEventsInformer, 0)
+// Start starts all informers, created by monitors
+func (mgr *kubeEventsManager) Start() {
+	rlog.Infof("Start monitors: %d", len(mgr.Monitors))
+	for _, monitor := range mgr.Monitors {
+		monitor.Start(mgr.ctx)
 	}
-
-	mgr.InformersStore[configId] = append(mgr.InformersStore[configId], informer)
 }
 
-func (mgr *MainKubeEventsManager) Stop(configId string) error {
-	informers, ok := mgr.InformersStore[configId]
+// StopMonitor stops monitor and removes it from Monitors
+func (mgr *kubeEventsManager) StopMonitor(configId string) error {
+	monitor, ok := mgr.Monitors[configId]
 	if ok {
-		for _, informer := range informers {
-			informer.Stop()
-		}
-		delete(mgr.InformersStore, configId)
-	} else {
-		rlog.Errorf("configId '%s' has no informers to stop", configId)
+		monitor.Stop()
+		delete(mgr.Monitors, configId)
 	}
 	return nil
+}
+
+func (mgr *kubeEventsManager) Ch() chan KubeEvent {
+	return nil
+}
+
+func (mgr *kubeEventsManager) StopAll() {
+	mgr.cancel()
+	// wait?
+	//
+	//informers, ok := mgr.InformersStore[configId]
+	//if ok {
+	//	for _, informer := range informers {
+	//		informer.Stop()
+	//	}
+	//	delete(mgr.InformersStore, configId)
+	//} else {
+	//	rlog.Errorf("configId '%s' has no informers to stop", configId)
+	//}
+	//return nil
 }

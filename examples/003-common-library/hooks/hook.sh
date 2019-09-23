@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-source $WORKING_DIR/common/functions.sh
+source /hooks/common/functions.sh
 
 hook::config() {
-  echo '{"onStartup": 10 }'
+  echo '{"configVersion": "v1", "onStartup": 10 }'
 }
 
 hook::trigger() {

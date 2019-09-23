@@ -27,8 +27,8 @@ Shell-operator provides:
 
 Steps to setup Shell-operator in your cluster are:
 - build an image with your hooks (scripts)
-- create necessary RBAC objects (for onKubernetesEvent binding)
-- run Pod with a built image
+- create necessary RBAC objects (for `kubernetes` bindings)
+- run Pod or Deployment with a built image
 
 ### Build an image with your hooks
 
@@ -36,7 +36,7 @@ A hook is a script that, when executed with `--config` option, returns configura
 
 Let's create a small operator that will watch for all Pods in all Namespaces and simply log a name of a new Pod.
 
-"onKubernetesEvent" binding is used to tell shell-operator about what objects we want to watch. Create the `pods-hook.sh` file with the following content:
+"kubernetes" binding is used to tell Shell-operator about objects that we want to watch. Create the `pods-hook.sh` file with the following content:
 ```bash
 #!/usr/bin/env bash
 
@@ -44,16 +44,17 @@ if [[ $1 == "--config" ]] ; then
   cat <<EOF
   {
     "configVersion":"v1",
-    "onKubernetesEvent": [
+    "kubernetes": [
       {
-        "kind":"Pod",
-        "watchEvent":["Added"]
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "watchEvent": ["Added"]
       }
     ]
   }
 EOF
 else
-  podName=$(jq -r .[0].resourceName $BINDING_CONTEXT_PATH)
+  podName=$(jq -r .[0].object.metadata.name $BINDING_CONTEXT_PATH)
   echo "Pod '${podName}' added"
 fi
 ```
@@ -115,7 +116,7 @@ Start shell-operator by applying a `shell-operator-pod.yaml` file:
 kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
 ```
 
-For instance, deploy [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) to trigger `onKuberneteEvent`:
+For instance, deploy [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) to trigger `kubernetes` hook:
 
 ```shell
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml
@@ -124,9 +125,9 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/a
 Run `kubectl -n example-monitor-pods logs po/shell-operator` and see that the hook will print dashboard pod names:
 ```
 ...
-INFO     : QUEUE add TASK_HOOK_RUN@KUBE_EVENTS pods-hook.sh
-INFO     : TASK_RUN HookRun@KUBE_EVENTS pods-hook.sh
-INFO     : Running hook 'pods-hook.sh' binding 'KUBE_EVENTS' ...
+INFO     : QUEUE add TASK_HOOK_RUN@KUBERNETES pods-hook.sh
+INFO     : TASK_RUN HookRun@KUBERNETES pods-hook.sh
+INFO     : Running hook 'pods-hook.sh' binding 'kubernetes' ...
 Pod 'kubernetes-dashboard-769df5545f-99xsb' added
 ...
 ```
@@ -176,18 +177,16 @@ Example `hook --config` with 2 schedules:
 }
 ```
 
-__onKubernetesEvent__
+__kubernetes__
 
-This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) expression to filter their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#onKubernetesEvent).
-
-> Note: No custom resources monitoring for now, see issue #14.
+This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) expression to filter their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#kubernetes).
 
 Example of `hook --config`:
 
 ```json
 {
   "configVersion": "v1",
-  "onKubernetesEvent": [
+  "kubernetes": [
   {"name":"Execute on changes of namespace labels",
    "kind": "namespace",
    "watchEvent":["Modified"],
@@ -195,6 +194,8 @@ Example of `hook --config`:
   }]
 }
 ```
+
+> Note: it is possible to watch custom resources, just use proper values for `apiVersion` and `kind` fields.
 
 ## Prometheus target
 

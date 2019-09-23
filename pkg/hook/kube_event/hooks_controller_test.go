@@ -1,6 +1,7 @@
 package kube_event
 
 import (
+	"context"
 	"testing"
 
 	"github.com/flant/shell-operator/pkg/hook"
@@ -11,24 +12,58 @@ import (
 type MockKubeEventsManager struct {
 }
 
-func (MockKubeEventsManager) Run(monitorConfig *kube_events_manager.MonitorConfig) (string, error) {
-	return monitorConfig.Kind, nil
+func (m *MockKubeEventsManager) WithContext(ctx context.Context) {
+	return
 }
 
-func (MockKubeEventsManager) Stop(configId string) error {
+func (m *MockKubeEventsManager) AddMonitor(name string, monitorConfig *kube_events_manager.MonitorConfig) error {
+	return nil
+}
+
+func (m *MockKubeEventsManager) Start() {
+	return
+}
+
+func (m *MockKubeEventsManager) StopMonitor(configId string) error {
+	return nil
+}
+
+func (m *MockKubeEventsManager) Ch() chan kube_events_manager.KubeEvent {
 	return nil
 }
 
 type MockHookManager struct {
 }
 
-func (*MockHookManager) Run() {
+func (hm *MockHookManager) Init() error {
 	panic("implement me")
 }
 
-func (*MockHookManager) GetHook(name string) (*hook.Hook, error) {
+func (hm *MockHookManager) WithDirectories(workingDir string, tempDir string) {
+	panic("implement me")
+}
+
+func (hm *MockHookManager) WorkingDir() string {
+	panic("implement me")
+}
+
+func (hm *MockHookManager) TempDir() string {
+	panic("implement me")
+}
+
+func (hm *MockHookManager) Run() {
+	panic("implement me")
+}
+
+func (hm *MockHookManager) GetHook(name string) (*hook.Hook, error) {
 	switch name {
 	case "hook-1":
+		monitor := &kube_events_manager.MonitorConfig{
+			Kind:       "ConfigMap",
+			EventTypes: []kube_events_manager.WatchEventType{kube_events_manager.WatchEventModified},
+		}
+		monitor.Metadata.ConfigId = "monitor-configmaps"
+		monitor.Metadata.DebugName = "monitor-configmaps"
 		return &hook.Hook{
 			Name: "hook-1",
 			Path: "/hooks/hook-1",
@@ -40,16 +75,18 @@ func (*MockHookManager) GetHook(name string) (*hook.Hook, error) {
 							ConfigName:   "monitor configmaps",
 							AllowFailure: false,
 						},
-						Monitor: &kube_events_manager.MonitorConfig{
-							ConfigIdPrefix: "monitor-configmaps",
-							Kind:           "ConfigMap",
-							EventTypes:     []kube_events_manager.WatchEventType{kube_events_manager.WatchEventModified},
-						},
+						Monitor: monitor,
 					},
 				},
 			},
 		}, nil
 	case "second":
+		monitor := &kube_events_manager.MonitorConfig{
+			Kind:       "pod",
+			EventTypes: []kube_events_manager.WatchEventType{kube_events_manager.WatchEventAdded},
+		}
+		monitor.Metadata.ConfigId = "monitor-pods"
+		monitor.Metadata.DebugName = "monitor-pods"
 		return &hook.Hook{
 			Name: "second",
 			Path: "/hooks/second",
@@ -61,11 +98,7 @@ func (*MockHookManager) GetHook(name string) (*hook.Hook, error) {
 							ConfigName:   "monitor pods",
 							AllowFailure: false,
 						},
-						Monitor: &kube_events_manager.MonitorConfig{
-							ConfigIdPrefix: "monitor-pods",
-							Kind:           "pod",
-							EventTypes:     []kube_events_manager.WatchEventType{kube_events_manager.WatchEventAdded},
-						},
+						Monitor: monitor,
 					},
 				},
 			},
@@ -74,21 +107,23 @@ func (*MockHookManager) GetHook(name string) (*hook.Hook, error) {
 	return nil, nil
 }
 
-func (*MockHookManager) GetHooksInOrder(bindingType hook.BindingType) []string {
+func (hm *MockHookManager) GetHooksInOrder(bindingType hook.BindingType) []string {
 	return []string{
 		"hook-1",
 		"second",
 	}
 }
 
-func (*MockHookManager) RunHook(hookName string, binding hook.BindingType, bindingContext []hook.BindingContext) error {
-	panic("implement me")
+func (hm *MockHookManager) RunHook(hookName string, binding hook.BindingType, bindingContext []hook.BindingContext) error {
+	return nil
 }
 
-func Test_KubeHooksController_EnableHooks(t *testing.T) {
-	ctrl := NewMainKubeEventsHooksController()
+func Test_KubernetesHooksController_EnableHooks(t *testing.T) {
+	ctrl := NewKubernetesHooksController()
+	ctrl.WithHookManager(&MockHookManager{})
+	ctrl.WithKubeEventsManager(&MockKubeEventsManager{})
 
-	err := ctrl.EnableHooks(&MockHookManager{}, MockKubeEventsManager{})
+	err := ctrl.EnableHooks()
 
 	if assert.NoError(t, err) {
 		assert.Len(t, ctrl.KubeHooks, 2)

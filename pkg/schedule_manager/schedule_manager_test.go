@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_MainScheduleManager_Add(t *testing.T) {
-	sm := NewMainScheduleManager()
+func Test_ScheduleManager_Add(t *testing.T) {
+	sm := NewScheduleManager()
 
 	expectations := []struct {
 		testName string
@@ -69,8 +69,8 @@ func Test_MainScheduleManager_Add(t *testing.T) {
 	})
 }
 
-func Test_MainScheduleManager_Run(t *testing.T) {
-	sm := NewMainScheduleManager()
+func Test_ScheduleManager_Run(t *testing.T) {
+	sm := NewScheduleManager()
 	ScheduleCh = make(chan string)
 
 	expectations := []struct {
@@ -114,9 +114,9 @@ infinity:
 	}
 }
 
-func Test_MainScheduleManager_Remove(t *testing.T) {
+func Test_ScheduleManager_Remove(t *testing.T) {
 	t.Run("base", func(t *testing.T) {
-		sm := NewMainScheduleManager()
+		sm := NewScheduleManager()
 
 		ScheduleCh = make(chan string)
 		expectation := struct {
@@ -154,7 +154,7 @@ func Test_MainScheduleManager_Remove(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		sm := NewMainScheduleManager()
+		sm := NewScheduleManager()
 		expectedError := "schedule manager entry '* * * * *' not found"
 		err := sm.Remove("* * * * *")
 		if err == nil {

@@ -1,6 +1,6 @@
 ## common library example
 
-Use `$WORKING_DIR` environment variable to source common libraries. This can be added to a PYTHONPATH.
+Example with common libraries.
 
 ### run
 

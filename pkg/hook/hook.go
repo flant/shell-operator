@@ -12,7 +12,6 @@ import (
 	"github.com/romana/rlog"
 
 	"github.com/flant/shell-operator/pkg/executor"
-	utils_data "github.com/flant/shell-operator/pkg/utils/data"
 )
 
 type Hook struct {
@@ -29,6 +28,10 @@ func NewHook(name, path string) *Hook {
 		Path:   path,
 		Config: &HookConfig{},
 	}
+}
+
+func (h *Hook) WithHookManager(hookManager HookManager) {
+	h.hookManager = hookManager
 }
 
 func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
@@ -59,7 +62,6 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext) error {
 	if contextPath != "" {
 		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
 	}
-	envs = append(envs, fmt.Sprintf("WORKING_DIR=%s", WorkingDir))
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
@@ -76,15 +78,13 @@ func (h *Hook) SafeName() string {
 }
 
 func (h *Hook) prepareBindingContextJsonFile(context interface{}) (string, error) {
-	data, _ := json.Marshal(context)
-	bindingContextPath := filepath.Join(TempDir, fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
+	data, _ := json.MarshalIndent(context, "", "  ")
+	bindingContextPath := filepath.Join(h.hookManager.TempDir(), fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
 
 	err := ioutil.WriteFile(bindingContextPath, data, 0644)
 	if err != nil {
 		return "", err
 	}
-
-	rlog.Debugf("Prepared hook '%s' binding context:\n%s", h.Name, utils_data.YamlToString(context))
 
 	return bindingContextPath, nil
 }

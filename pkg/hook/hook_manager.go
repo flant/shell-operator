@@ -14,76 +14,57 @@ import (
 )
 
 type HookManager interface {
+	Init() error
 	Run()
+	WithDirectories(workingDir string, tempDir string)
+	WorkingDir() string
+	TempDir() string
 	GetHook(name string) (*Hook, error)
 	GetHooksInOrder(bindingType BindingType) []string
 	RunHook(hookName string, binding BindingType, bindingContext []BindingContext) error
 }
 
-type MainHookManager struct {
+type hookManager struct {
+	workingDir       string
+	tempDir          string
 	hooksByName      map[string]*Hook
 	hookNamesInOrder []string
 	// index to search hooks by binding type
 	hooksInOrder map[BindingType][]*Hook
 }
 
-var (
-	WorkingDir string
-	TempDir    string
-	EventCh    chan Event
-)
+// hookManager should implement HookManager
+var _ HookManager = &hookManager{}
 
-type EventType string
-
-const (
-	HooksLoaded EventType = "HOOKS_LOADED"
-)
-
-type Event struct {
-	Type EventType
-}
-
-func Init(workingDir string, tempDir string) (HookManager, error) {
-	rlog.Info("Initialize hooks manager ...")
-
-	TempDir = tempDir
-	WorkingDir = workingDir
-
-	hm := NewMainHookManager()
-
-	EventCh = make(chan Event, 2)
-
-	if err := hm.loadAllHooks(); err != nil {
-		return nil, err
-	}
-
-	EventCh <- Event{Type: HooksLoaded}
-
-	return hm, nil
-}
-
-func NewMainHookManager() *MainHookManager {
-	return &MainHookManager{
+func NewHookManager() *hookManager {
+	return &hookManager{
 		hooksByName:      make(map[string]*Hook, 0),
 		hookNamesInOrder: make([]string, 0),
 		hooksInOrder:     make(map[BindingType][]*Hook, 0),
 	}
 }
 
-// loadAllHooks finds executables in WorkingDir, execute them with --config argument and add them into indices.
-func (hm *MainHookManager) loadAllHooks() error {
-	rlog.Info("Search and load hooks ...")
+func (hm *hookManager) WithDirectories(workingDir string, tempDir string) {
+	hm.workingDir = workingDir
+	hm.tempDir = tempDir
+}
+
+func (hm *hookManager) WorkingDir() string {
+	return hm.workingDir
+}
+
+func (hm *hookManager) TempDir() string {
+	return hm.tempDir
+}
+
+// Init finds executables in WorkingDir, execute them with --config argument and add them into indices.
+func (hm *hookManager) Init() error {
+	rlog.Info("Initialize hooks manager. Search and load hooks.")
 
 	hm.hooksInOrder = make(map[BindingType][]*Hook)
 	hm.hooksByName = make(map[string]*Hook)
 
-	hooksDir := WorkingDir
-
-	if _, err := os.Stat(hooksDir); os.IsNotExist(err) {
-		return nil
-	}
-
-	hooksRelativePaths, err := utils_file.RecursiveGetExecutablePaths(hooksDir)
+	hooksRelativePaths, err := utils_file.RecursiveGetExecutablePaths(hm.workingDir)
 	if err != nil {
 		return err
 	}
@@ -110,18 +91,17 @@ func (hm *MainHookManager) loadAllHooks() error {
 }
 
 // TODO move --config execution to a Hook method
-func (hm *MainHookManager) loadHook(hookPath string) (hook *Hook, err error) {
+func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	rlog.Infof("Load hook config from '%s'", hookPath)
 
 	envs := []string{}
-	envs = append(envs, fmt.Sprintf("WORKING_DIR=%s", WorkingDir))
 
-	configOutput, err := execCommandOutput(WorkingDir, hookPath, envs, []string{"--config"})
+	configOutput, err := execCommandOutput(hm.workingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
 		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
 	}
 
-	hookName, err := filepath.Rel(WorkingDir, hookPath)
+	hookName, err := filepath.Rel(hm.workingDir, hookPath)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +110,7 @@ func (hm *MainHookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating hook '%s' failed: %s", hookName, err.Error())
 	}
+	hook.WithHookManager(hm)
 
 	return hook, nil
 }
@@ -151,12 +132,12 @@ func execCommandOutput(dir string, entrypoint string, envs []string, args []stri
 	return output, nil
 }
 
-// HookManager has no events for now unlike addon-operator
-func (hm *MainHookManager) Run() {
+// HookManager has no events for now.
+func (hm *hookManager) Run() {
 	panic("implement me")
 }
 
-func (hm *MainHookManager) GetHook(name string) (*Hook, error) {
+func (hm *hookManager) GetHook(name string) (*Hook, error) {
 	hook, exists := hm.hooksByName[name]
 	if exists {
 		return hook, nil
@@ -165,7 +146,7 @@ func (hm *MainHookManager) GetHook(name string) (*Hook, error) {
 	}
 }
 
-func (hm *MainHookManager) GetHooksInOrder(bindingType BindingType) []string {
+func (hm *hookManager) GetHooksInOrder(bindingType BindingType) []string {
 	hooks, ok := hm.hooksInOrder[bindingType]
 	if !ok {
 		return []string{}
@@ -193,7 +174,7 @@ func (hm *MainHookManager) GetHooksInOrder(bindingType BindingType) []string {
 	return hooksNames
 }
 
-func (hm *MainHookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext) error {
+func (hm *hookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext) error {
 	hook, err := hm.GetHook(hookName)
 	if err != nil {
 		return err

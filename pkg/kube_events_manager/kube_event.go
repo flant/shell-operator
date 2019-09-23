@@ -10,22 +10,31 @@ const (
 	WatchEventAdded    WatchEventType = "Added"
 	WatchEventModified WatchEventType = "Modified"
 	WatchEventDeleted  WatchEventType = "Deleted"
+	Synchronization    WatchEventType = "Synchronization"
 )
 
 var (
 	KubeEventCh chan KubeEvent
 )
 
+type ObjectAndFilterResult struct {
+	Object       map[string]interface{} `json:"object,omitempty"`
+	FilterResult string                 `json:"filterResult,omitempty"`
+}
+
 // KubeEvent contains Config id returned from Run method, event types
 // and k8s object identification
 type KubeEvent struct {
 	ConfigId     string
-	Events       []WatchEventType
+	Type         string // Event or Synchronization
+	WatchEvents  []WatchEventType
+	Event        string
 	Namespace    string
 	Kind         string
 	Name         string
-	Object       interface{}
-	FilterResult interface{}
+	Object       map[string]interface{}
+	FilterResult string
+	Objects      []ObjectAndFilterResult
 }
 
 type NameSelector struct {

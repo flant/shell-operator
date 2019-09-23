@@ -95,7 +95,7 @@ func Test_HookConfig_V1(t *testing.T) {
 "schedule":[
 {"name":"each 1 min", "crontab":"0 */1 * * * *"},
 {"name":"each 5 min", "crontab":"0 */5 * * * *"}
-], "onKubernetesEvent":[
+], "kubernetes":[
 {"name":"monitor pods", "kind":"pod", "allowFailure":true}
 ]}
 `
@@ -129,7 +129,7 @@ func Test_HookConfig_Convert_v1(t *testing.T) {
 	}{
 		{
 			"empty nameSelector.matchNames",
-			`{"configVersion":"v1", "onKubernetesEvent": [{"kind":"pod", "nameSelector":{}}]}`,
+			`{"configVersion":"v1", "kubernetes": [{"kind":"pod", "nameSelector":{}}]}`,
 			func() {
 				if assert.NoError(t, err) {
 					assert.Len(t, hookConfig.OnKubernetesEvents, 1)
