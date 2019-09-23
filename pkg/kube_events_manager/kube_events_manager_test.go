@@ -43,14 +43,17 @@ func (*MockResourceInformer) Stop() {
 }
 
 func Test_MainKubeEventsManager_Run(t *testing.T) {
-
 	// Init() replacement
 	mgr := NewKubeEventsManager()
 
 	// Mock KubeEventInformer constructor method
+	oldResInf := NewResourceInformer
 	NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 		return &MockResourceInformer{}
 	}
+	defer func() {
+		NewResourceInformer = oldResInf
+	}()
 
 	// monitor with 3 namespaces and 4 object names
 	monitor := &MonitorConfig{
@@ -68,7 +71,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 	monitor.Metadata.ConfigId = "ConfigId"
 	err := mgr.AddMonitor("test", monitor)
 	if assert.NoError(t, err) {
-		assert.Len(t, mgr.Monitors["ConfigId"], 12)
+		assert.Len(t, mgr.Monitors, 1)
 	}
 }
 
@@ -120,6 +123,18 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	objs := []runtime.Object{}
 
 	kube.DynamicClient = fakedynamic.NewSimpleDynamicClient(scheme, objs...)
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"namespace": "default",
+				"name":      "pod-0",
+			},
+			"spec": "pod-0",
+		},
+	}
+	_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Create(obj, metav1.CreateOptions{}, []string{}...)
 
 	// Init() replacement
 	mgr := NewKubeEventsManager()
@@ -160,7 +175,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 			case 1:
 				assert.Equal(t, "Synchronization", ev.Type)
 				assert.Equal(t, "ConfigId", ev.ConfigId)
-				assert.Len(t, ev.Objects, 0)
+				assert.Len(t, ev.Objects, 1)
 				eventCounter = eventCounter + 1
 
 				// Inject an event into the fake client.
@@ -209,6 +224,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 			}
 		case <-ctx.Done():
 			t.Error("Kube events manager did not get the added pod")
+			done = true
 		}
 		if done {
 			break
