@@ -35,13 +35,9 @@ func (h *Hook) WithHookManager(hookManager HookManager) {
 }
 
 func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
-	if err := json.Unmarshal(configOutput, h.Config); err != nil {
-		return h, fmt.Errorf("unmarshaling hook '%s' config failed: %s\nhook --config output: %s", h.Name, err.Error(), configOutput)
-	}
-
-	err = h.Config.Convert()
+	err = h.Config.LoadAndValidate(configOutput)
 	if err != nil {
-		return h, fmt.Errorf("load hook config: %s", err)
+		return h, fmt.Errorf("load hook '%s' config: %s\nhook --config output: %s", h.Name, err.Error(), configOutput)
 	}
 
 	return h, nil

@@ -2,10 +2,10 @@ package hook
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
 
+	"github.com/flant/shell-operator/pkg/hook/config"
+	"github.com/hashicorp/go-multierror"
 	"github.com/romana/rlog"
 	uuid "gopkg.in/satori/go.uuid.v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,7 +76,7 @@ type OnKubernetesEventConfigV1 struct {
 	LabelSelector           *metav1.LabelSelector    `json:"labelSelector,omitempty"`
 	FieldSelector           *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
 	Namespace               *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
-	JqFilter                string                   `json:"jqFilter,omitempty"`
+	JqFilter                string                   `json:"JqFilter,omitempty"`
 	AllowFailure            bool                     `json:"allowFailure,omitempty"`
 	EventType               []string                 `json:"event,omitempty"`
 	ResynchronizationPeriod string                   `json:"resynchronizationPeriod,omitempty"`
@@ -123,71 +123,78 @@ type OnKubernetesEventConfig struct {
 	Monitor *kubemgr.MonitorConfig
 }
 
-func (c *HookConfig) UnmarshalJSON(data []byte) error {
-	versionDetector := &struct {
-		Version *string `json:"configVersion"`
-	}{}
+// LoadAndValidate loads config from bytes and validate it. Returns multierror.
+func (c *HookConfig) LoadAndValidate(data []byte) error {
+	// - unmarshal json into map
+	// - detect version
+	// - validate with openapi schema
+	// - load again as versioned struct
+	// - convert
+	// - complex, inter fields checks
 
-	err := json.Unmarshal(data, versionDetector)
+	var blank map[string]interface{}
+	err := json.Unmarshal(data, &blank)
 	if err != nil {
-		return fmt.Errorf("detect HookConfig version: %s", err)
+		return fmt.Errorf("json unmarshal: %v", err)
 	}
 
-	// v0 if configVersion is not specified
-	if versionDetector.Version == nil {
+	// detect version
+	version, err := getConfigVersion(blank)
+	if err != nil {
+		return fmt.Errorf("config version: %v", err)
+	}
+	c.Version = version
+
+	isValid, multiErr := config.ValidateConfig(blank, version, "")
+	if multiErr != nil {
+		return multiErr
+	}
+	if !isValid {
+		return fmt.Errorf("configuration is not valid")
+	}
+
+	switch version {
+	case "v0":
 		configV0 := &HookConfigV0{}
 		err := json.Unmarshal(data, configV0)
 		if err != nil {
-			return fmt.Errorf("unmarshal HookConfigV0: %s", err)
+			return fmt.Errorf("unmarshal HookConfig version 0: %s", err)
 		}
 		c.V0 = configV0
-		c.Version = "v0"
-		return nil
-	}
-
-	c.Version = *versionDetector.Version
-	switch c.Version {
+		err = c.ConvertAndCheckV0()
+		if err != nil {
+			return err
+		}
 	case "v1":
 		configV1 := &HookConfigV1{}
 		err := json.Unmarshal(data, configV1)
 		if err != nil {
-			return fmt.Errorf("unmarshal HookConfigV1: %s", err)
+			return fmt.Errorf("unmarshal HookConfig v1: %s", err)
 		}
 		c.V1 = configV1
+		err = c.ConvertAndCheckV1()
+		if err != nil {
+			return err
+		}
 	default:
-		return fmt.Errorf("HookConfig version '%s' is unsupported", c.Version)
+		// NOTE this should not happen because getConfigVersion should return supported version
+		return fmt.Errorf("version '%s' is unsupported", version)
 	}
 
 	return nil
 }
 
-// Convert creates a MonitorConfig array from versioned OnKubernetesEvent configurations.
-func (c *HookConfig) Convert() (err error) {
-	if c == nil {
-		return fmt.Errorf("HookConfig is nil")
-	}
+// ConvertAndCheckV0 fills non-versioned structures and run inter-field checks not covered by OpenAPI schemas.
+func (c *HookConfig) ConvertAndCheckV0() (err error) {
 
-	switch c.Version {
-	case "v0":
-		err = c.ConvertV0()
-	case "v1":
-		err = c.ConvertV1()
-	default:
-		err = fmt.Errorf("HookConfig version '%s' is unsupported", c.Version)
-	}
-
-	return
-}
-
-func (c *HookConfig) ConvertV0() (err error) {
-	c.OnStartup, err = c.ValidateOnStartup(c.V0.OnStartup)
+	c.OnStartup, err = c.ConvertOnStartup(c.V0.OnStartup)
 	if err != nil {
 		return err
 	}
 
 	c.Schedules = []ScheduleConfig{}
 	for _, rawSchedule := range c.V0.Schedule {
-		schedule, err := c.ValidateScheduleV0(rawSchedule)
+		schedule, err := c.ConvertScheduleV0(rawSchedule)
 		if err != nil {
 			return err
 		}
@@ -195,14 +202,19 @@ func (c *HookConfig) ConvertV0() (err error) {
 	}
 
 	c.OnKubernetesEvents = []OnKubernetesEventConfig{}
-	for i, config := range c.V0.OnKubernetesEvent {
+	for i, kubeCfg := range c.V0.OnKubernetesEvent {
+		err := c.CheckOnKubernetesEventV0(kubeCfg, fmt.Sprintf("onKubernetesEvent[%d]", i))
+		if err != nil {
+			return fmt.Errorf("invalid onKubernetesEvent config [%d]: %v", i, err)
+		}
+
 		monitor := &kubemgr.MonitorConfig{}
-		monitor.Metadata.DebugName = c.MonitorDebugName(config.Name, i)
+		monitor.Metadata.DebugName = c.MonitorDebugName(kubeCfg.Name, i)
 		monitor.Metadata.ConfigId = c.MonitorConfigId()
 
 		// a quick fix for legacy version.
 		eventTypes := []kubemgr.WatchEventType{}
-		for _, eventName := range config.EventTypes {
+		for _, eventName := range kubeCfg.EventTypes {
 			switch eventName {
 			case "add":
 				eventTypes = append(eventTypes, kubemgr.WatchEventAdded)
@@ -216,29 +228,29 @@ func (c *HookConfig) ConvertV0() (err error) {
 		}
 		monitor.WithEventTypes(eventTypes)
 
-		monitor.Kind = config.Kind
-		if config.ObjectName != "" {
+		monitor.Kind = kubeCfg.Kind
+		if kubeCfg.ObjectName != "" {
 			monitor.WithNameSelector(&kubemgr.NameSelector{
-				MatchNames: []string{config.ObjectName},
+				MatchNames: []string{kubeCfg.ObjectName},
 			})
 		}
-		if config.NamespaceSelector != nil && !config.NamespaceSelector.Any {
+		if kubeCfg.NamespaceSelector != nil && !kubeCfg.NamespaceSelector.Any {
 			monitor.WithNamespaceSelector(&kubemgr.NamespaceSelector{
 				NameSelector: &kubemgr.NameSelector{
-					MatchNames: config.NamespaceSelector.MatchNames,
+					MatchNames: kubeCfg.NamespaceSelector.MatchNames,
 				},
 			})
 		}
-		monitor.WithLabelSelector(config.Selector)
-		monitor.JqFilter = config.JqFilter
+		monitor.WithLabelSelector(kubeCfg.Selector)
+		monitor.JqFilter = kubeCfg.JqFilter
 
 		kubeConfig := OnKubernetesEventConfig{}
 		kubeConfig.Monitor = monitor
-		kubeConfig.AllowFailure = config.AllowFailure
-		if config.Name == "" {
+		kubeConfig.AllowFailure = kubeCfg.AllowFailure
+		if kubeCfg.Name == "" {
 			kubeConfig.ConfigName = "onKubernetesEvent"
 		} else {
-			kubeConfig.ConfigName = config.Name
+			kubeConfig.ConfigName = kubeCfg.Name
 		}
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
@@ -247,15 +259,16 @@ func (c *HookConfig) ConvertV0() (err error) {
 	return nil
 }
 
-func (c *HookConfig) ConvertV1() (err error) {
-	c.OnStartup, err = c.ValidateOnStartup(c.V1.OnStartup)
+// ConvertAndCheckV0 fills non-versioned structures and run inter-field checks not covered by OpenAPI schemas.
+func (c *HookConfig) ConvertAndCheckV1() (err error) {
+	c.OnStartup, err = c.ConvertOnStartup(c.V1.OnStartup)
 	if err != nil {
 		return err
 	}
 
 	c.Schedules = []ScheduleConfig{}
 	for _, rawSchedule := range c.V1.Schedule {
-		schedule, err := c.ValidateScheduleV0(rawSchedule)
+		schedule, err := c.ConvertScheduleV0(rawSchedule)
 		if err != nil {
 			return err
 		}
@@ -263,31 +276,31 @@ func (c *HookConfig) ConvertV1() (err error) {
 	}
 
 	c.OnKubernetesEvents = []OnKubernetesEventConfig{}
-	for i, config := range c.V1.OnKubernetesEvent {
-		err := c.ValidateOnKubernetesEventV1(config)
+	for i, kubeCfg := range c.V1.OnKubernetesEvent {
+		err := c.CheckOnKubernetesEventV1(kubeCfg, fmt.Sprintf("kubernetes[%d]", i))
 		if err != nil {
 			return fmt.Errorf("invalid kubernetes config [%d]: %v", i, err)
 		}
 
 		monitor := &kubemgr.MonitorConfig{}
-		monitor.Metadata.DebugName = c.MonitorDebugName(config.Name, i)
+		monitor.Metadata.DebugName = c.MonitorDebugName(kubeCfg.Name, i)
 		monitor.Metadata.ConfigId = c.MonitorConfigId()
-		monitor.WithEventTypes(config.WatchEventTypes)
-		monitor.ApiVersion = config.ApiVersion
-		monitor.Kind = config.Kind
-		monitor.WithNameSelector((*kubemgr.NameSelector)(config.NameSelector))
-		monitor.WithFieldSelector((*kubemgr.FieldSelector)(config.FieldSelector))
-		monitor.WithNamespaceSelector((*kubemgr.NamespaceSelector)(config.Namespace))
-		monitor.WithLabelSelector(config.LabelSelector)
-		monitor.JqFilter = config.JqFilter
+		monitor.WithEventTypes(kubeCfg.WatchEventTypes)
+		monitor.ApiVersion = kubeCfg.ApiVersion
+		monitor.Kind = kubeCfg.Kind
+		monitor.WithNameSelector((*kubemgr.NameSelector)(kubeCfg.NameSelector))
+		monitor.WithFieldSelector((*kubemgr.FieldSelector)(kubeCfg.FieldSelector))
+		monitor.WithNamespaceSelector((*kubemgr.NamespaceSelector)(kubeCfg.Namespace))
+		monitor.WithLabelSelector(kubeCfg.LabelSelector)
+		monitor.JqFilter = kubeCfg.JqFilter
 
 		kubeConfig := OnKubernetesEventConfig{}
 		kubeConfig.Monitor = monitor
-		kubeConfig.AllowFailure = config.AllowFailure
-		if config.Name == "" {
+		kubeConfig.AllowFailure = kubeCfg.AllowFailure
+		if kubeCfg.Name == "" {
 			kubeConfig.ConfigName = ContextBindingType[OnKubernetesEvent]
 		} else {
-			kubeConfig.ConfigName = config.Name
+			kubeConfig.ConfigName = kubeCfg.Name
 		}
 
 		rlog.Debugf("kubernetes[%d]: %+v", i, kubeConfig)
@@ -322,7 +335,7 @@ func (c *HookConfig) HasBinding(binding BindingType) bool {
 	return false
 }
 
-func (c *HookConfig) ValidateOnStartup(value interface{}) (*OnStartupConfig, error) {
+func (c *HookConfig) ConvertOnStartup(value interface{}) (*OnStartupConfig, error) {
 	if value == nil {
 		return nil, nil
 	}
@@ -336,7 +349,7 @@ func (c *HookConfig) ValidateOnStartup(value interface{}) (*OnStartupConfig, err
 	return nil, fmt.Errorf("'%v' for OnStartup binding is unsupported", value)
 }
 
-func (c *HookConfig) ValidateScheduleV0(schedule ScheduleConfigV0) (ScheduleConfig, error) {
+func (c *HookConfig) ConvertScheduleV0(schedule ScheduleConfigV0) (ScheduleConfig, error) {
 	res := ScheduleConfig{}
 
 	if schedule.Name != "" {
@@ -351,31 +364,29 @@ func (c *HookConfig) ValidateScheduleV0(schedule ScheduleConfigV0) (ScheduleConf
 	return res, nil
 }
 
-func (c *HookConfig) ValidateOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1) error {
-	msgs := []string{}
+func (c *HookConfig) CheckOnKubernetesEventV0(kubeCfg OnKubernetesEventConfigV0, rootPath string) error {
+	return nil
+}
 
+func (c *HookConfig) CheckOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1, rootPath string) (allErr error) {
 	if kubeCfg.ApiVersion != "" {
 		_, err := schema.ParseGroupVersion(kubeCfg.ApiVersion)
 		if err != nil {
-			msgs = append(msgs, "apiVersion is invalid")
+			allErr = multierror.Append(allErr, fmt.Errorf("apiVersion is invalid"))
 		}
-	}
-
-	if kubeCfg.Kind == "" {
-		msgs = append(msgs, "kind is required")
 	}
 
 	if kubeCfg.LabelSelector != nil {
 		_, err := kubemgr.FormatLabelSelector(kubeCfg.LabelSelector)
 		if err != nil {
-			msgs = append(msgs, fmt.Sprintf("labelSelector is invalid: %v", err))
+			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %v", err))
 		}
 	}
 
 	if kubeCfg.FieldSelector != nil {
 		_, err := kubemgr.FormatFieldSelector((*kubemgr.FieldSelector)(kubeCfg.FieldSelector))
 		if err != nil {
-			msgs = append(msgs, fmt.Sprintf("fieldSelector is invalid: %s", err))
+			allErr = multierror.Append(allErr, fmt.Errorf("fieldSelector is invalid: %v", err))
 		}
 	}
 
@@ -383,16 +394,13 @@ func (c *HookConfig) ValidateOnKubernetesEventV1(kubeCfg OnKubernetesEventConfig
 		if kubeCfg.FieldSelector != nil && len(kubeCfg.FieldSelector.MatchExpressions) > 0 {
 			for _, expr := range kubeCfg.FieldSelector.MatchExpressions {
 				if expr.Field == "metadata.name" {
-					msgs = append(msgs, "fieldSelector 'metadata.name' and nameSelector.matchNames are mutually exclusive")
+					allErr = multierror.Append(allErr, fmt.Errorf("fieldSelector 'metadata.name' and nameSelector.matchNames are mutually exclusive"))
 				}
 			}
 		}
 	}
 
-	if len(msgs) > 0 {
-		return errors.New(strings.Join(msgs, ", "))
-	}
-	return nil
+	return allErr
 }
 
 func (c *HookConfig) MonitorDebugName(configName string, configIndex int) string {
@@ -410,4 +418,25 @@ func (c *HookConfig) MonitorConfigId() string {
 	//	ei.DebugName = ei.Monitor.ConfigIdPrefix + "-" + ei.DebugName[len(ei.Monitor.ConfigIdPrefix)+1:]
 	//}
 	//return ei.DebugName
+}
+
+func getConfigVersion(obj map[string]interface{}) (string, error) {
+	key := "configVersion"
+	value, found := obj[key]
+	if !found {
+		return "v0", nil
+		//return "", fmt.Errorf("missing '%s' key", key)
+	}
+	if value == nil {
+		return "", fmt.Errorf("missing '%s' value", key)
+	}
+	typedValue, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("string value is expected for key '%s'", key)
+	}
+	// FIXME add version validator
+	if typedValue != "v1" {
+		return "", fmt.Errorf("'%s' value '%s' is unsupported", key, typedValue)
+	}
+	return typedValue, nil
 }

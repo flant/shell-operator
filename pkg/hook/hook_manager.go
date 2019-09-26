@@ -59,7 +59,7 @@ func (hm *hookManager) TempDir() string {
 
 // Init finds executables in WorkingDir, execute them with --config argument and add them into indices.
 func (hm *hookManager) Init() error {
-	rlog.Info("Initialize hooks manager. Search and load hooks.")
+	rlog.Info("Initialize hooks manager. Search for and load all hooks.")
 
 	hm.hooksInOrder = make(map[BindingType][]*Hook)
 	hm.hooksByName = make(map[string]*Hook)
@@ -108,7 +108,7 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 
 	hook, err = NewHook(hookName, hookPath).WithConfig(configOutput)
 	if err != nil {
-		return nil, fmt.Errorf("creating hook '%s' failed: %s", hookName, err.Error())
+		return nil, fmt.Errorf("creating hook '%s': %s", hookName, err.Error())
 	}
 	hook.WithHookManager(hm)
 

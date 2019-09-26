@@ -42,6 +42,14 @@ func Test_Hook_WithConfig(t *testing.T) {
 				}
 			},
 		},
+		{
+			"with validation error",
+			`{"configVersion":"v1", "onStartup": "10"}`,
+			func() {
+				assert.Error(t, err)
+				t.Logf("expected validation error was: %v", err)
+			},
+		},
 	}
 
 	for _, test := range tests {
