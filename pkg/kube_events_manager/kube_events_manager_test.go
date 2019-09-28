@@ -212,7 +212,6 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 				metadata := ev.Object["metadata"].(map[string]interface{})
 				assert.Equal(t, "pod-1", metadata["name"])
 				eventCounter = eventCounter + 1
-				//done = true
 			case 3:
 				assert.Equal(t, "Event", ev.Type)
 				assert.Equal(t, "ConfigId", ev.ConfigId)
