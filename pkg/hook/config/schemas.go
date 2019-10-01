@@ -109,11 +109,15 @@ properties:
         kind:
           type: string
         watchEvent:
-          type: string
-          enum:
-          - Added
-          - Modified
-          - Deleted
+          type: array
+          additionalItems: false
+          minItems: 1
+          items:
+            type: string
+            enum:
+            - Added
+            - Modified
+            - Deleted
         jqFilter:
           type: string
           example: ".metadata.labels"
