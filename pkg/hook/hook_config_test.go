@@ -204,6 +204,41 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
 			},
 		},
 		{
+			"watch event is array",
+			`{
+              "configVersion":"v1",
+              "kubernetes":[
+                {
+                  "apiVersion":"v1",
+                  "kind":"Pod",
+                  "watchEvent":["Added", "Modified"]
+                }
+              ]
+            }`,
+			func() {
+				if assert.NoError(t, err) {
+					assert.Len(t, hookConfig.OnKubernetesEvents[0].Monitor.EventTypes, 2)
+				}
+			},
+		},
+		{
+			"bad watch event",
+			`{
+              "configVersion":"v1",
+              "kubernetes":[
+                {
+                  "apiVersion":"v1",
+                  "kind":"Pod",
+                  "watchEvent": "Added"
+                }
+              ]
+            }`,
+			func() {
+				assert.Error(t, err)
+				t.Logf("expected error was: %v\n", err)
+			},
+		},
+		{
 			"nameSelector error",
 			`{
               "configVersion":"v1",
