@@ -130,30 +130,31 @@ func (c *HookConfig) LoadAndValidate(data []byte) error {
 	// - validate with openapi schema
 	// - load again as versioned struct
 	// - convert
-	// - complex, inter fields checks
+	// - make complex checks
 
-	var blank map[string]interface{}
-	err := json.Unmarshal(data, &blank)
+	vu := config.NewDefaultVersionedUntyped()
+	err := vu.Load(data)
 	if err != nil {
-		return fmt.Errorf("json unmarshal: %v", err)
+		return err
 	}
 
-	// detect version
-	version, err := getConfigVersion(blank)
+	err = config.ValidateConfig(vu.Obj, config.GetSchema(vu.Version), "")
 	if err != nil {
-		return fmt.Errorf("config version: %v", err)
-	}
-	c.Version = version
-
-	isValid, multiErr := config.ValidateConfig(blank, version, "")
-	if multiErr != nil {
-		return multiErr
-	}
-	if !isValid {
-		return fmt.Errorf("configuration is not valid")
+		return err
 	}
 
-	switch version {
+	c.Version = vu.Version
+
+	err = c.ConvertAndCheck(data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *HookConfig) ConvertAndCheck(data []byte) error {
+	switch c.Version {
 	case "v0":
 		configV0 := &HookConfigV0{}
 		err := json.Unmarshal(data, configV0)
@@ -177,8 +178,8 @@ func (c *HookConfig) LoadAndValidate(data []byte) error {
 			return err
 		}
 	default:
-		// NOTE this should not happen because getConfigVersion should return supported version
-		return fmt.Errorf("version '%s' is unsupported", version)
+		// NOTE: this should not happen
+		return fmt.Errorf("version '%s' is unsupported", c.Version)
 	}
 
 	return nil
@@ -336,17 +337,16 @@ func (c *HookConfig) HasBinding(binding BindingType) bool {
 }
 
 func (c *HookConfig) ConvertOnStartup(value interface{}) (*OnStartupConfig, error) {
-	if value == nil {
-		return nil, nil
+	floatValue, err := ConvertFloatForBinding(value, "onStartup")
+	if err != nil || floatValue == nil {
+		return nil, err
 	}
-	if floatValue, ok := value.(float64); ok {
-		res := &OnStartupConfig{}
-		res.AllowFailure = false
-		res.ConfigName = ContextBindingType[OnStartup]
-		res.Order = floatValue
-		return res, nil
-	}
-	return nil, fmt.Errorf("'%v' for OnStartup binding is unsupported", value)
+
+	res := &OnStartupConfig{}
+	res.AllowFailure = false
+	res.ConfigName = ContextBindingType[OnStartup]
+	res.Order = *floatValue
+	return res, nil
 }
 
 func (c *HookConfig) ConvertScheduleV0(schedule ScheduleConfigV0) (ScheduleConfig, error) {
@@ -420,23 +420,12 @@ func (c *HookConfig) MonitorConfigId() string {
 	//return ei.DebugName
 }
 
-func getConfigVersion(obj map[string]interface{}) (string, error) {
-	key := "configVersion"
-	value, found := obj[key]
-	if !found {
-		return "v0", nil
-		//return "", fmt.Errorf("missing '%s' key", key)
-	}
+func ConvertFloatForBinding(value interface{}, bindingName string) (*float64, error) {
 	if value == nil {
-		return "", fmt.Errorf("missing '%s' value", key)
+		return nil, nil
 	}
-	typedValue, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("string value is expected for key '%s'", key)
+	if floatValue, ok := value.(float64); ok {
+		return &floatValue, nil
 	}
-	// FIXME add version validator
-	if typedValue != "v1" {
-		return "", fmt.Errorf("'%s' value '%s' is unsupported", key, typedValue)
-	}
-	return typedValue, nil
+	return nil, fmt.Errorf("binding %s has unsupported value '%v'", bindingName, value)
 }

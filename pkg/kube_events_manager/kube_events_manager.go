@@ -9,6 +9,7 @@ import (
 type KubeEventsManager interface {
 	WithContext(ctx context.Context)
 	AddMonitor(name string, monitorConfig *MonitorConfig) error
+	HasMonitor(configId string) bool
 	Start()
 
 	StopMonitor(configId string) error
@@ -62,6 +63,12 @@ func (mgr *kubeEventsManager) AddMonitor(name string, monitorConfig *MonitorConf
 	mgr.Monitors[monitorConfig.Metadata.ConfigId] = monitor
 
 	return nil
+}
+
+// HasMonitor returns true if there is a monitor with configId
+func (mgr *kubeEventsManager) HasMonitor(configId string) bool {
+	_, has := mgr.Monitors[configId]
+	return has
 }
 
 // Start starts all informers, created by monitors

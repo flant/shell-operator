@@ -20,15 +20,12 @@ func Test_Validate_V1(t *testing.T) {
 	e := json.Unmarshal([]byte(data), &dataObj)
 	fmt.Printf("dataObj: %+v\nerr: %v\n", dataObj, e)
 
-	res, err := ValidateConfig(dataObj, "v1", "root")
+	s := GetSchema("v1")
 
-	assert.False(t, res)
+	err := ValidateConfig(dataObj, s, "root")
 
 	if assert.Error(t, err) {
-		if merr, ok := err.(*multierror.Error); ok {
-			for _, e := range merr.Errors {
-				fmt.Printf("- %v\n", e)
-			}
-		}
+		assert.IsType(t, &multierror.Error{}, err)
+		t.Logf("expected multierror was: %v", err)
 	}
 }

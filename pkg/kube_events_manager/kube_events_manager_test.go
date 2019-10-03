@@ -163,20 +163,25 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 
 	fmt.Printf("mgr Started\n")
 
-	// First event — Synchronization, second is Event
-	eventCounter := 1
+	// First event — Synchronization, second and third are Event
+	eventCounter := 0
 	done := false
+	state := struct {
+		podsCreated bool
+		gotPod1     bool
+		gotPod2     bool
+	}{}
 	for {
 		fmt.Printf("Start select\n")
 		select {
 		case ev := <-KubeEventCh:
-			fmt.Printf("Got event: %d %#v\n", eventCounter, ev)
-			switch eventCounter {
-			case 1:
+			eventCounter = eventCounter + 1
+			t.Logf("Got event: %d %#v\n", eventCounter, ev)
+
+			if !state.podsCreated {
 				assert.Equal(t, "Synchronization", ev.Type)
 				assert.Equal(t, "ConfigId", ev.ConfigId)
 				assert.Len(t, ev.Objects, 1)
-				eventCounter = eventCounter + 1
 
 				// Inject an event into the fake client.
 				obj1 := &unstructured.Unstructured{
@@ -204,21 +209,23 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 					},
 				}
 				_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Create(obj2, metav1.CreateOptions{}, []string{}...)
-				fmt.Printf("DynamicClient Created pod\n")
-			case 2:
-				assert.Equal(t, "Event", ev.Type)
-				assert.Equal(t, "ConfigId", ev.ConfigId)
-				assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
-				metadata := ev.Object["metadata"].(map[string]interface{})
-				assert.Equal(t, "pod-1", metadata["name"])
-				eventCounter = eventCounter + 1
-			case 3:
-				assert.Equal(t, "Event", ev.Type)
-				assert.Equal(t, "ConfigId", ev.ConfigId)
-				assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
-				metadata := ev.Object["metadata"].(map[string]interface{})
-				assert.Equal(t, "pod-2", metadata["name"])
-				eventCounter = eventCounter + 1
+				t.Logf("DynamicClient Created pod\n")
+				state.podsCreated = true
+				break
+			}
+
+			assert.Equal(t, "Event", ev.Type)
+			assert.Equal(t, "ConfigId", ev.ConfigId)
+			assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
+			metadata := ev.Object["metadata"].(map[string]interface{})
+			assert.Contains(t, metadata, "name")
+			if metadata["name"] == "pod-1" {
+				state.gotPod1 = true
+			}
+			if metadata["name"] == "pod-2" {
+				state.gotPod2 = true
+			}
+			if state.gotPod1 && state.gotPod2 {
 				done = true
 			}
 		case <-ctx.Done():
