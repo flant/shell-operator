@@ -89,7 +89,7 @@ properties:
         crontab:
           type: string
         allowFailure:
-          type: bool
+          type: boolean
           default: false
   kubernetes:
     title: kubernetes event bindings
@@ -122,7 +122,7 @@ properties:
           type: string
           example: ".metadata.labels"
         allowFailure:
-          type: bool
+          type: boolean
         resynchronizationPeriod:
           type: string
         nameSelector:

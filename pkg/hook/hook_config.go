@@ -76,9 +76,8 @@ type OnKubernetesEventConfigV1 struct {
 	LabelSelector           *metav1.LabelSelector    `json:"labelSelector,omitempty"`
 	FieldSelector           *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
 	Namespace               *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
-	JqFilter                string                   `json:"JqFilter,omitempty"`
+	JqFilter                string                   `json:"jqFilter,omitempty"`
 	AllowFailure            bool                     `json:"allowFailure,omitempty"`
-	EventType               []string                 `json:"event,omitempty"`
 	ResynchronizationPeriod string                   `json:"resynchronizationPeriod,omitempty"`
 }
 
