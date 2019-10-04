@@ -18,7 +18,7 @@ type ScheduleHooksController interface {
 }
 
 type scheduleHooksController struct {
-	Hooks scheduleHooksStorage
+	Hooks ScheduleHooksStorage
 
 	// dependencies
 	hookManager     hook.HookManager
@@ -27,7 +27,7 @@ type scheduleHooksController struct {
 
 var NewScheduleHooksController = func() ScheduleHooksController {
 	return &scheduleHooksController{
-		Hooks: make(scheduleHooksStorage, 0),
+		Hooks: make(ScheduleHooksStorage, 0),
 	}
 }
 
@@ -41,14 +41,7 @@ func (c *scheduleHooksController) WithScheduleManager(scheduleManager schedule_m
 
 // UpdateScheduledHooks recreates a new Hooks array
 func (c *scheduleHooksController) UpdateScheduleHooks() {
-	// map of crontabs that should be stopped in scheduleManager
-	oldCrontabs := map[string]bool{}
-	for _, crontab := range c.Hooks.GetCrontabs() {
-		oldCrontabs[crontab] = false
-	}
-
-	newStorage := make(scheduleHooksStorage, 0)
-
+	newStorage := make(ScheduleHooksStorage, 0)
 	hooks := c.hookManager.GetHooksInOrder(hook.Schedule)
 
 	for _, hookName := range hooks {
@@ -56,6 +49,7 @@ func (c *scheduleHooksController) UpdateScheduleHooks() {
 		for _, schedule := range hmHook.Config.Schedules {
 			_, err := c.scheduleManager.Add(schedule.Crontab)
 			if err != nil {
+				// TODO add crontab string validation and this error can be ignored
 				rlog.Errorf("Schedule: cannot add '%s' for hook '%s': %s", schedule.Crontab, hookName, err)
 				continue
 			}
@@ -64,22 +58,23 @@ func (c *scheduleHooksController) UpdateScheduleHooks() {
 		}
 	}
 
-	if len(oldCrontabs) > 0 {
-		// Creates a new set of schedules. If the schedule is in oldCrontabs, then set it to true.
-		newCrontabs := newStorage.GetCrontabs()
-		for _, crontab := range newCrontabs {
-			if _, has_crontab := oldCrontabs[crontab]; has_crontab {
-				oldCrontabs[crontab] = true
-			}
-		}
+	// Calculate obsolete crontab strings
+	oldCrontabs := map[string]bool{}
+	for _, crontab := range c.Hooks.GetCrontabs() {
+		oldCrontabs[crontab] = false
+	}
+	for _, crontab := range newStorage.GetCrontabs() {
+		oldCrontabs[crontab] = true
+	}
 
-		// Stop crontabs that was not added to new storage.
-		for crontab, _ := range oldCrontabs {
-			if !oldCrontabs[crontab] {
-				c.scheduleManager.Remove(crontab)
-			}
+	// Stop crontabs that is not in new storage.
+	for crontab, isActive := range oldCrontabs {
+		if !isActive {
+			c.scheduleManager.Remove(crontab)
 		}
 	}
+
+	c.Hooks = newStorage
 }
 
 func (c *scheduleHooksController) HandleEvent(crontab string) ([]task.Task, error) {
@@ -92,15 +87,16 @@ func (c *scheduleHooksController) HandleEvent(crontab string) ([]task.Task, erro
 
 	for _, schHook := range scheduleHooks {
 		_, err := c.hookManager.GetHook(schHook.HookName)
-		if err == nil {
-			newTask := task.NewTask(task.HookRun, schHook.HookName).
-				WithBinding(hook.Schedule).
-				AppendBindingContext(hook.BindingContext{Binding: schHook.ConfigName}).
-				WithAllowFailure(schHook.AllowFailure)
-			res = append(res, newTask)
+		if err != nil {
+			// This should not happen
+			rlog.Errorf("Possible bug: hook '%s' is scheduled as '%s' but not found by hook_manager", schHook.HookName, crontab)
+			continue
 		}
-
-		rlog.Errorf("MAIN_LOOP hook '%s' scheduled but not found by hook_manager", schHook.HookName)
+		newTask := task.NewTask(task.HookRun, schHook.HookName).
+			WithBinding(hook.Schedule).
+			AppendBindingContext(hook.BindingContext{Binding: schHook.ConfigName}).
+			WithAllowFailure(schHook.AllowFailure)
+		res = append(res, newTask)
 	}
 
 	return res, nil

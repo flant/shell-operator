@@ -12,16 +12,16 @@ type ScheduleHook struct {
 	AllowFailure bool
 }
 
-type scheduleHooksStorage []*ScheduleHook
+type ScheduleHooksStorage []*ScheduleHook
 
 // GetCrontabs returns uniq crontabs from the storage.
-func (s *scheduleHooksStorage) GetCrontabs() []string {
+func (s *ScheduleHooksStorage) GetCrontabs() []string {
 	resMap := map[string]bool{}
 	for _, scheduleHook := range *s {
 		resMap[scheduleHook.Crontab] = true
 	}
 
-	res := make([]string, len(resMap))
+	res := make([]string, 0)
 	for k := range resMap {
 		res = append(res, k)
 	}
@@ -29,7 +29,7 @@ func (s *scheduleHooksStorage) GetCrontabs() []string {
 }
 
 // GetHooksForSchedule returns new array of ScheduleHook objects for specific crontab.
-func (s *scheduleHooksStorage) GetHooksForSchedule(crontab string) []ScheduleHook {
+func (s *ScheduleHooksStorage) GetHooksForSchedule(crontab string) []ScheduleHook {
 	res := make([]ScheduleHook, 0)
 
 	for _, scheduleHook := range *s {
@@ -48,7 +48,7 @@ func (s *scheduleHooksStorage) GetHooksForSchedule(crontab string) []ScheduleHoo
 }
 
 // AddHook adds hook to the storage.
-func (s *scheduleHooksStorage) AddHook(hookName string, schedule hook.ScheduleConfig) {
+func (s *ScheduleHooksStorage) AddHook(hookName string, schedule hook.ScheduleConfig) {
 	newHook := &ScheduleHook{
 		HookName:     hookName,
 		Crontab:      schedule.Crontab,
@@ -59,7 +59,7 @@ func (s *scheduleHooksStorage) AddHook(hookName string, schedule hook.ScheduleCo
 }
 
 // RemoveHook removes all hooks from storage by hook name.
-func (s *scheduleHooksStorage) RemoveHook(hookName string) {
+func (s *ScheduleHooksStorage) RemoveHook(hookName string) {
 	newStorage := make([]*ScheduleHook, 0)
 	for _, scheduleHook := range *s {
 		if scheduleHook.HookName == hookName {

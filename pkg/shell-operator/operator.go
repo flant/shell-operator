@@ -289,13 +289,13 @@ func RunMetrics() {
 
 func InitHttpServer(listenAddr *net.TCPAddr) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = writer.Write([]byte(`<html>
+		_, _ = writer.Write([]byte(fmt.Sprintf(`<html>
     <head><title>Shell operator</title></head>
     <body>
     <h1>Shell operator</h1>
-    <pre>go tool pprof goprofex http://SHELL_OPERATOR_IP:9115/debug/pprof/profile</pre>
+    <pre>go tool pprof goprofex http://&lt;SHELL_OPERATOR_IP&gt;:%d/debug/pprof/profile</pre>
     </body>
-    </html>`))
+    </html>`, app.ListenAddress.Port)))
 	})
 
 	http.Handle("/metrics", promhttp.Handler())

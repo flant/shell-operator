@@ -12,12 +12,18 @@ import (
 type MockKubeEventsManager struct {
 }
 
+var _ kube_events_manager.KubeEventsManager = &MockKubeEventsManager{}
+
 func (m *MockKubeEventsManager) WithContext(ctx context.Context) {
 	return
 }
 
 func (m *MockKubeEventsManager) AddMonitor(name string, monitorConfig *kube_events_manager.MonitorConfig) error {
 	return nil
+}
+
+func (m *MockKubeEventsManager) HasMonitor(configId string) bool {
+	return false
 }
 
 func (m *MockKubeEventsManager) Start() {
