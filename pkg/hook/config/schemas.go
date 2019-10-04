@@ -54,7 +54,7 @@ definitions:
               type: array
               items:
                 type: string
-  
+
 type: object
 additionalProperties: false
 required:
@@ -70,7 +70,7 @@ properties:
     description: |
       the value is the order to sort onStartup hooks
     type: integer
-    example: 10    
+    example: 10
   schedule:
     title: schedule bindings
     description: |
@@ -172,9 +172,13 @@ properties:
       the value is the order to sort onStartup hooks
     type: integer
   schedule:
-    type: object
+    type: array
+    items:
+      type: object
   onKubernetesEvent:
-    type: object
+    type: array
+    items:
+      type: object
 `,
 }
 
