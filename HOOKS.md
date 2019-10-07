@@ -94,7 +94,7 @@ Parameters:
 
 `name` — is an optional identifier. It is used to distinguish between multiple schedules during runtime. For more information see [binding context](#binding-context).
 
-`crontab` – is a mandatory schedule with a regular crontab syntax (with [additional](https://godoc.org/github.com/robfig/cron) features).
+`crontab` – is a mandatory schedule with a regular crontab syntax (with [additional](https://godoc.org/gopkg.in/robfig/cron.v2) features).
 
 `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
