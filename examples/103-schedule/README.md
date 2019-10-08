@@ -1,6 +1,6 @@
 ## Schedule example
 
-Example of a hook that runs every 10 minutes.
+Example of hooks with schedule bindings. 5 fields and 6 fields for crontab are supported.
 
 ### run
 
@@ -27,10 +27,10 @@ INFO     : Running schedule manager entry '*/5 * * * * *' ...
 INFO     : Running schedule manager entry '*/10 * * * * *' ...
 INFO     : TASK_RUN HookRun@SCHEDULE schedule-hook.sh
 INFO     : Running hook 'schedule-hook.sh' binding 'SCHEDULE' ...
-Message from Schedule hook: [{"binding":"every 5 sec"}]
+Message from 'schedule' hook with 6 fields crontab: [{"binding":"every 5 sec"}]
 INFO     : TASK_RUN HookRun@SCHEDULE schedule-hook.sh
 INFO     : Running hook 'schedule-hook.sh' binding 'SCHEDULE' ...
-Message from Schedule hook: [{"binding":"every 10 sec"}]
+Message from 'schedule' hook with 6 fields crontab: [{"binding":"every 10 sec"}]
 ...
 ```
 

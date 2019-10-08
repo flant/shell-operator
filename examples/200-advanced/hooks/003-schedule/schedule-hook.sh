@@ -6,8 +6,8 @@ if [[ $1 == "--config" ]] ; then
   "configVersion":"v1",
   "schedule": [
     {
-      "name":"every 15 min",
-      "crontab":"0 */15 * * * *"
+      "name": "every 15 min",
+      "crontab": "*/15 * * * *"
     }
   ]
 }
