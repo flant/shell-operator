@@ -76,13 +76,18 @@ Syntax:
 {
   "configVersion": "v1",
   "schedule": [
-     {
-      "name": "Every 20 minutes",
-      "crontab": "0 */20 * * * *",
+    {
+      "crontab": "*/5 * * * *",
       "allowFailure": true|false,
     },
     {
-      "crontab": "* * * * * *",
+      "name": "Every 20 minutes",
+      "crontab": "*/20 * * * *",
+      "allowFailure": true|false,
+    },
+    {
+      "name": "every 10 seconds",
+      "crontab": "*/10 * * * * *",
       "allowFailure": true|false,
     },
     ...
@@ -94,7 +99,7 @@ Parameters:
 
 `name` — is an optional identifier. It is used to distinguish between multiple schedules during runtime. For more information see [binding context](#binding-context).
 
-`crontab` – is a mandatory schedule with a regular crontab syntax (with [additional](https://godoc.org/gopkg.in/robfig/cron.v2) features).
+`crontab` – is a mandatory schedule with a regular crontab syntax with 5 fields. 6 fields style crontab also supported, for more information see [documentation on robfig/cron.v2 library](https://godoc.org/gopkg.in/robfig/cron.v2).
 
 `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 

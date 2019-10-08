@@ -166,12 +166,14 @@ Example `hook --config` with 2 schedules:
 {
   "configVersion": "v1",
   "schedule": [
-   {"name":"every 10 min",
-    "crontab":"0 */10 * * * *",
-    "allowFailure":true
-   },
-   {"name":"Every Monday at 8:05",
-    "crontab":"0 5 8 * * 1"
+    {
+      "name": "every 10 min",
+      "crontab": "0 */10 * * * *",
+      "allowFailure": true
+    },
+    {
+      "name": "Every Monday at 8:05",
+      "crontab": "5 8 * * 1"
     }
   ]
 }
@@ -187,11 +189,13 @@ Example of `hook --config`:
 {
   "configVersion": "v1",
   "kubernetes": [
-  {"name":"Execute on changes of namespace labels",
-   "kind": "namespace",
-   "watchEvent":["Modified"],
-   "jqFilter":".metadata.labels"
-  }]
+    {
+      "name":"Execute on changes of namespace labels",
+      "kind": "namespace",
+      "watchEvent":["Modified"],
+      "jqFilter":".metadata.labels"
+    }
+  ]
 }
 ```
 
