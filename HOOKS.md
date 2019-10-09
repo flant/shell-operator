@@ -67,7 +67,7 @@ Parameters:
 
 ORDER — the execution order (when added to the queue, the hooks will be sorted in the specified order, and then alphabetically). The value should be an integer.
 
-#### schedule
+### schedule
 
 Scheduled execution. You can bind a hook to any number of schedules.
 
@@ -197,7 +197,7 @@ Parameters:
 - `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).
   If the selector is not set, then all objects of specified kind are monitored.
 
-- `fieldSelector` — selector of objects by their fields, works like `--field-selector=''` flag of `kubectl`. Due to limits of API, supported operators are Equals (or `=`, `==`) and NotEquals (or `!=`) and all expressions are combined with AND. Note that fieldSelector with 'metadata.name' field is mutually exclusive with nameSelector. 
+- `fieldSelector` — selector of objects by their fields, works like `--field-selector=''` flag of `kubectl`. Supported operators are Equals (or `=`, `==`) and NotEquals (or `!=`) and all expressions are combined with AND. Also note that fieldSelector with 'metadata.name' field is mutually exclusive with nameSelector. There are limits on fields, see [Note](#fieldselector).
 
 - `namespace` — filters to choose namespaces. If omitted, events from all namespaces will be monitored.
 
@@ -235,11 +235,58 @@ Example:
 
 This hook configuration will execute hook on each change in labels of pods labeled with myLabel=myLabelValue in default namespace.  
 
-> Note: unlike `kubectl` you should explicitly define namespace.nameSelector to monitor events from `default` namespace.
+#### usage notes
 
-> Note: Shell-operator requires a ServiceAccount with the appropriate [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) permissions. See examples with RBAC: [monitor-pods](examples/101-monitor-pods) and [monitor-namespaces](examples/102-monitor-namespaces).
+##### default namespace
 
-> Note: consider that "Added" event is not always equal to "Object created" if labelSelector, fieldSelector or namespace.labelSelector is specified in the `binding`. If objects and/or namespace are updated in Kubernetes, the `binding` may suddenly start matching them, with the "Added" event. The same with "Deleted" event: "Deleted" is not always equal to "Object removed", the object can just move out of scope.
+Unlike `kubectl` you should explicitly define namespace.nameSelector to monitor events from `default` namespace.
+
+```
+      "namespace": {
+        "nameSelector": ["default"]
+      },
+```
+
+##### RBAC is required
+
+Shell-operator requires a ServiceAccount with the appropriate [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) permissions. See examples with RBAC: [monitor-pods](examples/101-monitor-pods) and [monitor-namespaces](examples/102-monitor-namespaces).
+
+##### Added != Object created
+
+Consider that "Added" event is not always equal to "Object created" if labelSelector, fieldSelector or namespace.labelSelector is specified in the `binding`. If objects and/or namespace are updated in Kubernetes, the `binding` may suddenly start matching them, with the "Added" event. The same with "Deleted" event: "Deleted" is not always equal to "Object removed", the object can just move out of scope of selectors.
+
+##### fieldSelector
+
+There is no support of filtering by arbitrary field neither for core resources nor for custom resources (see [issue#53459](https://github.com/kubernetes/kubernetes/issues/53459)). Only `metadata.name` and `metadata.namespace` fields are commonly supported.
+
+However fieldSelector can be useful for some resources with extended set of supported fields:
+
+| kind       | fieldSelector | src url |
+|------------|---------------|---------|
+| Pod        | spec.nodeName<br>spec.restartPolicy<br>spec.schedulerName<br>spec.serviceAccountName<br>status.phase<br>status.podIP<br>status.nominatedNodeName              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/pod/strategy.go#L219-L230)        |
+| Event      | involvedObject.kind<br>involvedObject.namespace<br>involvedObject.name<br>involvedObject.uid<br>involvedObject.apiVersion<br>involvedObject.resourceVersion<br>involvedObject.fieldPath<br>reason<br>source<br>type                | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/event/strategy.go#L102-L112)        |
+| Secret     | type              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/secret/strategy.go#L128)        |
+| Namespace  | status.phase              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/namespace/strategy.go#L163)        |
+| ReplicaSet | status.replicas              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/apps/replicaset/strategy.go#L)        |
+| Job        | status.successful              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/batch/job/strategy.go#L205)        |
+| Node       | spec.unschedulable              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/node/strategy.go#L204)        |
+
+
+Example of selecting Pods by 'Running' phase:
+
+```
+"kind": "Pod",
+"fieldSelector":{
+  "matchExpressions":[
+    {
+      "field":"status.phase",
+      "operator":"Equals",
+      "value":"Running"
+    }
+  ]
+}
+```
+
 
 ## Event triggered execution
 
