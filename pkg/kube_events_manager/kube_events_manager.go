@@ -3,12 +3,12 @@ package kube_events_manager
 import (
 	"context"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 )
 
 type KubeEventsManager interface {
 	WithContext(ctx context.Context)
-	AddMonitor(name string, monitorConfig *MonitorConfig) error
+	AddMonitor(name string, monitorConfig *MonitorConfig, logEntry *log.Entry) error
 	HasMonitor(configId string) bool
 	Start()
 
@@ -49,13 +49,13 @@ func (mgr *kubeEventsManager) WithContext(ctx context.Context) {
 // AddMonitor creates a monitor with informers
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
-func (mgr *kubeEventsManager) AddMonitor(name string, monitorConfig *MonitorConfig) error {
-	rlog.Debugf("Add MOINITOR %+v", monitorConfig)
+func (mgr *kubeEventsManager) AddMonitor(name string, monitorConfig *MonitorConfig, logEntry *log.Entry) error {
+	log.Debugf("Add MOINITOR %+v", monitorConfig)
 	monitor := NewMonitor()
 	monitor.WithName(name)
 	monitor.WithConfig(monitorConfig)
 
-	err := monitor.CreateInformers()
+	err := monitor.CreateInformers(logEntry)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (mgr *kubeEventsManager) HasMonitor(configId string) bool {
 
 // Start starts all informers, created by monitors
 func (mgr *kubeEventsManager) Start() {
-	rlog.Infof("Start monitors: %d", len(mgr.Monitors))
+	log.WithField("operator.component", "kubeEventsManager").Infof("Start monitors: %d", len(mgr.Monitors))
 	for _, monitor := range mgr.Monitors {
 		monitor.Start(mgr.ctx)
 	}
@@ -104,7 +104,7 @@ func (mgr *kubeEventsManager) StopAll() {
 	//	}
 	//	delete(mgr.InformersStore, configId)
 	//} else {
-	//	rlog.Errorf("configId '%s' has no informers to stop", configId)
+	//	log.Errorf("configId '%s' has no informers to stop", configId)
 	//}
 	//return nil
 }

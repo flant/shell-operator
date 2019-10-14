@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,7 +13,7 @@ func WaitForProcessInterruption() {
 	for {
 		select {
 		case sig := <-interruptCh:
-			rlog.Infof("Grace shutdown with %s signal", sig.String())
+			log.Infof("Grace shutdown with %s signal", sig.String())
 			return
 		}
 	}

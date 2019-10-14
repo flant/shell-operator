@@ -3,7 +3,7 @@ package executor
 // Some information about docker and pid1 process and zombie problem:
 // https://blog.phusion.nl/2015/01/20/docker-and-the-pid-1-zombie-reaping-problem/
 // The code hereafter is from go-reaper (https://github.com/ramr/go-reaper) with small change:
-// - use rlog instead of fmt
+// - use log instead of fmt
 // - lock reaper when cmd.Run or cmd.Output are called
 
 /*  Note:  This is a *nix only implementation.  */
@@ -14,7 +14,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -26,7 +26,7 @@ type Config struct {
 //  Handle death of child (SIGCHLD) messages. Pushes the signal onto the
 //  notifications channel if there is a waiter.
 func sigChildHandler(notifications chan os.Signal) {
-	rlog.Debugf("Start SIGCHLD handler")
+	log.Debugf("Start SIGCHLD handler")
 	var sigs = make(chan os.Signal, 3)
 	signal.Notify(sigs, syscall.SIGCHLD)
 
@@ -48,19 +48,18 @@ func sigChildHandler(notifications chan os.Signal) {
 
 //  Be a good parent - clean up behind the children.
 func reapChildren(config Config) {
-	rlog.Debugf("Start WAIT4 loop")
+	log.Debugf("Start WAIT4 loop")
 
 	var notifications = make(chan os.Signal, 1)
 
 	go sigChildHandler(notifications)
 
 	pid := config.Pid
-	opts := config.Options|syscall.WNOHANG
-
+	opts := config.Options | syscall.WNOHANG
 
 	for {
 		si := <-notifications
-		rlog.Debugf("REAP: got %v signal", si)
+		log.Debugf("REAP: got %v signal", si)
 		func() {
 			// Acquire lock
 			ExecutorLock.Lock()
@@ -77,7 +76,7 @@ func reapChildren(config Config) {
 				pid, err = syscall.Wait4(pid, &wstatus, opts, nil)
 			}
 
-			rlog.Debugf(" - Grim reaper cleanup: pid=%d, wstatus=%+v\n",
+			log.Debugf(" - Grim reaper cleanup: pid=%d, wstatus=%+v\n",
 				pid, wstatus)
 
 		}()
@@ -122,7 +121,7 @@ func Start(config Config) {
 	if !config.DisablePid1Check {
 		mypid := os.Getpid()
 		if 1 != mypid {
-			rlog.Debugf(" - Grim reaper disabled, pid not 1\n")
+			log.Debugf(" - Grim reaper disabled, pid not 1\n")
 			return
 		}
 	}

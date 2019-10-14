@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 )
 
 var ExecutorLock = &sync.Mutex{}
@@ -15,7 +15,8 @@ func Run(cmd *exec.Cmd) error {
 	ExecutorLock.Lock()
 	defer ExecutorLock.Unlock()
 
-	rlog.Debugf("Executing command %q in %q dir", strings.Join(cmd.Args, " "), cmd.Dir)
+	// TODO context: hook name, hook phase, hook binding
+	log.Debugf("Executing command %q in %q dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
 	return cmd.Run()
 }

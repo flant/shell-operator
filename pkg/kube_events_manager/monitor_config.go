@@ -1,6 +1,7 @@
 package kube_events_manager
 
 import (
+	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -19,6 +20,7 @@ type MonitorConfig struct {
 	LabelSelector     *metav1.LabelSelector
 	FieldSelector     *FieldSelector
 	JqFilter          string
+	LogEntry          *log.Entry
 }
 
 func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {

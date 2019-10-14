@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/flant/shell-operator/pkg/kube"
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/informers/core/v1"
@@ -65,7 +65,7 @@ var SharedNamespaceInformerEventHandler = func(informer *namespaceInformer, addF
 		AddFunc: func(obj interface{}) {
 			_, nsName, err := metaFromEventObject(obj)
 			if err != nil {
-				rlog.Errorf("%s: add: get ns name: %s", informer.Monitor.Metadata.DebugName, err)
+				log.Errorf("%s: add: get ns name: %s", informer.Monitor.Metadata.DebugName, err)
 				return
 			}
 
@@ -74,7 +74,7 @@ var SharedNamespaceInformerEventHandler = func(informer *namespaceInformer, addF
 		DeleteFunc: func(obj interface{}) {
 			_, nsName, err := metaFromEventObject(obj)
 			if err != nil {
-				rlog.Errorf("%s: delete: get ns name: %s", informer.Monitor.Metadata.DebugName, err)
+				log.Errorf("%s: delete: get ns name: %s", informer.Monitor.Metadata.DebugName, err)
 				return
 			}
 
@@ -84,7 +84,7 @@ var SharedNamespaceInformerEventHandler = func(informer *namespaceInformer, addF
 }
 
 func (m *namespaceInformer) Run(stopCh <-chan struct{}) {
-	rlog.Debugf("%s: Run namespace informer", m.Monitor.Metadata.DebugName)
+	log.Debugf("%s: Run namespace informer", m.Monitor.Metadata.DebugName)
 	if m.SharedInformer != nil {
 		go m.SharedInformer.Run(stopCh)
 	}

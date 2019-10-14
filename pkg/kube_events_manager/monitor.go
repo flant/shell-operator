@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 )
 
 type Monitor interface {
 	WithName(string)
 	WithConfig(config *MonitorConfig)
-	CreateInformers() error
+	CreateInformers(logEntry *log.Entry) error
 	Start(context.Context)
 	Stop()
 }
@@ -48,9 +48,7 @@ func (m *monitor) WithName(name string) {
 }
 
 func (m *monitor) WithConfig(config *MonitorConfig) {
-	rlog.Debugf("WithConfig: %+v", config)
 	m.Config = config
-	rlog.Debugf("WithConfig: %+v", m.Config)
 }
 
 // CreateInformers creates all informers and
@@ -58,11 +56,12 @@ func (m *monitor) WithConfig(config *MonitorConfig) {
 // If MonitorConfig.NamespaceSelector.MatchNames is defined, then
 // multiple informers are created for each namespace.
 // If no NamespaceSelector defined, then one informer is created.
-func (m *monitor) CreateInformers() error {
-	rlog.Debugf("Create Informers Config: %+v", m.Config)
+func (m *monitor) CreateInformers(logEntry *log.Entry) error {
+	logEntry = logEntry.WithField("binding.name", m.Config.Metadata.DebugName)
+	logEntry.Debugf("Create Informers Config: %+v", m.Config)
 	nsNames := m.Config.Namespaces()
 	if len(nsNames) > 0 {
-		rlog.Debugf("%s: create static informers", m.Config.Metadata.DebugName)
+		logEntry.Debugf("create static ResourceInformers")
 		// create informers for each specified object name in each specified namespace
 		// This list of informers is static.
 		for _, nsName := range nsNames {
@@ -82,14 +81,14 @@ func (m *monitor) CreateInformers() error {
 	}
 
 	if m.Config.NamespaceSelector != nil && m.Config.NamespaceSelector.LabelSelector != nil {
-		rlog.Debugf("%s: create ns informer", m.Config.Metadata.DebugName)
+		logEntry.Debugf("Create NamespaceInformer for namespace.labelSelector")
 		m.NamespaceInformer = NewNamespaceInformer(m.Config)
 		err := m.NamespaceInformer.CreateSharedInformer(
 			func(nsName string) {
 				// add function — check, create and run informers for Ns
-				rlog.Infof("NS INFORMER %s: ADD %s", m.Config.Metadata.DebugName, nsName)
+				logEntry.Infof("got ns/%s, create dynamic ResourceInformers", nsName)
 
-				// ignore statically specified namespaces
+				// ignore event if namespace is already has static ResourceInformers
 				if _, ok := staticNamespaces[nsName]; ok {
 					return
 				}
@@ -102,7 +101,7 @@ func (m *monitor) CreateInformers() error {
 				var err error
 				m.VaryingInformers[nsName], err = m.CreateInformersForNamespace(nsName)
 				if err != nil {
-					rlog.Errorf("%s: create informers for ns/%s: %v", m.Config.Metadata.DebugName, nsName, err)
+					logEntry.Errorf("create ResourceInformers for ns/%s: %v", nsName, err)
 				}
 
 				var ctx context.Context
@@ -114,7 +113,7 @@ func (m *monitor) CreateInformers() error {
 			},
 			func(nsName string) {
 				// delete function — check, stop and remove informers for Ns
-				rlog.Infof("NS INFORMER %s: DELETE %s", m.Config.Metadata.DebugName, nsName)
+				logEntry.Infof("deleted ns/%s, stop dynamic ResourceInformers", nsName)
 
 				// ignore statically specified namespaces
 				if _, ok := staticNamespaces[nsName]; ok {

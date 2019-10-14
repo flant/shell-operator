@@ -2,7 +2,8 @@ package schedule_manager
 
 import (
 	"fmt"
-	"github.com/romana/rlog"
+
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/robfig/cron.v2"
 )
 
@@ -29,17 +30,19 @@ var NewScheduleManager = func() *scheduleManager {
 }
 
 func (sm *scheduleManager) Add(crontab string) (string, error) {
+	logEntry := log.WithField("operator.component", "scheduleManager")
+
 	_, ok := sm.entries[crontab]
 	if !ok {
 		entryId, err := sm.cron.AddFunc(crontab, func() {
-			rlog.Infof("Running schedule manager entry '%s' ...", crontab)
+			logEntry.Debugf("fire schedule event for entry '%s'", crontab)
 			ScheduleCh <- crontab
 		})
 		if err != nil {
 			return "", err
 		}
 
-		rlog.Debugf("Schedule manager entry '%s' added", crontab)
+		logEntry.Debugf("entry '%s' added", crontab)
 
 		sm.entries[crontab] = entryId
 	}
@@ -54,13 +57,13 @@ func (sm *scheduleManager) Remove(crontab string) error {
 	}
 
 	sm.cron.Remove(entryID)
-	rlog.Debugf("Schedule manager entry '%s' deleted", crontab)
+	log.WithField("operator.component", "scheduleManager").Debugf("entry '%s' deleted", crontab)
 
 	return nil
 }
 
 func (sm *scheduleManager) Run() {
-	rlog.Info("Running schedule manager ...")
+	log.Info("Run schedule manager")
 	sm.cron.Start()
 }
 
@@ -69,7 +72,7 @@ func (sm *scheduleManager) stop() {
 }
 
 func Init() (ScheduleManager, error) {
-	rlog.Info("Initializing schedule manager ...")
+	log.Info("Initialize schedule manager")
 
 	ScheduleCh = make(chan string, 1)
 

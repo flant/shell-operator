@@ -1,8 +1,11 @@
 package app
 
 import (
-	"gopkg.in/alecthomas/kingpin.v2"
 	"net"
+	"strings"
+
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var AppName = "shell-operator"
@@ -17,6 +20,11 @@ var TempDir = "/tmp/shell-operator"
 var KubeContext = ""
 var KubeConfig = ""
 var ListenAddress, _ = net.ResolveTCPAddr("tcp", "0.0.0.0:9115")
+
+// Use info level with timestamps and a text output by default
+var LogLevel = "info"
+var LogNoTime = false
+var LogType = "text"
 
 // SetupGlobalSettings init global flags with default values
 func SetupGlobalSettings(kpApp *kingpin.Application) {
@@ -49,4 +57,41 @@ func SetupGlobalSettings(kpApp *kingpin.Application) {
 		Envar("SHELL_OPERATOR_LISTEN_ADDRESS").
 		Default(ListenAddress.String()).
 		TCPVar(&ListenAddress)
+
+	kpApp.Flag("log-level", "Logging level: debug, info, error. Default is info.").
+		Envar("LOG_LEVEL").
+		Default(LogLevel).
+		StringVar(&LogLevel)
+	kpApp.Flag("log-type", "Logging formatter type: json, text or color. Default is text.").
+		Envar("LOG_TYPE").
+		Default(LogType).
+		StringVar(&LogType)
+	kpApp.Flag("log-no-time", "Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps.").
+		Envar("LOG_NO_TIME").
+		BoolVar(&LogNoTime)
+}
+
+// SetupLogging sets logging output
+func SetupLogging() {
+	switch LogType {
+	case "json":
+		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
+	case "text":
+		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true})
+	case "color":
+		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true})
+	default:
+		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
+	}
+
+	switch strings.ToLower(LogLevel) {
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+	case "error":
+		log.SetLevel(log.ErrorLevel)
+	case "info":
+		log.SetLevel(log.InfoLevel)
+	default:
+		log.SetLevel(log.InfoLevel)
+	}
 }

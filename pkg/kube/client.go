@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -39,10 +39,13 @@ type InitOptions struct {
 }
 
 func Init(opts InitOptions) error {
-	rlog.Info("KUBE Init Kubernetes client")
+	logEntry := log.WithField("operator.component", "kubeAPIClient")
+
+	logEntry.Info("Init Kubernetes client")
 
 	var err error
 	var config *rest.Config
+	var configType = "out-of-cluster"
 
 	// Try to load from kubeconfig in flags or from ~/.kube/config
 	config, outOfClusterErr := getOutOfClusterConfig(opts.KubeContext, opts.KubeConfig)
@@ -55,26 +58,27 @@ func Init(opts InitOptions) error {
 				if opts.KubeConfig != "" || opts.KubeContext != "" {
 					if outOfClusterErr != nil {
 						err = fmt.Errorf("out-of-cluster config error: %v, in-cluster config error: %v", outOfClusterErr, err)
-						rlog.Errorf("KUBE-INIT Kubernetes client problems: %s", err)
+						logEntry.Errorf("configuration problems: %s", err)
 						return err
 					}
 				} else {
-					rlog.Errorf("KUBE-INIT Kubernetes client in-cluster problem: %s", err)
+					logEntry.Errorf("in-cluster problem: %s", err)
 					return err
 				}
 			}
 		} else {
 			// if not in cluster return outOfCluster error
 			if outOfClusterErr != nil {
-				rlog.Errorf("KUBE-INIT Kubernetes client out-of-cluster problem: %s", outOfClusterErr)
+				logEntry.Errorf("out-of-cluster problem: %s", outOfClusterErr)
 				return outOfClusterErr
 			}
 		}
+		configType = "in-cluster"
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		rlog.Errorf("KUBE-INIT Kubernetes client configuration problem: %s", err)
+		logEntry.Errorf("configuration problem: %s", err)
 		return err
 	}
 	Kubernetes = clientset
@@ -85,7 +89,7 @@ func Init(opts InitOptions) error {
 	}
 	DynamicClient = dynamicClient
 
-	rlog.Info("KUBE-INIT Kubernetes client is configured successfully")
+	logEntry.Info("Kubernetes client is configured successfully with '%s' config", configType)
 
 	return nil
 }
@@ -261,7 +265,7 @@ func GroupVersionResource(apiVersion string, kind string) (schema.GroupVersionRe
 		}
 
 		// Debug mode will list all available CRDs for apiVersion
-		rlog.Debugf("GVR: %30s %30s %30s", gv.String(), resource.Kind,
+		log.Debugf("GVR: %30s %30s %30s", gv.String(), resource.Kind,
 			fmt.Sprintf("%+v", append([]string{resource.Name}, resource.ShortNames...)),
 		)
 
@@ -310,7 +314,7 @@ func GroupVersionResourceByKind(kind string) (schema.GroupVersionResource, error
 			}
 
 			// Debug mode will list all available CRDs
-			rlog.Debugf("GVR: %30s %30s %30s", gv.String(), resource.Kind,
+			log.Debugf("GVR: %30s %30s %30s", gv.String(), resource.Kind,
 				fmt.Sprintf("%+v", append([]string{resource.Name}, resource.ShortNames...)),
 			)
 
