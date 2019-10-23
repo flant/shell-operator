@@ -29,13 +29,13 @@ func main() {
 	kpApp.Command("start", "Start events processing.").
 		Action(func(c *kingpin.ParseContext) error {
 			app.SetupLogging()
+			log.Infof("%s %s", app.AppName, app.Version)
+
 			// Be a good parent - clean up after the child processes
 			// in case if shell-operator is a PID1.
 			go executor.Reap()
 
 			operator.InitHttpServer(app.ListenAddress)
-
-			log.Infof("%s %s", app.AppName, app.Version)
 
 			err := operator.Init()
 			if err != nil {
