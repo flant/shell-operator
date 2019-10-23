@@ -22,6 +22,7 @@ import (
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 var (
@@ -206,6 +207,8 @@ func HandleEventsFromManagers() {
 }
 
 func TasksRunner() {
+	logEntry := log.
+		WithField("operator.component", "taskRunner")
 	for {
 		if TasksQueue.IsEmpty() {
 			time.Sleep(QueueIsEmptyDelay)
@@ -218,34 +221,34 @@ func TasksRunner() {
 
 			switch t.GetType() {
 			case task.HookRun:
-				logEntry := log.
-					WithField("operator.component", "taskRunner").
-					WithField("task", "HookRun").
-					WithField("hook", t.GetName()).
-					WithField("phase", "run").
-					WithField("binding", hook.ContextBindingType[t.GetBinding()])
+				hookLogLabels := map[string]string{}
+				hookLogLabels["hook"] = t.GetName()
+				hookLogLabels["binding"] = hook.ContextBindingType[t.GetBinding()]
+				hookLogLabels["task"] = "HookRun"
 
-				logEntry.Info("Execute hook")
-				err := HookManager.RunHook(t.GetName(), t.GetBinding(), t.GetBindingContext())
+				taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
+
+				taskLogEntry.Info("Execute hook")
+				err := HookManager.RunHook(t.GetName(), t.GetBinding(), t.GetBindingContext(), hookLogLabels)
 				if err != nil {
 					taskHook, _ := HookManager.GetHook(t.GetName())
 					hookLabel := taskHook.SafeName()
 
 					if t.GetAllowFailure() {
-						logEntry.Infof("Hook failed, but allowed to fail: %v", err)
+						taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
 						MetricsStorage.SendCounterMetric("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
 						TasksQueue.Pop()
 					} else {
 						MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
 						t.IncrementFailureCount()
-						logEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
+						taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
 						delayTask := task.NewTaskDelay(FailedHookDelay)
 						delayTask.Name = t.GetName()
 						delayTask.Binding = t.GetBinding()
 						TasksQueue.Push(delayTask)
 					}
 				} else {
-					logEntry.Infof("Hook executed successfully")
+					taskLogEntry.Infof("Hook executed successfully")
 					TasksQueue.Pop()
 				}
 

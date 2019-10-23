@@ -21,7 +21,7 @@ type HookManager interface {
 	TempDir() string
 	GetHook(name string) (*Hook, error)
 	GetHooksInOrder(bindingType BindingType) ([]string, error)
-	RunHook(hookName string, binding BindingType, bindingContext []BindingContext) error
+	RunHook(hookName string, binding BindingType, bindingContext []BindingContext, logLabels map[string]string) error
 }
 
 type hookManager struct {
@@ -178,13 +178,13 @@ func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error
 	return hooksNames, nil
 }
 
-func (hm *hookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext) error {
+func (hm *hookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext, logLabels map[string]string) error {
 	hook, err := hm.GetHook(hookName)
 	if err != nil {
 		return err
 	}
 
-	if err := hook.Run(binding, bindingContext); err != nil {
+	if err := hook.Run(binding, bindingContext, logLabels); err != nil {
 		return err
 	}
 

@@ -73,7 +73,6 @@ func (mgr *kubeEventsManager) HasMonitor(configId string) bool {
 
 // Start starts all informers, created by monitors
 func (mgr *kubeEventsManager) Start() {
-	log.WithField("operator.component", "kubeEventsManager").Infof("Start monitors: %d", len(mgr.Monitors))
 	for _, monitor := range mgr.Monitors {
 		monitor.Start(mgr.ctx)
 	}

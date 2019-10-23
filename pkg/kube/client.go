@@ -39,9 +39,7 @@ type InitOptions struct {
 }
 
 func Init(opts InitOptions) error {
-	logEntry := log.WithField("operator.component", "kubeAPIClient")
-
-	logEntry.Info("Init Kubernetes client")
+	logEntry := log.WithField("operator.component", "KubernetesAPIClient")
 
 	var err error
 	var config *rest.Config
@@ -89,7 +87,7 @@ func Init(opts InitOptions) error {
 	}
 	DynamicClient = dynamicClient
 
-	logEntry.Info("Kubernetes client is configured successfully with '%s' config", configType)
+	logEntry.Infof("Kubernetes client is configured successfully with '%s' config", configType)
 
 	return nil
 }

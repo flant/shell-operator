@@ -63,7 +63,6 @@ func (sm *scheduleManager) Remove(crontab string) error {
 }
 
 func (sm *scheduleManager) Run() {
-	log.Info("Run schedule manager")
 	sm.cron.Start()
 }
 
@@ -72,8 +71,6 @@ func (sm *scheduleManager) stop() {
 }
 
 func Init() (ScheduleManager, error) {
-	log.Info("Initialize schedule manager")
-
 	ScheduleCh = make(chan string, 1)
 
 	sm := NewScheduleManager()
