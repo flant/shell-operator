@@ -24,7 +24,7 @@ jobs:
         id: kind
         uses: engineerd/setup-kind@v0.1.0
         with:
-          image: "kindest/node:v1.15"
+          image: "kindest/node:v1.15.3"
  #         config: hack/github/cluster.yaml
       - name: get nodes
         id: get-nodes

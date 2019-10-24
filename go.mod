@@ -25,7 +25,7 @@ require (
 	k8s.io/apimachinery v0.0.0-20190409092423-760d1845f48b
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/utils v0.0.0-20190308190857-21c4ce38f2a7 // indirect
-	sigs.k8s.io/kind v0.5.1
+	sigs.k8s.io/kind v0.0.0-20191024075107-85a46de11816
 )
 
 // replace github.com/go-openapi/validate => ../go-openapi-validate

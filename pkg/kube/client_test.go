@@ -111,7 +111,7 @@ func createCluster(name string) error {
 	fmt.Printf("Creating cluster %q ...\n", name)
 	if err = ctx.Create(
 		create.WithConfigFile(""),
-		create.WithNodeImage("kindest/node:v1.15"),
+		create.WithNodeImage("kindest/node:v1.15.3"),
 		//create.Retain(flags.Retain),
 		create.WaitForReady(time.Second*300),
 	); err != nil {
