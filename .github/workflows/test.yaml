@@ -17,10 +17,14 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v1
 
+      - name: Some info
+        run: id;pwd;lsblk;df;cat /proc/mounts
+
       - name: Create Kubernetes Cluster
         id: kind
         uses: engineerd/setup-kind@v0.1.0
-#        with:
+        with:
+          image: "kindest/node:v1.15"
  #         config: hack/github/cluster.yaml
       - name: get nodes
         id: get-nodes
@@ -44,6 +48,8 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v1
 
+      - name: Some info
+        run: id;pwd;lsblk;df;cat /proc/mounts
 #      - name: Get dependencies
 #        run: |
 #          go mod download
