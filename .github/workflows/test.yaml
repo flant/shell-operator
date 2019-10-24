@@ -2,6 +2,34 @@ name: Test
 on: [push]
 jobs:
 
+  run_kind:
+    name: Run Kind cluster
+
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
+
+      - name: Create Kubernetes Cluster
+        id: kind
+        uses: engineerd/setup-kind@v0.1.0
+#        with:
+ #         config: hack/github/cluster.yaml
+      - name: get nodes
+        id: get-nodes
+        run: |
+          export KUBECONFIG="$(kind get kubeconfig-path)"
+          kubectl wait --for=condition=Ready nodes --all --timeout=5m
+          kubectl get nodes
+
+
   build:
     name: Build and test
     runs-on: ubuntu-latest
