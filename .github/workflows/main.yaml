@@ -1,0 +1,68 @@
+name: Main
+on: [push]
+jobs:
+  some_info:
+    name: Some info
+    runs-on: ubuntu-latest
+    steps:
+    - name: Some info
+      run: id;pwd;lsblk;df;cat /proc/mounts
+
+  download_go_modules:
+    name: Download modules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
+
+      - name: Download modules
+        run: go mod download
+        shell: bash
+
+      - name: Pack go modules
+        run: tar -czvf go_modules.tar.gz -C $HOME/go/pkg/mod .
+        shell: bash
+
+      # FIXME: https://github.community/t5/GitHub-Actions/Caching-files-between-GitHub-Action-executions/m-p/30974#M630
+      - name: Upload go modules artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: go_modules
+          path: go_modules.tar.gz
+
+
+  build:
+    name: Build and test
+    needs: download_go_modules
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+        id: go
+
+      - name: Download go modules artifact
+        uses: actions/download-artifact@master
+        with:
+          name: go_modules
+          path: .
+
+      - name: Unpack go modules
+        run: mkdir -p $HOME/go/pkg/mod && tar -xzvf go_modules.tar.gz -C $HOME/go/pkg/mod
+        shell: bash
+
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
+
+      - name: Build
+        run: go build -v ./cmd/shell-operator
+        shell: bash
