@@ -19,10 +19,11 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/satori/go.uuid.v1 v1.2.0
-	gopkg.in/yaml.v2 v2.2.2
+	gopkg.in/yaml.v2 v2.2.4
 	k8s.io/apimachinery v0.0.0-20190409092423-760d1845f48b
 	k8s.io/client-go v0.0.0-20190411052641-7a6b4715b709
 	k8s.io/utils v0.0.0-20190308190857-21c4ce38f2a7 // indirect
+	sigs.k8s.io/kind v0.0.0-20191024075107-85a46de11816
 )
 
 // replace github.com/go-openapi/validate => ../go-openapi-validate
