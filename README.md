@@ -6,6 +6,7 @@
 <a href="https://hub.docker.com/r/flant/shell-operator"><img src="https://img.shields.io/docker/pulls/flant/shell-operator.svg?logo=docker" alt="docker pull flant/shell-operator"/></a>
 <a href="https://cloud-native.slack.com/messages/CJ13K3HFG"><img src="https://img.shields.io/badge/slack-EN%20chat-611f69.svg?logo=slack" alt="Slack chat EN"/></a>
 <a href="https://t.me/kubeoperator"><img src="https://img.shields.io/badge/telegram-RU%20chat-179cde.svg?logo=telegram" alt="Telegram chat RU"/></a>
+<a href="https://app.fossa.io/projects/git%2Bgithub.com%2Fflant%2Fshell-operator?ref=badge_shield" alt="FOSSA Status"><img src="https://app.fossa.io/api/projects/git%2Bgithub.com%2Fflant%2Fshell-operator.svg?type=shield"/></a>
 </p>
 
 
@@ -212,3 +213,6 @@ More examples can be found in [examples](examples/) directory.
 ## License
 
 Apache License 2.0, see [LICENSE](LICENSE).
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fflant%2Fshell-operator.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fflant%2Fshell-operator?ref=badge_large)
