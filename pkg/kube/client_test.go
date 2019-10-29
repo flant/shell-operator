@@ -2,6 +2,7 @@ package kube
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -14,6 +15,11 @@ import (
 	"sigs.k8s.io/kind/pkg/errors"
 	"sigs.k8s.io/kind/pkg/globals"
 )
+
+func TestMain(m *testing.M) {
+	// call flag.Parse() here if TestMain uses flags
+	os.Exit(m.Run())
+}
 
 func Test_Discover(t *testing.T) {
 	// Test works only with real cluster.
