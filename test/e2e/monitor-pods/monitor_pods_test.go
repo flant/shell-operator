@@ -3,15 +3,19 @@
 package monitor_pods_test
 
 import (
+	"encoding/json"
 	"fmt"
-	"strings"
+	"os"
+	"path/filepath"
 
-	//	"github.com/flant/shell-operator/pkg/kube"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/flant/shell-operator/pkg/kube"
 	"github.com/flant/shell-operator/test/utils"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Shell-operator kubernetes hook", func() {
@@ -31,50 +35,92 @@ var _ = Describe("Shell-operator kubernetes hook", func() {
 	})
 
 	Context("", func() {
-		It("should start successful and output some settings", func() {
-			expectedStrings := []struct {
-				expected string
-			}{
-				{
-					"Working dir",
-				},
-				{
-					"Listen on",
-				},
-				{
-					"Synchronization",
-				},
-			}
-			expectedStringsIndex := 0
+		It("should run hook after creating a pod", func() {
+			currentDir, _ := os.Getwd()
 
 			configPath := utils.KindGetKubeconfigPath(clusterName)
-
 			stopCh := make(chan struct{})
 
+			assertions := []struct {
+				matchFn   func(map[string]string) bool
+				successFn func()
+			}{
+				{
+					func(l map[string]string) bool {
+						return utils.FieldContains(l, "msg", "Working dir")
+					},
+					func() {},
+				},
+				{
+					func(l map[string]string) bool {
+						return utils.FieldContains(l, "msg", "Listen on")
+					},
+					func() {},
+				},
+				{
+					func(l map[string]string) bool {
+						return utils.FieldEquals(l, "msg", "Synchronization run") &&
+							utils.FieldEquals(l, "output", "stdout")
+					},
+					func() {},
+				},
+				{
+					func(l map[string]string) bool {
+						return utils.FieldEquals(l, "msg", "Hook executed successfully") &&
+							utils.FieldEquals(l, "hook", "pods-hook.sh")
+					},
+					func() {
+						_, err := kube.Kubernetes.CoreV1().Namespaces().Create(&v1.Namespace{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "monitor-pods-test",
+							},
+						})
+						Ω(err).ShouldNot(HaveOccurred())
+						//utils.KubectlCreateNamespace("monitor-pods-test")
+						utils.Kubectl(configPath).Apply("monitor-pods-test", "testdata/test-pod.yaml")
+					},
+				},
+				{
+					func(l map[string]string) bool {
+						return utils.FieldContains(l, "msg", "Pod 'test' added") &&
+							utils.FieldEquals(l, "output", "stdout")
+					},
+					func() {
+						stopCh <- struct{}{}
+					},
+				},
+			}
+			index := 0
+
 			err := utils.ExecShellOperator(utils.ShellOperatorOptions{
+				CurrentDir: currentDir,
 				Args:       []string{"start"},
 				KubeConfig: configPath,
 				LogType:    "json",
-				WorkingDir: "testdata",
+				WorkingDir: filepath.Join(currentDir, "testdata"),
 			}, utils.CommandOptions{
 				StopCh: stopCh,
 				OutputLineHandler: func(line string) {
 					fmt.Printf("Got line: %s\n", line)
-					//Ω(line).Should(ContainSubstring(expectedStrings[expectedStringsIndex].expected))
-					if strings.Contains(line, expectedStrings[expectedStringsIndex].expected) {
-						expectedStringsIndex++
+
+					if index == len(assertions) {
+						return
 					}
-					if expectedStringsIndex == len(expectedStrings) {
-						stopCh <- struct{}{}
+
+					Ω(line).Should(HavePrefix("{"))
+					var logLine map[string]string
+					err := json.Unmarshal([]byte(line), &logLine)
+					Ω(err).ShouldNot(HaveOccurred())
+
+					res := assertions[index].matchFn(logLine)
+					if res {
+						assertions[index].successFn()
+						index++
 					}
 				}})
 			Ω(err).Should(HaveOccurred())
-			Ω(err.Error()).Should(ContainSubstring("command failed, exit code"))
-			//switch e := err.(type) {
-			//case *utils.CommandError:
-			//	e.ExitCode
-			//}
-			Ω(expectedStringsIndex).Should(Equal(len(expectedStrings)))
+			Ω(err.Error()).Should(ContainSubstring("command is stopped"))
+			Ω(index).Should(Equal(len(assertions)))
 		})
 	})
 })

@@ -28,7 +28,6 @@ func KindCreateCluster(clusterName string) error {
 	if err = ctx.Create(
 		create.WithConfigFile(""),
 		create.WithNodeImage("kindest/node:v1.13.10"),
-		//create.Retain(flags.Retain),
 		create.WaitForReady(time.Second*300),
 	); err != nil {
 		if errs := errors.Errors(err); errs != nil {

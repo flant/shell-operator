@@ -47,6 +47,7 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 		return fmt.Errorf("error starting command: %s", err)
 	}
 
+	var stopMsg string
 	var wg sync.WaitGroup
 	wg.Add(3)
 
@@ -55,6 +56,7 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 		if opts.StopCh != nil {
 			select {
 			case <-opts.StopCh:
+				stopMsg = "command is stopped"
 				session.Kill()
 			case <-session.Exited:
 			}
@@ -86,8 +88,12 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 	wg.Wait()
 
 	if exitCode := session.ExitCode(); exitCode != 0 {
+		cmdErr := fmt.Errorf("command failed, exit code %d", exitCode)
+		if stopMsg != "" {
+			cmdErr = fmt.Errorf(stopMsg)
+		}
 		return &CommandError{
-			CommandError: fmt.Errorf("command failed, exit code %d", exitCode),
+			CommandError: cmdErr,
 			ExitCode:     exitCode,
 		}
 	}

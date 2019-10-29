@@ -16,5 +16,7 @@ else
   if [[ $type == "Event" ]] ; then
     podName=$(jq -r '.[0].object.metadata.name' $BINDING_CONTEXT_PATH)
     echo "Pod '${podName}' added"
+  else
+    echo "Synchronization run"
   fi
 fi
