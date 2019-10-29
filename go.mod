@@ -18,7 +18,6 @@ require (
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
-	golang.org/x/tools v0.0.0-20190617190820-da514acc4774
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/satori/go.uuid.v1 v1.2.0

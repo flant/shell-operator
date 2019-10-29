@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +20,7 @@ func (m *MockKubeEventsManager) WithContext(ctx context.Context) {
 	return
 }
 
-func (m *MockKubeEventsManager) AddMonitor(name string, monitorConfig *kube_events_manager.MonitorConfig) error {
+func (m *MockKubeEventsManager) AddMonitor(name string, monitorConfig *kube_events_manager.MonitorConfig, logEntry *log.Entry) error {
 	return nil
 }
 
@@ -40,6 +42,8 @@ func (m *MockKubeEventsManager) Ch() chan kube_events_manager.KubeEvent {
 
 type MockHookManager struct {
 }
+
+var _ hook.HookManager = &MockHookManager{}
 
 func (hm *MockHookManager) Init() error {
 	panic("implement me")
@@ -113,14 +117,14 @@ func (hm *MockHookManager) GetHook(name string) (*hook.Hook, error) {
 	return nil, nil
 }
 
-func (hm *MockHookManager) GetHooksInOrder(bindingType hook.BindingType) []string {
+func (hm *MockHookManager) GetHooksInOrder(bindingType hook.BindingType) ([]string, error) {
 	return []string{
 		"hook-1",
 		"second",
-	}
+	}, nil
 }
 
-func (hm *MockHookManager) RunHook(hookName string, binding hook.BindingType, bindingContext []hook.BindingContext) error {
+func (hm *MockHookManager) RunHook(hookName string, binding hook.BindingType, bindingContext []hook.BindingContext, logLabels map[string]string) error {
 	return nil
 }
 
