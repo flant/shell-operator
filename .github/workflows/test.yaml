@@ -2,36 +2,74 @@ name: Test
 on: [push]
 jobs:
 
-  run_kind:
-    name: Run Kind cluster
+  matrix_test:
+    matrix:
+      kubernetesVersion:
+        - version: 1.13
+          image: kinndest/1.13.10
+        - version: 1.14
+          image: kinndest/1.14.3
+        - version: 1.15
+          image: kinndest/1.15.1
+        - version: 1.16
+          image: kindest/1.16.7
 
     runs-on: ubuntu-latest
     steps:
-
-      - name: Set up Go 1.12
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.12
-        id: go
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
-
-      - name: Some info
-        run: id;pwd;lsblk;df;cat /proc/mounts
-
-      - name: Create Kubernetes Cluster
-        id: kind
-        uses: engineerd/setup-kind@v0.1.0
-        with:
-          image: "kindest/node:v1.15.3"
- #         config: hack/github/cluster.yaml
-      - name: get nodes
-        id: get-nodes
-        run: |
-          export KUBECONFIG="$(kind get kubeconfig-path)"
-          kubectl wait --for=condition=Ready nodes --all --timeout=5m
-          kubectl get nodes
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+      - name: Dump job context
+        env:
+          JOB_CONTEXT: ${{ toJson(job) }}
+        run: echo "$JOB_CONTEXT"
+      - name: Dump steps context
+        env:
+          STEPS_CONTEXT: ${{ toJson(steps) }}
+        run: echo "$STEPS_CONTEXT"
+      - name: Dump runner context
+        env:
+          RUNNER_CONTEXT: ${{ toJson(runner) }}
+        run: echo "$RUNNER_CONTEXT"
+      - name: Dump strategy context
+        env:
+          STRATEGY_CONTEXT: ${{ toJson(strategy) }}
+        run: echo "$STRATEGY_CONTEXT"
+      - name: Dump matrix context
+        env:
+          MATRIX_CONTEXT: ${{ toJson(matrix) }}
+        run: echo "$MATRIX_CONTEXT"
+#  run_kind:
+#    name: Run Kind cluster
+#
+#    runs-on: ubuntu-latest
+#    steps:
+#
+#      - name: Set up Go 1.12
+#        uses: actions/setup-go@v1
+#        with:
+#          go-version: 1.12
+#        id: go
+#
+#      - name: Check out code into the Go module directory
+#        uses: actions/checkout@v1
+#
+#      - name: Some info
+#        run: id;pwd;lsblk;df;cat /proc/mounts
+#
+#      - name: Create Kubernetes Cluster
+#        id: kind
+#        uses: engineerd/setup-kind@v0.1.0
+#        with:
+#          image: "kindest/node:v1.15.3"
+# #         config: hack/github/cluster.yaml
+#      - name: get nodes
+#        id: get-nodes
+#        run: |
+#          export KUBECONFIG="$(kind get kubeconfig-path)"
+#          kubectl wait --for=condition=Ready nodes --all --timeout=5m
+#          kubectl get nodes
 
 
   build:
@@ -50,6 +88,7 @@ jobs:
 
       - name: Some info
         run: id;pwd;lsblk;df;cat /proc/mounts
+
 #      - name: Get dependencies
 #        run: |
 #          go mod download
@@ -57,7 +96,7 @@ jobs:
 #      - name: Build
 #        run: go build -v ./cmd/shell-operator
 
-      - name: Test
-        run: go test -v ./pkg/kube
+#      - name: Test
+#        run: go test -v ./pkg/kube
 
 
