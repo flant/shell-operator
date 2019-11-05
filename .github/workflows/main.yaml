@@ -66,3 +66,41 @@ jobs:
       - name: Build
         run: go build -v ./cmd/shell-operator
         shell: bash
+
+  unit_tests:
+    name: Unit tests
+    needs: download_go_modules
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+        id: go
+
+      - name: Download go modules artifact
+        uses: actions/download-artifact@master
+        with:
+          name: go_modules
+          path: .
+
+      - name: Unpack go modules
+        run: mkdir -p $HOME/go/pkg/mod && tar -xzvf go_modules.tar.gz -C $HOME/go/pkg/mod
+        shell: bash
+
+      - name: Prepare environment
+        run: |
+          export COVERAGE_DIR=$GITHUB_WORKSPACE/tests_coverage/unit_tests/${{ matrix.os }}
+          mkdir -p $COVERAGE_DIR
+          echo ::set-env name=COVERAGE_DIR::$COVERAGE_DIR
+        shell: bash
+
+      - name: Checkout code
+        uses: actions/checkout@v1
+
+      - name: Test shell-operator packages
+        run: go test -tags test -v ./cmd/... ./pkg/... ./test/utils

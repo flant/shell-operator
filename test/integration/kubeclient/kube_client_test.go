@@ -17,7 +17,6 @@ var _ = Describe("Kubernetes API client package", func() {
 
 	SynchronizedBeforeSuite(func() []byte {
 		Ω(utils.KindCreateCluster(clusterName)).Should(Succeed())
-
 		return []byte{}
 	}, func([]byte) {
 		// Initialize kube client out-of-cluster
@@ -32,19 +31,9 @@ var _ = Describe("Kubernetes API client package", func() {
 	When("client connect outside of the cluster", func() {
 
 		It("should list deployments", func() {
-			//// Initialize kube client for kube events hooks.
-			//configPath := utils.KindGetKubeconfigPath(clusterName)
-			//fmt.Printf("KUBECONFIG=%s", configPath)
-			//Ω(kube.Init(kube.InitOptions{KubeContext: "", KubeConfig: configPath})).Should(Succeed())
-
 			list, err := kube.Kubernetes.AppsV1().Deployments("").List(metav1.ListOptions{})
 			Ω(err).Should(Succeed())
 			Ω(list.Items).Should(Not(HaveLen(0)))
-
-			//for _, obj := range list.Items {
-			//	t.Logf("%s/%s", obj.Namespace, obj.Name)
-			//}
-
 		})
 		It("should find GroupVersionResource for Pod by kind", func() {
 			gvr, err := kube.GroupVersionResourceByKind("Pod")
