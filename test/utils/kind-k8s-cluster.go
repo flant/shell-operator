@@ -4,6 +4,7 @@ package utils
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"sigs.k8s.io/kind/pkg/cluster"
@@ -27,7 +28,7 @@ func KindCreateCluster(clusterName string) error {
 	fmt.Printf("Creating cluster %q ...\n", clusterName)
 	if err = ctx.Create(
 		create.WithConfigFile(""),
-		create.WithNodeImage("kindest/node:v1.13.10"),
+		create.WithNodeImage(KindNodeImage()),
 		create.WaitForReady(time.Second*300),
 	); err != nil {
 		if errs := errors.Errors(err); errs != nil {
@@ -55,4 +56,22 @@ func KindDeleteCluster(clusterName string) error {
 
 func KindGetKubeconfigPath(clusterName string) string {
 	return cluster.NewContext(clusterName).KubeConfigPath()
+}
+
+func KindNodeImage() string {
+	k8sVer := os.Getenv("KIND_CLUSTER_VERSION")
+	if k8sVer == "" {
+		k8sVer = "1.13"
+	}
+
+	images := map[string]string{
+		"1.11": "kindest/node:v1.11.10",
+		"1.12": "kindest/node:v1.12.10",
+		"1.13": "kindest/node:v1.13.10",
+		"1.14": "kindest/node:v1.14.6",
+		"1.15": "kindest/node:v1.15.3",
+		"1.16": "kindest/node:v1.16.2",
+	}
+
+	return images[k8sVer]
 }
