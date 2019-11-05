@@ -136,7 +136,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          go install github.com/onsi/ginkgo/ginkgo
+          go build github.com/onsi/ginkgo/ginkgo
           echo ::set-env name=KIND_CLUSTER_VERSION::${{ matrix.k8s_version }}
 
       - name: Run integration tests
