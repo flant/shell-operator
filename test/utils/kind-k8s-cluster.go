@@ -58,12 +58,19 @@ func KindGetKubeconfigPath(clusterName string) string {
 	return cluster.NewContext(clusterName).KubeConfigPath()
 }
 
-func KindNodeImage() string {
+func KindClusterVersion() string {
 	k8sVer := os.Getenv("KIND_CLUSTER_VERSION")
 	if k8sVer == "" {
 		k8sVer = "1.13"
 	}
 
+	return k8sVer
+}
+
+// KindNodeImage maps cluster Major.Minor version to image name
+//
+// See: https://hub.docker.com/r/kindest/node/tags
+func KindNodeImage() string {
 	images := map[string]string{
 		"1.11": "kindest/node:v1.11.10",
 		"1.12": "kindest/node:v1.12.10",
@@ -73,5 +80,5 @@ func KindNodeImage() string {
 		"1.16": "kindest/node:v1.16.2",
 	}
 
-	return images[k8sVer]
+	return images[KindClusterVersion()]
 }

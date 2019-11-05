@@ -3,6 +3,7 @@
 package simple_monitors_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -24,8 +25,13 @@ var CurrentDir string
 
 var _ = SynchronizedBeforeSuite(func() (res []byte) {
 	Ω(KindCreateCluster(ClusterName)).Should(Succeed())
+	fmt.Printf("Use kind flavour of k8s cluster v%s with node image %s\n", KindClusterVersion(), KindNodeImage())
 	return
 }, func([]byte) {
+	clusterVer := KindClusterVersion()
+	if clusterVer != "" {
+		ClusterName = fmt.Sprintf("%s-%s", ClusterName, clusterVer)
+	}
 	// Initialize kube client out-of-cluster
 	ConfigPath = KindGetKubeconfigPath(ClusterName)
 	Ω(kube.Init(kube.InitOptions{KubeContext: "", KubeConfig: ConfigPath})).Should(Succeed())

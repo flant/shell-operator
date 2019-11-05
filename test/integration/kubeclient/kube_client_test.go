@@ -3,29 +3,36 @@
 package kubeclient_test
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"fmt"
 
-	"github.com/flant/shell-operator/pkg/kube"
-	"github.com/flant/shell-operator/test/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/flant/shell-operator/pkg/kube"
+	. "github.com/flant/shell-operator/test/utils"
 )
 
 var _ = Describe("Kubernetes API client package", func() {
-	var clusterName = "kube-client-test"
+	var ClusterName = "kube-client-test"
 
 	SynchronizedBeforeSuite(func() []byte {
-		Ω(utils.KindCreateCluster(clusterName)).Should(Succeed())
+		Ω(KindCreateCluster(ClusterName)).Should(Succeed())
+		fmt.Printf("Use kind flavour of k8s cluster v%s with node image %s\n", KindClusterVersion(), KindNodeImage())
 		return []byte{}
 	}, func([]byte) {
+		clusterVer := KindClusterVersion()
+		if clusterVer != "" {
+			ClusterName = fmt.Sprintf("%s-%s", ClusterName, clusterVer)
+		}
 		// Initialize kube client out-of-cluster
-		configPath := utils.KindGetKubeconfigPath(clusterName)
+		configPath := KindGetKubeconfigPath(ClusterName)
 		Ω(kube.Init(kube.InitOptions{KubeContext: "", KubeConfig: configPath})).Should(Succeed())
 	})
 
 	SynchronizedAfterSuite(func() {}, func() {
-		Ω(utils.KindDeleteCluster(clusterName)).Should(Succeed())
+		Ω(KindDeleteCluster(ClusterName)).Should(Succeed())
 	})
 
 	When("client connect outside of the cluster", func() {
@@ -35,6 +42,7 @@ var _ = Describe("Kubernetes API client package", func() {
 			Ω(err).Should(Succeed())
 			Ω(list.Items).Should(Not(HaveLen(0)))
 		})
+
 		It("should find GroupVersionResource for Pod by kind", func() {
 			gvr, err := kube.GroupVersionResourceByKind("Pod")
 			Ω(err).Should(Succeed())
