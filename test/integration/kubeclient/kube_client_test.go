@@ -15,17 +15,11 @@ import (
 )
 
 var _ = Describe("Kubernetes API client package", func() {
-	var ClusterName = "kube-client-test"
-
 	SynchronizedBeforeSuite(func() []byte {
 		Ω(KindCreateCluster(ClusterName)).Should(Succeed())
 		fmt.Printf("Use kind flavour of k8s cluster v%s with node image %s\n", KindClusterVersion(), KindNodeImage())
 		return []byte{}
 	}, func([]byte) {
-		clusterVer := KindClusterVersion()
-		if clusterVer != "" {
-			ClusterName = fmt.Sprintf("%s-%s", ClusterName, clusterVer)
-		}
 		// Initialize kube client out-of-cluster
 		configPath := KindGetKubeconfigPath(ClusterName)
 		Ω(kube.Init(kube.InitOptions{KubeContext: "", KubeConfig: configPath})).Should(Succeed())
