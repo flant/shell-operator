@@ -8,8 +8,9 @@ import (
 
 type KubeEventsManager interface {
 	WithContext(ctx context.Context)
-	AddMonitor(name string, monitorConfig *MonitorConfig, logEntry *log.Entry) error
+	AddMonitor(name string, monitorConfig *MonitorConfig, logEntry *log.Entry) ([]ObjectAndFilterResult, error)
 	HasMonitor(configId string) bool
+	StartMonitor(configId string)
 	Start()
 
 	StopMonitor(configId string) error
@@ -49,26 +50,32 @@ func (mgr *kubeEventsManager) WithContext(ctx context.Context) {
 // AddMonitor creates a monitor with informers
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
-func (mgr *kubeEventsManager) AddMonitor(name string, monitorConfig *MonitorConfig, logEntry *log.Entry) error {
-	log.Debugf("Add MOINITOR %+v", monitorConfig)
+func (mgr *kubeEventsManager) AddMonitor(name string, monitorConfig *MonitorConfig, logEntry *log.Entry) ([]ObjectAndFilterResult, error) {
+	log.Debugf("Add MONITOR %+v", monitorConfig)
 	monitor := NewMonitor()
 	monitor.WithName(name)
 	monitor.WithConfig(monitorConfig)
 
 	err := monitor.CreateInformers(logEntry)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	mgr.Monitors[monitorConfig.Metadata.ConfigId] = monitor
 
-	return nil
+	return monitor.GetExistedObjects(), nil
 }
 
 // HasMonitor returns true if there is a monitor with configId
 func (mgr *kubeEventsManager) HasMonitor(configId string) bool {
 	_, has := mgr.Monitors[configId]
 	return has
+}
+
+// StartMonitor starts all informers for monitor
+func (mgr *kubeEventsManager) StartMonitor(configId string) {
+	monitor := mgr.Monitors[configId]
+	monitor.Start(mgr.ctx)
 }
 
 // Start starts all informers, created by monitors

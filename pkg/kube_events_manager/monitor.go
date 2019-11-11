@@ -12,6 +12,7 @@ type Monitor interface {
 	WithName(string)
 	WithConfig(config *MonitorConfig)
 	CreateInformers(logEntry *log.Entry) error
+	GetExistedObjects() []ObjectAndFilterResult
 	Start(context.Context)
 	Stop()
 }
@@ -27,6 +28,9 @@ type monitor struct {
 	// map of dynamically starting informers
 	VaryingInformers map[string][]ResourceInformer
 
+	// Index of namespaces statically defined in monitor configuration
+	staticNamespaces map[string]bool
+
 	cancelForNs map[string]context.CancelFunc
 
 	ctx    context.Context
@@ -38,8 +42,9 @@ type monitor struct {
 var NewMonitor = func() Monitor {
 	return &monitor{
 		ResourceInformers: make([]ResourceInformer, 0),
-		VaryingInformers:  make(map[string][]ResourceInformer),
-		cancelForNs:       make(map[string]context.CancelFunc),
+		VaryingInformers:  make(map[string][]ResourceInformer, 0),
+		cancelForNs:       make(map[string]context.CancelFunc, 0),
+		staticNamespaces:  make(map[string]bool, 0),
 	}
 }
 
@@ -62,21 +67,18 @@ func (m *monitor) CreateInformers(logEntry *log.Entry) error {
 	nsNames := m.Config.Namespaces()
 	if len(nsNames) > 0 {
 		logEntry.Debugf("create static ResourceInformers")
+
 		// create informers for each specified object name in each specified namespace
 		// This list of informers is static.
 		for _, nsName := range nsNames {
+			if nsName != "" {
+				m.staticNamespaces[nsName] = true
+			}
 			informers, err := m.CreateInformersForNamespace(nsName)
 			if err != nil {
 				return err
 			}
 			m.ResourceInformers = append(m.ResourceInformers, informers...)
-		}
-	}
-
-	staticNamespaces := map[string]bool{}
-	for _, nsName := range m.Config.Namespaces() {
-		if nsName != "" {
-			staticNamespaces[nsName] = true
 		}
 	}
 
@@ -89,7 +91,7 @@ func (m *monitor) CreateInformers(logEntry *log.Entry) error {
 				logEntry.Infof("got ns/%s, create dynamic ResourceInformers", nsName)
 
 				// ignore event if namespace is already has static ResourceInformers
-				if _, ok := staticNamespaces[nsName]; ok {
+				if _, ok := m.staticNamespaces[nsName]; ok {
 					return
 				}
 				// ignore already started informers
@@ -116,7 +118,7 @@ func (m *monitor) CreateInformers(logEntry *log.Entry) error {
 				logEntry.Infof("deleted ns/%s, stop dynamic ResourceInformers", nsName)
 
 				// ignore statically specified namespaces
-				if _, ok := staticNamespaces[nsName]; ok {
+				if _, ok := m.staticNamespaces[nsName]; ok {
 					return
 				}
 
@@ -137,26 +139,59 @@ func (m *monitor) CreateInformers(logEntry *log.Entry) error {
 		if err != nil {
 			return fmt.Errorf("create namespace informer: %v", err)
 		}
+		for nsName := range m.NamespaceInformer.GetExistedObjects() {
+			logEntry.Infof("got ns/%s, create dynamic ResourceInformers", nsName)
+
+			// ignore event if namespace is already has static ResourceInformers
+			if _, ok := m.staticNamespaces[nsName]; ok {
+				continue
+			}
+
+			var err error
+			m.VaryingInformers[nsName], err = m.CreateInformersForNamespace(nsName)
+			if err != nil {
+				logEntry.Errorf("create ResourceInformers for ns/%s: %v", nsName, err)
+			}
+		}
 	}
 
 	return nil
 }
 
+// GetExistedObjects returns all existed objects from all created informers
+func (m *monitor) GetExistedObjects() []ObjectAndFilterResult {
+	objects := make([]ObjectAndFilterResult, 0)
+
+	for _, informer := range m.ResourceInformers {
+		objects = append(objects, informer.GetExistedObjects()...)
+	}
+
+	for nsName := range m.VaryingInformers {
+		for _, informer := range m.VaryingInformers[nsName] {
+			objects = append(objects, informer.GetExistedObjects()...)
+		}
+	}
+
+	return objects
+}
+
+// CreateInformersForNamespace creates informers bounded to the namespace. If no matchName is specified,
+// it is only one informer. If matchName is specified, then multiple informers are created.
+//
+// If namespace is empty, then informer is bounded to all namespaces.
 func (m *monitor) CreateInformersForNamespace(namespace string) (informers []ResourceInformer, err error) {
 	informers = make([]ResourceInformer, 0)
 
-	objNames := m.Config.Names()
-	if len(objNames) == 0 {
-		objNames = []string{""}
+	objNames := []string{""}
+
+	if len(m.Config.Names()) > 0 {
+		objNames = m.Config.Names()
 	}
 
 	for _, objName := range objNames {
-		if objName != "" {
-			m.Config.AddFieldSelectorRequirement("metadata.name", "=", objName)
-		}
 		informer := NewResourceInformer(m.Config)
 		informer.WithNamespace(namespace)
-		informer.WithDebugName(m.Name)
+		informer.WithName(objName)
 
 		err := informer.CreateSharedInformer()
 		if err != nil {
@@ -172,9 +207,16 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []Res
 func (m *monitor) Start(parentCtx context.Context) {
 	m.ctx, m.cancel = context.WithCancel(parentCtx)
 
-	//go m.NamespaceInformer.Run(m.ctx.Done())
 	for _, informer := range m.ResourceInformers {
 		go informer.Run(m.ctx.Done())
+	}
+
+	for nsName := range m.VaryingInformers {
+		var ctx context.Context
+		ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
+		for _, informer := range m.VaryingInformers[nsName] {
+			go informer.Run(ctx.Done())
+		}
 	}
 
 	if m.NamespaceInformer != nil {

@@ -134,24 +134,26 @@ func Run() {
 	go MetricsStorage.Run()
 	RunMetrics()
 
-	// Load queue with onStartup tasks
+	// Prepopulate queue with onStartup tasks and enable kubernetes bindings tasks
 	TasksQueue.ChangesDisable()
 	CreateOnStartupTasks()
+
+	// create tasks to enable all kubernetes bindings
+	enableBindingsTasks, err := KubernetesHooksController.EnableHooks()
+	if err != nil {
+		// Something wrong with hook configs, cannot start informers.
+		logEntry.Errorf("enable kubernetes hooks: %v", err)
+		return
+	}
+	for _, resTask := range enableBindingsTasks {
+		TasksQueue.Add(resTask)
+		logEntry.Infof("queue task %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
+	}
 	TasksQueue.ChangesEnable(true)
 
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
 	go HandleEventsFromManagers()
-
-	// create informers for all kubernetes hooks
-	err := KubernetesHooksController.EnableHooks()
-	if err != nil {
-		// Something wrong with hook configs, cannot start informers.
-		logEntry.Errorf("start informers for kubernetes hooks: %v", err)
-		return
-	}
-	// Start all created informers
-	KubeEventsManager.Start()
 
 	// add schedules to schedule manager
 	ScheduleHooksController.UpdateScheduleHooks()
@@ -207,8 +209,7 @@ func HandleEventsFromManagers() {
 }
 
 func TasksRunner() {
-	logEntry := log.
-		WithField("operator.component", "taskRunner")
+	logEntry := log.WithField("operator.component", "taskRunner")
 	for {
 		if TasksQueue.IsEmpty() {
 			time.Sleep(QueueIsEmptyDelay)
@@ -250,6 +251,38 @@ func TasksRunner() {
 				} else {
 					taskLogEntry.Infof("Hook executed successfully")
 					TasksQueue.Pop()
+				}
+
+			case task.EnableKubernetesBindings:
+				hookLogLabels := map[string]string{}
+				hookLogLabels["hook"] = t.GetName()
+				hookLogLabels["binding"] = hook.ContextBindingType[hook.OnKubernetesEvent]
+				hookLogLabels["task"] = "EnableKubernetesBindings"
+
+				taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
+
+				taskLogEntry.Info("Enable kubernetes binding for hook")
+
+				hookRunTasks, err := KubernetesHooksController.EnableKubernetesBindings(t.GetName())
+				if err != nil {
+					taskHook, _ := HookManager.GetHook(t.GetName())
+					hookLabel := taskHook.SafeName()
+					MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
+					t.IncrementFailureCount()
+					taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
+					delayTask := task.NewTaskDelay(FailedHookDelay)
+					delayTask.Name = t.GetName()
+					delayTask.Binding = t.GetBinding()
+					TasksQueue.Push(delayTask)
+				} else {
+					// Push Synchronization tasks to queue head. Informers can be started now — their events will
+					// be added to the queue tail.
+					taskLogEntry.Infof("Kubernetes binding for hook enabled successfully")
+					TasksQueue.Pop()
+					for _, hookRunTask := range hookRunTasks {
+						TasksQueue.Push(hookRunTask)
+					}
+					KubernetesHooksController.StartInformers(t.GetName())
 				}
 
 			case task.Delay:
