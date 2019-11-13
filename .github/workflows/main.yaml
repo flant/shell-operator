@@ -176,6 +176,8 @@ jobs:
         run: |
           go build github.com/onsi/ginkgo/ginkgo
           echo ::set-env name=KIND_CLUSTER_VERSION::${{ matrix.k8s_version }}
+          go build ./cmd/shell-operator
+          echo ::set-env name=SHELL_OPERATOR_BINARY_PATH::${{ github.workspace }}/shell-operator
 
       - name: Run integration tests
         run: |
