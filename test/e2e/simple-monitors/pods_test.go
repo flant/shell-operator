@@ -16,7 +16,7 @@ import (
 	. "github.com/flant/shell-operator/test/utils"
 )
 
-var _ = XDescribe("hook subscribed to Pods", func() {
+var _ = Describe("hook subscribed to Pods", func() {
 	It("should run hook after creating a pod", func() {
 		stopCh := make(chan struct{})
 

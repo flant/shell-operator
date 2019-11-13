@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
+
+	"github.com/onsi/gomega/types"
 )
 
 type ShellOperatorOptions struct {
@@ -46,4 +49,31 @@ func GetShellOperatorPath() string {
 		return "shell-operator"
 	}
 	return path
+}
+
+func BeShellOperatorStopped() types.GomegaMatcher {
+	return &BeShellOperatorStoppedMatcher{}
+}
+
+type BeShellOperatorStoppedMatcher struct {
+	err error
+}
+
+func (matcher *BeShellOperatorStoppedMatcher) Match(actual interface{}) (success bool, err error) {
+	err, ok := actual.(error)
+	if !ok {
+		return false, fmt.Errorf("BeShellOperatorStopped must be passed an error. Got %T\n", actual)
+	}
+
+	matcher.err = err
+
+	return matcher.err != nil && strings.Contains(matcher.err.Error(), "command is stopped"), nil
+}
+
+func (matcher *BeShellOperatorStoppedMatcher) FailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("Expected ShellOperator stopped. Got error: %v", matcher.err)
+}
+
+func (matcher *BeShellOperatorStoppedMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("Expected ShellOperator stopped with error")
 }

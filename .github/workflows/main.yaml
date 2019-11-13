@@ -142,3 +142,41 @@ jobs:
       - name: Run integration tests
         run: |
           ./ginkgo --tags 'integration test' -p -r test/integration
+
+  e2e_tests:
+    name: e2e tests
+    needs: download_go_modules
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+        k8s_version: [1.13, 1.15, 1.16]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+        id: go
+
+      - name: Download go modules artifact
+        uses: actions/download-artifact@master
+        with:
+          name: go_modules
+          path: .
+
+      - name: Unpack go modules
+        run: mkdir -p $HOME/go/pkg/mod && tar -xzvf go_modules.tar.gz -C $HOME/go/pkg/mod
+        shell: bash
+
+      - name: Checkout code
+        uses: actions/checkout@v1
+
+      - name: Prepare environment
+        run: |
+          go build github.com/onsi/ginkgo/ginkgo
+          echo ::set-env name=KIND_CLUSTER_VERSION::${{ matrix.k8s_version }}
+
+      - name: Run integration tests
+        run: |
+          ./ginkgo --tags 'e2e test' -p -r test/e2e

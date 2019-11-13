@@ -4,25 +4,30 @@ package utils
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/onsi/gomega/types"
 )
 
 type JsonLogAnalyzer struct {
-	Matchers [][]*JsonLogMatcher
-	OnStopFn func()
-	Index    int
-	finished bool
-	err      error
+	Matchers      [][]*JsonLogMatcher
+	OnStopFn      func()
+	Index         int
+	finished      bool
+	groupFinished bool // flag to reset group of matchers after previous group finish
+	err           error
 }
 
 func NewJsonLogAnalyzer() *JsonLogAnalyzer {
 	return &JsonLogAnalyzer{
-		Matchers: make([][]*JsonLogMatcher, 0),
-		Index:    0,
-		finished: false,
+		Matchers:      make([][]*JsonLogMatcher, 0),
+		Index:         0,
+		finished:      false,
+		groupFinished: true,
 	}
 }
 
-func (r *JsonLogAnalyzer) Add(analyzers ...*JsonLogMatcher) {
+func (r *JsonLogAnalyzer) AddGroup(analyzers ...*JsonLogMatcher) {
 	r.Matchers = append(r.Matchers, analyzers)
 }
 
@@ -45,20 +50,27 @@ func (a *JsonLogAnalyzer) Reset() {
 		}
 	}
 	a.Index = 0
+	a.groupFinished = true
 	a.finished = false
 	a.err = nil
 }
 
 func (a *JsonLogAnalyzer) HandleLine(line string) {
-	fmt.Printf("Got line: %s\n", line)
-	defer func() {
-		fmt.Printf("analyzer.HandleLine done: ind=%d fin=%v err=%v\n", a.Index, a.finished, a.err)
-	}()
+	//fmt.Printf("Got line: %s\n", line)
+	//defer func() {
+	//	fmt.Printf("analyzer.HandleLine done: ind=%d fin=%v err=%v\n", a.Index, a.finished, a.err)
+	//}()
 	if a.finished {
 		return
 	}
 
 	matchers := a.Matchers[a.Index]
+	if a.groupFinished {
+		for _, matcher := range matchers {
+			matcher.Reset()
+		}
+		a.groupFinished = false
+	}
 
 	groupFinished := true
 	for _, matcher := range matchers {
@@ -76,6 +88,7 @@ func (a *JsonLogAnalyzer) HandleLine(line string) {
 	if !a.finished {
 		if groupFinished {
 			a.Index++
+			a.groupFinished = groupFinished
 		}
 		if a.Index == len(a.Matchers) {
 			a.finished = true
@@ -83,7 +96,7 @@ func (a *JsonLogAnalyzer) HandleLine(line string) {
 	}
 
 	if a.finished && a.OnStopFn != nil {
-		fmt.Printf("analyzer.HandleLine OnStopFn()\n")
+		//fmt.Printf("analyzer.HandleLine OnStopFn()\n")
 		a.OnStopFn()
 	}
 }
@@ -105,11 +118,7 @@ func LineMatcher(matchFn func(JsonLogRecord) bool, onMatch ...func(JsonLogRecord
 	return res
 }
 
-func ShouldMatch(matchFn func(JsonLogRecord) bool, onMatch ...func(JsonLogRecord) error) *MatcherStep {
-	return LineMatcher(matchFn, onMatch...)
-}
-
-func ThenShouldBeLine(matchFn func(JsonLogRecord) bool, onMatch ...func(JsonLogRecord) error) *MatcherStep {
+func AwaitMatch(matchFn func(JsonLogRecord) bool, onMatch ...func(JsonLogRecord) error) *MatcherStep {
 	return LineMatcher(matchFn, onMatch...)
 }
 
@@ -127,7 +136,7 @@ func LineNotMatcher(matchFn func(JsonLogRecord) bool, onMatch ...func(JsonLogRec
 	return res
 }
 
-func ShouldNotMatch(notMatchFn func(JsonLogRecord) bool, onMatch ...func(JsonLogRecord) error) *MatcherStep {
+func AwaitNotMatch(notMatchFn func(JsonLogRecord) bool, onMatch ...func(JsonLogRecord) error) *MatcherStep {
 	return LineNotMatcher(notMatchFn, onMatch...)
 }
 
@@ -152,14 +161,9 @@ func (m *JsonLogMatcher) HandleRecord(r JsonLogRecord) {
 
 func (m *JsonLogMatcher) HandleLine(line string) {
 	//fmt.Printf("Matcher Got line: %s\n", line)
-	defer func() {
-		fmt.Printf("matcher.HandleLine done: ind=%d fin=%v err=%v\n", m.Index, m.finished, m.err)
-	}()
-	defer func() {
-		if m.Index == len(m.Steps) {
-			m.finished = true
-		}
-	}()
+	//defer func() {
+	//	fmt.Printf("matcher.HandleLine done: ind=%d fin=%v err=%v\n", m.Index, m.finished, m.err)
+	//}()
 	defer func() {
 		e := recover()
 		if e != nil {
@@ -167,7 +171,10 @@ func (m *JsonLogMatcher) HandleLine(line string) {
 		}
 	}()
 
-	if m.finished {
+	step := m.Steps[m.Index]
+
+	// NotMatcher step should always handle line. Matcher step should not handle line after finish.
+	if m.finished && step.Matcher != nil {
 		return
 	}
 	//Ω(line).Should(HavePrefix("{"))
@@ -175,35 +182,41 @@ func (m *JsonLogMatcher) HandleLine(line string) {
 	logRecord, err := NewJsonLogRecord().FromString(line)
 	//Ω(err).ShouldNot(HaveOccurred())
 
-	step := m.Steps[m.Index]
-
 	if step.Matcher != nil {
 		res := step.Matcher(logRecord)
 		if res {
 			if step.OnMatch != nil {
-				fmt.Printf("matcher.HandleLine OnMatch()\n")
+				//fmt.Printf("matcher.HandleLine OnMatch()\n")
 				err = step.OnMatch(logRecord)
-				fmt.Printf("matcher.HandleLine OnMatchDone()\n")
+				//fmt.Printf("matcher.HandleLine OnMatchDone()\n")
 				if err != nil {
 					m.err = err
 					m.finished = true
 					return
 				}
 			}
-			m.Index++
+			if m.Index == len(m.Steps)-1 {
+				m.finished = true
+			} else {
+				m.Index++
+			}
 		}
-	} else {
-		if step.NotMatcher != nil {
-			res := step.NotMatcher(logRecord)
-			if res {
-				if step.OnNotMatch != nil {
-					err := step.OnNotMatch(logRecord)
-					if err != nil {
-						m.err = err
-						m.finished = true
-						return
-					}
+	}
+	if step.NotMatcher != nil {
+		// NotMatcher is a non-blocking step, it should be always considered as finished
+		m.finished = true
+		res := step.NotMatcher(logRecord)
+		if res {
+			if step.OnNotMatch != nil {
+				err := step.OnNotMatch(logRecord)
+				if err != nil {
+					m.err = err
+					return
 				}
+			}
+			if m.Index == len(m.Steps)-1 {
+				m.finished = true
+			} else {
 				m.Index++
 			}
 		}
@@ -222,4 +235,47 @@ func (m *JsonLogMatcher) Reset() {
 	m.Index = 0
 	m.finished = false
 	m.err = nil
+}
+
+func FinishAllMatchersSuccessfully() types.GomegaMatcher {
+	return &FinishAllMatchersSuccessfullyMatcher{}
+}
+
+type FinishAllMatchersSuccessfullyMatcher struct {
+	finished bool
+	err      error
+}
+
+func (matcher *FinishAllMatchersSuccessfullyMatcher) Match(actual interface{}) (success bool, err error) {
+	analyzer, ok := actual.(*JsonLogAnalyzer)
+	if !ok {
+		return false, fmt.Errorf("FinishAllMatchersSuccessfully must be passed a JsonLogAnalyzer. Got %T\n", actual)
+	}
+
+	matcher.err = analyzer.Error()
+	matcher.finished = analyzer.Finished()
+
+	return matcher.finished && matcher.err == nil, nil
+}
+
+func (matcher *FinishAllMatchersSuccessfullyMatcher) FailureMessage(actual interface{}) (message string) {
+	msgs := []string{}
+	if !matcher.finished {
+		msgs = append(msgs, fmt.Sprintf("is finished"))
+	}
+	if matcher.err != nil {
+		msgs = append(msgs, fmt.Sprintf("has no error. Got %v", matcher.err))
+	}
+	return fmt.Sprintf("Expected JsonLogAnalyzer %s", strings.Join(msgs, " and "))
+}
+
+func (matcher *FinishAllMatchersSuccessfullyMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	msgs := []string{}
+	if matcher.finished {
+		msgs = append(msgs, "is not finished")
+	}
+	if matcher.err == nil {
+		msgs = append(msgs, "has error")
+	}
+	return fmt.Sprintf("Expected JsonLogAnalyzer %s", strings.Join(msgs, " or "))
 }

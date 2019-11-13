@@ -3,9 +3,6 @@
 package simple_monitors_test
 
 import (
-	"fmt"
-	"path/filepath"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -17,61 +14,74 @@ import (
 
 var _ = Describe("hook subscribed to CR objects", func() {
 	It("should run hook after creating a cr object", func() {
-		//Kubectl(ConfigPath).Apply("", "testdata/crd/crd.yaml")
+		Kubectl(ConfigPath).Apply("", "testdata/crd/crd.yaml")
 
 		stopCh := make(chan struct{})
 
-		//RegisterFailHandler(func(message string, callerSkip ...int) {
-		//fmt.Printf("send stop to StopCh\n")
-		//stopCh <- struct{}{}
-		//fmt.Printf("send stop to StopCh Done\n")
-		//	Fail(message, callerSkip...)
-		//})
+		promScraper := NewPromScraper("http://localhost:9115/metrics")
 
 		analyzer := NewJsonLogAnalyzer()
 		analyzer.OnStop(func() {
-
-			fmt.Printf("send stop to StopCh\n")
 			stopCh <- struct{}{}
-			fmt.Printf("send stop to StopCh Done\n")
 		})
 
 		startupLogMatcher := NewJsonLogMatcher(
-			ShouldMatch(func(r JsonLogRecord) bool {
+			AwaitMatch(func(r JsonLogRecord) bool {
 				return r.FieldContains("msg", "Working dir")
 			}),
-			ShouldMatch(func(r JsonLogRecord) bool {
+			AwaitMatch(func(r JsonLogRecord) bool {
 				return r.FieldContains("msg", "Listen on")
 			}),
 			/*, func(r JsonLogRecord) error {
 				//ExpectWithOffset(2, "qwe").Should(Equal("asd"))
 				return fmt.Errorf("listen on fail")
 			}*/
-			ShouldMatch(func(r JsonLogRecord) bool {
+			AwaitMatch(func(r JsonLogRecord) bool {
 				return r.FieldContains("msg", "start Run")
+			}),
+			AwaitMatch(func(r JsonLogRecord) bool {
+				// {"level":"info","msg":"Create new metric shell_operator_live_ticks","operator.component":"metricsStorage","time":"2019-11-12T22:34:18+03:00"}
+				return r.FieldContains("operator.component", "metricsStorage") &&
+					r.FieldContains("msg", "Create new metric shell_operator_live_ticks")
+			}, func(_ JsonLogRecord) error {
+				if err := promScraper.Scrape(); err != nil {
+					return err
+				}
+				Ω(promScraper).Should(HaveMetric(PromMetric("shell_operator_live_ticks")))
+				return nil
 			}),
 		)
 
+		//stopLogMatcher := NewJsonLogMatcher(
+		//	AwaitMatch(func(r JsonLogRecord) bool {
+		//		return r.FieldContains("msg", "Working dir")
+		//	}),
+		//)
+
 		errorMatcher := NewJsonLogMatcher(
-			ShouldNotMatch(func(r JsonLogRecord) bool {
+			AwaitNotMatch(func(r JsonLogRecord) bool {
 				return r.FieldContains("level", "error")
 			}),
 		)
 
-		_ = NewJsonLogMatcher(
-			ShouldMatch(func(r JsonLogRecord) bool {
+		hookMatcher := NewJsonLogMatcher(
+			AwaitMatch(func(r JsonLogRecord) bool {
 				return r.FieldEquals("msg", "Synchronization run") &&
 					r.FieldEquals("output", "stdout")
 			}),
-			ShouldMatch(func(r JsonLogRecord) bool {
+			AwaitMatch(func(r JsonLogRecord) bool {
 				return r.FieldEquals("msg", "Hook executed successfully") &&
 					r.FieldEquals("hook", "crd-hook.sh")
 			},
 				func(_ JsonLogRecord) error {
-					// metrics := MetricsScrape(":9115")
-					// Metrics.HasMetric("shell_operator_live_ticks")
-					// metrics.
-					_, err := kube.Kubernetes.CoreV1().Namespaces().Create(&v1.Namespace{
+					var err error
+
+					//err = promScraper.Scrape()
+					//Ω(err).ShouldNot(HaveOccurred())
+					//Ω(promScraper).Should(HaveMetric(PromMetric("shell_operator_live_ticks")))
+					//Ω(promScraper).Should(HaveMetricValue(PromMetric("shell_operator_hook_errors", "hook", "crd-hook.sh"), 0.0))
+
+					_, err = kube.Kubernetes.CoreV1().Namespaces().Create(&v1.Namespace{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "crd-test",
 						},
@@ -80,35 +90,17 @@ var _ = Describe("hook subscribed to CR objects", func() {
 					Kubectl(ConfigPath).Apply("crd-test", "testdata/crd/cr-object.yaml")
 					return nil
 				}),
-			ShouldMatch(func(r JsonLogRecord) bool {
+			AwaitMatch(func(r JsonLogRecord) bool {
 				return r.FieldContains("msg", "crontab is added") &&
 					r.FieldEquals("output", "stdout")
-			},
-				func(_ JsonLogRecord) error {
-					stopCh <- struct{}{}
-					return nil
-				}),
+			}),
 		)
 
-		analyzer.Add(startupLogMatcher, errorMatcher) // .Timeout(300)
-		//errorMatcher.Reset()
-		//analyzer.Add(hookMatcher, errorMatcher)
+		analyzer.AddGroup(startupLogMatcher, errorMatcher) // .Timeout(300)
+		analyzer.AddGroup(hookMatcher, errorMatcher)
 
-		err := ExecShellOperator(ShellOperatorOptions{
-			CurrentDir: CurrentDir,
-			Args:       []string{"start"},
-			KubeConfig: ConfigPath,
-			LogType:    "json",
-			WorkingDir: filepath.Join(CurrentDir, "testdata", "crd"),
-		}, CommandOptions{
-			StopCh:            stopCh,
-			OutputLineHandler: analyzer.HandleLine,
-		})
+		ShellOperatorStartWithAnalyzer(analyzer, "testdata/crd", stopCh)
 
-		Ω(err).Should(HaveOccurred())
-		Ω(err.Error()).Should(ContainSubstring("command is stopped"))
-
-		Ω(analyzer.Finished()).Should(BeTrue())
-		Ω(analyzer.Error()).ShouldNot(HaveOccurred())
+		Expect(analyzer).To(FinishAllMatchersSuccessfully())
 	})
 })
