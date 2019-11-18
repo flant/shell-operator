@@ -186,9 +186,30 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 				return
 			}
 
+			filtered, err := resourceFilter(obj, informer.Monitor.JqFilter)
+			if err != nil {
+				log.Errorf("%s: WATCH Modified: apply jqFilter on %s: %s",
+					informer.Monitor.Metadata.DebugName, objectId, err)
+				return
+			}
+
+			filteredResult := ""
+			if informer.Monitor.JqFilter != "" {
+				filteredResult = filtered
+			}
+
 			if informer.ShouldHandleEvent(WatchEventDeleted) {
-				log.Debugf("%s: WATCH Deleted: %s", informer.Monitor.Metadata.DebugName, objectId)
-				informer.HandleKubeEvent(obj, objectId, "", "", WatchEventDeleted)
+				jqFilterOutput := ""
+				if informer.Monitor.JqFilter != "" {
+					jqFilterOutput = fmt.Sprintf(": jqFilter '%s' output:\n%s",
+						informer.Monitor.JqFilter,
+						utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
+				}
+				log.Debugf("%s: WATCH Deleted: %s object%s",
+					informer.Monitor.Metadata.DebugName,
+					objectId,
+					jqFilterOutput)
+				informer.HandleKubeEvent(obj, objectId, filteredResult, "deleted", WatchEventDeleted)
 			}
 		},
 	}
