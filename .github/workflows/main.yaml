@@ -1,13 +1,6 @@
 name: Main
 on: [push]
 jobs:
-  some_info:
-    name: Some info
-    runs-on: ubuntu-latest
-    steps:
-    - name: Some info
-      run: id;pwd;lsblk;df;cat /proc/mounts
-
   download_go_modules:
     name: Download modules
     runs-on: ubuntu-latest
@@ -138,7 +131,7 @@ jobs:
         run: |
           go build github.com/onsi/ginkgo/ginkgo
           echo ::set-env name=KIND_CLUSTER_VERSION::${{ matrix.k8s_version }}
-
+# race flag ?
       - name: Run integration tests
         run: |
           ./ginkgo --tags 'integration test' -p -r test/integration
@@ -182,3 +175,4 @@ jobs:
       - name: Run integration tests
         run: |
           ./ginkgo --tags 'e2e test' -p -r test/e2e
+

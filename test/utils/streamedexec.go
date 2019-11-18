@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega/gexec"
@@ -57,16 +58,14 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 			select {
 			case <-opts.StopCh:
 				stopMsg = "command is stopped"
-				session.Kill()
+				session.Interrupt().Wait(time.Second * 30)
 			case <-session.Exited:
 			}
 		} else {
 			<-session.Exited
 		}
 
-		fmt.Printf("Session exited\n")
-
-		// Initiate EOF for consumeLines
+		// Initiate EOF to stop consumeLines
 		stdoutWritePipe.Close()
 		stderrWritePipe.Close()
 	}()
