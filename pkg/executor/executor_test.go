@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 )
 
 // Not really a test, more like a proof of concept.
@@ -18,8 +18,7 @@ import (
 // - reaper prevent to get real exitCode from cmd.Run
 func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 	t.SkipNow()
-	os.Setenv("RLOG_LOG_LEVEL", "DEBUG")
-	rlog.UpdateEnv()
+	log.SetLevel(log.DebugLevel)
 
 	config := Config{
 		Pid:              -1,
@@ -38,7 +37,7 @@ func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 		"ls -la; /bin/bash -c 'sleep 0.2; exit 1';  exit 2",
 		// "ls -la; sleep 1; exit 2", // no waitid error
 	}
-	rlog.Infof("run command: %s %+v", name, args)
+	log.Infof("run command: %s %+v", name, args)
 	var outbuf, errbuf bytes.Buffer
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = &outbuf
@@ -54,7 +53,7 @@ func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 			return err
 		}
 		time.Sleep(1 * time.Second)
-		rlog.Debug("start wait")
+		log.Debug("start wait")
 		return c.Wait()
 	}(cmd)
 
@@ -71,7 +70,7 @@ func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 					echild = true
 				}
 			}
-			rlog.Debugf("SyscallError %+v", errv)
+			log.Debugf("SyscallError %+v", errv)
 		}
 		if exitError, ok := err.(*exec.ExitError); ok {
 			ws := exitError.Sys().(syscall.WaitStatus)
@@ -81,7 +80,7 @@ func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 			// in this situation, exit code could not be get, and stderr will be
 			// empty string very likely, so we use the default fail code, and format err
 			// to string and set to stderr
-			rlog.Debugf("Could not get exit code for failed program: %v, %+v", name, args)
+			log.Debugf("Could not get exit code for failed program: %v, %+v", name, args)
 			exitCode = defaultFailedCode
 			if stderr == "" {
 				stderr = err.Error()
@@ -92,7 +91,7 @@ func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 		ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
 		exitCode = ws.ExitStatus()
 	}
-	rlog.Debugf("command result, stdout: %v, stderr: %v, exitCode: %v, echild: %v", stdout, stderr, exitCode, echild)
+	log.Debugf("command result, stdout: %v, stderr: %v, exitCode: %v, echild: %v", stdout, stderr, exitCode, echild)
 	return
 }
 
@@ -100,8 +99,7 @@ func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 // Run 10 go-routines that execute bash.
 func Test_Executor_Reaper_And_CmdRun_AreLocked(t *testing.T) {
 	t.SkipNow()
-	os.Setenv("RLOG_LOG_LEVEL", "DEBUG")
-	rlog.UpdateEnv()
+	log.SetLevel(log.DebugLevel)
 
 	config := Config{
 		Pid:              -1,
@@ -118,7 +116,7 @@ func Test_Executor_Reaper_And_CmdRun_AreLocked(t *testing.T) {
 		"-c",
 		"ls -la; /bin/bash -c 'sleep 0.2; exit 1';  exit 2",
 	}
-	rlog.Infof("run go routines for: %v %#v", name, args)
+	log.Infof("run go routines for: %v %#v", name, args)
 
 	stopCh := make(chan bool, 10)
 
@@ -144,7 +142,7 @@ func Test_Executor_Reaper_And_CmdRun_AreLocked(t *testing.T) {
 					// in this situation, exit code could not be get, and stderr will be
 					// empty string very likely, so we use the default fail code, and format err
 					// to string and set to stderr
-					rlog.Debugf("Could not get exit code for failed program: %v, %+v", name, args)
+					log.Debugf("Could not get exit code for failed program: %v, %+v", name, args)
 					exitCode = defaultFailedCode
 					if stderr == "" {
 						stderr = err.Error()
@@ -155,7 +153,7 @@ func Test_Executor_Reaper_And_CmdRun_AreLocked(t *testing.T) {
 				ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
 				exitCode = ws.ExitStatus()
 			}
-			rlog.Debugf("command result, stdout: %v, stderr: %v, exitCode: %v", stdout, stderr, exitCode)
+			log.Debugf("command result, stdout: %v, stderr: %v, exitCode: %v", stdout, stderr, exitCode)
 			stopCh <- true
 		}()
 
@@ -166,7 +164,7 @@ WAIT_LOOP:
 	for {
 		select {
 		case <-stopCh:
-			rlog.Info("Got stopCh")
+			log.Info("Got stopCh")
 			counter++
 			if counter == 10 {
 				break WAIT_LOOP

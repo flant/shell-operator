@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
@@ -22,6 +22,7 @@ import (
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 var (
@@ -55,39 +56,39 @@ var (
 // - initialize managers: hook manager, kube events manager, schedule manager
 // - create an empty task queue
 func Init() (err error) {
-	rlog.Debug("MAIN Init")
+	log.Debug("MAIN Init")
 
 	if app.WorkingDir != "" {
 		WorkingDir = app.WorkingDir
 	} else {
 		WorkingDir, err = os.Getwd()
 		if err != nil {
-			rlog.Errorf("MAIN Fatal: Cannot determine a working dir: %s", err)
+			log.Errorf("MAIN Fatal: Cannot determine a working dir: %s", err)
 			return err
 		}
 	}
 	if exists, _ := utils_file.DirExists(WorkingDir); !exists {
-		rlog.Errorf("MAIN Fatal: working dir '%s' is not exists", WorkingDir)
+		log.Errorf("MAIN Fatal: working dir '%s' is not exists", WorkingDir)
 		return fmt.Errorf("no working dir")
 	}
-	rlog.Infof("Working dir: %s", WorkingDir)
+	log.Infof("Working dir: %s", WorkingDir)
 
 	TempDir = app.TempDir
 	if exists, _ := utils_file.DirExists(TempDir); !exists {
 		err = os.Mkdir(TempDir, os.FileMode(0777))
 		if err != nil {
-			rlog.Errorf("MAIN Fatal: Cannot create a temporary dir: %s", err)
+			log.Errorf("MAIN Fatal: Cannot create a temporary dir: %s", err)
 			return err
 		}
 	}
-	rlog.Infof("Use temporary dir: %s", TempDir)
+	log.Infof("Use temporary dir: %s", TempDir)
 
 	// Initializing hook manager (load hooks from WorkingDir)
 	HookManager = hook.NewHookManager()
 	HookManager.WithDirectories(WorkingDir, TempDir)
 	err = HookManager.Init()
 	if err != nil {
-		rlog.Errorf("MAIN Fatal: initialize hook manager: %s\n", err)
+		log.Errorf("MAIN Fatal: initialize hook manager: %s\n", err)
 		return err
 	}
 
@@ -97,7 +98,7 @@ func Init() (err error) {
 	// Initializing the hooks schedule.
 	ScheduleManager, err = schedule_manager.Init()
 	if err != nil {
-		rlog.Errorf("MAIN Fatal: initialize schedule manager: %s", err)
+		log.Errorf("MAIN Fatal: initialize schedule manager: %s", err)
 		return err
 	}
 
@@ -108,7 +109,7 @@ func Init() (err error) {
 	// Initialize kube client for kube events hooks.
 	err = kube.Init(kube.InitOptions{KubeContext: app.KubeContext, KubeConfig: app.KubeConfig})
 	if err != nil {
-		rlog.Errorf("MAIN Fatal: initialize kube client: %s\n", err)
+		log.Errorf("MAIN Fatal: initialize kube client: %s\n", err)
 		return err
 	}
 
@@ -126,7 +127,8 @@ func Init() (err error) {
 }
 
 func Run() {
-	rlog.Info("MAIN: run main loop")
+	logEntry := log.WithField("operator.component", "mainRun")
+	logEntry.Info("start Run")
 
 	// Metric storage and live metrics
 	go MetricsStorage.Run()
@@ -145,7 +147,7 @@ func Run() {
 	err := KubernetesHooksController.EnableHooks()
 	if err != nil {
 		// Something wrong with hook configs, cannot start informers.
-		rlog.Errorf("Start informers for kubernetes hooks: %v", err)
+		logEntry.Errorf("start informers for kubernetes hooks: %v", err)
 		return
 	}
 	// Start all created informers
@@ -163,40 +165,50 @@ func HandleEventsFromManagers() {
 	for {
 		select {
 		case crontab := <-schedule_manager.ScheduleCh:
-			rlog.Infof("EVENT Schedule event '%s'", crontab)
+			logEntry := log.
+				WithField("operator.component", "handleEvents").
+				WithField("binding", hook.ContextBindingType[hook.Schedule])
+			logEntry.Infof("trigger from '%s'", crontab)
 
 			tasks, err := ScheduleHooksController.HandleEvent(crontab)
 			if err != nil {
-				rlog.Errorf("MAIN_LOOP error handling Schedule event '%s': %s", crontab, err)
+				logEntry.Errorf("handle '%s': %s", crontab, err)
 				break
 			}
 
 			for _, resTask := range tasks {
 				TasksQueue.Add(resTask)
-				rlog.Infof("QUEUE add %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
+				logEntry.Infof("queue task %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
 			}
 
 		case kubeEvent := <-kube_events_manager.KubeEventCh:
-			rlog.Infof("EVENT Kube event '%s'", kubeEvent.ConfigId)
+			logEntry := log.WithField("operator.component", "handleEvents").
+				WithField("binding", hook.ContextBindingType[hook.OnKubernetesEvent])
+
+			logEntry.Infof("trigger from '%s'", kubeEvent.ConfigId)
 
 			tasks, err := KubernetesHooksController.HandleEvent(kubeEvent)
 			if err != nil {
-				rlog.Errorf("MAIN_LOOP error handling kubernetes event '%s': %s", kubeEvent.ConfigId, err)
+				logEntry.Errorf("handle '%s': %s", kubeEvent.ConfigId, err)
 				break
 			}
 
 			for _, resTask := range tasks {
 				TasksQueue.Add(resTask)
-				rlog.Infof("QUEUE add %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
+				logEntry.Infof("queue task %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
 			}
 		case <-StopHandleEventsFromManagersCh:
-			rlog.Infof("EVENT Stop")
+			logEntry := log.WithField("operator.component", "handleEvents").
+				WithField("binding", "stop")
+			logEntry.Infof("trigger Stop HandleEventsFromManagers Loop")
 			return
 		}
 	}
 }
 
 func TasksRunner() {
+	logEntry := log.
+		WithField("operator.component", "taskRunner")
 	for {
 		if TasksQueue.IsEmpty() {
 			time.Sleep(QueueIsEmptyDelay)
@@ -209,43 +221,65 @@ func TasksRunner() {
 
 			switch t.GetType() {
 			case task.HookRun:
-				rlog.Infof("TASK_RUN HookRun@%s %s", t.GetBinding(), t.GetName())
-				err := HookManager.RunHook(t.GetName(), t.GetBinding(), t.GetBindingContext())
+				hookLogLabels := map[string]string{}
+				hookLogLabels["hook"] = t.GetName()
+				hookLogLabels["binding"] = hook.ContextBindingType[t.GetBinding()]
+				hookLogLabels["task"] = "HookRun"
+
+				taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
+
+				taskLogEntry.Info("Execute hook")
+				err := HookManager.RunHook(t.GetName(), t.GetBinding(), t.GetBindingContext(), hookLogLabels)
 				if err != nil {
 					taskHook, _ := HookManager.GetHook(t.GetName())
 					hookLabel := taskHook.SafeName()
 
 					if t.GetAllowFailure() {
+						taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
 						MetricsStorage.SendCounterMetric("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
 						TasksQueue.Pop()
 					} else {
 						MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
 						t.IncrementFailureCount()
-						rlog.Errorf("TASK_RUN %s '%s' on '%s' failed. Will retry after delay. Failed count is %d. Error: %s", t.GetType(), t.GetName(), t.GetBinding(), t.GetFailureCount(), err)
-						TasksQueue.Push(task.NewTaskDelay(FailedHookDelay))
+						taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
+						delayTask := task.NewTaskDelay(FailedHookDelay)
+						delayTask.Name = t.GetName()
+						delayTask.Binding = t.GetBinding()
+						TasksQueue.Push(delayTask)
 					}
-
 				} else {
+					taskLogEntry.Infof("Hook executed successfully")
 					TasksQueue.Pop()
 				}
 
 			case task.Delay:
-				rlog.Infof("TASK_RUN Delay for %s", t.GetDelay().String())
+				logEntry := log.
+					WithField("operator.component", "taskRunner").
+					WithField("task", "Delay").
+					WithField("hook", t.GetName()).
+					WithField("binding", hook.ContextBindingType[t.GetBinding()])
+
+				logEntry.Infof("Delay for %s", t.GetDelay().String())
 				TasksQueue.Pop()
 				time.Sleep(t.GetDelay())
 			case task.Stop:
-				rlog.Infof("TASK_RUN Stop: Exiting TASK_RUN loop.")
+				log.WithField("operator.component", "taskRunner").
+					WithField("task", "Stop").
+					Infof("Stop TaskRunner loop.")
 				TasksQueue.Pop()
 				return
 			case task.Exit:
-				rlog.Infof("TASK_RUN Exit: program halts.")
+				log.WithField("operator.component", "taskRunner").
+					WithField("task", "Exit").
+					Infof("Program will exit now.")
 				TasksQueue.Pop()
 				os.Exit(1)
 			}
 
 			// Breaking, if the task queue is empty to prevent the infinite loop.
 			if TasksQueue.IsEmpty() {
-				rlog.Debug("Task queue is empty. Will sleep now.")
+				log.WithField("operator.component", "taskRunner").
+					Debug("Task queue is empty. Will sleep now.")
 				break
 			}
 		}
@@ -253,16 +287,24 @@ func TasksRunner() {
 }
 
 func CreateOnStartupTasks() {
-	rlog.Infof("QUEUE add all HookRun@OnStartup")
+	logEntry := log.
+		WithField("operator.component", "createOnStartupTasks").
+		WithField("binding", hook.ContextBindingType[hook.OnStartup])
 
-	onStartupHooks := HookManager.GetHooksInOrder(hook.OnStartup)
+	onStartupHooks, err := HookManager.GetHooksInOrder(hook.OnStartup)
+	if err != nil {
+		logEntry.Errorf("%v", err)
+		return
+	}
+
+	logEntry.Infof("add HookRun@OnStartup tasks for %d hooks", len(onStartupHooks))
 
 	for _, hookName := range onStartupHooks {
 		newTask := task.NewTask(task.HookRun, hookName).
 			WithBinding(hook.OnStartup).
 			AppendBindingContext(hook.BindingContext{Binding: hook.ContextBindingType[hook.OnStartup]})
 		TasksQueue.Add(newTask)
-		rlog.Debugf("QUEUE add HookRun@OnStartup '%s'", hookName)
+		logEntry.Debugf("new task HookRun@OnStartup '%s'", hookName)
 	}
 
 	return
@@ -305,9 +347,11 @@ func InitHttpServer(listenAddr *net.TCPAddr) {
 	})
 
 	go func() {
-		rlog.Infof("HTTP SERVER Listening on %s", listenAddr.String())
+		logEntry := log.
+			WithField("operator.component", "httpServer")
+		logEntry.Infof("Listen on %s", listenAddr.String())
 		if err := http.ListenAndServe(listenAddr.String(), nil); err != nil {
-			rlog.Errorf("Error starting HTTP server: %s", err)
+			logEntry.Errorf("Starting HTTP server: %s", err)
 		}
 	}()
 }

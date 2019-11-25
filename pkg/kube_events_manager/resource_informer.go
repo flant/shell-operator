@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,13 +64,13 @@ func (ei *resourceInformer) WithNamespace(ns string) {
 
 func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	// discover GroupVersionResource for informer
-	rlog.Debugf("%s: discover GVR for apiVersion '%s' kind '%s'...", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind)
+	log.Debugf("%s: discover GVR for apiVersion '%s' kind '%s'...", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind)
 	ei.GroupVersionResource, err = kube.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind)
 	if err != nil {
-		rlog.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
+		log.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 		return err
 	}
-	rlog.Debugf("%s: GVR for kind '%s' is '%s'", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.GroupVersionResource.String())
+	log.Debugf("%s: GVR for kind '%s' is '%s'", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.GroupVersionResource.String())
 
 	// define resyncPeriod for informer
 	resyncPeriod := time.Duration(2) * time.Hour
@@ -111,13 +111,13 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 		AddFunc: func(obj interface{}) {
 			objectId, err := runtimeResourceId(obj, informer.Monitor.Kind)
 			if err != nil {
-				rlog.Errorf("%s: WATCH Added: get object id: %s", informer.Monitor.Metadata.DebugName, err)
+				log.Errorf("%s: WATCH Added: get object id: %s", informer.Monitor.Metadata.DebugName, err)
 				return
 			}
 
 			filtered, err := resourceFilter(obj, informer.Monitor.JqFilter)
 			if err != nil {
-				rlog.Errorf("%s: WATCH Added: apply jqFilter on %s: %s",
+				log.Errorf("%s: WATCH Added: apply jqFilter on %s: %s",
 					informer.Monitor.Metadata.DebugName, objectId, err)
 				return
 			}
@@ -136,7 +136,7 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 						informer.Monitor.JqFilter,
 						utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 				}
-				rlog.Debugf("%s: WATCH Added: %s%s",
+				log.Debugf("%s: WATCH Added: %s%s",
 					informer.Monitor.Metadata.DebugName,
 					objectId,
 					jqFilterOutput)
@@ -146,13 +146,13 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 		UpdateFunc: func(_ interface{}, obj interface{}) {
 			objectId, err := runtimeResourceId(obj, informer.Monitor.Kind)
 			if err != nil {
-				rlog.Errorf("%s: WATCH Modified: get object id: %s", informer.Monitor.Metadata.DebugName, err)
+				log.Errorf("%s: WATCH Modified: get object id: %s", informer.Monitor.Metadata.DebugName, err)
 				return
 			}
 
 			filtered, err := resourceFilter(obj, informer.Monitor.JqFilter)
 			if err != nil {
-				rlog.Errorf("%s: WATCH Modified: apply jqFilter on %s: %s",
+				log.Errorf("%s: WATCH Modified: apply jqFilter on %s: %s",
 					informer.Monitor.Metadata.DebugName, objectId, err)
 				return
 			}
@@ -171,7 +171,7 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 						informer.Monitor.JqFilter,
 						utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 				}
-				rlog.Debugf("%s: WATCH Modified: %s object%s",
+				log.Debugf("%s: WATCH Modified: %s object%s",
 					informer.Monitor.Metadata.DebugName,
 					objectId,
 					jqFilterOutput)
@@ -182,12 +182,12 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 		DeleteFunc: func(obj interface{}) {
 			objectId, err := runtimeResourceId(obj, informer.Monitor.Kind)
 			if err != nil {
-				rlog.Errorf("%s: WATCH Deleted: get object id: %s", informer.Monitor.Metadata.DebugName, err)
+				log.Errorf("%s: WATCH Deleted: get object id: %s", informer.Monitor.Metadata.DebugName, err)
 				return
 			}
 
 			if informer.ShouldHandleEvent(WatchEventDeleted) {
-				rlog.Debugf("%s: WATCH Deleted: %s", informer.Monitor.Metadata.DebugName, objectId)
+				log.Debugf("%s: WATCH Deleted: %s", informer.Monitor.Metadata.DebugName, objectId)
 				informer.HandleKubeEvent(obj, objectId, "", "", WatchEventDeleted)
 			}
 		},
@@ -202,16 +202,16 @@ func (ei *resourceInformer) ListExistedObjects() error {
 		Namespace(ei.Namespace).
 		List(ei.ListOptions)
 	if err != nil {
-		rlog.Errorf("%s: initial list resources of kind '%s': %v", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, err)
+		log.Errorf("%s: initial list resources of kind '%s': %v", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, err)
 		return err
 	}
 
 	if objList == nil || len(objList.Items) == 0 {
-		rlog.Debugf("%s: Got no existing '%s' resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind)
+		log.Debugf("%s: Got no existing '%s' resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind)
 		return nil
 	}
 
-	rlog.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
+	log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
 
 	for _, obj := range objList.Items {
 		resourceId, err := runtimeResourceId(&obj, ei.Monitor.Kind)
@@ -232,7 +232,7 @@ func (ei *resourceInformer) ListExistedObjects() error {
 				ei.Monitor.JqFilter,
 				utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
 		}
-		rlog.Debugf("%s: initial checksum of %s is %s.%s",
+		log.Debugf("%s: initial checksum of %s is %s.%s",
 			ei.Monitor.Metadata.DebugName,
 			resourceId,
 			ei.Checksum[resourceId],
@@ -260,7 +260,7 @@ func (ei *resourceInformer) HandleKubeEvent(obj interface{}, objectId string, fi
 	if ei.Checksum[objectId] != newChecksum {
 		ei.Checksum[objectId] = newChecksum
 
-		rlog.Debugf("%s: %+v %s: checksum changed, send KubeEvent",
+		log.Debugf("%s: %+v %s: checksum changed, send KubeEvent",
 			ei.Monitor.Metadata.DebugName,
 			string(eventType),
 			objectId,
@@ -268,7 +268,7 @@ func (ei *resourceInformer) HandleKubeEvent(obj interface{}, objectId string, fi
 		// Safe to ignore an error because of previous call to runtimeResourceId()
 		namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
 
-		rlog.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj)
+		log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj)
 
 		var eventObj map[string]interface{}
 		switch v := obj.(type) {
@@ -293,7 +293,7 @@ func (ei *resourceInformer) HandleKubeEvent(obj interface{}, objectId string, fi
 			FilterResult: filterResult,
 		}
 	} else {
-		rlog.Debugf("%s: %+v %s: checksum is not changed",
+		log.Debugf("%s: %+v %s: checksum is not changed",
 			ei.Monitor.Metadata.DebugName,
 			string(eventType),
 			objectId,
@@ -316,11 +316,9 @@ func (ei *resourceInformer) Run(stopCh <-chan struct{}) {
 	err := ei.ListExistedObjects()
 	// FIXME do something with this error
 	if err != nil {
-		rlog.Errorf("Cannot list existing objects: %v", err)
+		log.Errorf("Cannot list existing objects: %v", err)
 		return
 	}
-
-	rlog.Infof("Resync Event")
 
 	// Send KubeEvent with Synchronization type
 	KubeEventCh <- KubeEvent{
@@ -328,10 +326,10 @@ func (ei *resourceInformer) Run(stopCh <-chan struct{}) {
 		Type:     "Synchronization",
 		Objects:  ei.ExistedObjects,
 	}
-	rlog.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
+	log.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
 	ei.SharedInformer.Run(stopCh)
 }
 
 func (ei *resourceInformer) Stop() {
-	rlog.Debugf("%s: STOP resource informer", ei.Monitor.Metadata.DebugName)
+	log.Debugf("%s: STOP resource informer", ei.Monitor.Metadata.DebugName)
 }

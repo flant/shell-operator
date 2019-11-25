@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/flant/shell-operator/pkg/executor"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
@@ -20,8 +20,8 @@ type HookManager interface {
 	WorkingDir() string
 	TempDir() string
 	GetHook(name string) (*Hook, error)
-	GetHooksInOrder(bindingType BindingType) []string
-	RunHook(hookName string, binding BindingType, bindingContext []BindingContext) error
+	GetHooksInOrder(bindingType BindingType) ([]string, error)
+	RunHook(hookName string, binding BindingType, bindingContext []BindingContext, logLabels map[string]string) error
 }
 
 type hookManager struct {
@@ -59,7 +59,7 @@ func (hm *hookManager) TempDir() string {
 
 // Init finds executables in WorkingDir, execute them with --config argument and add them into indices.
 func (hm *hookManager) Init() error {
-	rlog.Info("Initialize hooks manager. Search for and load all hooks.")
+	log.Info("Initialize hooks manager. Search for and load all hooks.")
 
 	hm.hooksInOrder = make(map[BindingType][]*Hook)
 	hm.hooksByName = make(map[string]*Hook)
@@ -71,7 +71,7 @@ func (hm *hookManager) Init() error {
 
 	// sort hooks by path
 	sort.Strings(hooksRelativePaths)
-	rlog.Debugf("  Hook paths: %+v", hooksRelativePaths)
+	log.Debugf("  Search hooks in this paths: %+v", hooksRelativePaths)
 
 	for _, hookPath := range hooksRelativePaths {
 		hook, err := hm.loadHook(hookPath)
@@ -92,21 +92,27 @@ func (hm *hookManager) Init() error {
 
 // TODO move --config execution to a Hook method
 func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
-	rlog.Infof("Load hook config from '%s'", hookPath)
-
-	envs := []string{}
-
-	configOutput, err := execCommandOutput(hm.workingDir, hookPath, envs, []string{"--config"})
-	if err != nil {
-		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
-	}
 
 	hookName, err := filepath.Rel(hm.workingDir, hookPath)
 	if err != nil {
 		return nil, err
 	}
+	hook = NewHook(hookName, hookPath)
 
-	hook, err = NewHook(hookName, hookPath).WithConfig(configOutput)
+	log.WithField("hook", hook.Name).
+		WithField("phase", "config").
+		Infof("Load config from '%s'", hookPath)
+
+	envs := []string{}
+	configOutput, err := execCommandOutput(hm.workingDir, hookPath, envs, []string{"--config"})
+	if err != nil {
+		log.WithField("hook", hook.Name).
+			WithField("phase", "config").
+			Errorf("Hook config output:\n%s", string(configOutput))
+		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
+	}
+
+	_, err = hook.WithConfig(configOutput)
 	if err != nil {
 		return nil, fmt.Errorf("creating hook '%s': %s", hookName, err.Error())
 	}
@@ -118,16 +124,15 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 func execCommandOutput(dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
 	envs = append(os.Environ(), envs...)
 	cmd := executor.MakeCommand(dir, entrypoint, args, envs)
-	rlog.Debugf("Executing hook in %s: '%s'", cmd.Dir, strings.Join(cmd.Args, " "))
+	log.Debugf("Executing hook in %s: '%s'", cmd.Dir, strings.Join(cmd.Args, " "))
 	cmd.Stdout = nil
 
 	output, err := executor.Output(cmd)
 	if err != nil {
-		rlog.Errorf("Hook '%s' output:\n%s", strings.Join(cmd.Args, " "), string(output))
 		return output, err
 	}
 
-	rlog.Debugf("Hook '%s' output:\n%s", strings.Join(cmd.Args, " "), string(output))
+	log.Debugf("Hook '%s' output:\n%s", strings.Join(cmd.Args, " "), string(output))
 
 	return output, nil
 }
@@ -146,22 +151,21 @@ func (hm *hookManager) GetHook(name string) (*Hook, error) {
 	}
 }
 
-func (hm *hookManager) GetHooksInOrder(bindingType BindingType) []string {
+func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error) {
 	hooks, ok := hm.hooksInOrder[bindingType]
 	if !ok {
-		return []string{}
+		return []string{}, nil
 	}
 
 	// OnStartup hooks are sorted by onStartup config value
 	if bindingType == OnStartup {
-		sort.Slice(hooks[:], func(i, j int) bool {
-			if !hooks[i].Config.HasBinding(OnStartup) {
-				rlog.Errorf("hook '%s' is registered as OnStartup but has no onStartup value", hooks[i].Name)
+		for _, hook := range hooks {
+			if !hook.Config.HasBinding(OnStartup) {
+				return nil, fmt.Errorf("possible bug: hook '%s' is registered as OnStartup but has no onStartup value", hook.Name)
 			}
-			if !hooks[j].Config.HasBinding(OnStartup) {
-				rlog.Errorf("hook '%s' is registered as OnStartup but has no onStartup value", hooks[j].Name)
-			}
+		}
 
+		sort.Slice(hooks[:], func(i, j int) bool {
 			return hooks[i].Config.OnStartup.Order < hooks[j].Config.OnStartup.Order
 		})
 	}
@@ -171,16 +175,16 @@ func (hm *hookManager) GetHooksInOrder(bindingType BindingType) []string {
 		hooksNames = append(hooksNames, hook.Name)
 	}
 
-	return hooksNames
+	return hooksNames, nil
 }
 
-func (hm *hookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext) error {
+func (hm *hookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext, logLabels map[string]string) error {
 	hook, err := hm.GetHook(hookName)
 	if err != nil {
 		return err
 	}
 
-	if err := hook.Run(binding, bindingContext); err != nil {
+	if err := hook.Run(binding, bindingContext, logLabels); err != nil {
 		return err
 	}
 

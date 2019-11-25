@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-
 	"os/exec"
 	"strings"
 
-	"github.com/flant/shell-operator/pkg/executor"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+
+	"github.com/flant/shell-operator/pkg/executor"
 )
 
 func resourceFilter(obj interface{}, jqFilter string) (res string, err error) {

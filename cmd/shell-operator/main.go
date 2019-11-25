@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -14,7 +14,6 @@ import (
 )
 
 func main() {
-
 	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
 
 	// global defaults
@@ -29,13 +28,14 @@ func main() {
 	// start main loop
 	kpApp.Command("start", "Start events processing.").
 		Action(func(c *kingpin.ParseContext) error {
+			app.SetupLogging()
+			log.Infof("%s %s", app.AppName, app.Version)
+
 			// Be a good parent - clean up after the child processes
 			// in case if shell-operator is a PID1.
 			go executor.Reap()
 
 			operator.InitHttpServer(app.ListenAddress)
-
-			rlog.Infof("%s %s", app.AppName, app.Version)
 
 			err := operator.Init()
 			if err != nil {

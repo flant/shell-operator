@@ -2,17 +2,17 @@ package metrics_storage
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 )
 
 // Metrics collection methods
 // Antiopa generates the following metrics:
-// hooks errors
+// hooks errors:
 // - shell_operator_hook_errors{hook="hook_name"} counter increases when hook fails
 // - shell_operator_hook_beareable_errors{hook="xxx"}
-// a work counter
+// health counter:
 // - shell_operator_live_ticks counter increases every 5 sec. while shell_operator runs.
-// queue length
+// queue length:
 // - shell_operator_tasks_queue_length
 type Metric interface {
 	store(*MetricStorage)
@@ -42,7 +42,7 @@ func (metric *BaseMetric) getOrCreateMetricVec(storage *MetricStorage, createVec
 	if !hasMetricVec {
 		prometheusCollector, metricVec = createVecFunc()
 
-		rlog.Infof("MSTOR Create new metric %s", metric.Metric)
+		log.WithField("operator.component", "metricsStorage").Infof("Create new metric %s", metric.Metric)
 
 		prometheus.MustRegister(prometheusCollector)
 		storage.MetricVecs[metric.Metric] = metricVec
@@ -138,7 +138,8 @@ type MetricVec interface {
 func (metricVec *MetricGaugeVec) UpdateValue(labels prometheus.Labels, value float64) {
 	defer func() {
 		if r := recover(); r != nil {
-			rlog.Errorf("MSTOR Panic! Metric %s %v update with %v error: %v", metricVec.Name, metricVec.LabelNames, labels, r)
+			log.WithField("operator.component", "metricsStorage").
+				Errorf("Metric %s %v update with %v error: %v", metricVec.Name, metricVec.LabelNames, labels, r)
 		}
 	}()
 	metricVec.With(labels).Set(value)
@@ -146,7 +147,8 @@ func (metricVec *MetricGaugeVec) UpdateValue(labels prometheus.Labels, value flo
 func (metricVec *MetricCounterVec) UpdateValue(labels prometheus.Labels, value float64) {
 	defer func() {
 		if r := recover(); r != nil {
-			rlog.Errorf("MSTOR Panic! Metric %s %v update with %v error: %v", metricVec.Name, metricVec.LabelNames, labels, r)
+			log.WithField("operator.component", "metricsStorage").
+				Errorf("Metric %s %v update with %v error: %v", metricVec.Name, metricVec.LabelNames, labels, r)
 		}
 	}()
 	metricVec.With(labels).Add(value)
@@ -160,14 +162,12 @@ func Init() *MetricStorage {
 type MetricStorage struct {
 	MetricChan chan Metric
 	MetricVecs map[string]MetricVec
-	//EmptyConstLabels map[string]string
 }
 
 func NewMetricStorage() *MetricStorage {
 	return &MetricStorage{
 		MetricChan: make(chan Metric, 1000),
 		MetricVecs: make(map[string]MetricVec),
-		//EmptyConstLabels: make(map[string]string),
 	}
 }
 

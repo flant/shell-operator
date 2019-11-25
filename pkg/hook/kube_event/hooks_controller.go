@@ -3,6 +3,8 @@ package kube_event
 import (
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/task"
@@ -44,13 +46,17 @@ func (c *kubernetesHooksController) WithKubeEventsManager(kubeEventsManager kube
 }
 
 func (c *kubernetesHooksController) EnableHooks() error {
-	hooks := c.hookManager.GetHooksInOrder(hook.OnKubernetesEvent)
+	hooks, err := c.hookManager.GetHooksInOrder(hook.OnKubernetesEvent)
+	if err != nil {
+		return err
+	}
 
 	for _, hookName := range hooks {
 		hmHook, _ := c.hookManager.GetHook(hookName)
 
 		for _, config := range hmHook.Config.OnKubernetesEvents {
-			err := c.kubeEventsManager.AddMonitor("", config.Monitor)
+			logEntry := log.WithField("hook", hmHook.Name).WithField("binding", hook.ContextBindingType[hook.OnKubernetesEvent])
+			err := c.kubeEventsManager.AddMonitor("", config.Monitor, logEntry)
 			if err != nil {
 				return fmt.Errorf("run kube monitor for hook %s: %s", hmHook.Name, err)
 			}

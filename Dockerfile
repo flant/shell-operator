@@ -20,5 +20,6 @@ RUN apt-get update && \
 COPY --from=0 /src/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_WORKING_DIR /hooks
+ENV LOG_TYPE json
 ENTRYPOINT ["/shell-operator"]
 CMD ["start"]

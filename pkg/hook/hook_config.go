@@ -6,7 +6,6 @@ import (
 
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/hashicorp/go-multierror"
-	"github.com/romana/rlog"
 	uuid "gopkg.in/satori/go.uuid.v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -98,7 +97,7 @@ const (
 var ContextBindingType = map[BindingType]string{
 	Schedule:          "schedule",
 	OnStartup:         "onStartup",
-	OnKubernetesEvent: "onKubernetesEvent",
+	OnKubernetesEvent: "kubernetes",
 }
 
 // Types for effective binding configs
@@ -302,8 +301,6 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		} else {
 			kubeConfig.ConfigName = kubeCfg.Name
 		}
-
-		rlog.Debugf("kubernetes[%d]: %+v", i, kubeConfig)
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}

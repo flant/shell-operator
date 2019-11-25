@@ -6,7 +6,7 @@ import (
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
-	"github.com/romana/rlog"
+	log "github.com/sirupsen/logrus"
 )
 
 type ScheduleHooksController interface {
@@ -41,8 +41,14 @@ func (c *scheduleHooksController) WithScheduleManager(scheduleManager schedule_m
 
 // UpdateScheduledHooks recreates a new Hooks array
 func (c *scheduleHooksController) UpdateScheduleHooks() {
+	logEntry := log.WithField("operator.component", "scheduleHooksController")
+
 	newStorage := make(ScheduleHooksStorage, 0)
-	hooks := c.hookManager.GetHooksInOrder(hook.Schedule)
+	hooks, err := c.hookManager.GetHooksInOrder(hook.Schedule)
+	if err != nil {
+		logEntry.Errorf("%v", err)
+		return
+	}
 
 	for _, hookName := range hooks {
 		hmHook, _ := c.hookManager.GetHook(hookName)
@@ -50,10 +56,10 @@ func (c *scheduleHooksController) UpdateScheduleHooks() {
 			_, err := c.scheduleManager.Add(schedule.Crontab)
 			if err != nil {
 				// TODO add crontab string validation and this error can be ignored
-				rlog.Errorf("Schedule: cannot add '%s' for hook '%s': %s", schedule.Crontab, hookName, err)
+				logEntry.Errorf("Schedule: cannot add '%s' for hook '%s': %s", schedule.Crontab, hookName, err)
 				continue
 			}
-			rlog.Debugf("Schedule: add '%s' for hook '%s'", schedule.Crontab, hookName)
+			logEntry.Debugf("Schedule: add '%s' for hook '%s'", schedule.Crontab, hookName)
 			newStorage.AddHook(hmHook.Name, schedule)
 		}
 	}
@@ -89,7 +95,8 @@ func (c *scheduleHooksController) HandleEvent(crontab string) ([]task.Task, erro
 		_, err := c.hookManager.GetHook(schHook.HookName)
 		if err != nil {
 			// This should not happen
-			rlog.Errorf("Possible bug: hook '%s' is scheduled as '%s' but not found by hook_manager", schHook.HookName, crontab)
+			log.WithField("operator.component", "scheduleHooksController").
+				Errorf("Possible bug: hook '%s' is scheduled as '%s' but not found by hook_manager", schHook.HookName, crontab)
 			continue
 		}
 		newTask := task.NewTask(task.HookRun, schHook.HookName).

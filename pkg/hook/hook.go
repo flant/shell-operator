@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/kennygrant/sanitize"
-	"github.com/romana/rlog"
 
 	"github.com/flant/shell-operator/pkg/executor"
 )
@@ -43,9 +42,7 @@ func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
 	return h, nil
 }
 
-func (h *Hook) Run(bindingType BindingType, context []BindingContext) error {
-	rlog.Infof("Running hook '%s' binding '%s' ...", h.Name, bindingType)
-
+func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) error {
 	var versionedContext = ConvertBindingContextList(h.Config.Version, context)
 
 	contextPath, err := h.prepareBindingContextJsonFile(versionedContext)
@@ -61,7 +58,7 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext) error {
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
-	err = executor.Run(hookCmd)
+	err = executor.RunAndLogLines(hookCmd, logLabels)
 	if err != nil {
 		return fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
