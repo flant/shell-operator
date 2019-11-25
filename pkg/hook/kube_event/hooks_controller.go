@@ -13,7 +13,9 @@ import (
 type KubernetesHooksController interface {
 	WithHookManager(hook.HookManager)
 	WithKubeEventsManager(kube_events_manager.KubeEventsManager)
-	EnableHooks() error
+	EnableHooks() ([]task.Task, error)
+	EnableKubernetesBindings(hookName string) ([]task.Task, error)
+	StartInformers(hookName string)
 	HandleEvent(kubeEvent kube_events_manager.KubeEvent) ([]task.Task, error)
 }
 
@@ -45,31 +47,75 @@ func (c *kubernetesHooksController) WithKubeEventsManager(kubeEventsManager kube
 	c.kubeEventsManager = kubeEventsManager
 }
 
-func (c *kubernetesHooksController) EnableHooks() error {
+// EnableHooks returns an array of tasks for all hooks with kubernetes bindings
+func (c *kubernetesHooksController) EnableHooks() ([]task.Task, error) {
+	res := make([]task.Task, 0)
+
 	hooks, err := c.hookManager.GetHooksInOrder(hook.OnKubernetesEvent)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, hookName := range hooks {
-		hmHook, _ := c.hookManager.GetHook(hookName)
-
-		for _, config := range hmHook.Config.OnKubernetesEvents {
-			logEntry := log.WithField("hook", hmHook.Name).WithField("binding", hook.ContextBindingType[hook.OnKubernetesEvent])
-			err := c.kubeEventsManager.AddMonitor("", config.Monitor, logEntry)
-			if err != nil {
-				return fmt.Errorf("run kube monitor for hook %s: %s", hmHook.Name, err)
-			}
-			c.KubeHooks[config.Monitor.Metadata.ConfigId] = &KubeEventHook{
-				HookName:     hmHook.Name,
-				ConfigName:   config.ConfigName,
-				AllowFailure: config.AllowFailure,
-			}
-		}
-
+		newTask := task.NewTask(task.EnableKubernetesBindings, hookName)
+		res = append(res, newTask)
 	}
 
-	return nil
+	return res, nil
+}
+
+//
+func (c *kubernetesHooksController) EnableKubernetesBindings(hookName string) ([]task.Task, error) {
+	res := make([]task.Task, 0)
+
+	hmHook, _ := c.hookManager.GetHook(hookName)
+
+	for _, config := range hmHook.Config.OnKubernetesEvents {
+		logEntry := log.WithField("hook", hmHook.Name).WithField("binding", hook.ContextBindingType[hook.OnKubernetesEvent])
+		existedObjects, err := c.kubeEventsManager.AddMonitor("", config.Monitor, logEntry)
+		if err != nil {
+			return nil, fmt.Errorf("run kube monitor for hook %s: %s", hmHook.Name, err)
+		}
+		c.KubeHooks[config.Monitor.Metadata.ConfigId] = &KubeEventHook{
+			HookName:     hmHook.Name,
+			ConfigName:   config.ConfigName,
+			AllowFailure: config.AllowFailure,
+		}
+
+		// Do not create Synchronization task for 'v0' binding configuration
+		if hmHook.Config.Version == "v0" {
+			continue
+		}
+
+		// Get existed objects and create HookRun task with Synchronization type
+		objList := make([]interface{}, 0)
+		for _, obj := range existedObjects {
+			objList = append(objList, interface{}(obj))
+		}
+		bindingContext := make([]hook.BindingContext, 0)
+		bindingContext = append(bindingContext, hook.BindingContext{
+			Binding: config.ConfigName,
+			Type:    "Synchronization",
+			Objects: objList,
+		})
+
+		newTask := task.NewTask(task.HookRun, hookName).
+			WithBinding(hook.OnKubernetesEvent).
+			WithBindingContext(bindingContext).
+			WithAllowFailure(config.AllowFailure)
+
+		res = append(res, newTask)
+	}
+
+	return res, nil
+}
+
+func (c *kubernetesHooksController) StartInformers(hookName string) {
+	hmHook, _ := c.hookManager.GetHook(hookName)
+
+	for _, config := range hmHook.Config.OnKubernetesEvents {
+		c.kubeEventsManager.StartMonitor(config.Monitor.Metadata.ConfigId)
+	}
 }
 
 // HandleEvent receives event from kube_event_manager and generate a new task to run a hook.

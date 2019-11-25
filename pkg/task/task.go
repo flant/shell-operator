@@ -12,7 +12,8 @@ type TaskType string
 
 const (
 	// a task to run a particular hook
-	HookRun TaskType = "TASK_HOOK_RUN"
+	HookRun                  TaskType = "TASK_HOOK_RUN"
+	EnableKubernetesBindings TaskType = "TASK_ENABLE_KUBERNETES_BINDINGS"
 
 	// queue control tasks
 	Delay TaskType = "TASK_DELAY"

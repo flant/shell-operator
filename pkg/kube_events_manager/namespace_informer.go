@@ -16,6 +16,7 @@ import (
 
 type NamespaceInformer interface {
 	CreateSharedInformer(addFn func(string), delFn func(string)) error
+	GetExistedObjects() map[string]bool
 	Run(stopCh <-chan struct{})
 	Stop()
 }
@@ -23,6 +24,8 @@ type NamespaceInformer interface {
 type namespaceInformer struct {
 	Monitor        *MonitorConfig
 	SharedInformer cache.SharedInformer
+
+	ExistedObjects map[string]bool
 }
 
 // namespaceInformer implements NamespaceInformer interface
@@ -30,12 +33,13 @@ var _ NamespaceInformer = &namespaceInformer{}
 
 var NewNamespaceInformer = func(monitor *MonitorConfig) NamespaceInformer {
 	informer := &namespaceInformer{
-		Monitor: monitor,
+		Monitor:        monitor,
+		ExistedObjects: make(map[string]bool, 0),
 	}
 	return informer
 }
 
-func (m *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(string)) error {
+func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(string)) error {
 	// define resyncPeriod for informer
 	resyncPeriod := time.Duration(2) * time.Hour
 
@@ -43,9 +47,9 @@ func (m *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(
 	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 
 	// define tweakListOptions for informer
-	formatSelector, err := FormatLabelSelector(m.Monitor.NamespaceSelector.LabelSelector)
+	formatSelector, err := FormatLabelSelector(ni.Monitor.NamespaceSelector.LabelSelector)
 	if err != nil {
-		return fmt.Errorf("format label selector '%s': %s", m.Monitor.NamespaceSelector.LabelSelector.String(), err)
+		return fmt.Errorf("format label selector '%s': %s", ni.Monitor.NamespaceSelector.LabelSelector.String(), err)
 	}
 	tweakListOptions := func(options *metav1.ListOptions) {
 		if formatSelector != "" {
@@ -53,11 +57,27 @@ func (m *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(
 		}
 	}
 
-	m.SharedInformer = corev1.NewFilteredNamespaceInformer(kube.Kubernetes, resyncPeriod, indexers, tweakListOptions)
-	m.SharedInformer.AddEventHandler(SharedNamespaceInformerEventHandler(m, addFn, delFn))
-	//resourceList, listErr = kube.Kubernetes.CoreV1().Namespaces().List(listOptions)
+	ni.SharedInformer = corev1.NewFilteredNamespaceInformer(kube.Kubernetes, resyncPeriod, indexers, tweakListOptions)
+	ni.SharedInformer.AddEventHandler(SharedNamespaceInformerEventHandler(ni, addFn, delFn))
+
+	listOptions := metav1.ListOptions{}
+	tweakListOptions(&listOptions)
+	existedObjects, err := kube.Kubernetes.CoreV1().Namespaces().List(listOptions)
+
+	if err != nil {
+		log.Errorf("list existing namespaces: %v", err)
+		return err
+	}
+
+	for _, ns := range existedObjects.Items {
+		ni.ExistedObjects[ns.Name] = true
+	}
 
 	return nil
+}
+
+func (ni *namespaceInformer) GetExistedObjects() map[string]bool {
+	return ni.ExistedObjects
 }
 
 var SharedNamespaceInformerEventHandler = func(informer *namespaceInformer, addFn func(string), delFn func(string)) cache.ResourceEventHandlerFuncs {
@@ -83,13 +103,13 @@ var SharedNamespaceInformerEventHandler = func(informer *namespaceInformer, addF
 	}
 }
 
-func (m *namespaceInformer) Run(stopCh <-chan struct{}) {
-	log.Debugf("%s: Run namespace informer", m.Monitor.Metadata.DebugName)
-	if m.SharedInformer != nil {
-		go m.SharedInformer.Run(stopCh)
+func (ni *namespaceInformer) Run(stopCh <-chan struct{}) {
+	log.Debugf("%s: Run namespace informer", ni.Monitor.Metadata.DebugName)
+	if ni.SharedInformer != nil {
+		go ni.SharedInformer.Run(stopCh)
 	}
 }
 
-func (m *namespaceInformer) Stop() {
+func (ni *namespaceInformer) Stop() {
 	return
 }

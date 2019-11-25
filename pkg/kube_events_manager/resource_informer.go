@@ -20,16 +20,20 @@ import (
 
 // ResourceInformer is a kube informer for particular onKubernetesEvent
 type ResourceInformer interface {
-	WithDebugName(string)
 	WithNamespace(string)
+	WithName(string)
 	CreateSharedInformer() error
+	GetExistedObjects() []ObjectAndFilterResult
 	Run(stopCh <-chan struct{})
 	Stop()
 }
 
 type resourceInformer struct {
-	Monitor   *MonitorConfig
+	Monitor *MonitorConfig
+	// Filter by namespace
 	Namespace string
+	// Filter by object name
+	Name string
 
 	Checksum       map[string]string
 	ExistedObjects []ObjectAndFilterResult
@@ -53,13 +57,12 @@ var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 	return informer
 }
 
-// FIXME can we drop this and calculate debugname only in debug mode?
-func (ei *resourceInformer) WithDebugName(configId string) {
-	//ei.Monitor.Metadata.DebugName = configId
-}
-
 func (ei *resourceInformer) WithNamespace(ns string) {
 	ei.Namespace = ns
+}
+
+func (ei *resourceInformer) WithName(name string) {
+	ei.Name = name
 }
 
 func (ei *resourceInformer) CreateSharedInformer() (err error) {
@@ -79,20 +82,23 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 
 	// define tweakListOptions for informer
-	formatSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
+	fmtLabelSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
 	if err != nil {
 		return fmt.Errorf("format label selector '%s': %s", ei.Monitor.LabelSelector.String(), err)
 	}
-	fieldSelector, err := FormatFieldSelector(ei.Monitor.FieldSelector)
+
+	fieldSelector := ei.adjustFieldSelector(ei.Monitor.FieldSelector, ei.Name)
+	fmtFieldSelector, err := FormatFieldSelector(fieldSelector)
 	if err != nil {
-		return fmt.Errorf("format field selector '%+v': %s", ei.Monitor.FieldSelector, err)
+		return fmt.Errorf("format field selector '%+v': %s", fieldSelector, err)
 	}
+
 	tweakListOptions := func(options *metav1.ListOptions) {
-		if fieldSelector != "" {
-			options.FieldSelector = fieldSelector
+		if fmtFieldSelector != "" {
+			options.FieldSelector = fmtFieldSelector
 		}
-		if formatSelector != "" {
-			options.LabelSelector = formatSelector
+		if fmtLabelSelector != "" {
+			options.LabelSelector = fmtLabelSelector
 		}
 	}
 	ei.ListOptions = metav1.ListOptions{}
@@ -103,7 +109,17 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	informer.Informer().AddEventHandler(SharedInformerEventHandler(ei))
 	ei.SharedInformer = informer.Informer()
 
+	err = ei.ListExistedObjects()
+	if err != nil {
+		log.Errorf("list existing objects: %v", err)
+		return err
+	}
+
 	return nil
+}
+
+func (ei *resourceInformer) GetExistedObjects() []ObjectAndFilterResult {
+	return ei.ExistedObjects
 }
 
 var SharedInformerEventHandler = func(informer *resourceInformer) cache.ResourceEventHandlerFuncs {
@@ -303,6 +319,35 @@ func (ei *resourceInformer) HandleKubeEvent(obj interface{}, objectId string, fi
 	return
 }
 
+func (ei *resourceInformer) adjustFieldSelector(selector *FieldSelector, objName string) *FieldSelector {
+	var selectorCopy *FieldSelector
+
+	if selector != nil {
+		selectorCopy = &FieldSelector{
+			MatchExpressions: selector.MatchExpressions,
+		}
+	}
+
+	if objName != "" {
+		objNameReq := FieldSelectorRequirement{
+			Field:    "metadata.name",
+			Operator: "=",
+			Value:    objName,
+		}
+		if selectorCopy == nil {
+			selectorCopy = &FieldSelector{
+				MatchExpressions: []FieldSelectorRequirement{
+					objNameReq,
+				},
+			}
+		} else {
+			selectorCopy.MatchExpressions = append(selectorCopy.MatchExpressions, objNameReq)
+		}
+	}
+
+	return selectorCopy
+}
+
 func (ei *resourceInformer) ShouldHandleEvent(checkEvent WatchEventType) bool {
 	for _, event := range ei.Monitor.EventTypes {
 		if event == checkEvent {
@@ -313,19 +358,6 @@ func (ei *resourceInformer) ShouldHandleEvent(checkEvent WatchEventType) bool {
 }
 
 func (ei *resourceInformer) Run(stopCh <-chan struct{}) {
-	err := ei.ListExistedObjects()
-	// FIXME do something with this error
-	if err != nil {
-		log.Errorf("Cannot list existing objects: %v", err)
-		return
-	}
-
-	// Send KubeEvent with Synchronization type
-	KubeEventCh <- KubeEvent{
-		ConfigId: ei.Monitor.Metadata.ConfigId,
-		Type:     "Synchronization",
-		Objects:  ei.ExistedObjects,
-	}
 	log.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
 	ei.SharedInformer.Run(stopCh)
 }

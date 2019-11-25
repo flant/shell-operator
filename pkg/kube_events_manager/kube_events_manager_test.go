@@ -22,15 +22,15 @@ import (
 type MockResourceInformer struct {
 }
 
-func (*MockResourceInformer) WithDebugName(string) {
-	return
-}
-
 func (*MockResourceInformer) WithNamespace(string) {
 	return
 }
 
 func (*MockResourceInformer) CreateSharedInformer() error {
+	return nil
+}
+
+func (*MockResourceInformer) GetExistedObjects() []ObjectAndFilterResult {
 	return nil
 }
 
