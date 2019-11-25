@@ -3,6 +3,7 @@ module github.com/flant/shell-operator
 go 1.12
 
 require (
+	github.com/flant/libjq-go v0.0.0-20191126154400-1afb898d97a3 // branch: master
 	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.3
 	github.com/go-openapi/strfmt v0.19.2
@@ -32,3 +33,5 @@ require (
 
 // replace github.com/go-openapi/validate => ../go-openapi-validate
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.4-0.20190926112101-38fbca4ac77f // branch: fix_in_body
+
+//replace github.com/flant/libjq-go => ../libjq-go

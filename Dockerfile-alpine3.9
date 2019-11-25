@@ -1,21 +1,42 @@
-FROM golang:1.12-alpine3.9
+# build libjq
+FROM alpine:3.9 AS libjq
+RUN apk --no-cache add git ca-certificates && \
+    git clone https://github.com/flant/libjq-go /libjq-go && \
+    cd /libjq-go && \
+    git submodule update --init && \
+    /libjq-go/scripts/install-libjq-dependencies-alpine.sh && \
+    /libjq-go/scripts/build-libjq-static.sh /libjq-go /out
+
+
+# build shell-operator binary
+FROM golang:1.12-alpine3.9 AS shell-operator
 ARG appVersion=latest
-RUN apk --no-cache add git ca-certificates
+RUN apk --no-cache add git ca-certificates gcc libc-dev
 
 # Cache-friendly download of go dependencies.
 ADD go.mod go.sum /src/shell-operator/
 WORKDIR /src/shell-operator
 RUN go mod download
 
+COPY --from=libjq /out/build /build
 ADD . /src/shell-operator
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" -o shell-operator ./cmd/shell-operator
 
+RUN CGO_ENABLED=1 \
+    CGO_CFLAGS="-I/build/jq/include" \
+    CGO_LDFLAGS="-L/build/onig/lib -L/build/jq/lib" \
+    GOOS=linux \
+    go build -ldflags="-s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" \
+             -o shell-operator \
+             ./cmd/shell-operator
+
+
+# build final image
 FROM alpine:3.9
 RUN apk --no-cache add ca-certificates jq bash && \
     wget https://storage.googleapis.com/kubernetes-release/release/v1.13.5/bin/linux/amd64/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
-COPY --from=0 /src/shell-operator /
+COPY --from=shell-operator /src/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_WORKING_DIR /hooks
 ENV LOG_TYPE json

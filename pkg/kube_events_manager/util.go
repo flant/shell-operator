@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -11,28 +12,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 
+	. "github.com/flant/libjq-go"
 	"github.com/flant/shell-operator/pkg/executor"
 )
 
-func resourceFilter(obj interface{}, jqFilter string) (res string, err error) {
+func ResourceFilter(obj interface{}, jqFilter string) (res string, err error) {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return "", err
 	}
 
 	if jqFilter != "" {
-		stdout, stderr, err := execJq(jqFilter, data)
-		if err != nil {
-			return "", fmt.Errorf("failed exec jq: \nerr: '%s'\nstderr: '%s'", err, stderr)
-		}
+		if os.Getenv("JQ_EXEC") == "yes" {
+			stdout, stderr, err := execJq(jqFilter, data)
+			if err != nil {
+				return "", fmt.Errorf("failed exec jq: \nerr: '%s'\nstderr: '%s'", err, stderr)
+			}
 
-		res = stdout
+			res = stdout
+		} else {
+			res, err = Jq().Program(jqFilter).Cached().Run(string(data))
+			if err != nil {
+				return "", fmt.Errorf("failed jq filter: '%s'", err)
+			}
+		}
 	} else {
 		res = string(data)
 	}
 	return
 }
 
+// TODO: Can be removed after testing with libjq-go
+// execJq run jq in locked mode with executor
 func execJq(jqFilter string, jsonData []byte) (stdout string, stderr string, err error) {
 	cmd := exec.Command("/usr/bin/jq", jqFilter)
 
