@@ -1,0 +1,4 @@
+apiVersion: v1
+name: 201-install-with-helm-chart
+version: 1.0.0
+description: Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster
