@@ -15,9 +15,9 @@ At startup Shell-operator initializes the hooks:
 
 - If hook's configuration is successful, the workqueue is filled with `onStartup` hooks.
 
-- After `onStartup` hooks execution, Shell-operator subscribes to Kubernetes events according to configured `kubernetes` bindings.
+- After executing `onStartup` hooks, Shell-operator subscribes to Kubernetes events according to configured `kubernetes` bindings.
 
-- Than, the work queue is filled with `kubernetes` hooks with `Synchronization` type of [binding context](#binding-context), so each hook receives all existing objects described in hook configuration.
+- Then, the work queue is filled with `kubernetes` hooks with `Synchronization` [binding context](#binding-context) type, so that each hook receives all existing objects described in hook's configuration.
 
 Next the main cycle is started:
 
@@ -207,7 +207,7 @@ Parameters:
 
 - `namespace.labelSelector` — this filter works like `labelSelector` but for namespaces and Shell-operator dynamically subscribes to events from matched namespaces.
 
-- `jqFilter` —  an optional parameter that specifies additional event filtering with [jq syntax](https://stedolan.github.io/jq/manual/). The  hook will be triggered on Modified event only if filter result is changed after the last event. See example [102-monitor-namespaces](examples/102-monitor-namespaces).
+- `jqFilter` —  an optional parameter that specifies additional event filtering with [jq syntax](https://stedolan.github.io/jq/manual/). The hook will be triggered on Modified event only if filter result is changed after the last event. See example [102-monitor-namespaces](examples/102-monitor-namespaces).
 
 - `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
@@ -255,7 +255,7 @@ Shell-operator requires a ServiceAccount with the appropriate [RBAC](https://kub
 
 ##### jqFilter
 
-This filter is used to ignore excess "Modified" events, not to select subscribed objects. For example, if hook is interested in changes of labels, `"jqFilter":".metadata.labels"` can be used to ignore changes in status or annotations.
+This filter is used to ignore superfluous "Modified" events, not to select objects to subscribe to. For example, if hook is interested in changes of labels, `"jqFilter": ".metadata.labels"` can be used to ignore changes in `.status` or `.metadata.annotations`.
 
 The result of applying filter to the event's object is passed to hook in a binding context file in a `filterResult` field. See [binding context](#binding-context).
 
