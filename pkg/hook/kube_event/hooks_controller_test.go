@@ -4,9 +4,11 @@ import (
 	"context"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	"github.com/stretchr/testify/assert"
 )
 
 type MockKubeEventsManager struct {
@@ -18,8 +20,8 @@ func (m *MockKubeEventsManager) WithContext(ctx context.Context) {
 	return
 }
 
-func (m *MockKubeEventsManager) AddMonitor(name string, monitorConfig *kube_events_manager.MonitorConfig) error {
-	return nil
+func (m *MockKubeEventsManager) AddMonitor(name string, monitorConfig *kube_events_manager.MonitorConfig, logEntry *log.Entry) ([]kube_events_manager.ObjectAndFilterResult, error) {
+	return nil, nil
 }
 
 func (m *MockKubeEventsManager) HasMonitor(configId string) bool {
@@ -34,12 +36,18 @@ func (m *MockKubeEventsManager) StopMonitor(configId string) error {
 	return nil
 }
 
+func (m *MockKubeEventsManager) StartMonitor(configId string) {
+	return
+}
+
 func (m *MockKubeEventsManager) Ch() chan kube_events_manager.KubeEvent {
 	return nil
 }
 
 type MockHookManager struct {
 }
+
+var _ hook.HookManager = &MockHookManager{}
 
 func (hm *MockHookManager) Init() error {
 	panic("implement me")
@@ -113,14 +121,14 @@ func (hm *MockHookManager) GetHook(name string) (*hook.Hook, error) {
 	return nil, nil
 }
 
-func (hm *MockHookManager) GetHooksInOrder(bindingType hook.BindingType) []string {
+func (hm *MockHookManager) GetHooksInOrder(bindingType hook.BindingType) ([]string, error) {
 	return []string{
 		"hook-1",
 		"second",
-	}
+	}, nil
 }
 
-func (hm *MockHookManager) RunHook(hookName string, binding hook.BindingType, bindingContext []hook.BindingContext) error {
+func (hm *MockHookManager) RunHook(hookName string, binding hook.BindingType, bindingContext []hook.BindingContext, logLabels map[string]string) error {
 	return nil
 }
 
@@ -129,9 +137,9 @@ func Test_KubernetesHooksController_EnableHooks(t *testing.T) {
 	ctrl.WithHookManager(&MockHookManager{})
 	ctrl.WithKubeEventsManager(&MockKubeEventsManager{})
 
-	err := ctrl.EnableHooks()
+	tasks, err := ctrl.EnableHooks()
 
 	if assert.NoError(t, err) {
-		assert.Len(t, ctrl.KubeHooks, 2)
+		assert.Len(t, tasks, 2)
 	}
 }

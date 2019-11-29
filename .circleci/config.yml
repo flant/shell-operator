@@ -14,7 +14,7 @@ jobs:
       - checkout
       - run: go mod download
       - run: go build -v ./cmd/shell-operator
-      - run: go test -race -v ./...
+      - run: go test -race -v ./pkg/...
       # TODO add vet, lint, speller
 
   build_image_branch:
@@ -22,9 +22,12 @@ jobs:
     steps:
     - checkout
     - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
-    # build and push only alpine version
-    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev -f Dockerfile-alpine3.9 .
-    - run: docker push flant/shell-operator:dev
+    # build and push ubuntu version
+    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev-ubuntu .
+    - run: docker push flant/shell-operator:dev-ubuntu
+    # build and push alpine version
+    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev-alpine -f Dockerfile-alpine3.9 .
+    - run: docker push flant/shell-operator:dev-alpine
 
   build_image_latest:
     machine: true

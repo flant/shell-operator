@@ -305,7 +305,8 @@ func (ei *resourceInformer) HandleKubeEvent(obj interface{}, objectId string, fi
 		// Safe to ignore an error because of previous call to runtimeResourceId()
 		namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
 
-		log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj)
+		// TODO: should be disabled by default and enabled by a debug feature switch
+		//log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
 		var eventObj map[string]interface{}
 		switch v := obj.(type) {
