@@ -253,7 +253,9 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 
 }
 
+// Test_FakeClient_CatchUpdates try to catch updates from fake client with additional WatchReactor
 func Test_FakeClient_CatchUpdates(t *testing.T) {
+	t.SkipNow()
 	timeout := time.Duration(30 * time.Second)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -295,50 +297,28 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	objs := []runtime.Object{}
 
 	dc := fakedynamic.NewSimpleDynamicClient(scheme, objs...)
-	//dc.PrependWatchReactor("*", func(action testing2.Action) (handled bool, ret watch.Interface, err error) {
-	//	switch v := action.(type) {
-	//	case testing2.CreateAction:
-	//		gvr := action.GetResource()
-	//		obj := v.GetObject()
-	//		fmt.Printf("create object: %s %+v\n", gvr.String(), obj)
-	//	case testing2.UpdateAction:
-	//		gvr := action.GetResource()
-	//		obj := v.GetObject()
-	//
-	//		name, _, _ := metaFromEventObject(obj)
-	//
-	//		oldObj, _ := dc.Resource(gvr).Namespace(action.GetNamespace()).Get(name, metav1.GetOptions{})
-	//
-	//		fmt.Printf("updated object: %s\n>>> old: %+v\n>>> new: %+v\n", gvr.String(), oldObj.Object, obj)
-	//
-	//	default:
-	//		return false, nil, nil
-	//	}
-	//	return false, nil, nil
-	//})
 	/*
-		dc := fakedynamic.NewSimpleDynamicClient(scheme, objs...)
-			dc.PrependWatchReactor("*", func(action testing2.Action) (handled bool, ret watch.Interface, err error) {
-				switch v := action.(type) {
-				case testing2.CreateAction:
-					gvr := action.GetResource()
-					obj := v.GetObject()
-					fmt.Printf("create object: %s %+v\n", gvr.String(), obj)
-				case testing2.UpdateAction:
-					gvr := action.GetResource()
-					obj := v.GetObject()
+		dc.PrependWatchReactor("*", func(action testing2.Action) (handled bool, ret watch.Interface, err error) {
+			switch v := action.(type) {
+			case testing2.CreateAction:
+				gvr := action.GetResource()
+				obj := v.GetObject()
+				fmt.Printf("create object: %s %+v\n", gvr.String(), obj)
+			case testing2.UpdateAction:
+				gvr := action.GetResource()
+				obj := v.GetObject()
 
-					name, _, _ := metaFromEventObject(obj)
+				name, _, _ := metaFromEventObject(obj)
 
-					oldObj, _ := dc.Resource(gvr).Namespace(action.GetNamespace()).Get(name, metav1.GetOptions{})
+				oldObj, _ := dc.Resource(gvr).Namespace(action.GetNamespace()).Get(name, metav1.GetOptions{})
 
-					fmt.Printf("updated object: %s\n>>> old: %+v\n>>> new: %+v\n", gvr.String(), oldObj.Object, obj)
+				fmt.Printf("updated object: %s\n>>> old: %+v\n>>> new: %+v\n", gvr.String(), oldObj.Object, obj)
 
-				default:
-					return false, nil, nil
-				}
+			default:
 				return false, nil, nil
-			})
+			}
+			return false, nil, nil
+		})
 	*/
 	kube.DynamicClient = dc
 
