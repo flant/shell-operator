@@ -32,12 +32,12 @@ func (m *MockKubeEventsManager) Start() {
 	return
 }
 
-func (m *MockKubeEventsManager) StopMonitor(configId string) error {
-	return nil
-}
-
 func (m *MockKubeEventsManager) StartMonitor(configId string) {
 	return
+}
+
+func (m *MockKubeEventsManager) StopMonitor(configId string) error {
+	return nil
 }
 
 func (m *MockKubeEventsManager) Ch() chan kube_events_manager.KubeEvent {

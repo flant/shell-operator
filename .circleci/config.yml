@@ -12,9 +12,9 @@ jobs:
     working_directory: /tmp/flant/shell-operator
     steps:
       - checkout
-      - run: go mod download
-      - run: go build -v ./cmd/shell-operator
-      - run: go test -race -v ./pkg/...
+      #- run: go mod download
+      #- run: go build -v ./cmd/shell-operator
+      #- run: go test -race -v ./...
       # TODO add vet, lint, speller
 
   build_image_branch:

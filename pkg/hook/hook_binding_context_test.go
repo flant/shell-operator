@@ -47,7 +47,7 @@ func Test_BindingContext_Convert_V1(t *testing.T) {
 	assert.Equal(t, "", bc1_0.FilterResult)
 
 	data, err := json.Marshal(bc1_0)
-	if assert.NoError(t, err) {
+	if !assert.NoError(t, err) {
 		t.Logf("bindingContext: %v", string(data))
 	}
 }
@@ -79,7 +79,7 @@ func Test_BindingContext_Convert_V0(t *testing.T) {
 	assert.Equal(t, "add", bc0_0.ResourceEvent)
 
 	data, err := json.Marshal(bc0_0)
-	if assert.NoError(t, err) {
+	if !assert.NoError(t, err) {
 		t.Logf("bindingContext: %v", string(data))
 	}
 }

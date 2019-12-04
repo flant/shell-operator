@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -58,14 +59,10 @@ var (
 func Init() (err error) {
 	log.Debug("MAIN Init")
 
-	if app.WorkingDir != "" {
-		WorkingDir = app.WorkingDir
-	} else {
-		WorkingDir, err = os.Getwd()
-		if err != nil {
-			log.Errorf("MAIN Fatal: Cannot determine a working dir: %s", err)
-			return err
-		}
+	WorkingDir, err := filepath.Abs(app.WorkingDir)
+	if err != nil {
+		log.Errorf("MAIN Fatal: Cannot determine a current dir: %s", err)
+		return err
 	}
 	if exists, _ := utils_file.DirExists(WorkingDir); !exists {
 		log.Errorf("MAIN Fatal: working dir '%s' is not exists", WorkingDir)
@@ -161,6 +158,14 @@ func Run() {
 
 	// TasksRunner runs tasks from the queue.
 	go TasksRunner()
+}
+
+// Stop closes event handle loop and pushes Stop task to wait until current task is done.
+func Stop() {
+	StopHandleEventsFromManagersCh <- struct{}{}
+	// FIXME: Double push to prevent Pop in task handlers.
+	TasksQueue.Push(task.NewTask(task.Stop, "Stop"))
+	TasksQueue.Push(task.NewTask(task.Stop, "Stop"))
 }
 
 func HandleEventsFromManagers() {
