@@ -1,6 +1,10 @@
 package hook
 
-import "github.com/flant/shell-operator/pkg/kube_events_manager"
+import (
+	"encoding/json"
+
+	"github.com/flant/shell-operator/pkg/kube_events_manager"
+)
 
 // Additional info from schedule and kube events
 type BindingContext struct {
@@ -42,6 +46,40 @@ type BindingContextV1 struct {
 	Objects []interface{} `json:"objects,omitempty"`
 }
 
+func (bc *BindingContextV1) Map() map[string]interface{} {
+	res := make(map[string]interface{}, 0)
+	res["binding"] = bc.Binding
+	if bc.Type == "" {
+		return res
+	}
+	// This BindingContext is for "kubernetes" binding, add more fields
+	res["type"] = bc.Type
+	// omitempty for watchEvent
+	if bc.WatchEvent != "" {
+		res["watchEvent"] = bc.WatchEvent
+	}
+	switch bc.Type {
+	case "Synchronization":
+		if len(bc.Objects) == 0 {
+			res["objects"] = make([]string, 0)
+		} else {
+			res["objects"] = bc.Objects
+		}
+	case "Event":
+		if bc.Object != nil {
+			res["object"] = bc.Object
+		}
+		if bc.FilterResult != "" {
+			res["filterResult"] = bc.FilterResult
+		}
+	}
+	return res
+}
+
+func (bc *BindingContextV1) MarshalJSON() ([]byte, error) {
+	return json.Marshal(bc.Map())
+}
+
 func ConvertBindingContext(version string, context BindingContext) interface{} {
 	var versionedContext interface{}
 	switch version {
@@ -80,20 +118,22 @@ func ConvertBindingContextV1(context BindingContext) BindingContextV1 {
 	switch context.Type {
 	case "Synchronization":
 		ctx = BindingContextV1{
-			Binding:      context.Binding,
-			Type:         context.Type,
-			Objects:      context.Objects,
-			Object:       nil,
-			FilterResult: "",
+			Binding: context.Binding,
+			Type:    context.Type,
+			Objects: context.Objects,
 		}
-	default:
+	case "Event":
 		ctx = BindingContextV1{
 			Binding:      context.Binding,
-			Type:         "Event",
+			Type:         context.Type,
 			WatchEvent:   string(context.WatchEvent),
 			Object:       context.Object,
 			FilterResult: context.FilterResult,
-			Objects:      nil,
+		}
+	default:
+		// non kubernetes binding
+		ctx = BindingContextV1{
+			Binding: context.Binding,
 		}
 	}
 	return ctx
