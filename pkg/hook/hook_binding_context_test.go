@@ -9,12 +9,33 @@ import (
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 )
 
+// Test conversion of BindingContext for v1, also test json marshal of v1 binding contexts.
 func Test_BindingContext_Convert_V1(t *testing.T) {
-	bc := BindingContext{
-		Binding: "kubernetes",
-		Type:    "Synchronization",
-		Objects: []interface{}{
-			kube_events_manager.ObjectAndFilterResult{
+	var bc BindingContextV1
+	var jsonDump map[string]interface{}
+
+	tests := []struct {
+		name string
+		bc   BindingContext
+		fn   func()
+	}{
+		{
+			"non kubernetes binding",
+			BindingContext{
+				Binding: "onStartup",
+			},
+			func() {
+				assert.Equal(t, "onStartup", bc.Binding)
+				assert.Equal(t, "onStartup", jsonDump["binding"])
+				assert.Len(t, jsonDump, 1)
+			},
+		},
+		{
+			"kubernetes Event binding",
+			BindingContext{
+				Binding:    "kubernetes",
+				Type:       "Event",
+				WatchEvent: kube_events_manager.WatchEventAdded,
 				Object: map[string]interface{}{
 					"metadata": map[string]string{
 						"namespace": "default",
@@ -22,33 +43,110 @@ func Test_BindingContext_Convert_V1(t *testing.T) {
 					"kind": "Pod",
 					"name": "pod-qwe",
 				},
-				FilterResult: "",
+				Kind:      "Pod",
+				Name:      "pod-qwe",
+				Namespace: "default",
 			},
-			kube_events_manager.ObjectAndFilterResult{
-				Object: map[string]interface{}{
-					"metadata": map[string]string{
-						"namespace": "default",
+			func() {
+				assert.Equal(t, "kubernetes", bc.Binding)
+				assert.Equal(t, "Event", bc.Type)
+				assert.Contains(t, bc.WatchEvent, "Added")
+				assert.Contains(t, bc.Object, "metadata")
+
+				// test json marshal
+				assert.Equal(t, "kubernetes", jsonDump["binding"])
+				assert.NotContains(t, jsonDump, "objects")
+				assert.Contains(t, jsonDump, "watchEvent")
+				assert.Equal(t, jsonDump["watchEvent"], "Added")
+				assert.Contains(t, jsonDump, "object")
+				assert.NotContains(t, jsonDump, "filterResult")
+			},
+		},
+		{
+			"kubernetes Synchronization binding",
+			BindingContext{
+				Binding:    "kubernetes",
+				Type:       "Synchronization",
+				WatchEvent: "Added",
+				Objects: []interface{}{
+					kube_events_manager.ObjectAndFilterResult{
+						Object: map[string]interface{}{
+							"metadata": map[string]string{
+								"namespace": "default",
+							},
+							"kind": "Pod",
+							"name": "pod-qwe",
+						},
+						FilterResult: "",
 					},
-					"kind": "Deployment",
-					"name": "deployment-test",
+					kube_events_manager.ObjectAndFilterResult{
+						Object: map[string]interface{}{
+							"metadata": map[string]string{
+								"namespace": "default",
+							},
+							"kind": "Deployment",
+							"name": "deployment-test",
+						},
+						FilterResult: "{\"labels\":{\"label-name\":\"label-value\"}}",
+					},
 				},
-				FilterResult: "{\"labels\":{\"label-name\":\"label-value\"}}",
+			},
+			func() {
+				assert.Len(t, bc.Objects, 2)
+				assert.Equal(t, "Synchronization", bc.Type)
+				assert.Equal(t, "kubernetes", bc.Binding)
+				assert.Len(t, bc.Object, 0)
+				assert.Equal(t, "", bc.FilterResult)
+
+				// test json marshal
+				assert.Equal(t, "kubernetes", jsonDump["binding"])
+				assert.NotContains(t, jsonDump, "object")
+				assert.NotContains(t, jsonDump, "filterResult")
+				assert.NotContains(t, jsonDump, "watchEvent")
+			},
+		},
+		{
+			"kubernetes empty Synchronization binding",
+			BindingContext{
+				Binding: "kubernetes",
+				Type:    "Synchronization",
+				Objects: []interface{}{},
+			},
+			func() {
+				assert.Len(t, bc.Objects, 0)
+				assert.Equal(t, "Synchronization", bc.Type)
+				assert.Equal(t, "kubernetes", bc.Binding)
+				assert.Len(t, bc.Object, 0)
+				assert.Equal(t, "", bc.FilterResult)
+
+				// test json marshal
+				assert.Equal(t, "kubernetes", jsonDump["binding"])
+				assert.Equal(t, "Synchronization", jsonDump["type"])
+
+				assert.NotContains(t, jsonDump, "object")
+				assert.NotContains(t, jsonDump, "filterResult")
+				assert.NotContains(t, jsonDump, "watchEvent")
+
+				assert.Contains(t, jsonDump, "objects")
+				assert.Len(t, jsonDump["objects"], 0)
+				assert.Equal(t, []interface{}{}, jsonDump["objects"])
 			},
 		},
 	}
 
-	bc1 := ConvertBindingContextListV1([]BindingContext{bc})
-	assert.Len(t, bc1, 1)
-	bc1_0 := bc1[0]
-	assert.Len(t, bc1_0.Objects, 2)
-	assert.Equal(t, "Synchronization", bc1_0.Type)
-	assert.Equal(t, "kubernetes", bc1_0.Binding)
-	assert.Len(t, bc1_0.Object, 0)
-	assert.Equal(t, "", bc1_0.FilterResult)
-
-	data, err := json.Marshal(bc1_0)
-	if !assert.NoError(t, err) {
-		t.Logf("bindingContext: %v", string(data))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jsonDump = make(map[string]interface{}, 0)
+			bcList := ConvertBindingContextListV1([]BindingContext{tt.bc})
+			assert.Len(t, bcList, 1)
+			bc = bcList[0]
+			jsonData, err := json.Marshal(bc.Map())
+			assert.NoError(t, err)
+			err = json.Unmarshal(jsonData, &jsonDump)
+			//fmt.Printf("bc.Map(): %#v\njsonData: %s\njsonDump: %#v\n", bc.Map(), string(jsonData), jsonDump)
+			assert.NoError(t, err)
+			tt.fn()
+		})
 	}
 }
 
