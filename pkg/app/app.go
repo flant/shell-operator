@@ -20,6 +20,7 @@ var TempDir = "/tmp/shell-operator"
 var KubeContext = ""
 var KubeConfig = ""
 var ListenAddress, _ = net.ResolveTCPAddr("tcp", "0.0.0.0:9115")
+var JqLibraryPath = ""
 
 // Use info level with timestamps and a text output by default
 var LogLevel = "info"
@@ -57,6 +58,11 @@ func SetupGlobalSettings(kpApp *kingpin.Application) {
 		Envar("SHELL_OPERATOR_LISTEN_ADDRESS").
 		Default(ListenAddress.String()).
 		TCPVar(&ListenAddress)
+
+	kpApp.Flag("jq-library-path", "Prepend directory to the search list for jq modules (-L flag). (Can be set with $JQ_LIBRARY_PATH).").
+		Envar("JQ_LIBRARY_PATH").
+		Default(JqLibraryPath).
+		StringVar(&JqLibraryPath)
 
 	kpApp.Flag("log-level", "Logging level: debug, info, error. Default is info.").
 		Envar("LOG_LEVEL").

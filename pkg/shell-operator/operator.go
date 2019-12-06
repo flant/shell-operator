@@ -43,7 +43,7 @@ var (
 	MetricsStorage *metrics_storage.MetricStorage
 
 	// StopHandleEventsFromManagersCh channel is used to stop loop of the HandleEventsFromManagers.
-	StopHandleEventsFromManagersCh chan struct{}
+	StopHandleEventsFromManagersCh = make(chan struct{}, 1)
 )
 
 var (
@@ -168,6 +168,7 @@ func Stop() {
 	TasksQueue.Push(task.NewTask(task.Stop, "Stop"))
 }
 
+// HandleEventsFromManagers read schedule and kubernetes events and emit tasks to the working queue.
 func HandleEventsFromManagers() {
 	for {
 		select {
@@ -213,6 +214,7 @@ func HandleEventsFromManagers() {
 	}
 }
 
+// TasksRunner is a tasks queue handler
 func TasksRunner() {
 	logEntry := log.WithField("operator.component", "taskRunner")
 	for {

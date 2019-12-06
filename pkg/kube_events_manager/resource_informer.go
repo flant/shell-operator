@@ -131,7 +131,7 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 				return
 			}
 
-			filtered, err := resourceFilter(obj, informer.Monitor.JqFilter)
+			filtered, err := ResourceFilter(obj, informer.Monitor.JqFilter)
 			if err != nil {
 				log.Errorf("%s: WATCH Added: apply jqFilter on %s: %s",
 					informer.Monitor.Metadata.DebugName, objectId, err)
@@ -166,7 +166,7 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 				return
 			}
 
-			filtered, err := resourceFilter(obj, informer.Monitor.JqFilter)
+			filtered, err := ResourceFilter(obj, informer.Monitor.JqFilter)
 			if err != nil {
 				log.Errorf("%s: WATCH Modified: apply jqFilter on %s: %s",
 					informer.Monitor.Metadata.DebugName, objectId, err)
@@ -202,7 +202,7 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 				return
 			}
 
-			filtered, err := resourceFilter(obj, informer.Monitor.JqFilter)
+			filtered, err := ResourceFilter(obj, informer.Monitor.JqFilter)
 			if err != nil {
 				log.Errorf("%s: WATCH Modified: apply jqFilter on %s: %s",
 					informer.Monitor.Metadata.DebugName, objectId, err)
@@ -225,7 +225,7 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 					informer.Monitor.Metadata.DebugName,
 					objectId,
 					jqFilterOutput)
-				informer.HandleKubeEvent(obj, objectId, filteredResult, "deleted", WatchEventDeleted)
+				informer.HandleKubeEvent(obj, objectId, filteredResult, "", WatchEventDeleted)
 			}
 		},
 	}
@@ -256,7 +256,7 @@ func (ei *resourceInformer) ListExistedObjects() error {
 			return err
 		}
 
-		filtered, err := resourceFilter(obj.Object, ei.Monitor.JqFilter)
+		filtered, err := ResourceFilter(obj.Object, ei.Monitor.JqFilter)
 		if err != nil {
 			return err
 		}
@@ -290,54 +290,63 @@ func (ei *resourceInformer) ListExistedObjects() error {
 }
 
 // HandleKubeEvent sends new KubeEvent to KubeEventCh
-// obj doesn't contains Kind information, so kind is passed from AddMonitor() argument.
+// obj doesn't contain Kind information, so kind is passed from AddMonitor() argument.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modifed is enough)
 func (ei *resourceInformer) HandleKubeEvent(obj interface{}, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
-	if ei.Checksum[objectId] != newChecksum {
-		ei.Checksum[objectId] = newChecksum
-
-		log.Debugf("%s: %+v %s: checksum changed, send KubeEvent",
-			ei.Monitor.Metadata.DebugName,
-			string(eventType),
-			objectId,
-		)
-		// Safe to ignore an error because of previous call to runtimeResourceId()
-		namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
-
-		// TODO: should be disabled by default and enabled by a debug feature switch
-		//log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
-
-		var eventObj map[string]interface{}
-		switch v := obj.(type) {
-		case unstructured.Unstructured:
-			eventObj = v.Object
-		case *unstructured.Unstructured:
-			eventObj = v.Object
-		default:
-			eventObj = map[string]interface{}{
-				"object": obj,
-			}
+	switch eventType {
+	case WatchEventAdded:
+		fallthrough
+	case WatchEventModified:
+		if ei.Checksum[objectId] != newChecksum {
+			ei.Checksum[objectId] = newChecksum
+		} else {
+			// ignore changes
+			log.Debugf("%s: %+v %s: checksum is not changed, no KubeEvent",
+				ei.Monitor.Metadata.DebugName,
+				string(eventType),
+				objectId,
+			)
+			return
 		}
 
-		KubeEventCh <- KubeEvent{
-			ConfigId:     ei.Monitor.Metadata.ConfigId,
-			Type:         "Event",
-			WatchEvents:  []WatchEventType{eventType},
-			Namespace:    namespace,
-			Kind:         ei.Monitor.Kind,
-			Name:         name,
-			Object:       eventObj,
-			FilterResult: filterResult,
-		}
-	} else {
-		log.Debugf("%s: %+v %s: checksum is not changed",
-			ei.Monitor.Metadata.DebugName,
-			string(eventType),
-			objectId,
-		)
+	case WatchEventDeleted:
+		delete(ei.Checksum, objectId)
 	}
 
+	log.Debugf("%s: %+v %s: send KubeEvent",
+		ei.Monitor.Metadata.DebugName,
+		string(eventType),
+		objectId,
+	)
+	// Safe to ignore an error because of previous call to runtimeResourceId()
+	namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
+
+	// TODO: should be disabled by default and enabled by a debug feature switch
+	//log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
+
+	var eventObj map[string]interface{}
+	switch v := obj.(type) {
+	case unstructured.Unstructured:
+		eventObj = v.Object
+	case *unstructured.Unstructured:
+		eventObj = v.Object
+	default:
+		eventObj = map[string]interface{}{
+			"object": obj,
+		}
+	}
+
+	KubeEventCh <- KubeEvent{
+		ConfigId:     ei.Monitor.Metadata.ConfigId,
+		Type:         "Event",
+		WatchEvents:  []WatchEventType{eventType},
+		Namespace:    namespace,
+		Kind:         ei.Monitor.Kind,
+		Name:         name,
+		Object:       eventObj,
+		FilterResult: filterResult,
+	}
 	return
 }
 

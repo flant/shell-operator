@@ -1,8 +1,8 @@
 name: Main
 on: [push]
 jobs:
-  download_go_modules:
-    name: Download modules
+  prepare_build_dependencies:
+    name: Download modules and build libjq
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go 1.12
@@ -11,83 +11,75 @@ jobs:
           go-version: 1.12
         id: go
 
-      - name: Check out code into the Go module directory
+      - name: Check out shell-operator code
         uses: actions/checkout@v1
 
-      - name: Download modules
-        run: go mod download
+      - name: Download and pack Go modules
+        run: |
+          go mod download
+          tar -czf go_modules.tar.gz -C $HOME/go/pkg/mod .
+          echo Calculate $HOME/go/pkg/mod size:
+          du -sh $HOME/go/pkg/mod
+          echo Calculate go_modules.tar.gz size:
+          du -sh go_modules.tar.gz
         shell: bash
-
-      - name: Pack go modules
-        run: tar -czvf go_modules.tar.gz -C $HOME/go/pkg/mod .
-        shell: bash
-
-
 
       # FIXME: https://github.community/t5/GitHub-Actions/Caching-files-between-GitHub-Action-executions/m-p/30974#M630
-      - name: Upload go modules artifact
+      - name: Upload Go modules artifact
         uses: actions/upload-artifact@master
         with:
           name: go_modules
           path: go_modules.tar.gz
 
-      - name: Build
-        run: go build -v ./cmd/shell-operator
-        shell: bash
+      # Restore libjq-go-build directory from cache or build it, upload it as artifact for other jobs.
+      - name: Extract libjq-go.lock from go.mod
+        run: |
+          grep 'flant/libjq-go' go.mod > libjq-go.lock
+          cat libjq-go.lock
 
-#
-#      - name: Upload binary artifact
-#        uses: actions/upload-artifact@master
-#        with:
-#          name: shell-operator
-#          path: shell-operator.tar.gz
-#
-#      - name: Upload unit test binary artifact
-#        uses: actions/upload-artifact@master
-#        with:
-#          name: unit_test
-#          path: unit_test.tar.gz
-
-
-  build:
-    name: Build and test
-    needs: download_go_modules
-    runs-on: ubuntu-latest
-    steps:
-
-      - name: Set up Go 1.12
-        uses: actions/setup-go@v1
+      - name: Cache libjq libraries
+        id: libjq-cache
+        uses: actions/cache@v1
         with:
-          go-version: 1.12
-        id: go
+          path: libjq
+          key: ${{ runner.os }}-libjq-${{ hashFiles('libjq-go.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-libjq-
 
-      - name: Download go modules artifact
-        uses: actions/download-artifact@master
+      - name: Build libjq libraries
+        if: steps.libjq-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git ca-certificates tree
+
+          git clone https://github.com/flant/libjq-go libjq-go
+          cd libjq-go
+          git submodule update --init
+          sudo ./scripts/install-libjq-dependencies-ubuntu.sh
+
+          ./scripts/build-libjq-static.sh ${GITHUB_WORKSPACE}/libjq-go ${GITHUB_WORKSPACE}/libjq
+
+          tree  ${GITHUB_WORKSPACE}/libjq
+        shell: bash
+
+      - name: Upload libjq libraries
+        uses: actions/upload-artifact@master
         with:
-          name: go_modules
-          path: .
-
-      - name: Unpack go modules
-        run: mkdir -p $HOME/go/pkg/mod && tar -xzvf go_modules.tar.gz -C $HOME/go/pkg/mod
-        shell: bash
-
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
-
-      - name: Build
-        run: go build -v ./cmd/shell-operator
-        shell: bash
+          name: libjq
+          path: libjq
 
   unit_tests:
     name: Unit tests
-    needs: download_go_modules
+    needs: prepare_build_dependencies
     strategy:
       fail-fast: true
       matrix:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v1
+
       - name: Set up Go 1.12
         uses: actions/setup-go@v1
         with:
@@ -104,22 +96,36 @@ jobs:
         run: mkdir -p $HOME/go/pkg/mod && tar -xzvf go_modules.tar.gz -C $HOME/go/pkg/mod
         shell: bash
 
+      - name: Download libjq artifact
+        uses: actions/download-artifact@master
+        with:
+          name: libjq
+          path: libjq
+
       - name: Prepare environment
         run: |
           export COVERAGE_DIR=$GITHUB_WORKSPACE/tests_coverage/unit_tests/${{ matrix.os }}
           mkdir -p $COVERAGE_DIR
           echo ::set-env name=COVERAGE_DIR::$COVERAGE_DIR
+
+          echo ::set-env name=CGO_ENABLED::1
+
+          CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/build/jq/include"
+          echo ::set-env name=CGO_CFLAGS::${CGO_CFLAGS}
+
+          CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/build/onig/lib -L$GITHUB_WORKSPACE/libjq/build/jq/lib"
+          echo ::set-env name=CGO_LDFLAGS::${CGO_LDFLAGS}
+
+          echo ::set-env name=GOOS::linux
+
         shell: bash
 
-      - name: Checkout code
-        uses: actions/checkout@v1
-
-      - name: Test shell-operator packages
+      - name: Run unit tests
         run: go test -tags test -v ./cmd/... ./pkg/... ./test/utils
 
   integration_tests:
     name: Integration tests
-    needs: download_go_modules
+    needs: prepare_build_dependencies
     strategy:
       fail-fast: true
       matrix:
@@ -127,6 +133,9 @@ jobs:
         k8s_version: [1.13, 1.16]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v1
+
       - name: Set up Go 1.12
         uses: actions/setup-go@v1
         with:
@@ -143,14 +152,28 @@ jobs:
         run: mkdir -p $HOME/go/pkg/mod && tar -xzvf go_modules.tar.gz -C $HOME/go/pkg/mod
         shell: bash
 
-      - name: Checkout code
-        uses: actions/checkout@v1
+      - name: Download libjq artifact
+        uses: actions/download-artifact@master
+        with:
+          name: libjq
+          path: libjq
 
       - name: Prepare environment
         run: |
           go build github.com/onsi/ginkgo/ginkgo
           echo ::set-env name=KIND_CLUSTER_VERSION::${{ matrix.k8s_version }}
-# race flag ?
+
+          echo ::set-env name=CGO_ENABLED::1
+
+          CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/build/jq/include"
+          echo ::set-env name=CGO_CFLAGS::${CGO_CFLAGS}
+
+          CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/build/onig/lib -L$GITHUB_WORKSPACE/libjq/build/jq/lib"
+          echo ::set-env name=CGO_LDFLAGS::${CGO_LDFLAGS}
+
+          echo ::set-env name=GOOS::linux
+
+      # race flag ?
       - name: Run integration tests
         run: |
           ./ginkgo --tags 'integration test' -p -r test/integration
