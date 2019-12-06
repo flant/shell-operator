@@ -14,22 +14,33 @@ jobs:
       - name: Check out shell-operator code
         uses: actions/checkout@v1
 
+      # Restore go_modules.tar.gz from cache or download and pack them, upload archive as artifact for other jobs.
+      # NOTE: cache action is limited to 400Mb artifacts and has a 2Gb space.
+      # As of December 2019, go_modules.tar.gz is 281Mb
+      - name: Cache go modules archive
+        id: go-modules-cache
+        uses: actions/cache@v1
+        with:
+          path: gomod
+          key: ${{ runner.os }}-gomod-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-gomod-
+
       - name: Download and pack Go modules
+        if: steps.go-modules-cache.outputs.cache-hit != 'true'
         run: |
+          mkdir gomod
           go mod download
-          tar -czf go_modules.tar.gz -C $HOME/go/pkg/mod .
-          echo Calculate $HOME/go/pkg/mod size:
-          du -sh $HOME/go/pkg/mod
-          echo Calculate go_modules.tar.gz size:
-          du -sh go_modules.tar.gz
+          tar -czf gomod/go_modules.tar.gz -C $HOME/go/pkg/mod .
+          echo -n "Unpacked size is: " && du -sh $HOME/go/pkg/mod
+          echo -n "Packed size is: " && du -sh gomod/go_modules.tar.gz
         shell: bash
 
-      # FIXME: https://github.community/t5/GitHub-Actions/Caching-files-between-GitHub-Action-executions/m-p/30974#M630
       - name: Upload Go modules artifact
         uses: actions/upload-artifact@master
         with:
           name: go_modules
-          path: go_modules.tar.gz
+          path: gomod/go_modules.tar.gz
 
       # Restore libjq-go-build directory from cache or build it, upload it as artifact for other jobs.
       - name: Extract libjq-go.lock from go.mod
@@ -93,7 +104,7 @@ jobs:
           path: .
 
       - name: Unpack go modules
-        run: mkdir -p $HOME/go/pkg/mod && tar -xzvf go_modules.tar.gz -C $HOME/go/pkg/mod
+        run: mkdir -p $HOME/go/pkg/mod && tar -xzf go_modules.tar.gz -C $HOME/go/pkg/mod
         shell: bash
 
       - name: Download libjq artifact
@@ -104,7 +115,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          export COVERAGE_DIR=$GITHUB_WORKSPACE/tests_coverage/unit_tests/${{ matrix.os }}
+          export COVERAGE_DIR=$GITHUB_WORKSPACE/coverage_reports/unit_tests/${{ matrix.os }}
           mkdir -p $COVERAGE_DIR
           echo ::set-env name=COVERAGE_DIR::$COVERAGE_DIR
 
@@ -121,7 +132,20 @@ jobs:
         shell: bash
 
       - name: Run unit tests
-        run: go test -tags test -v ./cmd/... ./pkg/... ./test/utils
+        run: |
+          go test \
+            -tags test \
+            -coverpkg=./... \
+            -coverprofile=$COVERAGE_DIR/coverage.out  \
+            -v \
+            ./cmd/... ./pkg/... ./test/utils
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: coverage_reports
+          path: coverage_reports
+
 
   integration_tests:
     name: Integration tests
@@ -149,7 +173,7 @@ jobs:
           path: .
 
       - name: Unpack go modules
-        run: mkdir -p $HOME/go/pkg/mod && tar -xzvf go_modules.tar.gz -C $HOME/go/pkg/mod
+        run: mkdir -p $HOME/go/pkg/mod && tar -xzf go_modules.tar.gz -C $HOME/go/pkg/mod
         shell: bash
 
       - name: Download libjq artifact
@@ -162,6 +186,10 @@ jobs:
         run: |
           go build github.com/onsi/ginkgo/ginkgo
           echo ::set-env name=KIND_CLUSTER_VERSION::${{ matrix.k8s_version }}
+
+          export COVERAGE_DIR=$GITHUB_WORKSPACE/coverage_reports/integration_tests/${{ matrix.os }}-k8s-${{ matrix.k8s_version }}
+          mkdir -p $COVERAGE_DIR
+          echo ::set-env name=COVERAGE_DIR::$COVERAGE_DIR
 
           echo ::set-env name=CGO_ENABLED::1
 
@@ -176,4 +204,46 @@ jobs:
       # race flag ?
       - name: Run integration tests
         run: |
-          ./ginkgo --tags 'integration test' -p -r test/integration
+          ./ginkgo \
+            --tags 'integration test'  \
+            -race \
+            -cover \
+            -coverpkg=github.com/flant/shell-operator/pkg/...,github.com/flant/shell-operator/test/utils \
+            -coverprofile=coverage.out \
+            -outputdir=${COVERAGE_DIR} \
+            -p \
+            -r test/integration
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: coverage_reports
+          path: coverage_reports
+
+
+  upload_coverage:
+    name: Upload coverage
+    needs:
+      - unit_tests
+      - integration_tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v1
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@master
+        with:
+          name: coverage_reports
+          path: coverage_reports
+
+      - name: Upload report to codeclimate.com
+        run: |
+          du -ah coverage_reports
+
+          export COVERAGE_DIR=coverage_reports
+          export GIT_BRANCH=${GITHUB_REF:11}
+          export GIT_COMMIT_SHA=$GITHUB_SHA
+          ./scripts/ci/codeclimate.sh
+        env:
+          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
