@@ -163,8 +163,8 @@ You can configure the operator with the following environment variables:
 | SHELL_OPERATOR_LISTEN_ADDRESS | `'0.0.0.0:9115'` | Address and port to use for HTTP serving. |
 | JQ_LIBRARY_PATH | `''` | Prepend directory to the search list for jq modules (-L flag). |
 | JQ_EXEC | `''` | Set to `'yes'` to use jq as executable — it is more for **developing purposes**. |
-| LOG_LEVEL | `'info'` | Logging level: `debug`, `info`, `error`. Default is `info`. |
-| LOG_TYPE | `'text'` | Logging formatter type: `json`, `text` or `color`. Default is `text`. |
+| LOG_LEVEL | `'info'` | Logging level: `debug`, `info`, `error`. |
+| LOG_TYPE | `'text'` | Logging formatter type: `json`, `text` or `color`. |
 | LOG_NO_TIME | `false` | Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps. |
 
 ## Hook binding types
