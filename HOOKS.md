@@ -417,7 +417,7 @@ If pod `pod-321d12` will be added into namespace 'default', then hook will be ex
 The following tools for debugging and fine-tuning of Shell-operator and hooks are available:
 
 - Analysis of logs of a Shell-operator’s pod (enter `kubectl logs -f po/POD_NAME` in terminal),
-- The environment variable can be set to `RLOG_LOG_LEVEL=DEBUG` to include the detailed debugging information into logs,
+- The environment variable can be set to `LOG_LEVEL=debug` to include the detailed debugging information into logs,
 - You can view the contents of the working queue via the HTTP request `/queue` (`queue` endpoint):
    ```
    kubectl port-forward po/shell-operator 9115:9115
