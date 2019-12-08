@@ -137,7 +137,7 @@ Syntax:
           ...
         ],
       },
-      "fieldSelector": { 
+      "fieldSelector": {
         "matchExpressions": [
           {
             "field": "status.phase",
@@ -235,7 +235,7 @@ Example:
 }
 ```
 
-This hook configuration will execute hook on each change in labels of pods labeled with myLabel=myLabelValue in default namespace.  
+This hook configuration will execute hook on each change in labels of pods labeled with myLabel=myLabelValue in default namespace.
 
 #### usage notes
 
@@ -381,7 +381,7 @@ During startup, hook will be executed with following binding context file:
           },
         }
       },
-      ... 
+      ...
     ]
   }
 ]
