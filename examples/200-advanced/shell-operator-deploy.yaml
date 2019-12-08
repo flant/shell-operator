@@ -20,6 +20,6 @@ spec:
         image: registry.mycompany.com/shell-operator:advanced
         imagePullPolicy: Always
         env:
-        - name: RLOG_LOG_LEVEL
-          value: DEBUG
+        - name: LOG_LEVEL
+          value: debug
       serviceAccountName: advanced-acc
