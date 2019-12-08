@@ -141,6 +141,24 @@ kubectl delete clusterrolebinding monitor-pods
 
 This example is also available in /examples: [monitor-pods](examples/101-monitor-pods).
 
+### Environment variables
+
+You can configure the operator with the following environment variables:
+
+| Env-Variable name | Default | Description |
+|---|---|---|
+| SHELL_OPERATOR_DEBUG | `'no'` | Set to `yes` to turn on debug messages |
+| SHELL_OPERATOR_WORKING_DIR | `''` | A path to a hooks file structure |
+| SHELL_OPERATOR_TMP_DIR | `'/tmp/shell-operator'` | A path to store temporary files with data for hooks |
+| SHELL_OPERATOR_KUBE_CONTEXT | `''` | The name of the kubeconfig context to use. |
+| SHELL_OPERATOR_KUBE_CONFIG | `''` | Path to the kubeconfig file.. |
+| SHELL_OPERATOR_LISTEN_ADDRESS | `'0.0.0.0:9115'` | Address and port to use for HTTP serving. |
+| JQ_LIBRARY_PATH | `''` | Prepend directory to the search list for jq modules (-L flag). |
+| JQ_EXEC | `''` | Set to `'yes'` to use jq as executable — it is more for **developing purposes**. |
+| LOG_LEVEL | `'info'` | Logging level: `debug`, `info`, `error`. Default is `info`. |
+| LOG_TYPE | `'text'` | Logging formatter type: `json`, `text` or `color`. Default is `text`. |
+| LOG_NO_TIME | `false` | Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps. |
+
 ## Hook binding types
 
 __onStartup__
