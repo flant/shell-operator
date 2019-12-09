@@ -8,11 +8,13 @@ import (
 	"os/exec"
 	"strings"
 
+	. "github.com/flant/libjq-go"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 
-	. "github.com/flant/libjq-go"
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 )
 
@@ -31,7 +33,7 @@ func ResourceFilter(obj interface{}, jqFilter string) (res string, err error) {
 
 			res = stdout
 		} else {
-			res, err = Jq().Program(jqFilter).Cached().Run(string(data))
+			res, err = Jq().WithLibPath(app.JqLibraryPath).Program(jqFilter).Cached().Run(string(data))
 			if err != nil {
 				return "", fmt.Errorf("failed jq filter: '%s'", err)
 			}
@@ -45,7 +47,12 @@ func ResourceFilter(obj interface{}, jqFilter string) (res string, err error) {
 // TODO: Can be removed after testing with libjq-go
 // execJq run jq in locked mode with executor
 func execJq(jqFilter string, jsonData []byte) (stdout string, stderr string, err error) {
-	cmd := exec.Command("/usr/bin/jq", jqFilter)
+	var cmd *exec.Cmd
+	if app.JqLibraryPath == "" {
+		cmd = exec.Command("/usr/bin/jq", jqFilter)
+	} else {
+		cmd = exec.Command("/usr/bin/jq", "-L", app.JqLibraryPath, jqFilter)
+	}
 
 	var stdinBuf bytes.Buffer
 	_, err = stdinBuf.WriteString(string(jsonData))
