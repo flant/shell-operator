@@ -37,6 +37,7 @@ A hook is a script that, when executed with `--config` option, returns configura
 Let's create a small operator that will watch for all Pods in all Namespaces and simply log a name of a new Pod.
 
 "kubernetes" binding is used to tell Shell-operator about objects that we want to watch. Create the `pods-hook.sh` file with the following content:
+
 ```bash
 #!/usr/bin/env bash
 
@@ -60,6 +61,7 @@ fi
 ```
 
 Make the `pods-hook.sh` executable:
+
 ```shell
 chmod +x pods-hook.sh
 ```
@@ -67,17 +69,20 @@ chmod +x pods-hook.sh
 You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the `Dockerfile`.
 
 Create the following `Dockerfile` in the directory where you created the `pods-hook.sh` file:
+
 ```dockerfile
 FROM flant/shell-operator:latest
 ADD pods-hook.sh /hooks
 ```
 
 Build image (change image tag according your Docker registry):
+
 ```shell
 docker build -t "registry.mycompany.com/shell-operator:monitor-pods" .
 ```
 
 Push image to the Docker registry accessible by Kubernetes cluster:
+
 ```shell
 docker push registry.mycompany.com/shell-operator:monitor-pods
 ```
@@ -112,6 +117,7 @@ spec:
 ```
 
 Start shell-operator by applying a `shell-operator-pod.yaml` file:
+
 ```shell
 kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
 ```
@@ -123,7 +129,8 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/a
 ```
 
 Run `kubectl -n example-monitor-pods logs po/shell-operator` and see that the hook will print dashboard pod names:
-```
+
+```plain
 ...
 INFO     : QUEUE add TASK_HOOK_RUN@KUBERNETES pods-hook.sh
 INFO     : TASK_RUN HookRun@KUBERNETES pods-hook.sh
@@ -133,13 +140,32 @@ Pod 'kubernetes-dashboard-769df5545f-99xsb' added
 ```
 
 To delete created objects execute:
-```
+
+```shell
 kubectl delete ns example-monitor-pods &&
 kubectl delete clusterrole monitor-pods &&
 kubectl delete clusterrolebinding monitor-pods
 ```
 
 This example is also available in /examples: [monitor-pods](examples/101-monitor-pods).
+
+### Environment variables
+
+You can configure the operator with the following environment variables:
+
+| Env-Variable name | Default | Description |
+|---|---|---|
+| SHELL_OPERATOR_DEBUG | `'no'` | Set to `yes` to turn on debug messages |
+| SHELL_OPERATOR_WORKING_DIR | `''` | A path to a hooks file structure |
+| SHELL_OPERATOR_TMP_DIR | `'/tmp/shell-operator'` | A path to store temporary files with data for hooks |
+| SHELL_OPERATOR_KUBE_CONTEXT | `''` | The name of the kubeconfig context to use. |
+| SHELL_OPERATOR_KUBE_CONFIG | `''` | Path to the kubeconfig file.. |
+| SHELL_OPERATOR_LISTEN_ADDRESS | `'0.0.0.0:9115'` | Address and port to use for HTTP serving. |
+| JQ_LIBRARY_PATH | `''` | Prepend directory to the search list for jq modules (-L flag). |
+| JQ_EXEC | `''` | Set to `'yes'` to use jq as executable — it is more for **developing purposes**. |
+| LOG_LEVEL | `'info'` | Logging level: `debug`, `info`, `error`. |
+| LOG_TYPE | `'text'` | Logging formatter type: `json`, `text` or `color`. |
+| LOG_NO_TIME | `false` | Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps. |
 
 ## Hook binding types
 
