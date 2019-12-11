@@ -51,6 +51,19 @@ func (k *KubectlCmd) ReplaceForce(ns string, fileName string) {
 	k.Succeed(cmd)
 }
 
+func (k *KubectlCmd) Delete(ns string, resourceName string) {
+	args := []string{"delete"}
+	if ns != "" {
+		args = append(args, "-n")
+		args = append(args, ns)
+	}
+	args = append(args, resourceName)
+
+	cmd := exec.Command(GetKubectlPath(), args...)
+
+	k.Succeed(cmd)
+}
+
 func (k *KubectlCmd) Succeed(cmd *exec.Cmd) {
 	if k.ConfigPath != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", k.ConfigPath))

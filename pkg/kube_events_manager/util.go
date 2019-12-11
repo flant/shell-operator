@@ -9,39 +9,55 @@ import (
 	"strings"
 
 	. "github.com/flant/libjq-go"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
+
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
+	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 )
 
-func ResourceFilter(obj interface{}, jqFilter string) (res string, err error) {
+// ApplyJqFilter filter object json representation with jq expression, calculate checksum
+// over result and return ObjectAndFilterResult. If jqFilter is empty, no filter
+// is required and checksum is calculated over full json representation of the object.
+func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (*ObjectAndFilterResult, error) {
+	res := &ObjectAndFilterResult{
+		Object: obj,
+	}
+	res.Metadata.JqFilter = jqFilter
+	res.Metadata.ResourceId = ResourceId(obj)
+
 	data, err := json.Marshal(obj)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if jqFilter != "" {
+	if jqFilter == "" {
+		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))
+	} else {
+		var err error
+		var filtered string
 		if os.Getenv("JQ_EXEC") == "yes" {
 			stdout, stderr, err := execJq(jqFilter, data)
 			if err != nil {
-				return "", fmt.Errorf("failed exec jq: \nerr: '%s'\nstderr: '%s'", err, stderr)
+				return nil, fmt.Errorf("failed exec jq: \nerr: '%s'\nstderr: '%s'", err, stderr)
 			}
 
-			res = stdout
+			filtered = stdout
 		} else {
-			res, err = Jq().WithLibPath(app.JqLibraryPath).Program(jqFilter).Cached().Run(string(data))
+			filtered, err = Jq().WithLibPath(app.JqLibraryPath).Program(jqFilter).Cached().Run(string(data))
 			if err != nil {
-				return "", fmt.Errorf("failed jq filter: '%s'", err)
+				return nil, fmt.Errorf("failed jq filter: '%s'", err)
 			}
 		}
-	} else {
-		res = string(data)
+		res.FilterResult = filtered
+		res.Metadata.Checksum = utils_checksum.CalculateChecksum(filtered)
 	}
-	return
+	return res, nil
 }
 
 // TODO: Can be removed after testing with libjq-go
@@ -91,6 +107,10 @@ func runtimeResourceId(obj interface{}, kind string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s/%s/%s", namespace, kind, name), nil
+}
+
+func ResourceId(obj *unstructured.Unstructured) string {
+	return fmt.Sprintf("%s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 }
 
 func FormatLabelSelector(selector *metav1.LabelSelector) (string, error) {

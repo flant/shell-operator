@@ -3,30 +3,40 @@ package kube_events_manager
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
+	"github.com/flant/shell-operator/pkg/kube"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	log "github.com/sirupsen/logrus"
+
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 type Monitor interface {
-	WithName(string)
+	WithKubeClient(client kube.KubernetesClient)
 	WithConfig(config *MonitorConfig)
-	CreateInformers(logEntry *log.Entry) error
-	GetExistedObjects() []ObjectAndFilterResult
+	WithKubeEventCb(eventCb func(KubeEvent))
+	CreateInformers() error
 	Start(context.Context)
 	Stop()
+	GetExistedObjects() []ObjectAndFilterResult
+	GetConfig() *MonitorConfig
 }
 
 // Monitor holds informers for resources and a namespace informer
 type monitor struct {
-	Name   string
-	Config *MonitorConfig
+	Name       string
+	Config     *MonitorConfig
+	KubeClient kube.KubernetesClient
 	// Static list of informers
 	ResourceInformers []ResourceInformer
 	// Namespace informer to get new namespaces
 	NamespaceInformer NamespaceInformer
 	// map of dynamically starting informers
 	VaryingInformers map[string][]ResourceInformer
+
+	eventCb func(KubeEvent)
 
 	// Index of namespaces statically defined in monitor configuration
 	staticNamespaces map[string]bool
@@ -48,12 +58,20 @@ var NewMonitor = func() Monitor {
 	}
 }
 
-func (m *monitor) WithName(name string) {
-	m.Name = name
+func (m *monitor) WithKubeClient(client kube.KubernetesClient) {
+	m.KubeClient = client
 }
 
 func (m *monitor) WithConfig(config *MonitorConfig) {
 	m.Config = config
+}
+
+func (m *monitor) GetConfig() *MonitorConfig {
+	return m.Config
+}
+
+func (m *monitor) WithKubeEventCb(eventCb func(KubeEvent)) {
+	m.eventCb = eventCb
 }
 
 // CreateInformers creates all informers and
@@ -61,8 +79,11 @@ func (m *monitor) WithConfig(config *MonitorConfig) {
 // If MonitorConfig.NamespaceSelector.MatchNames is defined, then
 // multiple informers are created for each namespace.
 // If no NamespaceSelector defined, then one informer is created.
-func (m *monitor) CreateInformers(logEntry *log.Entry) error {
-	logEntry = logEntry.WithField("binding.name", m.Config.Metadata.DebugName)
+func (m *monitor) CreateInformers() error {
+	logEntry := log.
+		WithFields(utils.LabelsToLogFields(m.Config.Metadata.LogLabels)).
+		WithField("binding.name", m.Config.Metadata.DebugName)
+
 	logEntry.Debugf("Create Informers Config: %+v", m.Config)
 	nsNames := m.Config.Namespaces()
 	if len(nsNames) > 0 {
@@ -85,6 +106,7 @@ func (m *monitor) CreateInformers(logEntry *log.Entry) error {
 	if m.Config.NamespaceSelector != nil && m.Config.NamespaceSelector.LabelSelector != nil {
 		logEntry.Debugf("Create NamespaceInformer for namespace.labelSelector")
 		m.NamespaceInformer = NewNamespaceInformer(m.Config)
+		m.NamespaceInformer.WithKubeClient(m.KubeClient)
 		err := m.NamespaceInformer.CreateSharedInformer(
 			func(nsName string) {
 				// add function — check, create and run informers for Ns
@@ -172,6 +194,9 @@ func (m *monitor) GetExistedObjects() []ObjectAndFilterResult {
 		}
 	}
 
+	// Sort objects by namespace and name
+	sort.Sort(ByNamespaceAndName(objects))
+
 	return objects
 }
 
@@ -190,8 +215,10 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []Res
 
 	for _, objName := range objNames {
 		informer := NewResourceInformer(m.Config)
+		informer.WithKubeClient(m.KubeClient)
 		informer.WithNamespace(namespace)
 		informer.WithName(objName)
+		informer.WithKubeEventCb(m.eventCb)
 
 		err := informer.CreateSharedInformer()
 		if err != nil {

@@ -1,44 +1,60 @@
 package config
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
+	. "github.com/onsi/gomega"
+
 	"github.com/hashicorp/go-multierror"
-	"github.com/stretchr/testify/assert"
 )
 
+func prepareConfigObj(g *WithT, input string) *VersionedUntyped {
+	vu := NewDefaultVersionedUntyped()
+	err := vu.Load([]byte(input))
+	g.Expect(err).ShouldNot(HaveOccurred())
+	return vu
+}
+
 func Test_Validate_V1_With_Error(t *testing.T) {
-	data := `{
+	g := NewWithT(t)
+
+	var vu *VersionedUntyped
+	var err error
+
+	var tests = []struct {
+		name       string
+		configText string
+		fn         func()
+	}{
+		{
+			"v1 config with error",
+			`{
   "configVrsion":"v1",
   "schedule":{"name":"qwe"},
   "qwdqwd":"QWD"
-}`
-
-	dataObj := make(map[string]interface{})
-	e := json.Unmarshal([]byte(data), &dataObj)
-	fmt.Printf("dataObj: %+v\nerr: %v\n", dataObj, e)
-
-	s := GetSchema("v1")
-
-	err := ValidateConfig(dataObj, s, "root")
-
-	if assert.Error(t, err) {
-		assert.IsType(t, &multierror.Error{}, err)
-		t.Logf("expected multierror was: %v", err)
-	}
-}
-
-func Test_Validate_V1_Full(t *testing.T) {
-	data := `{
+}`,
+			func() {
+				g.Expect(err).Should(HaveOccurred())
+				g.Expect(err).To(BeAssignableToTypeOf(&multierror.Error{}))
+				g.Expect(err.(*multierror.Error).Error()).Should(And(
+					ContainSubstring("configVrsion is a forbidden property"),
+					ContainSubstring("qwdqwd is a forbidden property"),
+					ContainSubstring("schedule must be of type array"),
+				))
+			},
+		},
+		{
+			"v1 full config",
+			`{
   "configVersion": "v1",
   "onStartup": 256,
   "schedule": [
     {
       "name": "qwe",
       "crontab": "*/5 * * * * *",
-      "allowFailure": true
+      "allowFailure": true,
+      "includeKubernetesSnapshotsFrom": ["monitor pods"],
+      "queue": "offload"
     }
   ],
   "kubernetes": [
@@ -47,6 +63,8 @@ func Test_Validate_V1_Full(t *testing.T) {
       "watchEvent": ["Added", "Deleted", "Modified"],
       "apiVersion": "v1",
       "kind": "Pod",
+      "includeSnapshotsFrom": ["monitor pods"],
+      "queue": "pods-offload",
       "labelSelector": {
         "matchLabels": {
           "app": "app",
@@ -79,20 +97,14 @@ func Test_Validate_V1_Full(t *testing.T) {
       "resynchronizationPeriod": "10s"
     }
   ]
-}`
-
-	dataObj := make(map[string]interface{})
-	err := json.Unmarshal([]byte(data), &dataObj)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	s := GetSchema("v1")
-	err = ValidateConfig(dataObj, s, "")
-	assert.NoError(t, err)
-}
-
-func Test_Validate_V0_Full(t *testing.T) {
-	data := `{
+}`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+			},
+		},
+		{
+			"v0 full config",
+			`{
   "onStartup": 256,
   "schedule": [
     {
@@ -107,7 +119,7 @@ func Test_Validate_V0_Full(t *testing.T) {
       "kind": "Pod",
       "event": [
         "add",
-        "uupdate"
+        "update"
       ],
       "selector": {
         "matchLabels": {
@@ -125,14 +137,19 @@ func Test_Validate_V0_Full(t *testing.T) {
       "allowFailure": true
     }
   ]
-}`
-
-	dataObj := make(map[string]interface{})
-	err := json.Unmarshal([]byte(data), &dataObj)
-	if !assert.NoError(t, err) {
-		t.FailNow()
+}`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+			},
+		},
 	}
-	s := GetSchema("v0")
-	err = ValidateConfig(dataObj, s, "")
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vu = prepareConfigObj(g, tt.configText)
+			s := GetSchema(vu.Version)
+			err = ValidateConfig(vu.Obj, s, "root")
+			//t.Logf("expected multierror was: %v", err)
+			tt.fn()
+		})
+	}
 }

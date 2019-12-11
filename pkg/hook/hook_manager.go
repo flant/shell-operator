@@ -9,7 +9,13 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	. "github.com/flant/shell-operator/pkg/hook/types"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+
 	"github.com/flant/shell-operator/pkg/executor"
+	"github.com/flant/shell-operator/pkg/hook/controller"
+	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/schedule_manager"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 )
 
@@ -17,18 +23,29 @@ type HookManager interface {
 	Init() error
 	Run()
 	WithDirectories(workingDir string, tempDir string)
+	WithKubeEventManager(kube_events_manager.KubeEventsManager)
+	WithScheduleManager(schedule_manager.ScheduleManager)
 	WorkingDir() string
 	TempDir() string
-	GetHook(name string) (*Hook, error)
+	GetHook(name string) *Hook
 	GetHooksInOrder(bindingType BindingType) ([]string, error)
-	RunHook(hookName string, binding BindingType, bindingContext []BindingContext, logLabels map[string]string) error
+	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	EnableScheduleBindings()
+	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 }
 
 type hookManager struct {
-	workingDir       string
-	tempDir          string
-	hooksByName      map[string]*Hook
+	// dependencies
+	workingDir        string
+	tempDir           string
+	kubeEventsManager kube_events_manager.KubeEventsManager
+	scheduleManager   schedule_manager.ScheduleManager
+
+	// sorted hook names
 	hookNamesInOrder []string
+
+	// index by name
+	hooksByName map[string]*Hook
 	// index to search hooks by binding type
 	hooksInOrder map[BindingType][]*Hook
 }
@@ -47,6 +64,14 @@ func NewHookManager() *hookManager {
 func (hm *hookManager) WithDirectories(workingDir string, tempDir string) {
 	hm.workingDir = workingDir
 	hm.tempDir = tempDir
+}
+
+func (hm *hookManager) WithKubeEventManager(mgr kube_events_manager.KubeEventsManager) {
+	hm.kubeEventsManager = mgr
+}
+
+func (hm *hookManager) WithScheduleManager(mgr schedule_manager.ScheduleManager) {
+	hm.scheduleManager = mgr
 }
 
 func (hm *hookManager) WorkingDir() string {
@@ -92,23 +117,21 @@ func (hm *hookManager) Init() error {
 
 // TODO move --config execution to a Hook method
 func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
-
 	hookName, err := filepath.Rel(hm.workingDir, hookPath)
 	if err != nil {
 		return nil, err
 	}
 	hook = NewHook(hookName, hookPath)
 
-	log.WithField("hook", hook.Name).
-		WithField("phase", "config").
-		Infof("Load config from '%s'", hookPath)
+	hookEntry := log.WithField("hook", hook.Name).
+		WithField("phase", "config")
+
+	hookEntry.Infof("Load config from '%s'", hookPath)
 
 	envs := []string{}
-	configOutput, err := execCommandOutput(hm.workingDir, hookPath, envs, []string{"--config"})
+	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
-		log.WithField("hook", hook.Name).
-			WithField("phase", "config").
-			Errorf("Hook config output:\n%s", string(configOutput))
+		hookEntry.Errorf("Hook config output:\n%s", string(configOutput))
 		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
 	}
 
@@ -116,23 +139,40 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating hook '%s': %s", hookName, err.Error())
 	}
-	hook.WithHookManager(hm)
+
+	// Add hook info as log labels
+	for _, kubeCfg := range hook.GetConfig().OnKubernetesEvents {
+		kubeCfg.Monitor.Metadata.LogLabels["hook"] = hook.Name
+	}
+
+	hookCtrl := controller.NewHookController()
+	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
+	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
+
+	hook.WithHookController(hookCtrl)
+	hook.WithTmpDir(hm.TempDir())
+
+	hookEntry.Infof("Loaded config: %s", hook.GetConfigDescription())
 
 	return hook, nil
 }
 
-func execCommandOutput(dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
+func (hm *hookManager) execCommandOutput(hookName string, dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
 	envs = append(os.Environ(), envs...)
 	cmd := executor.MakeCommand(dir, entrypoint, args, envs)
-	log.Debugf("Executing hook in %s: '%s'", cmd.Dir, strings.Join(cmd.Args, " "))
 	cmd.Stdout = nil
+
+	debugEntry := log.WithField("hook", hookName).
+		WithField("cmd", strings.Join(cmd.Args, " "))
+
+	debugEntry.Debugf("Executing hook in %s", cmd.Dir)
 
 	output, err := executor.Output(cmd)
 	if err != nil {
 		return output, err
 	}
 
-	log.Debugf("Hook '%s' output:\n%s", strings.Join(cmd.Args, " "), string(output))
+	debugEntry.Debugf("output:\n%s", string(output))
 
 	return output, nil
 }
@@ -142,12 +182,13 @@ func (hm *hookManager) Run() {
 	panic("implement me")
 }
 
-func (hm *hookManager) GetHook(name string) (*Hook, error) {
+func (hm *hookManager) GetHook(name string) *Hook {
 	hook, exists := hm.hooksByName[name]
 	if exists {
-		return hook, nil
+		return hook
 	} else {
-		return nil, fmt.Errorf("hook '%s' not found", name)
+		log.Errorf("Possible bug!!! Hook '%s' not found in hook manager", name)
+		return nil
 	}
 }
 
@@ -178,15 +219,44 @@ func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error
 	return hooksNames, nil
 }
 
-func (hm *hookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext, logLabels map[string]string) error {
-	hook, err := hm.GetHook(hookName)
-	if err != nil {
-		return err
+func (hm *hookManager) HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+	kubeHooks, _ := hm.GetHooksInOrder(OnKubernetesEvent)
+
+	for _, hookName := range kubeHooks {
+		h := hm.GetHook(hookName)
+
+		if h.HookController.CanHandleKubeEvent(kubeEvent) {
+			h.HookController.HandleKubeEvent(kubeEvent, func(info controller.BindingExecutionInfo) {
+				if createTaskFn != nil {
+					createTaskFn(h, info)
+				}
+			})
+		}
+	}
+}
+
+// EnableScheduleBindings add all schedules to scheduleManager
+func (hm *hookManager) EnableScheduleBindings() {
+	schHooks, _ := hm.GetHooksInOrder(Schedule)
+
+	for _, hookName := range schHooks {
+		h := hm.GetHook(hookName)
+		h.HookController.EnableScheduleBindings()
 	}
 
-	if err := hook.Run(binding, bindingContext, logLabels); err != nil {
-		return err
-	}
+	return
+}
 
-	return nil
+func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+	schHooks, _ := hm.GetHooksInOrder(Schedule)
+	for _, hookName := range schHooks {
+		h := hm.GetHook(hookName)
+		if h.HookController.CanHandleScheduleEvent(crontab) {
+			h.HookController.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
+				if createTaskFn != nil {
+					createTaskFn(h, info)
+				}
+			})
+		}
+	}
 }
