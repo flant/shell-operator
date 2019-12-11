@@ -1,34 +1,35 @@
 // +build integration
 
-package kubeclient_test
+package suite
 
 import (
 	"fmt"
 	"testing"
 
+	. "github.com/flant/libjq-go"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/test/utils"
+
+	"github.com/flant/shell-operator/pkg/kube"
 )
 
-var ClusterName = "kube-client-test"
+var ClusterName string
 var ConfigPath string
 
-func TestSuite(t *testing.T) {
-	clusterVer := KindClusterVersion()
-	if clusterVer != "" {
-		ClusterName = fmt.Sprintf("%s-%s", ClusterName, clusterVer)
-	}
+func RunIntegrationSuite(t *testing.T, description string, clusterPrefix string) {
+	go JqCallLoop(make(chan struct{}, 1))
+
+	ClusterName = KindClusterName(clusterPrefix)
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "kube client suite")
+	RunSpecs(t, description)
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
 	Ω(KindCreateCluster(ClusterName)).Should(Succeed())
-	fmt.Printf("Use kind flavour of k8s cluster v%s with node image %s\n", KindClusterVersion(), KindNodeImage())
+	fmt.Println(KindUseClusterMessage(ClusterName))
 	return []byte{}
 }, func([]byte) {
 	// Initialize kube client out-of-cluster

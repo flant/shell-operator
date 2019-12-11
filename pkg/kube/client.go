@@ -123,11 +123,11 @@ func makeOutOfClusterClientConfigError(kubeConfig, kubeContext string, err error
 	baseErrMsg := fmt.Sprintf("out-of-cluster configuration problem")
 
 	if kubeConfig != "" {
-		baseErrMsg += fmt.Sprintf(", custom kube config path is %q", kubeConfig)
+		baseErrMsg += fmt.Sprintf(", custom kube config path is '%s'", kubeConfig)
 	}
 
 	if kubeContext != "" {
-		baseErrMsg += fmt.Sprintf(", custom kube context is %q", kubeContext)
+		baseErrMsg += fmt.Sprintf(", custom kube context is '%s'", kubeContext)
 	}
 
 	return fmt.Errorf("%s: %s", baseErrMsg, err)

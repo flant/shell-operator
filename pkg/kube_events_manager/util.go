@@ -9,10 +9,13 @@ import (
 	"strings"
 
 	. "github.com/flant/libjq-go"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
@@ -91,6 +94,10 @@ func runtimeResourceId(obj interface{}, kind string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s/%s/%s", namespace, kind, name), nil
+}
+
+func ResourceId(obj *unstructured.Unstructured) string {
+	return fmt.Sprintf("%s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 }
 
 func FormatLabelSelector(selector *metav1.LabelSelector) (string, error) {

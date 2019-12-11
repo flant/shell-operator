@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flant/shell-operator/pkg/hook"
+	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/types"
 )
 
 type TaskType string
@@ -26,8 +27,8 @@ const (
 type Task interface {
 	GetName() string
 	GetType() TaskType
-	GetBinding() hook.BindingType
-	GetBindingContext() []hook.BindingContext
+	GetBinding() BindingType
+	GetBindingContext() []BindingContext
 	GetFailureCount() int
 	IncrementFailureCount()
 	GetDelay() time.Duration
@@ -38,8 +39,8 @@ type BaseTask struct {
 	FailureCount   int    // Failed executions count
 	Name           string // hook name
 	Type           TaskType
-	Binding        hook.BindingType
-	BindingContext []hook.BindingContext
+	Binding        BindingType
+	BindingContext []BindingContext
 	Delay          time.Duration
 	AllowFailure   bool // Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
 }
@@ -50,7 +51,7 @@ func NewTask(taskType TaskType, name string) *BaseTask {
 		Name:           name,
 		Type:           taskType,
 		AllowFailure:   false,
-		BindingContext: make([]hook.BindingContext, 0),
+		BindingContext: make([]BindingContext, 0),
 	}
 }
 
@@ -62,11 +63,11 @@ func (t *BaseTask) GetType() TaskType {
 	return t.Type
 }
 
-func (t *BaseTask) GetBinding() hook.BindingType {
+func (t *BaseTask) GetBinding() BindingType {
 	return t.Binding
 }
 
-func (t *BaseTask) GetBindingContext() []hook.BindingContext {
+func (t *BaseTask) GetBindingContext() []BindingContext {
 	return t.BindingContext
 }
 
@@ -78,17 +79,17 @@ func (t *BaseTask) GetAllowFailure() bool {
 	return t.AllowFailure
 }
 
-func (t *BaseTask) WithBinding(binding hook.BindingType) *BaseTask {
+func (t *BaseTask) WithBinding(binding BindingType) *BaseTask {
 	t.Binding = binding
 	return t
 }
 
-func (t *BaseTask) WithBindingContext(context []hook.BindingContext) *BaseTask {
+func (t *BaseTask) WithBindingContext(context []BindingContext) *BaseTask {
 	t.BindingContext = context
 	return t
 }
 
-func (t *BaseTask) AppendBindingContext(context hook.BindingContext) *BaseTask {
+func (t *BaseTask) AppendBindingContext(context BindingContext) *BaseTask {
 	t.BindingContext = append(t.BindingContext, context)
 	return t
 }

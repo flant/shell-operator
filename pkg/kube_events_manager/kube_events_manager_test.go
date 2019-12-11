@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/flant/shell-operator/pkg/kube"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 type MockResourceInformer struct {
@@ -76,8 +77,8 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 		},
 	}
 
-	monitor.Metadata.ConfigId = "ConfigId"
-	_, err := mgr.AddMonitor("test", monitor, log.WithField("test", "MainKubeEventsManager"))
+	monitor.Metadata.MonitorId = "MonitorId"
+	_, err := mgr.AddMonitor(monitor, log.WithField("test", "MainKubeEventsManager"))
 	if assert.NoError(t, err) {
 		assert.Len(t, mgr.Monitors, 1)
 	}
@@ -165,9 +166,9 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 			},
 		},
 	}
-	monitor.Metadata.ConfigId = "ConfigId"
+	monitor.Metadata.MonitorId = "MonitorId"
 
-	_, err := mgr.AddMonitor("test", monitor, log.WithField("test", "MainKubeEventsManager"))
+	_, err := mgr.AddMonitor(monitor, log.WithField("test", "MainKubeEventsManager"))
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
@@ -187,13 +188,13 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	for {
 		fmt.Printf("Start select\n")
 		select {
-		case ev := <-KubeEventCh:
+		case ev := <-mgr.Ch():
 			eventCounter = eventCounter + 1
 			t.Logf("Got event: %d %#v\n", eventCounter, ev)
 
 			if !state.podsCreated {
 				assert.Equal(t, "Synchronization", ev.Type)
-				assert.Equal(t, "ConfigId", ev.ConfigId)
+				assert.Equal(t, "MonitorId", ev.MonitorId)
 				assert.Len(t, ev.Objects, 1)
 
 				// Inject an event into the fake client.
@@ -228,7 +229,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 			}
 
 			assert.Equal(t, "Event", ev.Type)
-			assert.Equal(t, "ConfigId", ev.ConfigId)
+			assert.Equal(t, "MonitorId", ev.MonitorId)
 			assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
 			metadata := ev.Object["metadata"].(map[string]interface{})
 			assert.Contains(t, metadata, "name")
@@ -338,7 +339,6 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	//// Init() replacement
 	mgr := NewKubeEventsManager()
 	mgr.WithContext(ctx)
-	KubeEventCh = make(chan KubeEvent, 10)
 
 	// monitor with 3 namespaces and 4 object names and all event types
 	monitor := &MonitorConfig{
@@ -351,9 +351,9 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 			},
 		},
 	}
-	monitor.Metadata.ConfigId = "ConfigId"
+	monitor.Metadata.MonitorId = "MonitorId"
 
-	_, err := mgr.AddMonitor("test", monitor, log.WithField("test", "yes"))
+	_, err := mgr.AddMonitor(monitor, log.WithField("test", "yes"))
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
@@ -373,14 +373,14 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	for {
 		fmt.Printf("Start select\n")
 		select {
-		case ev := <-KubeEventCh:
+		case ev := <-mgr.Ch():
 			eventCounter = eventCounter + 1
 			fmt.Printf("Got event: %d %#v\n", eventCounter, ev)
 			//t.Logf("Got event: %d %#v\n", eventCounter, ev)
 
 			if !state.podsCreated {
 				assert.Equal(t, "Synchronization", ev.Type)
-				assert.Equal(t, "ConfigId", ev.ConfigId)
+				assert.Equal(t, "MonitorId", ev.MonitorId)
 				assert.Len(t, ev.Objects, 1)
 
 				obj.Object["spec"] = "pod-0-new-spec"
@@ -419,7 +419,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 			}
 
 			assert.Equal(t, "Event", ev.Type)
-			assert.Equal(t, "ConfigId", ev.ConfigId)
+			assert.Equal(t, "MonitorId", ev.MonitorId)
 			assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
 			metadata := ev.Object["metadata"].(map[string]interface{})
 			assert.Contains(t, metadata, "name")

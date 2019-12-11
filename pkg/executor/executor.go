@@ -18,7 +18,7 @@ func Run(cmd *exec.Cmd) error {
 	defer ExecutorLock.Unlock()
 
 	// TODO context: hook name, hook phase, hook binding
-	log.Debugf("Executing command %q in %q dir", strings.Join(cmd.Args, " "), cmd.Dir)
+	log.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
 	return cmd.Run()
 }
@@ -31,7 +31,7 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
 	stdoutLogEntry := logEntry.WithField("output", "stdout")
 	stderrLogEntry := logEntry.WithField("output", "stderr")
 
-	logEntry.Debugf("Executing command %q in %q dir", strings.Join(cmd.Args, " "), cmd.Dir)
+	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
 	var wg sync.WaitGroup
 

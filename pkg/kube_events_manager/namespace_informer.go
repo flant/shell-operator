@@ -8,7 +8,7 @@ import (
 
 	"github.com/flant/shell-operator/pkg/kube"
 	log "github.com/sirupsen/logrus"
-
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -83,22 +83,14 @@ func (ni *namespaceInformer) GetExistedObjects() map[string]bool {
 var SharedNamespaceInformerEventHandler = func(informer *namespaceInformer, addFn func(string), delFn func(string)) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			_, nsName, err := metaFromEventObject(obj)
-			if err != nil {
-				log.Errorf("%s: add: get ns name: %s", informer.Monitor.Metadata.DebugName, err)
-				return
-			}
-
-			addFn(nsName)
+			nsObj := obj.(*v1.Namespace)
+			log.Debugf("NamespaceInformer: Added ns/%s", nsObj.Name)
+			addFn(nsObj.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
-			_, nsName, err := metaFromEventObject(obj)
-			if err != nil {
-				log.Errorf("%s: delete: get ns name: %s", informer.Monitor.Metadata.DebugName, err)
-				return
-			}
-
-			delFn(nsName)
+			nsObj := obj.(*v1.Namespace)
+			log.Debugf("NamespaceInformer: Deleted ns/%s", nsObj.Name)
+			delFn(nsObj.Name)
 		},
 	}
 }

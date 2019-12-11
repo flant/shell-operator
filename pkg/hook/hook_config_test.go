@@ -96,12 +96,32 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 			},
 		},
 		{
+			"v1 with schedule",
+			`{
+              "configVersion":"v1",
+			  "schedule":[
+			    {"name":"each 1 min", "crontab":"0 */1 * * * *", "includeKubernetesSnapshotsFrom":["pods", "secrets"]},
+			    {"name":"each 5 min", "crontab":"0 */5 * * * *"}
+			  ]
+            }`,
+			func() {
+				if assert.NoError(t, err) {
+					assert.Equal(t, "v1", hookConfig.Version)
+					assert.Nil(t, hookConfig.V0)
+					assert.NotNil(t, hookConfig.V1)
+					assert.Nil(t, hookConfig.OnStartup)
+					assert.Len(t, hookConfig.Schedules, 2)
+					assert.Len(t, hookConfig.OnKubernetesEvents, 0)
+				}
+			},
+		},
+		{
 			"v1 with kubernetes",
 			`{
               "configVersion":"v1",
 			  "kubernetes":[
 			    {"name":"monitor pods", "apiVersion":"v1", "kind":"Pod"},
-			    {"name":"deployments", "apiVersion":"apps/v1", "kind":"Deployment"}
+			    {"name":"deployments", "apiVersion":"apps/v1", "kind":"Deployment", "includeSnapshotsFrom":["pods", "secrets"]}
               ]
             }`,
 			func() {

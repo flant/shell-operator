@@ -114,7 +114,6 @@ func (b *BindingContextController) Run() (string, error) {
 	kube.DynamicClient = fakedynamic.NewSimpleDynamicClient(runtime.NewScheme())
 
 	b.Manager = manager.NewKubeEventsManager()
-	manager.KubeEventCh = make(chan manager.KubeEvent)
 
 	// Use StateController to apply changes
 	controller, err := NewStateController(b.InitialState)
@@ -133,11 +132,11 @@ func (b *BindingContextController) Run() (string, error) {
 
 	// Add onKubernetes hook monitors to manager
 	for _, binding := range hc.OnKubernetesEvents {
-		existedObjects, err := b.Manager.AddMonitor(binding.CommonBindingConfig.ConfigName, binding.Monitor, log.WithField("test", "yes"))
+		existedObjects, err := b.Manager.AddMonitor(binding.CommonBindingConfig.Name, binding.Monitor, log.WithField("test", "yes"))
 		if err != nil {
-			return "", fmt.Errorf("monitor %q adding failed: %v", binding.ConfigName, err)
+			return "", fmt.Errorf("monitor '%s' adding failed: %v", binding.Name, err)
 		}
-		b.HookMap[binding.Monitor.Metadata.ConfigId] = binding.CommonBindingConfig.ConfigName
+		b.HookMap[binding.Monitor.Metadata.MonitorId] = binding.CommonBindingConfig.Name
 
 		// Get existed objects and create HookRun task with Synchronization type
 		objList := make([]interface{}, 0)
@@ -145,7 +144,7 @@ func (b *BindingContextController) Run() (string, error) {
 			objList = append(objList, interface{}(obj))
 		}
 		bindingContexts = append(bindingContexts, hook.BindingContext{
-			Binding: binding.CommonBindingConfig.ConfigName,
+			Binding: binding.CommonBindingConfig.Name,
 			Type:    "Synchronization",
 			Objects: objList,
 		})
@@ -176,8 +175,8 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 
 	for {
 		select {
-		case ev := <-manager.KubeEventCh:
-			data := kubeEventToBindingContext(ev, b.HookMap[ev.ConfigId])
+		case ev := <-b.Manager.Ch():
+			data := kubeEventToBindingContext(ev, b.HookMap[ev.MonitorId])
 			bindingContexts = append(bindingContexts, data...)
 			continue
 		case <-ctx.Done():

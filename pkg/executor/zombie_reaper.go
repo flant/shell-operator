@@ -23,10 +23,12 @@ type Config struct {
 	DisablePid1Check bool
 }
 
+var reapLogEntry = log.WithField("operator.component", "zombieReaper")
+
 //  Handle death of child (SIGCHLD) messages. Pushes the signal onto the
 //  notifications channel if there is a waiter.
 func sigChildHandler(notifications chan os.Signal) {
-	log.Debugf("Start SIGCHLD handler")
+	reapLogEntry.Debugf("Start SIGCHLD handler")
 	var sigs = make(chan os.Signal, 3)
 	signal.Notify(sigs, syscall.SIGCHLD)
 
@@ -48,7 +50,7 @@ func sigChildHandler(notifications chan os.Signal) {
 
 //  Be a good parent - clean up behind the children.
 func reapChildren(config Config) {
-	log.Debugf("Start WAIT4 loop")
+	reapLogEntry.Debugf("Start WAIT4 loop")
 
 	var notifications = make(chan os.Signal, 1)
 
@@ -59,7 +61,7 @@ func reapChildren(config Config) {
 
 	for {
 		si := <-notifications
-		log.Debugf("REAP: got %v signal", si)
+		reapLogEntry.Debugf("Got '%v' signal", si.String())
 		func() {
 			// Acquire lock
 			ExecutorLock.Lock()
@@ -76,7 +78,7 @@ func reapChildren(config Config) {
 				pid, err = syscall.Wait4(pid, &wstatus, opts, nil)
 			}
 
-			log.Debugf(" - Grim reaper cleanup: pid=%d, wstatus=%+v\n",
+			reapLogEntry.Debugf("Cleanup: pid=%d, wstatus=%+v\n",
 				pid, wstatus)
 
 		}()
@@ -121,7 +123,7 @@ func Start(config Config) {
 	if !config.DisablePid1Check {
 		mypid := os.Getpid()
 		if 1 != mypid {
-			log.Debugf(" - Grim reaper disabled, pid not 1\n")
+			reapLogEntry.Debugf("Grim reaper disabled, pid is not 1\n")
 			return
 		}
 	}

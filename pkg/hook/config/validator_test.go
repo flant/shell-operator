@@ -38,7 +38,8 @@ func Test_Validate_V1_Full(t *testing.T) {
     {
       "name": "qwe",
       "crontab": "*/5 * * * * *",
-      "allowFailure": true
+      "allowFailure": true,
+      "includeKubernetesSnapshotsFrom": ["monitor pods"]
     }
   ],
   "kubernetes": [
@@ -47,6 +48,7 @@ func Test_Validate_V1_Full(t *testing.T) {
       "watchEvent": ["Added", "Deleted", "Modified"],
       "apiVersion": "v1",
       "kind": "Pod",
+      "includeSnapshotsFrom": ["monitor pods"],
       "labelSelector": {
         "matchLabels": {
           "app": "app",

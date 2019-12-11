@@ -1,24 +1,34 @@
 package hook
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/kennygrant/sanitize"
 
+	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/types"
+
 	"github.com/flant/shell-operator/pkg/executor"
+	"github.com/flant/shell-operator/pkg/hook/controller"
 )
+
+type CommonHook interface {
+	Name() string
+}
 
 type Hook struct {
 	Name   string // The unique name like '002-prometheus-hooks/startup_hook'.
 	Path   string // The absolute path to the executable file.
 	Config *HookConfig
 
-	hookManager HookManager
+	HookController controller.HookController
+
+	tmpDir string
 }
 
 func NewHook(name, path string) *Hook {
@@ -29,8 +39,8 @@ func NewHook(name, path string) *Hook {
 	}
 }
 
-func (h *Hook) WithHookManager(hookManager HookManager) {
-	h.hookManager = hookManager
+func (h *Hook) WithTmpDir(dir string) {
+	h.tmpDir = dir
 }
 
 func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
@@ -42,10 +52,22 @@ func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
 	return h, nil
 }
 
-func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) error {
-	var versionedContext = ConvertBindingContextList(h.Config.Version, context)
+func (h *Hook) GetConfig() *HookConfig {
+	return h.Config
+}
 
-	contextPath, err := h.prepareBindingContextJsonFile(versionedContext)
+func (h *Hook) WithHookController(hookController controller.HookController) {
+	h.HookController = hookController
+}
+
+func (h *Hook) GetHookController() controller.HookController {
+	return h.HookController
+}
+
+func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) error {
+	versionedContextList := ConvertBindingContextList(h.Config.Version, context)
+
+	contextPath, err := h.prepareBindingContextJsonFile(versionedContextList)
 	if err != nil {
 		return err
 	}
@@ -70,11 +92,46 @@ func (h *Hook) SafeName() string {
 	return sanitize.BaseName(h.Name)
 }
 
-func (h *Hook) prepareBindingContextJsonFile(context interface{}) (string, error) {
-	data, _ := json.MarshalIndent(context, "", "  ")
-	bindingContextPath := filepath.Join(h.hookManager.TempDir(), fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
+func (h *Hook) GetConfigDescription() string {
+	msgs := []string{}
+	if h.Config.OnStartup != nil {
+		msgs = append(msgs, fmt.Sprintf("OnStartup:%d", int64(h.Config.OnStartup.Order)))
+	}
+	if len(h.Config.Schedules) > 0 {
+		crontabs := map[string]bool{}
+		for _, schCfg := range h.Config.Schedules {
+			crontabs[schCfg.ScheduleEntry.Crontab] = true
+		}
+		crontabList := []string{}
+		for crontab := range crontabs {
+			crontabList = append(crontabList, crontab)
+		}
+		msgs = append(msgs, fmt.Sprintf("Schedules: '%s'", strings.Join(crontabList, "', '")))
+	}
+	if len(h.Config.OnKubernetesEvents) > 0 {
+		kinds := map[string]bool{}
+		for _, kubeCfg := range h.Config.OnKubernetesEvents {
+			kinds[kubeCfg.Monitor.Kind] = true
+		}
+		kindList := []string{}
+		for kind := range kinds {
+			kindList = append(kindList, kind)
+		}
+		msgs = append(msgs, fmt.Sprintf("Watch k8s kinds: '%s'", strings.Join(kindList, "', '")))
+	}
+	return strings.Join(msgs, ", ")
+}
 
-	err := ioutil.WriteFile(bindingContextPath, data, 0644)
+func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string, error) {
+	var err error
+	data, err := context.Json()
+	if err != nil {
+		return "", err
+	}
+
+	bindingContextPath := filepath.Join(h.tmpDir, fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
+
+	err = ioutil.WriteFile(bindingContextPath, data, 0644)
 	if err != nil {
 		return "", err
 	}
