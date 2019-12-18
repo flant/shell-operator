@@ -217,12 +217,18 @@ func (ei *resourceInformer) ListExistedObjects() error {
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modifed is enough)
 //func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eventType WatchEventType) {
+	resourceId := ResourceId(obj)
+
 	if !ei.ShouldHandleEvent(eventType) {
 		// TODO it seems too easy for bindings with jqFilter
+
+		// object should be deleted from cache even if hook is not subscribed to Delete
+		if eventType == WatchEventDeleted {
+			delete(ei.CachedObjects, resourceId)
+		}
+
 		return
 	}
-
-	resourceId := ResourceId(obj)
 
 	filterResult, newChecksum, err := ApplyJqFilter(ei.Monitor.JqFilter, obj)
 	if err != nil {
