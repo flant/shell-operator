@@ -16,11 +16,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-
 	"github.com/flant/shell-operator/pkg/hook"
+	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/kube"
 	manager "github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -37,27 +34,9 @@ func convertBindingContexts(bindingContexts []BindingContext) (string, error) {
 	return string(data), nil
 }
 
-// kubeEventToBindingContext returns binding context in json format to use in hook tests
-func kubeEventToBindingContext(kubeEvent KubeEvent, configName string) []BindingContext {
-	bindingContexts := make([]BindingContext, 0)
-
-	// todo: get the code from shell operator instead of copy-pasting
-	for _, kEvent := range kubeEvent.WatchEvents {
-		bindingContexts = append(bindingContexts, BindingContext{
-			// Remove this
-			Binding:    configName,
-			Type:       "Event",
-			WatchEvent: kEvent,
-
-			Object:       kubeEvent.Object,
-			FilterResult: kubeEvent.FilterResult,
-		})
-	}
-	return bindingContexts
-}
-
 type BindingContextController struct {
-	//HookMap      map[string]string
+	HookCtrl     controller.HookController
+	HookMap      map[string]string
 	HookConfig   string
 	InitialState string
 	Controller   StateController
@@ -68,16 +47,17 @@ type BindingContextController struct {
 
 func NewBindingContextController(config, initialState string) (BindingContextController, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	controller := BindingContextController{
-		//HookMap:      make(map[string]string),
+	c := BindingContextController{
+		HookMap:      make(map[string]string),
 		HookConfig:   config,
 		InitialState: initialState,
 		Context:      ctx,
 		Cancel:       cancel,
 	}
-	return controller, nil
+	return c, nil
 }
 
+// RegisterCRD registers custom resources for the cluster
 func (b *BindingContextController) RegisterCRD(group, version, kind string, namespaced bool) {
 	scheme.Scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: group, Version: version, Kind: kind}, &unstructured.Unstructured{})
 	newResource := metav1.APIResource{
@@ -122,39 +102,40 @@ func (b *BindingContextController) Run() (string, error) {
 	}
 	b.Controller = stateController
 
-	hook := hook.NewHook("test", "test")
-
-	_, err := hook.WithConfig(b.HookConfig)
+	testHook := hook.NewHook("test", "test")
+	_, err = testHook.WithConfig([]byte(b.HookConfig))
 	if err != nil {
 		return "", fmt.Errorf("couldn't load or validate hook configuration: %v", err)
 	}
 
-	hookCtrl := controller.NewHookController()
-	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
+	b.HookCtrl = controller.NewHookController()
+	b.HookCtrl.InitKubernetesBindings(testHook.GetConfig().OnKubernetesEvents, b.Manager)
 
-	hook.WithHookController(hookCtrl)
-
+	testHook.WithHookController(b.HookCtrl)
 	bindingContexts := make([]BindingContext, 0)
 
-	hookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
 		bindingContexts = append(bindingContexts, info.BindingContext...)
 	})
+	if err != nil {
+		return "", fmt.Errorf("couldn't enable kubernetes bindings: %v", err)
+	}
 
 	b.Manager.WithContext(b.Context)
-	hookCtrl.StartMonitors()
+	b.HookCtrl.StartMonitors()
 
 	return convertBindingContexts(bindingContexts)
 }
 
 func (b *BindingContextController) ChangeState(newState ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
 	defer cancel()
 
 	bindingContexts := make([]BindingContext, 0)
 
 	done := false
 	go func() {
-		time.Sleep(time.Second * 1)
+		time.Sleep(100 * time.Millisecond)
 		for _, state := range newState {
 			err := b.Controller.ChangeState(state)
 			if err != nil {
@@ -167,19 +148,17 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 	for {
 		select {
 		case ev := <-b.Manager.Ch():
-			// operator.go <- KubeEventManager.Ch()
-
-			data := kubeEventToBindingContext(ev, b.HookMap[ev.MonitorId])
-			bindingContexts = append(bindingContexts, data...)
+			b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
+				bindingContexts = append(bindingContexts, info.BindingContext...)
+			})
 			continue
 		case <-ctx.Done():
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		if done {
 			break
 		}
 	}
-
 	return convertBindingContexts(bindingContexts)
 }

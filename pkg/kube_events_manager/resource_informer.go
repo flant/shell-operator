@@ -318,11 +318,15 @@ func (ei *resourceInformer) adjustFieldSelector(selector *FieldSelector, objName
 }
 
 func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (result string, checksum string, err error) {
-	if jqFilter == "" {
-		return "", "", nil
-	}
-
 	resourceId := ResourceId(obj)
+
+	if jqFilter == "" {
+		jsonObject, err := obj.MarshalJSON()
+		if err != nil {
+			return "", "", fmt.Errorf("calculate the object checksumm failed on %s: %s", resourceId, err)
+		}
+		return "", utils_checksum.CalculateChecksum(string(jsonObject)), nil
+	}
 
 	filtered, err := ResourceFilter(obj, jqFilter)
 	if err != nil {
