@@ -28,7 +28,7 @@ type Hook struct {
 
 	HookController controller.HookController
 
-	tmpDir string
+	TmpDir string
 }
 
 func NewHook(name, path string) *Hook {
@@ -40,7 +40,7 @@ func NewHook(name, path string) *Hook {
 }
 
 func (h *Hook) WithTmpDir(dir string) {
-	h.tmpDir = dir
+	h.TmpDir = dir
 }
 
 func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
@@ -129,7 +129,7 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 		return "", err
 	}
 
-	bindingContextPath := filepath.Join(h.tmpDir, fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
+	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
 
 	err = ioutil.WriteFile(bindingContextPath, data, 0644)
 	if err != nil {

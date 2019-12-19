@@ -84,10 +84,6 @@ func Init() (err error) {
 
 	// Initializing schedule manager.
 	ScheduleManager = schedule_manager.NewScheduleManager()
-	//if err != nil {
-	//	log.Errorf("MAIN Fatal: initialize schedule manager: %s", err)
-	//	return err
-	//}
 
 	// Initialize kube client for kube events hooks.
 	err = kube.Init(kube.InitOptions{KubeContext: app.KubeContext, KubeConfig: app.KubeConfig})

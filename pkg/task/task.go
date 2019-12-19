@@ -7,6 +7,8 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
+	uuid "gopkg.in/satori/go.uuid.v1"
 )
 
 type TaskType string
@@ -33,6 +35,7 @@ type Task interface {
 	IncrementFailureCount()
 	GetDelay() time.Duration
 	GetAllowFailure() bool
+	GetLogLabels() map[string]string
 }
 
 type BaseTask struct {
@@ -42,7 +45,8 @@ type BaseTask struct {
 	Binding        BindingType
 	BindingContext []BindingContext
 	Delay          time.Duration
-	AllowFailure   bool // Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
+	AllowFailure   bool //Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
+	LogLabels      map[string]string
 }
 
 func NewTask(taskType TaskType, name string) *BaseTask {
@@ -52,6 +56,7 @@ func NewTask(taskType TaskType, name string) *BaseTask {
 		Type:           taskType,
 		AllowFailure:   false,
 		BindingContext: make([]BindingContext, 0),
+		LogLabels:      map[string]string{"task.id": uuid.NewV4().String()},
 	}
 }
 
@@ -79,6 +84,10 @@ func (t *BaseTask) GetAllowFailure() bool {
 	return t.AllowFailure
 }
 
+func (t *BaseTask) GetLogLabels() map[string]string {
+	return t.LogLabels
+}
+
 func (t *BaseTask) WithBinding(binding BindingType) *BaseTask {
 	t.Binding = binding
 	return t
@@ -96,6 +105,11 @@ func (t *BaseTask) AppendBindingContext(context BindingContext) *BaseTask {
 
 func (t *BaseTask) WithAllowFailure(allowFailure bool) *BaseTask {
 	t.AllowFailure = allowFailure
+	return t
+}
+
+func (t *BaseTask) WithLogLabels(labels map[string]string) *BaseTask {
+	t.LogLabels = utils.MergeLabels(t.LogLabels, labels)
 	return t
 }
 
