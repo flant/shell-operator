@@ -2,12 +2,10 @@ package context
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,15 +16,21 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/types"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+
 	"github.com/flant/shell-operator/pkg/hook"
+	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/kube"
 	manager "github.com/flant/shell-operator/pkg/kube_events_manager"
 )
 
 // convertBindingContexts render json with array of binding contexts
-func convertBindingContexts(bindingContexts []hook.BindingContext) (string, error) {
+func convertBindingContexts(bindingContexts []BindingContext) (string, error) {
 	// Only v1 binding contexts supported by now
-	data, err := json.Marshal(hook.ConvertBindingContextListV1(bindingContexts))
+	bcList := ConvertBindingContextList("v1", bindingContexts)
+	data, err := bcList.Json()
 	if err != nil {
 		return "", fmt.Errorf("marshaling binding context error: %v", err)
 	}
@@ -34,20 +38,16 @@ func convertBindingContexts(bindingContexts []hook.BindingContext) (string, erro
 }
 
 // kubeEventToBindingContext returns binding context in json format to use in hook tests
-func kubeEventToBindingContext(kubeEvent manager.KubeEvent, configName string) []hook.BindingContext {
-	bindingContexts := make([]hook.BindingContext, 0)
+func kubeEventToBindingContext(kubeEvent KubeEvent, configName string) []BindingContext {
+	bindingContexts := make([]BindingContext, 0)
 
 	// todo: get the code from shell operator instead of copy-pasting
 	for _, kEvent := range kubeEvent.WatchEvents {
-		bindingContexts = append(bindingContexts, hook.BindingContext{
+		bindingContexts = append(bindingContexts, BindingContext{
 			// Remove this
 			Binding:    configName,
 			Type:       "Event",
 			WatchEvent: kEvent,
-
-			Namespace: kubeEvent.Namespace,
-			Kind:      kubeEvent.Kind,
-			Name:      kubeEvent.Name,
 
 			Object:       kubeEvent.Object,
 			FilterResult: kubeEvent.FilterResult,
@@ -57,7 +57,7 @@ func kubeEventToBindingContext(kubeEvent manager.KubeEvent, configName string) [
 }
 
 type BindingContextController struct {
-	HookMap      map[string]string
+	//HookMap      map[string]string
 	HookConfig   string
 	InitialState string
 	Controller   StateController
@@ -69,7 +69,7 @@ type BindingContextController struct {
 func NewBindingContextController(config, initialState string) (BindingContextController, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	controller := BindingContextController{
-		HookMap:      make(map[string]string),
+		//HookMap:      make(map[string]string),
 		HookConfig:   config,
 		InitialState: initialState,
 		Context:      ctx,
@@ -116,41 +116,32 @@ func (b *BindingContextController) Run() (string, error) {
 	b.Manager = manager.NewKubeEventsManager()
 
 	// Use StateController to apply changes
-	controller, err := NewStateController(b.InitialState)
+	stateController, err := NewStateController(b.InitialState)
 	if err != nil {
 		return "", err
 	}
-	b.Controller = controller
+	b.Controller = stateController
 
-	hc := &hook.HookConfig{}
-	err = hc.LoadAndValidate([]byte(b.HookConfig))
+	hook := hook.NewHook("test", "test")
+
+	_, err := hook.WithConfig(b.HookConfig)
 	if err != nil {
 		return "", fmt.Errorf("couldn't load or validate hook configuration: %v", err)
 	}
 
-	bindingContexts := make([]hook.BindingContext, 0)
+	hookCtrl := controller.NewHookController()
+	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
 
-	// Add onKubernetes hook monitors to manager
-	for _, binding := range hc.OnKubernetesEvents {
-		existedObjects, err := b.Manager.AddMonitor(binding.CommonBindingConfig.Name, binding.Monitor, log.WithField("test", "yes"))
-		if err != nil {
-			return "", fmt.Errorf("monitor '%s' adding failed: %v", binding.Name, err)
-		}
-		b.HookMap[binding.Monitor.Metadata.MonitorId] = binding.CommonBindingConfig.Name
+	hook.WithHookController(hookCtrl)
 
-		// Get existed objects and create HookRun task with Synchronization type
-		objList := make([]interface{}, 0)
-		for _, obj := range existedObjects {
-			objList = append(objList, interface{}(obj))
-		}
-		bindingContexts = append(bindingContexts, hook.BindingContext{
-			Binding: binding.CommonBindingConfig.Name,
-			Type:    "Synchronization",
-			Objects: objList,
-		})
-	}
+	bindingContexts := make([]BindingContext, 0)
+
+	hookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+		bindingContexts = append(bindingContexts, info.BindingContext...)
+	})
+
 	b.Manager.WithContext(b.Context)
-	b.Manager.Start()
+	hookCtrl.StartMonitors()
 
 	return convertBindingContexts(bindingContexts)
 }
@@ -159,7 +150,7 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	bindingContexts := make([]hook.BindingContext, 0)
+	bindingContexts := make([]BindingContext, 0)
 
 	done := false
 	go func() {
@@ -176,6 +167,8 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 	for {
 		select {
 		case ev := <-b.Manager.Ch():
+			// operator.go <- KubeEventManager.Ch()
+
 			data := kubeEventToBindingContext(ev, b.HookMap[ev.MonitorId])
 			bindingContexts = append(bindingContexts, data...)
 			continue
@@ -187,5 +180,6 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 			break
 		}
 	}
+
 	return convertBindingContexts(bindingContexts)
 }
