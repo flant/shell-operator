@@ -21,14 +21,14 @@ type BindingContext struct {
 
 	// additional fields for 'kubernetes' binding
 	Type         string
-	WatchEvent   WatchEventType `json:"watchEvent,omitempty"`
+	WatchEvent   WatchEventType
 	Object       *unstructured.Unstructured
 	FilterResult string
 	Objects      []ObjectAndFilterResult
-	Snapshots    map[string][]ObjectAndFilterResult `json:"snapshots,omitempty"`
+	Snapshots    map[string][]ObjectAndFilterResult
 
 	// additional field for 'schedule' binding
-	KubernetesSnapshots map[string][]ObjectAndFilterResult `json:"kubernetesSnapshots,omitempty"`
+	KubernetesSnapshots map[string][]ObjectAndFilterResult
 }
 
 func (bc BindingContext) MarshalJSON() ([]byte, error) {

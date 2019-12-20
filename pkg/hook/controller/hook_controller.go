@@ -50,6 +50,7 @@ type HookController interface {
 	DisableScheduleBindings()
 
 	KubernetesSnapshots() map[string][]ObjectAndFilterResult
+	UpdateSnapshots([]BindingContext) []BindingContext
 }
 
 var _ HookController = &hookController{}
@@ -61,6 +62,8 @@ func NewHookController() HookController {
 type hookController struct {
 	KubernetesController KubernetesBindingsController
 	ScheduleController   ScheduleBindingsController
+	kubernetesBindings   []OnKubernetesEventConfig
+	scheduleBindings     []ScheduleConfig
 }
 
 func (hc *hookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager) {
@@ -122,7 +125,7 @@ func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 		if createTasksFn != nil {
 			// Inject IncludeSnapshots to BindingContext
 			if len(execInfo.BindingContext) > 0 && len(execInfo.IncludeSnapshots) > 0 {
-				execInfo.BindingContext[0].Snapshots = hc.KubernetesController.Snapshot(execInfo.IncludeSnapshots...)
+				execInfo.BindingContext[0].Snapshots = hc.KubernetesController.SnapshotsFrom(execInfo.IncludeSnapshots...)
 			}
 			createTasksFn(execInfo)
 		}
@@ -137,7 +140,7 @@ func (hc *hookController) HandleScheduleEvent(crontab string, createTasksFn func
 			if createTasksFn != nil {
 				// Inject IncludeKubernetesSnapshots to BindingContext
 				if hc.KubernetesController != nil && len(info.BindingContext) > 0 && len(info.IncludeSnapshots) > 0 {
-					info.BindingContext[0].KubernetesSnapshots = hc.KubernetesController.Snapshot(info.IncludeSnapshots...)
+					info.BindingContext[0].KubernetesSnapshots = hc.KubernetesController.SnapshotsFrom(info.IncludeSnapshots...)
 				}
 				createTasksFn(info)
 			}
@@ -178,4 +181,42 @@ func (hc *hookController) KubernetesSnapshots() map[string][]ObjectAndFilterResu
 		return hc.KubernetesController.Snapshots()
 	}
 	return map[string][]ObjectAndFilterResult{}
+}
+
+// KubernetesSnapshotsFor returns snapshots for schedule or kubernetes binding
+func (hc *hookController) KubernetesSnapshotsFor(bindingType BindingType, bindingName string) map[string][]ObjectAndFilterResult {
+	includeSnapshots := []string{}
+
+	switch bindingType {
+	case OnKubernetesEvent:
+		for _, binding := range hc.kubernetesBindings {
+			if bindingName == binding.BindingName {
+				includeSnapshots = binding.IncludeSnapshotsFrom
+				break
+			}
+		}
+	case Schedule:
+		for _, binding := range hc.scheduleBindings {
+			if bindingName == binding.BindingName {
+				includeSnapshots = binding.IncludeKubernetesSnapshotsFrom
+				break
+			}
+		}
+	}
+
+	return hc.KubernetesController.SnapshotsFrom(includeSnapshots...)
+}
+
+func (hc *hookController) UpdateSnapshots(context []BindingContext) []BindingContext {
+	if hc.KubernetesController == nil {
+		return context
+	}
+
+	newContext := []BindingContext{}
+	for _, bc := range context {
+		bc.Snapshots = hc.KubernetesSnapshotsFor(bc.BindingType, bc.Binding)
+		newContext = append(newContext, bc)
+	}
+
+	return newContext
 }

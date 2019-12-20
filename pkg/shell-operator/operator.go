@@ -235,13 +235,16 @@ func TasksRunner() {
 				hookLogLabels["hook"] = t.GetName()
 				hookLogLabels["binding"] = ContextBindingType[t.GetBinding()]
 				hookLogLabels["task"] = "HookRun"
-
 				taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
-
 				taskLogEntry.Info("Execute hook")
-				err := HookManager.RunHook(t.GetName(), t.GetBinding(), t.GetBindingContext(), hookLogLabels)
+
+				taskHook := HookManager.GetHook(t.GetName())
+
+				// get actual snapshots
+				bindingContext := taskHook.HookController.UpdateSnapshots(t.GetBindingContext())
+
+				err := taskHook.Run(t.GetBinding(), bindingContext, hookLogLabels)
 				if err != nil {
-					taskHook := HookManager.GetHook(t.GetName())
 					hookLabel := taskHook.SafeName()
 
 					if t.GetAllowFailure() {
@@ -272,10 +275,12 @@ func TasksRunner() {
 
 				taskLogEntry.Info("Enable kubernetes binding for hook")
 
+				taskHook := HookManager.GetHook(t.GetName())
+
 				hookRunTasks := []task.Task{}
 
-				err := HookManager.HandleEnableKubernetesBindings(t.GetName(), func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-					newTask := task.NewTask(task.HookRun, hook.Name).
+				err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+					newTask := task.NewTask(task.HookRun, taskHook.Name).
 						WithBinding(OnKubernetesEvent).
 						WithBindingContext(info.BindingContext).
 						WithAllowFailure(info.AllowFailure)
@@ -283,7 +288,6 @@ func TasksRunner() {
 				})
 
 				if err != nil {
-					taskHook := HookManager.GetHook(t.GetName())
 					hookLabel := taskHook.SafeName()
 					MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
 					t.IncrementFailureCount()

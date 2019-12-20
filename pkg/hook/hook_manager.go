@@ -9,7 +9,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
@@ -30,9 +29,7 @@ type HookManager interface {
 	TempDir() string
 	GetHook(name string) *Hook
 	GetHooksInOrder(bindingType BindingType) ([]string, error)
-	RunHook(hookName string, binding BindingType, bindingContext []BindingContext, logLabels map[string]string) error
 	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
-	HandleEnableKubernetesBindings(hookName string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) error
 	EnableScheduleBindings()
 	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) error
 }
@@ -222,16 +219,6 @@ func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error
 	return hooksNames, nil
 }
 
-func (hm *hookManager) RunHook(hookName string, binding BindingType, bindingContext []BindingContext, logLabels map[string]string) error {
-	hook := hm.GetHook(hookName)
-
-	if err := hook.Run(binding, bindingContext, logLabels); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (hm *hookManager) HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	kubeHooks, _ := hm.GetHooksInOrder(OnKubernetesEvent)
 
@@ -246,20 +233,6 @@ func (hm *hookManager) HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*H
 			})
 		}
 	}
-}
-
-func (hm *hookManager) HandleEnableKubernetesBindings(hookName string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) error {
-	h := hm.GetHook(hookName)
-	err := h.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
-		if createTaskFn != nil {
-			createTaskFn(h, info)
-		}
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // EnableScheduleBindings add all schedules to scheduleManager

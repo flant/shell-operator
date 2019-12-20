@@ -31,7 +31,7 @@ type KubernetesBindingsController interface {
 	CanHandleEvent(kubeEvent KubeEvent) bool
 	HandleEvent(kubeEvent KubeEvent) BindingExecutionInfo
 	BindingNames() []string
-	Snapshot(bindingNames ...string) map[string][]ObjectAndFilterResult
+	SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult
 	Snapshots() map[string][]ObjectAndFilterResult
 }
 
@@ -148,7 +148,7 @@ func (c *kubernetesBindingsController) BindingNames() []string {
 	return []string{}
 }
 
-func (c *kubernetesBindingsController) Snapshot(bindingNames ...string) map[string][]ObjectAndFilterResult {
+func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult {
 	res := map[string][]ObjectAndFilterResult{}
 
 	for _, bindingName := range bindingNames {
@@ -166,13 +166,7 @@ func (c *kubernetesBindingsController) Snapshot(bindingNames ...string) map[stri
 }
 
 func (c *kubernetesBindingsController) Snapshots() map[string][]ObjectAndFilterResult {
-	res := map[string][]ObjectAndFilterResult{}
-
-	for _, bindingName := range c.BindingNames() {
-		res[bindingName] = c.Snapshot(bindingName)[bindingName]
-	}
-
-	return res
+	return c.SnapshotsFrom(c.BindingNames()...)
 }
 
 func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, bindingName string) []BindingContext {

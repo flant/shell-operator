@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -33,8 +34,33 @@ const (
 )
 
 type ObjectAndFilterResult struct {
-	Object       *unstructured.Unstructured `json:"object,omitempty"`
-	FilterResult string                     `json:"filterResult,omitempty"`
+	Metadata struct {
+		JqFilter   string
+		Checksum   string
+		ResourceId string
+	}
+	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
+	FilterResult string
+}
+
+func (o ObjectAndFilterResult) MarshalJSON() ([]byte, error) {
+	m := map[string]interface{}{
+		"object": o.Object,
+	}
+	// Add filterResult field only if it was requested
+	if o.Metadata.JqFilter != "" {
+		inJson := o.FilterResult
+		if inJson == "" {
+			inJson = "null"
+		}
+		var res interface{}
+		err := json.Unmarshal([]byte(inJson), &res)
+		if err != nil {
+			return nil, err
+		}
+		m["filterResult"] = res
+	}
+	return json.Marshal(m)
 }
 
 // KubeEvent contains MonitorId from monitor configuration, event type

@@ -65,6 +65,9 @@ func (h *Hook) GetHookController() controller.HookController {
 }
 
 func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) error {
+	// Refresh snapshots
+	context = h.HookController.UpdateSnapshots(context)
+
 	versionedContextList := ConvertBindingContextList(h.Config.Version, context)
 
 	contextPath, err := h.prepareBindingContextJsonFile(versionedContextList)

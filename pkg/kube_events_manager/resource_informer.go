@@ -15,7 +15,6 @@ import (
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
 	"github.com/flant/shell-operator/pkg/kube"
-	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 	utils_data "github.com/flant/shell-operator/pkg/utils/data"
 )
 
@@ -30,11 +29,6 @@ type ResourceInformer interface {
 	Stop()
 }
 
-type CachedObject struct {
-	Checksum string
-	Object   ObjectAndFilterResult
-}
-
 type resourceInformer struct {
 	Monitor *MonitorConfig
 	// Filter by namespace
@@ -42,7 +36,7 @@ type resourceInformer struct {
 	// Filter by object name
 	Name string
 
-	CachedObjects  map[string]*CachedObject
+	CachedObjects  map[string]*ObjectAndFilterResult
 	SharedInformer cache.SharedInformer
 
 	GroupVersionResource schema.GroupVersionResource
@@ -59,7 +53,7 @@ var _ ResourceInformer = &resourceInformer{}
 var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 	informer := &resourceInformer{
 		Monitor:       monitor,
-		CachedObjects: make(map[string]*CachedObject, 0),
+		CachedObjects: make(map[string]*ObjectAndFilterResult, 0),
 	}
 	return informer
 }
@@ -135,14 +129,18 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	return nil
 }
 
+// TODO we need locks here
 func (ei *resourceInformer) GetExistedObjects() []ObjectAndFilterResult {
 	res := make([]ObjectAndFilterResult, 0)
 	for _, obj := range ei.CachedObjects {
-		res = append(res, obj.Object)
+		log.Infof("I see %s", ResourceId(obj.Object))
+		newObj := *obj
+		res = append(res, newObj)
 	}
-
+	for _, obj := range res {
+		log.Infof("I return %s", ResourceId(obj.Object))
+	}
 	return res
-	//	return ei.ExistedObjects
 }
 
 // TODO make monitor config accessible here to get LogLabels
@@ -179,34 +177,29 @@ func (ei *resourceInformer) ListExistedObjects() error {
 
 	log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
 
-	for _, obj := range objList.Items {
-		resourceId := ResourceId(&obj)
-
-		filterResult, checksum, err := ApplyJqFilter(ei.Monitor.JqFilter, &obj)
+	for _, item := range objList.Items {
+		// copy internal var to avoid duplication of pointer
+		obj := item
+		objFilterRes, err := ApplyJqFilter(ei.Monitor.JqFilter, &obj)
 		if err != nil {
 			return err
 		}
+		// save object to cache
+		ei.CachedObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
+		// Debug message
+		// TODO can this be simpler?
 		jqFilterOutput := ""
 		if ei.Monitor.JqFilter != "" {
 			jqFilterOutput = fmt.Sprintf(" jqFilter '%s' output:\n%s",
 				ei.Monitor.JqFilter,
-				utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filterResult)))
+				utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(objFilterRes.FilterResult)))
 		}
 		log.Debugf("%s: initial checksum of %s is %s.%s",
 			ei.Monitor.Metadata.DebugName,
-			resourceId,
-			checksum,
+			objFilterRes.Metadata.ResourceId,
+			objFilterRes.Metadata.Checksum,
 			jqFilterOutput)
-
-		// save object to cache
-		ei.CachedObjects[resourceId] = &CachedObject{
-			Checksum: checksum,
-			Object: ObjectAndFilterResult{
-				Object:       &obj,
-				FilterResult: filterResult,
-			},
-		}
 	}
 
 	return nil
@@ -219,18 +212,9 @@ func (ei *resourceInformer) ListExistedObjects() error {
 func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eventType WatchEventType) {
 	resourceId := ResourceId(obj)
 
-	if !ei.ShouldHandleEvent(eventType) {
-		// TODO it seems too easy for bindings with jqFilter
+	// Always calculate checksum and update cache, because we need actual state in CachedObjects
 
-		// object should be deleted from cache even if hook is not subscribed to Delete
-		if eventType == WatchEventDeleted {
-			delete(ei.CachedObjects, resourceId)
-		}
-
-		return
-	}
-
-	filterResult, newChecksum, err := ApplyJqFilter(ei.Monitor.JqFilter, obj)
+	objFilterRes, err := ApplyJqFilter(ei.Monitor.JqFilter, obj)
 	if err != nil {
 		log.Errorf("%s: WATCH %s: %s",
 			ei.Monitor.Metadata.DebugName,
@@ -246,44 +230,41 @@ func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eve
 		fallthrough
 	case WatchEventModified:
 		cachedObject, objectInCache := ei.CachedObjects[resourceId]
-		if objectInCache && cachedObject.Checksum == newChecksum {
-			// ignore changes
+		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
+			// update object in cache and do not send event
+			ei.CachedObjects[resourceId] = objFilterRes
 			log.Debugf("%s: %s %s: checksum is not changed, no KubeEvent",
 				ei.Monitor.Metadata.DebugName,
 				string(eventType),
 				resourceId,
 			)
 			return
-		} else {
-			// save new object and result
-			ei.CachedObjects[resourceId] = &CachedObject{
-				Checksum: newChecksum,
-				Object: ObjectAndFilterResult{
-					Object:       obj,
-					FilterResult: filterResult,
-				},
-			}
 		}
+		// save new object and result
+		ei.CachedObjects[resourceId] = objFilterRes
 
 	case WatchEventDeleted:
 		delete(ei.CachedObjects, resourceId)
 	}
 
-	log.Debugf("%s: %s %s: send KubeEvent",
-		ei.Monitor.Metadata.DebugName,
-		string(eventType),
-		resourceId,
-	)
-	// TODO: should be disabled by default and enabled by a debug feature switch
-	//log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
+	// Fire KubeEvent only if needed.
+	if ei.ShouldHandleEvent(eventType) {
+		log.Debugf("%s: %s %s: send KubeEvent",
+			ei.Monitor.Metadata.DebugName,
+			string(eventType),
+			resourceId,
+		)
+		// TODO: should be disabled by default and enabled by a debug feature switch
+		//log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
-	// Pass event info to callback
-	ei.EventCb(KubeEvent{
-		MonitorId:    ei.Monitor.Metadata.MonitorId,
-		WatchEvents:  []WatchEventType{eventType},
-		Object:       obj,
-		FilterResult: filterResult,
-	})
+		// Pass event info to callback
+		ei.EventCb(KubeEvent{
+			MonitorId:    ei.Monitor.Metadata.MonitorId,
+			WatchEvents:  []WatchEventType{eventType},
+			Object:       obj,
+			FilterResult: objFilterRes.FilterResult,
+		})
+	}
 
 	return
 }
@@ -315,27 +296,6 @@ func (ei *resourceInformer) adjustFieldSelector(selector *FieldSelector, objName
 	}
 
 	return selectorCopy
-}
-
-func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (result string, checksum string, err error) {
-	resourceId := ResourceId(obj)
-
-	if jqFilter == "" {
-		jsonObject, err := obj.MarshalJSON()
-		if err != nil {
-			return "", "", fmt.Errorf("calculate the object checksumm failed on %s: %s", resourceId, err)
-		}
-		return "", utils_checksum.CalculateChecksum(string(jsonObject)), nil
-	}
-
-	filtered, err := ResourceFilter(obj, jqFilter)
-	if err != nil {
-		return "", "", fmt.Errorf("apply jqFilter on %s: %s", resourceId, err)
-	}
-
-	checksum = utils_checksum.CalculateChecksum(filtered)
-
-	return filtered, checksum, nil
 }
 
 func (ei *resourceInformer) ShouldHandleEvent(checkEvent WatchEventType) bool {
