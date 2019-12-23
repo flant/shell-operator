@@ -259,10 +259,9 @@ func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eve
 
 		// Pass event info to callback
 		ei.EventCb(KubeEvent{
-			MonitorId:    ei.Monitor.Metadata.MonitorId,
-			WatchEvents:  []WatchEventType{eventType},
-			Object:       obj,
-			FilterResult: objFilterRes.FilterResult,
+			MonitorId:   ei.Monitor.Metadata.MonitorId,
+			WatchEvents: []WatchEventType{eventType},
+			Objects:     []ObjectAndFilterResult{*objFilterRes},
 		})
 	}
 

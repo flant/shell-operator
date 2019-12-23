@@ -73,11 +73,14 @@ func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecut
 
 	for _, link := range c.ScheduleLinks {
 		if link.Crontab == crontab {
+			bc := BindingContext{
+				Binding: link.BindingName,
+			}
+			bc.Metadata.BindingType = Schedule
+			bc.Metadata.IncludeSnapshots = link.IncludeKubernetesSnapshots
+
 			info := BindingExecutionInfo{
-				BindingContext: []BindingContext{{
-					BindingType: Schedule,
-					Binding:     link.BindingName,
-				}},
+				BindingContext:   []BindingContext{bc},
 				IncludeSnapshots: link.IncludeKubernetesSnapshots,
 				AllowFailure:     link.AllowFailure,
 			}

@@ -7,28 +7,25 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // Information about event for hook
 type BindingContext struct {
-	Version     string
-	BindingType BindingType
+	Metadata struct {
+		Version             string
+		BindingType         BindingType
+		JqFilter            string
+		IncludeSnapshots    []string
+		IncludeAllSnapshots bool
+	}
 
 	// name of binding or kubeEventType if binding has no 'name' field
 	Binding string
-
 	// additional fields for 'kubernetes' binding
-	Type         string
-	WatchEvent   WatchEventType
-	Object       *unstructured.Unstructured
-	FilterResult string
-	Objects      []ObjectAndFilterResult
-	Snapshots    map[string][]ObjectAndFilterResult
-
-	// additional field for 'schedule' binding
-	KubernetesSnapshots map[string][]ObjectAndFilterResult
+	Type       KubeEventType
+	WatchEvent WatchEventType
+	Objects    []ObjectAndFilterResult
+	Snapshots  map[string][]ObjectAndFilterResult
 }
 
 func (bc BindingContext) MarshalJSON() ([]byte, error) {
@@ -36,7 +33,7 @@ func (bc BindingContext) MarshalJSON() ([]byte, error) {
 }
 
 func (bc BindingContext) Map() map[string]interface{} {
-	switch bc.Version {
+	switch bc.Metadata.Version {
 	case "v0":
 		return bc.MapV0()
 	case "v1":
@@ -50,43 +47,62 @@ func (bc BindingContext) Map() map[string]interface{} {
 func (bc BindingContext) MapV1() map[string]interface{} {
 	res := make(map[string]interface{}, 0)
 	res["binding"] = bc.Binding
-	if bc.KubernetesSnapshots != nil {
-		res["kubernetesSnapshots"] = bc.KubernetesSnapshots
-	}
-	if bc.BindingType != OnKubernetesEvent || bc.Type == "" {
+
+	if bc.Metadata.BindingType == OnStartup {
 		return res
 	}
-	// This BindingContext is for "kubernetes" binding, add more fields
+
+	if len(bc.Metadata.IncludeSnapshots) > 0 || bc.Metadata.IncludeAllSnapshots {
+		key := "kubernetesSnapshost"
+		if bc.Metadata.BindingType == OnKubernetesEvent {
+			key = "snapshots"
+		}
+		if len(bc.Snapshots) > 0 {
+			res[key] = bc.Snapshots
+		} else {
+			res[key] = map[string]string{}
+		}
+	}
+
+	if bc.Metadata.BindingType != OnKubernetesEvent || bc.Type == "" {
+		return res
+	}
+
+	// So, this BindingContext is for "kubernetes" binding.
 	res["type"] = bc.Type
 	// omitempty for watchEvent
 	if bc.WatchEvent != "" {
 		res["watchEvent"] = string(bc.WatchEvent)
 	}
 	switch bc.Type {
-	case "Synchronization":
+	case TypeSynchronization:
 		if len(bc.Objects) == 0 {
 			res["objects"] = make([]string, 0)
 		} else {
 			res["objects"] = bc.Objects
 		}
-	case "Event":
-		if bc.Object != nil {
-			res["object"] = bc.Object
-		}
-		if bc.FilterResult != "" {
-			res["filterResult"] = bc.FilterResult
+	case TypeEvent:
+		if len(bc.Objects) == 0 {
+			res["object"] = nil
+			if bc.Metadata.JqFilter != "" {
+				res["filterResult"] = ""
+			}
+		} else {
+			obj := bc.Objects[0]
+			objMap := obj.Map()
+			for k, v := range objMap {
+				res[k] = v
+			}
 		}
 	}
-	if bc.Snapshots != nil {
-		res["snapshots"] = bc.Snapshots
-	}
+
 	return res
 }
 
 func (bc BindingContext) MapV0() map[string]interface{} {
 	res := make(map[string]interface{}, 0)
 	res["binding"] = bc.Binding
-	if bc.BindingType != OnKubernetesEvent {
+	if bc.Metadata.BindingType != OnKubernetesEvent {
 		return res
 	}
 
@@ -102,10 +118,10 @@ func (bc BindingContext) MapV0() map[string]interface{} {
 
 	res["resourceEvent"] = eventV0
 
-	if bc.Object != nil {
-		res["resourceNamespace"] = bc.Object.GetNamespace()
-		res["resourceKind"] = bc.Object.GetKind()
-		res["resourceName"] = bc.Object.GetName()
+	if len(bc.Objects) > 0 {
+		res["resourceNamespace"] = bc.Objects[0].Object.GetNamespace()
+		res["resourceKind"] = bc.Objects[0].Object.GetKind()
+		res["resourceName"] = bc.Objects[0].Object.GetName()
 	}
 
 	return res
@@ -116,7 +132,7 @@ type BindingContextList []map[string]interface{}
 func ConvertBindingContextList(version string, contexts []BindingContext) BindingContextList {
 	res := make([]map[string]interface{}, len(contexts))
 	for i, context := range contexts {
-		context.Version = version
+		context.Metadata.Version = version
 		res[i] = context.Map()
 	}
 	return res

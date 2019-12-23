@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -15,7 +17,6 @@ const (
 	WatchEventAdded    WatchEventType = "Added"
 	WatchEventModified WatchEventType = "Modified"
 	WatchEventDeleted  WatchEventType = "Deleted"
-	Synchronization    WatchEventType = "Synchronization"
 )
 
 type KubeEventType string
@@ -43,59 +44,76 @@ type ObjectAndFilterResult struct {
 	FilterResult string
 }
 
-func (o ObjectAndFilterResult) MarshalJSON() ([]byte, error) {
+func (o ObjectAndFilterResult) Map() map[string]interface{} {
 	m := map[string]interface{}{
 		"object": o.Object,
 	}
-	// Add filterResult field only if it was requested
-	if o.Metadata.JqFilter != "" {
-		inJson := o.FilterResult
-		if inJson == "" {
-			inJson = "null"
-		}
-		var res interface{}
-		err := json.Unmarshal([]byte(inJson), &res)
-		if err != nil {
-			return nil, err
-		}
-		m["filterResult"] = res
+	if o.Metadata.JqFilter == "" {
+		return m
 	}
-	return json.Marshal(m)
+
+	// Add filterResult field only if it was requested
+	inJson := o.FilterResult
+	if inJson == "" {
+		m["filterResult"] = nil
+		return m
+	}
+	var res interface{}
+	err := json.Unmarshal([]byte(inJson), &res)
+	if err != nil {
+		log.Errorf("Possible bug!!! Cannot unmarshal jq filter '%s' result: %s", o.Metadata.JqFilter, err)
+		m["filterResult"] = nil
+		return m
+	}
+	m["filterResult"] = res
+
+	return m
+}
+
+func (o ObjectAndFilterResult) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.Map())
 }
 
 // KubeEvent contains MonitorId from monitor configuration, event type
 // and involved k8s objects.
 type KubeEvent struct {
-	MonitorId    string
-	Type         string // Event or Synchronization
-	WatchEvents  []WatchEventType
-	Object       *unstructured.Unstructured // for Event
-	FilterResult string                     // for Event
-	Objects      []ObjectAndFilterResult    // for Synchronization
+	MonitorId   string
+	Type        KubeEventType // Event or Synchronization
+	WatchEvents []WatchEventType
+	Objects     []ObjectAndFilterResult
 }
 
 func (k KubeEvent) String() string {
 	msgs := []string{}
 	switch k.Type {
-	case "Synchronization":
+	case TypeSynchronization:
 		if len(k.Objects) > 0 {
 			kind := k.Objects[0].Object.GetKind()
 			msgs = append(msgs, fmt.Sprintf("Synchronization with %d objects of kind '%s'", len(k.Objects), kind))
 		} else {
 			msgs = append(msgs, fmt.Sprintf("Synchronization with 0 objects"))
 		}
-	case "Event":
-		if len(k.WatchEvents) > 0 {
-			if k.Object != nil {
-				msgs = append(msgs, fmt.Sprintf("Event '%s' for %s/%s/%s", k.WatchEvents[0], k.Object.GetNamespace(), k.Object.GetKind(), k.Object.GetName()))
+	case TypeEvent:
+		if len(k.Objects) == 1 {
+			obj := k.Objects[0].Object
+			if len(k.WatchEvents) > 0 {
+				if obj != nil {
+					msgs = append(msgs, fmt.Sprintf("Event '%s' for %s/%s/%s", k.WatchEvents[0], obj.GetNamespace(), obj.GetKind(), obj.GetName()))
+				} else {
+					msgs = append(msgs, fmt.Sprintf("Event '%s' without object", k.WatchEvents[0]))
+				}
 			} else {
-				msgs = append(msgs, fmt.Sprintf("Event '%s' without object", k.WatchEvents[0]))
+				if obj != nil {
+					msgs = append(msgs, fmt.Sprintf("Event with no kubernetes event type for %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName()))
+				} else {
+					msgs = append(msgs, fmt.Sprintf("Event with no kubernetes event type"))
+				}
 			}
 		} else {
-			if k.Object != nil {
-				msgs = append(msgs, fmt.Sprintf("Event with no kubernetes event type for %s/%s/%s", k.Object.GetNamespace(), k.Object.GetKind(), k.Object.GetName()))
+			if len(k.WatchEvents) > 0 {
+				msgs = append(msgs, fmt.Sprintf("Event '%s' without objects", k.WatchEvents[0]))
 			} else {
-				msgs = append(msgs, fmt.Sprintf("Event with no kubernetes event type"))
+				msgs = append(msgs, fmt.Sprintf("Event without objects and kubernetes event type"))
 			}
 		}
 	default:

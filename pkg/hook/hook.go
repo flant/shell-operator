@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/kennygrant/sanitize"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -66,9 +68,11 @@ func (h *Hook) GetHookController() controller.HookController {
 
 func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) error {
 	// Refresh snapshots
-	context = h.HookController.UpdateSnapshots(context)
+	log.Debugf("RunHookMethod: original bc = %#v", context)
+	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
-	versionedContextList := ConvertBindingContextList(h.Config.Version, context)
+	log.Debugf("RunHookMethod: fresh bc = %#v", freshBindingContext)
+	versionedContextList := ConvertBindingContextList(h.Config.Version, freshBindingContext)
 
 	contextPath, err := h.prepareBindingContextJsonFile(versionedContextList)
 	if err != nil {

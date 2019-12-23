@@ -11,9 +11,9 @@ import (
 type KubeEventsManager interface {
 	WithContext(ctx context.Context)
 	AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error)
-	HasMonitor(configId string) bool
-	GetMonitor(configId string) Monitor
-	StartMonitor(configId string)
+	HasMonitor(monitorId string) bool
+	GetMonitor(monitorId string) Monitor
+	StartMonitor(monitorId string)
 	Start()
 
 	StopMonitor(configId string) error
@@ -79,33 +79,34 @@ func (mgr *kubeEventsManager) MakeKubeEvent(monitor Monitor, ev ...KubeEvent) *K
 		}
 		return &KubeEvent{
 			MonitorId: monitor.GetConfig().Metadata.MonitorId,
-			Type:      "Synchronization",
+			Type:      TypeSynchronization,
 			Objects:   monitor.GetExistedObjects(),
 		}
 	}
 
 	return &KubeEvent{
-		MonitorId:    ev[0].MonitorId,
-		Type:         "Event",
-		WatchEvents:  ev[0].WatchEvents,
-		Object:       ev[0].Object,
-		FilterResult: ev[0].FilterResult,
+		MonitorId:   ev[0].MonitorId,
+		Type:        TypeEvent,
+		WatchEvents: ev[0].WatchEvents,
+		Objects:     ev[0].Objects,
+		//Object:       ev[0].Object,
+		//FilterResult: ev[0].FilterResult,
 	}
 }
 
 // HasMonitor returns true if there is a monitor with configId
-func (mgr *kubeEventsManager) HasMonitor(configId string) bool {
-	_, has := mgr.Monitors[configId]
+func (mgr *kubeEventsManager) HasMonitor(monitorId string) bool {
+	_, has := mgr.Monitors[monitorId]
 	return has
 }
 
-func (mgr *kubeEventsManager) GetMonitor(configId string) Monitor {
-	return mgr.Monitors[configId]
+func (mgr *kubeEventsManager) GetMonitor(monitorId string) Monitor {
+	return mgr.Monitors[monitorId]
 }
 
 // StartMonitor starts all informers for monitor
-func (mgr *kubeEventsManager) StartMonitor(configId string) {
-	monitor := mgr.Monitors[configId]
+func (mgr *kubeEventsManager) StartMonitor(monitorId string) {
+	monitor := mgr.Monitors[monitorId]
 	monitor.Start(mgr.ctx)
 }
 

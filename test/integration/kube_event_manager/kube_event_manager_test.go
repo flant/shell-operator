@@ -7,18 +7,17 @@ import (
 	"fmt"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
-
 	. "github.com/flant/shell-operator/test/integration/suite"
 	. "github.com/flant/shell-operator/test/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
-	"github.com/flant/shell-operator/pkg/hook/kube_event"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 //var verBcs map[string]string
@@ -37,24 +36,22 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 		KubeEventsManager.WithContext(context.Background())
 	})
 
-	Context("with configVersion: v1 and mode: Incremental", func() {
+	Context("with configVersion: v1", func() {
 		var monitorConfig *kube_events_manager.MonitorConfig
 		var ev *KubeEvent
 
 		BeforeEach(func() {
-			logentry := log.WithField("1", "1")
 			monitorConfig = &kube_events_manager.MonitorConfig{
 				Kind:       "Pod",
 				ApiVersion: "v1",
 				EventTypes: []WatchEventType{
 					WatchEventAdded,
 				},
-				LogEntry: log.WithField("test", ""),
 			}
 			monitorConfig.Metadata.MonitorId = "test-abcd"
 
 			var err error
-			ev, err = KubeEventsManager.AddMonitor("", monitorConfig, logentry)
+			ev, err = KubeEventsManager.AddMonitor(monitorConfig)
 			Ω(err).ShouldNot(HaveOccurred())
 			fmt.Printf("ev: %#v\n", ev)
 		})
@@ -64,7 +61,7 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 
 			Ω(ev.Objects).ShouldNot(HaveLen(0))
 
-			bcList := kube_event.ConvertKubeEventToBindingContext(*ev, "kubernetes")
+			bcList := hook.ConvertKubeEventToBindingContext(*ev, "kubernetes")
 			verBcs := hook.ConvertBindingContextList("v1", bcList)
 
 			Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, "true"))

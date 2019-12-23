@@ -19,6 +19,7 @@ type KubernetesBindingToMonitorLink struct {
 	// Useful fields to create a BindingContext
 	IncludeSnapshots []string
 	AllowFailure     bool
+	JqFilter         string
 }
 
 // KubernetesBindingsController handles kubernetes bindings for one hook.
@@ -81,6 +82,7 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 			BindingName:      config.BindingName,
 			IncludeSnapshots: config.IncludeSnapshotsFrom,
 			AllowFailure:     config.AllowFailure,
+			JqFilter:         config.Monitor.JqFilter,
 		}
 
 		// There is no Synchronization event for 'v0' binding configuration.
@@ -131,7 +133,7 @@ func (c *kubernetesBindingsController) HandleEvent(kubeEvent KubeEvent) BindingE
 		}
 	}
 
-	bindingContext := ConvertKubeEventToBindingContext(kubeEvent, link.BindingName)
+	bindingContext := ConvertKubeEventToBindingContext(kubeEvent, link.BindingName, link.JqFilter, link.IncludeSnapshots)
 
 	return BindingExecutionInfo{
 		BindingContext:   bindingContext,
@@ -151,8 +153,11 @@ func (c *kubernetesBindingsController) BindingNames() []string {
 func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult {
 	res := map[string][]ObjectAndFilterResult{}
 
+	log.Debugf("SnapshotsFrom: request: %#v", bindingNames)
+
 	for _, bindingName := range bindingNames {
 		for _, binding := range c.KubernetesBindings {
+			log.Debugf("SnapshotsFrom: see in %v", binding.BindingName)
 			if bindingName == binding.BindingName {
 				monitorId := binding.Monitor.Metadata.MonitorId
 				if c.kubeEventsManager.HasMonitor(monitorId) {
@@ -162,6 +167,8 @@ func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map
 		}
 	}
 
+	log.Debugf("SnapshotsFrom: result: %#v", res)
+
 	return res
 }
 
@@ -169,28 +176,35 @@ func (c *kubernetesBindingsController) Snapshots() map[string][]ObjectAndFilterR
 	return c.SnapshotsFrom(c.BindingNames()...)
 }
 
-func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, bindingName string) []BindingContext {
+func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, bindingName string, jqFilter string, includeSnapshots []string) []BindingContext {
 	bindingContexts := make([]BindingContext, 0)
 
 	switch kubeEvent.Type {
-	case "Synchronization":
-		bindingContexts = append(bindingContexts, BindingContext{
-			BindingType: OnKubernetesEvent,
-			Binding:     bindingName,
-			Type:        kubeEvent.Type,
-			Objects:     kubeEvent.Objects,
-		})
+	case TypeSynchronization:
+		bc := BindingContext{
+			Binding: bindingName,
+			Type:    kubeEvent.Type,
+			Objects: kubeEvent.Objects,
+		}
+		bc.Metadata.JqFilter = jqFilter
+		bc.Metadata.BindingType = OnKubernetesEvent
+		bc.Metadata.IncludeSnapshots = includeSnapshots
 
-	case "Event":
+		bindingContexts = append(bindingContexts, bc)
+
+	case TypeEvent:
 		for _, kEvent := range kubeEvent.WatchEvents {
-			bindingContexts = append(bindingContexts, BindingContext{
-				BindingType:  OnKubernetesEvent,
-				Binding:      bindingName,
-				Type:         kubeEvent.Type,
-				WatchEvent:   kEvent,
-				Object:       kubeEvent.Object,
-				FilterResult: kubeEvent.FilterResult,
-			})
+			bc := BindingContext{
+				Binding:    bindingName,
+				Type:       kubeEvent.Type,
+				WatchEvent: kEvent,
+				Objects:    kubeEvent.Objects,
+			}
+			bc.Metadata.JqFilter = jqFilter
+			bc.Metadata.BindingType = OnKubernetesEvent
+			bc.Metadata.IncludeSnapshots = includeSnapshots
+
+			bindingContexts = append(bindingContexts, bc)
 		}
 	}
 

@@ -240,10 +240,7 @@ func TasksRunner() {
 
 				taskHook := HookManager.GetHook(t.GetName())
 
-				// get actual snapshots
-				bindingContext := taskHook.HookController.UpdateSnapshots(t.GetBindingContext())
-
-				err := taskHook.Run(t.GetBinding(), bindingContext, hookLogLabels)
+				err := taskHook.Run(t.GetBinding(), t.GetBindingContext(), hookLogLabels)
 				if err != nil {
 					hookLabel := taskHook.SafeName()
 
@@ -355,9 +352,14 @@ func CreateOnStartupTasks() {
 	logEntry.Infof("add HookRun@OnStartup tasks for %d hooks", len(onStartupHooks))
 
 	for _, hookName := range onStartupHooks {
+		bc := BindingContext{
+			Binding: ContextBindingType[OnStartup],
+		}
+		bc.Metadata.BindingType = OnStartup
+
 		newTask := task.NewTask(task.HookRun, hookName).
 			WithBinding(OnStartup).
-			AppendBindingContext(BindingContext{Binding: ContextBindingType[OnStartup]})
+			AppendBindingContext(bc)
 		TasksQueue.Add(newTask)
 		logEntry.Debugf("new task HookRun@OnStartup '%s'", hookName)
 	}

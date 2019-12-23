@@ -75,6 +75,7 @@ func (hc *hookController) InitKubernetesBindings(bindings []OnKubernetesEventCon
 	bindingCtrl.WithKubeEventsManager(kubeEventMgr)
 	bindingCtrl.WithKubernetesBindings(bindings)
 	hc.KubernetesController = bindingCtrl
+	hc.kubernetesBindings = bindings
 }
 
 func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, scheduleMgr schedule_manager.ScheduleManager) {
@@ -86,6 +87,7 @@ func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, schedu
 	bindingCtrl.WithScheduleManager(scheduleMgr)
 	bindingCtrl.WithScheduleBindings(bindings)
 	hc.ScheduleController = bindingCtrl
+	hc.scheduleBindings = bindings
 }
 
 func (hc *hookController) CanHandleKubeEvent(kubeEvent KubeEvent) bool {
@@ -140,7 +142,9 @@ func (hc *hookController) HandleScheduleEvent(crontab string, createTasksFn func
 			if createTasksFn != nil {
 				// Inject IncludeKubernetesSnapshots to BindingContext
 				if hc.KubernetesController != nil && len(info.BindingContext) > 0 && len(info.IncludeSnapshots) > 0 {
-					info.BindingContext[0].KubernetesSnapshots = hc.KubernetesController.SnapshotsFrom(info.IncludeSnapshots...)
+					newBc := info.BindingContext[0]
+					newBc.Snapshots = hc.KubernetesController.SnapshotsFrom(info.IncludeSnapshots...)
+					info.BindingContext[0] = newBc
 				}
 				createTasksFn(info)
 			}
@@ -214,8 +218,9 @@ func (hc *hookController) UpdateSnapshots(context []BindingContext) []BindingCon
 
 	newContext := []BindingContext{}
 	for _, bc := range context {
-		bc.Snapshots = hc.KubernetesSnapshotsFor(bc.BindingType, bc.Binding)
-		newContext = append(newContext, bc)
+		newBc := bc
+		newBc.Snapshots = hc.KubernetesSnapshotsFor(bc.Metadata.BindingType, bc.Binding)
+		newContext = append(newContext, newBc)
 	}
 
 	return newContext

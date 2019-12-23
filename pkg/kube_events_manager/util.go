@@ -57,7 +57,7 @@ func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (*ObjectAndF
 			}
 		}
 		if filtered == "" && len(data) > 0 {
-			log.Errorf("Possible Bug!!! jq '%s' return as unusual empty result, but input was not empty", jqFilter)
+			log.Errorf("Possible Bug!!! jq '%s' return an unusual empty result, but input was not empty", jqFilter)
 		}
 		res.FilterResult = filtered
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(filtered)
