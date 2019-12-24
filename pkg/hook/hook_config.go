@@ -1,7 +1,6 @@
 package hook
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -9,6 +8,7 @@ import (
 	uuid "gopkg.in/satori/go.uuid.v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/yaml"
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -59,6 +59,7 @@ type ScheduleConfigV1 struct {
 	Crontab                        string   `json:"crontab"`
 	AllowFailure                   bool     `json:"allowFailure"`
 	IncludeKubernetesSnapshotsFrom []string `json:"includeKubernetesSnapshotsFrom"`
+	Queue                          string   `json:"queue"`
 }
 
 // Legacy version of kubernetes event configuration
@@ -93,6 +94,7 @@ type OnKubernetesEventConfigV1 struct {
 	AllowFailure            bool                     `json:"allowFailure,omitempty"`
 	ResynchronizationPeriod string                   `json:"resynchronizationPeriod,omitempty"`
 	IncludeSnapshotsFrom    []string                 `json:"includeSnapshotsFrom"`
+	Queue                   string                   `json:"queue"`
 }
 
 type KubeNameSelectorV1 NameSelector
@@ -135,7 +137,7 @@ func (c *HookConfig) ConvertAndCheck(data []byte) error {
 	switch c.Version {
 	case "v0":
 		configV0 := &HookConfigV0{}
-		err := json.Unmarshal(data, configV0)
+		err := yaml.Unmarshal(data, configV0)
 		if err != nil {
 			return fmt.Errorf("unmarshal HookConfig version 0: %s", err)
 		}
@@ -146,7 +148,7 @@ func (c *HookConfig) ConvertAndCheck(data []byte) error {
 		}
 	case "v1":
 		configV1 := &HookConfigV1{}
-		err := json.Unmarshal(data, configV1)
+		err := yaml.Unmarshal(data, configV1)
 		if err != nil {
 			return fmt.Errorf("unmarshal HookConfig v1: %s", err)
 		}
@@ -281,6 +283,7 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 			kubeConfig.BindingName = kubeCfg.Name
 		}
 		kubeConfig.IncludeSnapshotsFrom = kubeCfg.IncludeSnapshotsFrom
+		kubeConfig.Queue = kubeCfg.Queue
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}
@@ -349,60 +352,61 @@ func (c *HookConfig) ConvertOnStartup(value interface{}) (*OnStartupConfig, erro
 	return res, nil
 }
 
-func (c *HookConfig) ConvertScheduleV0(schedule ScheduleConfigV0) (ScheduleConfig, error) {
+func (c *HookConfig) ConvertScheduleV0(schV0 ScheduleConfigV0) (ScheduleConfig, error) {
 	res := ScheduleConfig{}
 
-	if schedule.Name != "" {
-		res.BindingName = schedule.Name
+	if schV0.Name != "" {
+		res.BindingName = schV0.Name
 	} else {
 		res.BindingName = ContextBindingType[Schedule]
 	}
 
-	res.AllowFailure = schedule.AllowFailure
+	res.AllowFailure = schV0.AllowFailure
 	res.ScheduleEntry = ScheduleEntry{
-		Crontab: schedule.Crontab,
+		Crontab: schV0.Crontab,
 		Id:      c.ScheduleId(),
 	}
 
 	return res, nil
 }
 
-func (c *HookConfig) ConvertScheduleV1(schedule ScheduleConfigV1) (ScheduleConfig, error) {
+func (c *HookConfig) ConvertScheduleV1(schV1 ScheduleConfigV1) (ScheduleConfig, error) {
 	res := ScheduleConfig{}
 
-	if schedule.Name != "" {
-		res.BindingName = schedule.Name
+	if schV1.Name != "" {
+		res.BindingName = schV1.Name
 	} else {
 		res.BindingName = ContextBindingType[Schedule]
 	}
 
-	res.AllowFailure = schedule.AllowFailure
+	res.AllowFailure = schV1.AllowFailure
 	res.ScheduleEntry = ScheduleEntry{
-		Crontab: schedule.Crontab,
+		Crontab: schV1.Crontab,
 		Id:      c.ScheduleId(),
 	}
-	res.IncludeKubernetesSnapshotsFrom = schedule.IncludeKubernetesSnapshotsFrom
+	res.IncludeKubernetesSnapshotsFrom = schV1.IncludeKubernetesSnapshotsFrom
+	res.Queue = schV1.Queue
 
 	return res, nil
 }
 
-func (c *HookConfig) CheckScheduleV0(schedule ScheduleConfigV0) error {
-	_, err := cron.Parse(schedule.Crontab)
+func (c *HookConfig) CheckScheduleV0(schV0 ScheduleConfigV0) error {
+	_, err := cron.Parse(schV0.Crontab)
 	if err != nil {
 		return fmt.Errorf("crontab is invalid: %v", err)
 	}
 	return nil
 }
 
-func (c *HookConfig) CheckScheduleV1(schedule ScheduleConfigV1) (allErr error) {
+func (c *HookConfig) CheckScheduleV1(schV1 ScheduleConfigV1) (allErr error) {
 	var err error
-	_, err = cron.Parse(schedule.Crontab)
+	_, err = cron.Parse(schV1.Crontab)
 	if err != nil {
 		allErr = multierror.Append(allErr, fmt.Errorf("crontab is invalid: %v", err))
 	}
 
-	if len(schedule.IncludeKubernetesSnapshotsFrom) > 0 {
-		err = c.CheckIncludeSnapshots(schedule.IncludeKubernetesSnapshotsFrom...)
+	if len(schV1.IncludeKubernetesSnapshotsFrom) > 0 {
+		err = c.CheckIncludeSnapshots(schV1.IncludeKubernetesSnapshotsFrom...)
 		if err != nil {
 			allErr = multierror.Append(allErr, fmt.Errorf("includeKubernetesSnapshotsFrom is invalid: %v", err))
 		}

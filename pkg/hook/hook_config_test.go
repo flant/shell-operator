@@ -5,23 +5,25 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/gomega"
 )
 
 func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
+	g := NewWithT(t)
 	var hookConfig *HookConfig
 	var err error
 
 	tests := []struct {
-		name     string
-		jsonText string
-		testFn   func()
+		name       string
+		jsonConfig string
+		testFn     func()
 	}{
 		{
 			"load unknown version",
 			`{"configVersion":"1.0.1-unknown","onStartup": 1}`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
+
 				if merr, ok := err.(*multierror.Error); ok {
 					fmt.Printf("expected error was: %s\n", multierror.ListFormatFunc(merr.Errors))
 				} else {
@@ -33,7 +35,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 			"load empty version",
 			`{"configVersion":"","onStartup": 1}`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
 				if merr, ok := err.(*multierror.Error); ok {
 					fmt.Printf("expected error was: %s\n", multierror.ListFormatFunc(merr.Errors))
 				} else {
@@ -45,29 +47,68 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 			"v0 onStartup config",
 			`{"onStartup": 1}`,
 			func() {
-				if assert.NoError(t, err) {
-					assert.Equal(t, "v0", hookConfig.Version)
-					assert.NotNil(t, hookConfig.V0)
-					assert.Nil(t, hookConfig.V1)
-				}
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.Version).To(Equal("v0"))
+				g.Expect(hookConfig.V0).NotTo(BeNil())
+				g.Expect(hookConfig.V1).To(BeNil())
+				g.Expect(hookConfig.OnStartup).NotTo(BeNil())
+				g.Expect(hookConfig.OnStartup.Order).To(Equal(1.0))
 			},
 		},
+		{
+			"v0 with schedules and onKubernetesEvent",
+			`{
+              "onStartup": 1,
+			  "schedule":[
+			    {"name":"each 1 min", "crontab":"0 */1 * * * *"},
+			    {"name":"each 5 min", "crontab":"0 */5 * * * *"}
+			  ],
+              "onKubernetesEvent":[
+                {"name":"monitor pods", "kind":"pod", "allowFailure":true}
+              ]
+            }`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				g.Expect(hookConfig.Version).To(Equal("v0"))
+				g.Expect(hookConfig.V0).NotTo(BeNil())
+				g.Expect(hookConfig.V1).To(BeNil())
+
+				g.Expect(hookConfig.OnStartup).NotTo(BeNil())
+				g.Expect(hookConfig.OnStartup.Order).To(Equal(1.0))
+
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(1))
+				pods := hookConfig.OnKubernetesEvents[0]
+				g.Expect(pods.BindingName).To(Equal("monitor pods"))
+				g.Expect(pods.Monitor.Kind).To(Equal("pod"))
+				g.Expect(pods.AllowFailure).To(Equal(true))
+
+				g.Expect(hookConfig.Schedules).Should(HaveLen(2))
+				sch1min := hookConfig.Schedules[0]
+				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
+				sch5min := hookConfig.Schedules[1]
+				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
+
+			},
+		},
+
 		{
 			"v1 onStartup config",
 			`{"configVersion":"v1","onStartup": 1}`,
 			func() {
-				if assert.NoError(t, err) {
-					assert.Equal(t, "v1", hookConfig.Version)
-					assert.Nil(t, hookConfig.V0)
-					assert.NotNil(t, hookConfig.V1)
-				}
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+				g.Expect(hookConfig.OnStartup).NotTo(BeNil())
+				g.Expect(hookConfig.OnStartup.Order).To(Equal(1.0))
 			},
 		},
 		{
 			"v1 onStartup bad value",
 			`{"configVersion":"v1","onStartup": e1}`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
 				if merr, ok := err.(*multierror.Error); ok {
 					fmt.Printf("expected error was: %s\n", multierror.ListFormatFunc(merr.Errors))
 				} else {
@@ -76,7 +117,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 			},
 		},
 		{
-			"v1 with schedule",
+			"v1 with schedules",
 			`{
               "configVersion":"v1",
 			  "schedule":[
@@ -85,54 +126,203 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 			  ]
             }`,
 			func() {
-				if assert.NoError(t, err) {
-					assert.Equal(t, "v1", hookConfig.Version)
-					assert.Nil(t, hookConfig.V0)
-					assert.NotNil(t, hookConfig.V1)
-					assert.Nil(t, hookConfig.OnStartup)
-					assert.Len(t, hookConfig.Schedules, 2)
-					assert.Len(t, hookConfig.OnKubernetesEvents, 0)
-				}
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+				g.Expect(hookConfig.OnStartup).To(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(0))
+
+				g.Expect(hookConfig.Schedules).Should(HaveLen(2))
+
+				sch1min := hookConfig.Schedules[0]
+				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
+
+				sch5min := hookConfig.Schedules[1]
+				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
+
 			},
 		},
 		{
-			"v1 with schedule",
+			"v1 with onStartup and schedule",
 			`{
               "configVersion":"v1",
+              "onStartup": 212,
 			  "schedule":[
-			    {"name":"each 1 min", "crontab":"0 */1 * * * *", "includeKubernetesSnapshotsFrom":["pods", "secrets"]},
-			    {"name":"each 5 min", "crontab":"0 */5 * * * *"}
+			    {"name":"each 5 min", "crontab":"*/5 * * * *"},
+			    {"name":"each 5 sec", "crontab":"*/5 * * * * *", "queue":"off-schedule"}
 			  ]
             }`,
 			func() {
-				if assert.NoError(t, err) {
-					assert.Equal(t, "v1", hookConfig.Version)
-					assert.Nil(t, hookConfig.V0)
-					assert.NotNil(t, hookConfig.V1)
-					assert.Nil(t, hookConfig.OnStartup)
-					assert.Len(t, hookConfig.Schedules, 2)
-					assert.Len(t, hookConfig.OnKubernetesEvents, 0)
-				}
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+
+				g.Expect(hookConfig.OnStartup).NotTo(BeNil())
+				g.Expect(hookConfig.OnStartup.Order).To(Equal(212.0))
+
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(0))
+
+				g.Expect(hookConfig.Schedules).Should(HaveLen(2))
+
+				sch5min := hookConfig.Schedules[0]
+				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
+				g.Expect(sch5min.Queue).To(Equal(""))
+
+				sch5sec := hookConfig.Schedules[1]
+				g.Expect(sch5sec.BindingName).To(Equal("each 5 sec"))
+				g.Expect(sch5sec.Queue).To(Equal("off-schedule"))
+
 			},
 		},
 		{
-			"v1 with kubernetes",
+			"v1 with onStartup and kubernetes",
 			`{
               "configVersion":"v1",
 			  "kubernetes":[
-			    {"name":"monitor pods", "apiVersion":"v1", "kind":"Pod"},
-			    {"name":"deployments", "apiVersion":"apps/v1", "kind":"Deployment", "includeSnapshotsFrom":["pods", "secrets"]}
+			    {"name":"pods", "apiVersion":"v1", "kind":"Pod"},
+			    {"name":"deployments", "apiVersion":"apps/v1", "kind":"Deployment", "includeSnapshotsFrom":["pods", "secrets"]},
+			    {"name":"secrets", "apiVersion":"v1", "kind":"Secret", "queue":"offload"}
               ]
             }`,
 			func() {
-				if assert.NoError(t, err) {
-					assert.Equal(t, "v1", hookConfig.Version)
-					assert.Nil(t, hookConfig.V0)
-					assert.NotNil(t, hookConfig.V1)
-					assert.Nil(t, hookConfig.OnStartup)
-					assert.Len(t, hookConfig.Schedules, 0)
-					assert.Len(t, hookConfig.OnKubernetesEvents, 2)
-				}
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+				g.Expect(hookConfig.OnStartup).To(BeNil())
+				g.Expect(hookConfig.Schedules).Should(HaveLen(0))
+
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(3))
+
+				pods := hookConfig.OnKubernetesEvents[0]
+				g.Expect(pods.BindingName).To(Equal("pods"))
+
+				deployments := hookConfig.OnKubernetesEvents[1]
+				g.Expect(deployments.BindingName).To(Equal("deployments"))
+				g.Expect(deployments.IncludeSnapshotsFrom).To(HaveLen(2))
+
+				secrets := hookConfig.OnKubernetesEvents[2]
+				g.Expect(secrets.BindingName).To(Equal("secrets"))
+				g.Expect(secrets.Queue).To(Equal("offload"))
+			},
+		},
+		{
+			"v1 with snapshots in schedule",
+			`{
+              "configVersion":"v1",
+			  "kubernetes":[
+			    {"name":"pods", "apiVersion":"v1", "kind":"Pod"},
+			    {"name":"secrets", "apiVersion":"v1", "kind":"Secret", "queue":"secrets"}
+              ],
+			  "schedule":[
+			    {"name":"each 1 min", "crontab":"0 */1 * * * *", "includeKubernetesSnapshotsFrom":["pods", "secrets"]},
+			    {"name":"each 5 min", "crontab":"0 */5 * * * *"},
+			    {"name":"each 7 sec", "crontab":"*/7 * * * * *", "queue":"off-schedule"}
+			  ]
+            }`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+
+				g.Expect(hookConfig.OnStartup).To(BeNil())
+
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(2))
+
+				g.Expect(hookConfig.Schedules).Should(HaveLen(3))
+
+				sch1min := hookConfig.Schedules[0]
+				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
+				g.Expect(sch1min.Queue).To(Equal(""))
+				g.Expect(sch1min.IncludeKubernetesSnapshotsFrom).Should(HaveLen(2))
+
+				sch5min := hookConfig.Schedules[1]
+				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
+				g.Expect(sch5min.Queue).To(Equal(""))
+
+				sch7sec := hookConfig.Schedules[2]
+				g.Expect(sch7sec.BindingName).To(Equal("each 7 sec"))
+				g.Expect(sch7sec.Queue).To(Equal("off-schedule"))
+			},
+		},
+		{
+			"v1 yaml full config",
+			`
+configVersion: v1
+onStartup: 112
+kubernetes:
+- name: pods
+  apiVersion: v1
+  kind: Pod
+- name: secrets
+  apiVersion: v1
+  kind: Secret
+  queue: secrets
+schedule:
+- name: each 1 min
+  crontab: "0 */1 * * * *"
+  includeKubernetesSnapshotsFrom: ["pods", "secrets"]
+- name: each 5 min
+  crontab: "0 */5 * * * *"
+- name: each 7 sec
+  crontab: "*/7 * * * * *"
+  queue: off-schedule
+`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+
+				g.Expect(hookConfig.OnStartup).NotTo(BeNil())
+				g.Expect(hookConfig.OnStartup.Order).To(Equal(112.0))
+
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(2))
+
+				g.Expect(hookConfig.Schedules).Should(HaveLen(3))
+
+				sch1min := hookConfig.Schedules[0]
+				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
+				g.Expect(sch1min.Queue).To(Equal(""))
+				g.Expect(sch1min.IncludeKubernetesSnapshotsFrom).Should(HaveLen(2))
+
+				sch5min := hookConfig.Schedules[1]
+				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
+				g.Expect(sch5min.Queue).To(Equal(""))
+
+				sch7sec := hookConfig.Schedules[2]
+				g.Expect(sch7sec.BindingName).To(Equal("each 7 sec"))
+				g.Expect(sch7sec.Queue).To(Equal("off-schedule"))
+			},
+		},
+		{
+			"v1 kubernetes with empty nameSelector.matchNames",
+			`{
+              "configVersion":"v1",
+			  "kubernetes":[
+			    {"name":"monitor pods", "apiVersion":"v1", "kind":"Pod",
+                 "nameSelector":{"matchNames":[]}}
+              ]
+            }`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(1))
+
+				cfg := hookConfig.OnKubernetesEvents[0]
+
+				g.Expect(cfg.Monitor).ToNot(BeNil())
+				g.Expect(cfg.Monitor.NameSelector).ToNot(BeNil())
+				g.Expect(cfg.Monitor.NameSelector.MatchNames).ToNot(BeNil())
+
 			},
 		},
 		{
@@ -144,7 +334,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
               ]
             }`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
 			},
 		},
 		{
@@ -156,7 +346,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
               ]
             }`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
 			},
 		},
 		{
@@ -179,7 +369,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
               ]
             }`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
 			},
 		},
 	}
@@ -187,7 +377,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			hookConfig = &HookConfig{}
-			err = hookConfig.LoadAndValidate([]byte(test.jsonText))
+			err = hookConfig.LoadAndValidate([]byte(test.jsonConfig))
 			test.testFn()
 		})
 	}
@@ -195,6 +385,8 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 
 // load kubernetes configs with errors
 func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
+	g := NewWithT(t)
+
 	var hookConfig *HookConfig
 	var err error
 
@@ -218,9 +410,8 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
               ]
             }`,
 			func() {
-				if assert.NoError(t, err) {
-					assert.Len(t, hookConfig.OnKubernetesEvents[0].Monitor.NameSelector.MatchNames, 1)
-				}
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.NameSelector.MatchNames).Should(HaveLen(1))
 			},
 		},
 		{
@@ -236,9 +427,8 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
               ]
             }`,
 			func() {
-				if assert.NoError(t, err) {
-					assert.Len(t, hookConfig.OnKubernetesEvents[0].Monitor.EventTypes, 2)
-				}
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).Should(HaveLen(2))
 			},
 		},
 		{
@@ -254,7 +444,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
               ]
             }`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
 				t.Logf("expected error was: %v\n", err)
 			},
 		},
@@ -273,7 +463,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
               ]
             }`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
 				t.Logf("expected error was: %v\n", err)
 			},
 		},
@@ -336,7 +526,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
               ]
             }`,
 			func() {
-				assert.Error(t, err)
+				g.Expect(err).Should(HaveOccurred())
 				t.Logf("expected error was: %v\n", err)
 			},
 		},
@@ -350,101 +540,3 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
 		})
 	}
 }
-
-//// Test loading legacy version of hook configuration
-//func Test_HookConfig_V0(t *testing.T) {
-//	configData := `
-//{"schedule":[
-//{"name":"each 1 min", "crontab":"0 */1 * * * *"},
-//{"name":"each 5 min", "crontab":"0 */5 * * * *"}
-//], "onKubernetesEvent":[
-//{"name":"monitor pods", "kind":"pod", "allowFailure":true}
-//]}
-//`
-//
-//	hc := &HookConfig{}
-//
-//	err := json.Unmarshal([]byte(configData), hc)
-//
-//	if assert.NoError(t, err) {
-//		assert.Equal(t, "v0", hc.Version)
-//		assert.NotNil(t, hc.V0)
-//		assert.Nil(t, hc.V1)
-//	}
-//
-//	err = hc.Convert()
-//	if assert.NoError(t, err) {
-//		assert.Nil(t, hc.OnStartup)
-//		assert.Len(t, hc.Schedules, 2)
-//		assert.Len(t, hc.OnKubernetesEvents, 1)
-//	}
-//
-//}
-//
-//// Test loading v1 version of hook configuration
-//func Test_HookConfig_V1(t *testing.T) {
-//	configData := `
-//{"configVersion":"v1",
-//"schedule":[
-//{"name":"each 1 min", "crontab":"0 */1 * * * *"},
-//{"name":"each 5 min", "crontab":"0 */5 * * * *"}
-//], "kubernetes":[
-//{"name":"monitor pods", "kind":"pod", "allowFailure":true}
-//]}
-//`
-//
-//	hc := &HookConfig{}
-//
-//	err := json.Unmarshal([]byte(configData), hc)
-//	if assert.NoError(t, err) {
-//		assert.Equal(t, "v1", hc.Version)
-//		assert.Nil(t, hc.V0)
-//		assert.NotNil(t, hc.V1)
-//	}
-//
-//	err = hc.Convert()
-//	if assert.NoError(t, err) {
-//		assert.Nil(t, hc.OnStartup)
-//		assert.Len(t, hc.Schedules, 2)
-//		assert.Len(t, hc.OnKubernetesEvents, 1)
-//	}
-//}
-//
-//func Test_HookConfig_Convert_v1(t *testing.T) {
-//
-//	var hookConfig *HookConfig
-//	var err error
-//
-//	tests := []struct {
-//		name     string
-//		jsonText string
-//		testFn   func()
-//	}{
-//		{
-//			"empty nameSelector.matchNames",
-//			`{"configVersion":"v1", "kubernetes": [{"kind":"pod", "nameSelector":{}}]}`,
-//			func() {
-//				if assert.NoError(t, err) {
-//					assert.Len(t, hookConfig.OnKubernetesEvents, 1)
-//					assert.NotNil(t, hookConfig.OnKubernetesEvents[0].Monitor)
-//					assert.NotNil(t, hookConfig.OnKubernetesEvents[0].Monitor.NameSelector)
-//					// MatchNames array is nil
-//					//assert.NotNil(t, hookConfig.OnKubernetesEvents[0].Monitor.NameSelector.MatchNames)
-//					assert.Len(t, hookConfig.OnKubernetesEvents[0].Monitor.NameSelector.MatchNames, 0)
-//				}
-//			},
-//		},
-//	}
-//
-//	for _, test := range tests {
-//		t.Run(test.name, func(t *testing.T) {
-//			hookConfig = &HookConfig{}
-//			err = nil
-//			err = json.Unmarshal([]byte(test.jsonText), hookConfig)
-//			if assert.NoError(t, err) {
-//				err = hookConfig.Convert()
-//				test.testFn()
-//			}
-//		})
-//	}
-//}

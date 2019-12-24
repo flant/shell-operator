@@ -97,6 +97,8 @@ properties:
           minItems: 1
           items:
             type: string
+        queue:
+          type: string
   kubernetes:
     title: kubernetes event bindings
     type: array
@@ -130,6 +132,8 @@ properties:
           minItems: 1
           items:
             type: string
+        queue:
+          type: string
         jqFilter:
           type: string
           example: ".metadata.labels"

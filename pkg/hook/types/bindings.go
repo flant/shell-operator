@@ -34,10 +34,12 @@ type ScheduleConfig struct {
 	CommonBindingConfig
 	ScheduleEntry                  ScheduleEntry
 	IncludeKubernetesSnapshotsFrom []string
+	Queue                          string
 }
 
 type OnKubernetesEventConfig struct {
 	CommonBindingConfig
 	Monitor              *kube_events_manager.MonitorConfig
 	IncludeSnapshotsFrom []string
+	Queue                string
 }

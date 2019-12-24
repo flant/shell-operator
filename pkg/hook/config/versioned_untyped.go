@@ -1,8 +1,9 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"sigs.k8s.io/yaml"
 )
 
 const VersionKey = "configVersion"
@@ -37,7 +38,7 @@ func NewDefaultVersionedUntyped() *VersionedUntyped {
 }
 
 func (u *VersionedUntyped) Load(data []byte) error {
-	err := json.Unmarshal(data, &u.Obj)
+	err := yaml.Unmarshal(data, &u.Obj)
 	if err != nil {
 		return fmt.Errorf("json unmarshal: %v", err)
 	}
