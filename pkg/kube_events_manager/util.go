@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	. "github.com/flant/libjq-go"
-	log "github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -55,9 +53,6 @@ func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (*ObjectAndF
 			if err != nil {
 				return nil, fmt.Errorf("failed jq filter: '%s'", err)
 			}
-		}
-		if filtered == "" && len(data) > 0 {
-			log.Errorf("Possible Bug!!! jq '%s' return an unusual empty result, but input was not empty", jqFilter)
 		}
 		res.FilterResult = filtered
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(filtered)

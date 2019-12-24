@@ -153,11 +153,8 @@ func (c *kubernetesBindingsController) BindingNames() []string {
 func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult {
 	res := map[string][]ObjectAndFilterResult{}
 
-	log.Debugf("SnapshotsFrom: request: %#v", bindingNames)
-
 	for _, bindingName := range bindingNames {
 		for _, binding := range c.KubernetesBindings {
-			log.Debugf("SnapshotsFrom: see in %v", binding.BindingName)
 			if bindingName == binding.BindingName {
 				monitorId := binding.Monitor.Metadata.MonitorId
 				if c.kubeEventsManager.HasMonitor(monitorId) {
@@ -166,8 +163,6 @@ func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map
 			}
 		}
 	}
-
-	log.Debugf("SnapshotsFrom: result: %#v", res)
 
 	return res
 }

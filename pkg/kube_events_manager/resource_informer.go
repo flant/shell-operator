@@ -15,7 +15,6 @@ import (
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
 	"github.com/flant/shell-operator/pkg/kube"
-	utils_data "github.com/flant/shell-operator/pkg/utils/data"
 )
 
 // ResourceInformer is a kube informer for particular onKubernetesEvent
@@ -129,16 +128,11 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	return nil
 }
 
-// TODO we need locks here
+// TODO we need locks between HandleEvent and GetExistedObjects
 func (ei *resourceInformer) GetExistedObjects() []ObjectAndFilterResult {
 	res := make([]ObjectAndFilterResult, 0)
 	for _, obj := range ei.CachedObjects {
-		log.Infof("I see %s", ResourceId(obj.Object))
-		newObj := *obj
-		res = append(res, newObj)
-	}
-	for _, obj := range res {
-		log.Infof("I return %s", ResourceId(obj.Object))
+		res = append(res, *obj)
 	}
 	return res
 }
@@ -178,28 +172,19 @@ func (ei *resourceInformer) ListExistedObjects() error {
 	log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
 
 	for _, item := range objList.Items {
-		// copy internal var to avoid duplication of pointer
+		// copy loop var to avoid duplication of pointer
 		obj := item
 		objFilterRes, err := ApplyJqFilter(ei.Monitor.JqFilter, &obj)
 		if err != nil {
 			return err
 		}
-		// save object to cache
+		// save object to the cache
 		ei.CachedObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
-		// Debug message
-		// TODO can this be simpler?
-		jqFilterOutput := ""
-		if ei.Monitor.JqFilter != "" {
-			jqFilterOutput = fmt.Sprintf(" jqFilter '%s' output:\n%s",
-				ei.Monitor.JqFilter,
-				utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(objFilterRes.FilterResult)))
-		}
-		log.Debugf("%s: initial checksum of %s is %s.%s",
+		log.Debugf("%s: first add %s to the cache with checksum %s",
 			ei.Monitor.Metadata.DebugName,
 			objFilterRes.Metadata.ResourceId,
-			objFilterRes.Metadata.Checksum,
-			jqFilterOutput)
+			objFilterRes.Metadata.Checksum)
 	}
 
 	return nil
