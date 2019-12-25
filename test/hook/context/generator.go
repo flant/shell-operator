@@ -94,6 +94,7 @@ func (b *BindingContextController) Run() (string, error) {
 	kube.DynamicClient = fakedynamic.NewSimpleDynamicClient(runtime.NewScheme())
 
 	b.Manager = manager.NewKubeEventsManager()
+	b.Manager.WithContext(b.Context)
 
 	// Use StateController to apply changes
 	stateController, err := NewStateController(b.InitialState)
@@ -103,7 +104,7 @@ func (b *BindingContextController) Run() (string, error) {
 	b.Controller = stateController
 
 	testHook := hook.NewHook("test", "test")
-	_, err = testHook.WithConfig([]byte(b.HookConfig))
+	testHook, err = testHook.WithConfig([]byte(b.HookConfig))
 	if err != nil {
 		return "", fmt.Errorf("couldn't load or validate hook configuration: %v", err)
 	}
@@ -111,17 +112,14 @@ func (b *BindingContextController) Run() (string, error) {
 	b.HookCtrl = controller.NewHookController()
 	b.HookCtrl.InitKubernetesBindings(testHook.GetConfig().OnKubernetesEvents, b.Manager)
 
-	testHook.WithHookController(b.HookCtrl)
 	bindingContexts := make([]BindingContext, 0)
 
 	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
-		bindingContexts = append(bindingContexts, info.BindingContext...)
+		bindingContexts = append(bindingContexts, b.HookCtrl.UpdateSnapshots(info.BindingContext)...)
 	})
 	if err != nil {
 		return "", fmt.Errorf("couldn't enable kubernetes bindings: %v", err)
 	}
-
-	b.Manager.WithContext(b.Context)
 	b.HookCtrl.StartMonitors()
 
 	return convertBindingContexts(bindingContexts)
