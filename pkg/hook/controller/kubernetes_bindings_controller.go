@@ -154,6 +154,8 @@ func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map
 	res := map[string][]ObjectAndFilterResult{}
 
 	for _, bindingName := range bindingNames {
+		// initialize all keys with empty arrays.
+		res[bindingName] = make([]ObjectAndFilterResult, 0)
 		for _, binding := range c.KubernetesBindings {
 			if bindingName == binding.BindingName {
 				monitorId := binding.Monitor.Metadata.MonitorId

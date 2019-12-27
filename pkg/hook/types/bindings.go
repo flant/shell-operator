@@ -8,9 +8,9 @@ import (
 type BindingType string
 
 const (
-	Schedule          BindingType = "SCHEDULE"
-	OnStartup         BindingType = "ON_STARTUP"
-	OnKubernetesEvent BindingType = "ON_KUBERNETES_EVENT"
+	Schedule          BindingType = "schedule"
+	OnStartup         BindingType = "onStartup"
+	OnKubernetesEvent BindingType = "kubernetes"
 )
 
 var ContextBindingType = map[BindingType]string{

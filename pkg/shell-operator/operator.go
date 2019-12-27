@@ -14,7 +14,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/types"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
@@ -24,15 +26,41 @@ import (
 	"github.com/flant/shell-operator/pkg/metrics_storage"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
+	"github.com/flant/shell-operator/pkg/task/dump"
+	"github.com/flant/shell-operator/pkg/task/queue"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
-var (
-	WorkingDir string
-	TempDir    string
+//var (
+//	WorkingDir string
+//	TempDir    string
+//
+//	TaskQueues *queue.TaskQueueSet
+//
+//	HookManager hook.HookManager
+//
+//	ScheduleManager   schedule_manager.ScheduleManager
+//	KubeEventsManager kube_events_manager.KubeEventsManager
+//
+//	MetricsStorage *metrics_storage.MetricStorage
+//
+//	ManagersEventsHandler *ManagerEventsHandler
+//
+//	// StopHandleEventsFromManagersCh channel is used to stop loop of the HandleEventsFromManagers.
+//	StopHandleEventsFromManagersCh = make(chan struct{}, 1)
+//
+//	CancelOperator context.CancelFunc
+//)
 
-	TasksQueue *task.TasksQueue
+type ShellOperator struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	HooksDir string
+	TempDir  string
+
+	TaskQueues *queue.TaskQueueSet
 
 	HookManager hook.HookManager
 
@@ -41,49 +69,71 @@ var (
 
 	MetricsStorage *metrics_storage.MetricStorage
 
-	// StopHandleEventsFromManagersCh channel is used to stop loop of the HandleEventsFromManagers.
-	StopHandleEventsFromManagersCh = make(chan struct{}, 1)
-)
+	ManagerEventsHandler *ManagerEventsHandler
+}
 
-var (
-	QueueIsEmptyDelay = 3 * time.Second
-	FailedHookDelay   = 5 * time.Second
-)
+func NewShellOperator() *ShellOperator {
+	return &ShellOperator{}
+}
+
+func (op *ShellOperator) WithHooksDir(dir string) {
+	op.HooksDir = dir
+}
+
+func (op *ShellOperator) WithTempDir(dir string) {
+	op.TempDir = dir
+}
+
+func (op *ShellOperator) WithContext(ctx context.Context) {
+	op.ctx, op.cancel = context.WithCancel(ctx)
+}
+
+func (op *ShellOperator) Stop() {
+	if op.cancel != nil {
+		op.cancel()
+	}
+}
 
 // Init does some basic checks and instantiate managers
 //
 // - check settings: directories, kube config
 // - initialize managers: hook manager, kube events manager, schedule manager
 // - create an empty task queue
-func Init() (err error) {
+func (op *ShellOperator) Init() (err error) {
 	log.Debug("MAIN Init")
 
-	WorkingDir, err := filepath.Abs(app.WorkingDir)
-	if err != nil {
-		log.Errorf("MAIN Fatal: Cannot determine a current dir: %s", err)
-		return err
-	}
-	if exists, _ := utils_file.DirExists(WorkingDir); !exists {
-		log.Errorf("MAIN Fatal: working dir '%s' is not exists", WorkingDir)
-		return fmt.Errorf("no working dir")
-	}
-	log.Infof("Working dir: %s", WorkingDir)
-
-	TempDir = app.TempDir
-	if exists, _ := utils_file.DirExists(TempDir); !exists {
-		err = os.Mkdir(TempDir, os.FileMode(0777))
+	if op.HooksDir == "" {
+		op.HooksDir, err = filepath.Abs(app.WorkingDir)
 		if err != nil {
-			log.Errorf("MAIN Fatal: Cannot create a temporary dir: %s", err)
+			log.Errorf("MAIN Fatal: Cannot determine a current dir: %s", err)
 			return err
 		}
+		if exists, _ := utils_file.DirExists(op.HooksDir); !exists {
+			log.Errorf("MAIN Fatal: working dir '%s' is not exists", op.HooksDir)
+			return fmt.Errorf("no working dir")
+		}
 	}
-	log.Infof("Use temporary dir: %s", TempDir)
+	log.Infof("Working dir: %s", op.HooksDir)
 
-	// Initializing the empty task queue.
-	TasksQueue = task.NewTasksQueue()
+	if op.TempDir == "" {
+		op.TempDir = app.TempDir
+		if exists, _ := utils_file.DirExists(op.TempDir); !exists {
+			err = os.Mkdir(op.TempDir, os.FileMode(0777))
+			if err != nil {
+				log.Errorf("MAIN Fatal: Cannot create a temporary dir: %s", err)
+				return err
+			}
+		}
+	}
+	log.Infof("Use temporary dir: %s", op.TempDir)
+
+	// Initializing the task queues set with the "main" queue.
+	op.TaskQueues = queue.NewTaskQueueSet()
+	op.TaskQueues.WithContext(op.ctx)
 
 	// Initializing schedule manager.
-	ScheduleManager = schedule_manager.NewScheduleManager()
+	op.ScheduleManager = schedule_manager.NewScheduleManager()
+	op.ScheduleManager.WithContext(op.ctx)
 
 	// Initialize kube client for kube events hooks.
 	err = kube.Init(kube.InitOptions{KubeContext: app.KubeContext, KubeConfig: app.KubeConfig})
@@ -92,258 +142,191 @@ func Init() (err error) {
 		return err
 	}
 
-	KubeEventsManager = kube_events_manager.NewKubeEventsManager()
-	KubeEventsManager.WithContext(context.Background())
+	op.KubeEventsManager = kube_events_manager.NewKubeEventsManager()
+	op.KubeEventsManager.WithContext(op.ctx)
 
 	// Initializing hook manager (load hooks from WorkingDir)
-	HookManager = hook.NewHookManager()
-	HookManager.WithDirectories(WorkingDir, TempDir)
-	HookManager.WithKubeEventManager(KubeEventsManager)
-	HookManager.WithScheduleManager(ScheduleManager)
-	err = HookManager.Init()
+	op.HookManager = hook.NewHookManager()
+	op.HookManager.WithDirectories(op.HooksDir, op.TempDir)
+	op.HookManager.WithKubeEventManager(op.KubeEventsManager)
+	op.HookManager.WithScheduleManager(op.ScheduleManager)
+	err = op.HookManager.Init()
 	if err != nil {
 		log.Errorf("MAIN Fatal: initialize hook manager: %s\n", err)
 		return err
 	}
 
+	op.ManagerEventsHandler = NewManagerEventsHandler()
+	op.ManagerEventsHandler.WithContext(op.ctx)
+	op.ManagerEventsHandler.WithTaskQueueSet(op.TaskQueues)
+	op.ManagerEventsHandler.WithScheduleManager(op.ScheduleManager)
+	op.ManagerEventsHandler.WithKubeEventsManager(op.KubeEventsManager)
+	op.ManagerEventsHandler.WithKubeEventHandler(func(kubeEvent KubeEvent) []task.Task {
+		//logEntry := log.WithField("binding", ContextBindingType[OnKubernetesEvent])
+		//logEntry.Infof("Kubernetes event %s", kubeEvent.String())
+
+		tasks := []task.Task{}
+
+		op.HookManager.HandleKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+			newTask := task.NewTask(HookRun).
+				WithMetadata(HookMetadata{
+					HookName:       hook.Name,
+					BindingType:    OnKubernetesEvent,
+					BindingContext: info.BindingContext,
+					AllowFailure:   info.AllowFailure,
+				})
+			tasks = append(tasks, newTask)
+		})
+
+		return tasks
+	})
+	op.ManagerEventsHandler.WithScheduleEventHandler(func(crontab string) []task.Task {
+		var tasks []task.Task
+		err := op.HookManager.HandleScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+			newTask := task.NewTask(HookRun).
+				WithMetadata(HookMetadata{
+					HookName:       hook.Name,
+					BindingType:    Schedule,
+					BindingContext: info.BindingContext,
+					AllowFailure:   info.AllowFailure,
+				})
+			tasks = append(tasks, newTask)
+		})
+
+		if err != nil {
+			log.Errorf("handle event from ScheduleManager '%s': %s", crontab, err)
+			return []task.Task{}
+		}
+
+		return tasks
+	})
+
 	// Initialiaze prometheus client
-	MetricsStorage = metrics_storage.Init()
+	op.MetricsStorage = metrics_storage.Init()
 
 	return nil
 }
 
-func Run() {
+func (op *ShellOperator) Run() {
 	logEntry := log.WithField("operator.component", "mainRun")
 	logEntry.Info("start Run")
 
 	// Metric storage and live metrics
-	go MetricsStorage.Run()
-	RunMetrics()
+	go op.MetricsStorage.Run()
+	op.RunMetrics()
 
-	// Prepopulate queue with onStartup tasks and enable kubernetes bindings tasks
-	TasksQueue.ChangesDisable()
-	CreateOnStartupTasks()
-
-	kubeHooks, _ := HookManager.GetHooksInOrder(OnKubernetesEvent)
-	enableBindingsTasks := []task.Task{}
-	for _, hookName := range kubeHooks {
-		newTask := task.NewTask(task.EnableKubernetesBindings, hookName)
-		enableBindingsTasks = append(enableBindingsTasks, newTask)
-	}
-	for _, resTask := range enableBindingsTasks {
-		TasksQueue.Add(resTask)
-		logEntry.Infof("queue task %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
-	}
-	TasksQueue.ChangesEnable(true)
+	// Prepopulate main queue with onStartup tasks and enable kubernetes bindings tasks.
+	op.PrepopulateMainQueue(op.TaskQueues)
+	// Start main task queue handler
+	op.TaskQueues.StartMain()
 
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
-	go HandleEventsFromManagers()
+	op.ManagerEventsHandler.Start()
+	//go HandleEventsFromManagers(op.TaskQueues)
 
 	// add schedules to schedule manager
-	HookManager.EnableScheduleBindings()
-	go ScheduleManager.Run()
+	op.HookManager.EnableScheduleBindings()
+	op.ScheduleManager.Start()
 
-	// TasksRunner runs tasks from the queue.
-	go TasksRunner()
 }
 
-// Stop closes event handle loop and pushes Stop task to wait until current task is done.
-func Stop() {
-	StopHandleEventsFromManagersCh <- struct{}{}
-	// FIXME: Double push to prevent Pop in task handlers.
-	TasksQueue.Push(task.NewTask(task.Stop, "Stop"))
-	TasksQueue.Push(task.NewTask(task.Stop, "Stop"))
-}
+// TaskHandler
+func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
+	var logEntry = log.WithField("operator.component", "taskRunner")
+	var hookMeta = HookMetadataAccessor(t)
+	var res queue.TaskResult
 
-// HandleEventsFromManagers read schedule and kubernetes events and emit tasks to the working queue.
-func HandleEventsFromManagers() {
-	for {
-		select {
-		case crontab := <-ScheduleManager.Ch():
-			logEntry := log.
-				WithField("operator.component", "handleEvents").
-				WithField("binding", ContextBindingType[Schedule])
-			logEntry.Infof("Schedule event '%s'", crontab)
+	switch t.GetType() {
+	case HookRun:
+		hookLogLabels := map[string]string{}
+		hookLogLabels["hook"] = hookMeta.HookName
+		hookLogLabels["binding"] = string(hookMeta.BindingType)
+		hookLogLabels["task"] = "HookRun"
+		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
+		taskLogEntry.Info("Execute hook")
 
-			tasks := []task.Task{}
-			err := HookManager.HandleScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-				newTask := task.NewTask(task.HookRun, hook.Name).
-					WithBinding(Schedule).
-					WithBindingContext(info.BindingContext).
-					WithAllowFailure(info.AllowFailure)
-				tasks = append(tasks, newTask)
-			})
+		taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
-			if err != nil {
-				logEntry.Errorf("handle '%s': %s", crontab, err)
-				break
+		err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+		if err != nil {
+			hookLabel := taskHook.SafeName()
+
+			if hookMeta.AllowFailure {
+				taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
+				op.MetricsStorage.SendCounterMetric("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
+				res.Status = "Success"
+			} else {
+				op.MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
+				t.IncrementFailureCount()
+				taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
+				res.Status = "Fail"
 			}
-
-			for _, resTask := range tasks {
-				TasksQueue.Add(resTask)
-				logEntry.Infof("queue task %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
-			}
-
-		case kubeEvent := <-KubeEventsManager.Ch():
-			logEntry := log.
-				WithField("operator.component", "handleEvents").
-				WithField("binding", ContextBindingType[OnKubernetesEvent])
-			logEntry.Infof("Kubernetes event %s", kubeEvent.String())
-
-			tasks := []task.Task{}
-
-			HookManager.HandleKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-				newTask := task.NewTask(task.HookRun, hook.Name).
-					WithBinding(OnKubernetesEvent).
-					WithBindingContext(info.BindingContext).
-					WithAllowFailure(info.AllowFailure)
-				tasks = append(tasks, newTask)
-			})
-
-			for _, resTask := range tasks {
-				TasksQueue.Add(resTask)
-				logEntry.Infof("queue task %s@%s %s", resTask.GetType(), resTask.GetBinding(), resTask.GetName())
-			}
-
-		case <-StopHandleEventsFromManagersCh:
-			logEntry := log.
-				WithField("operator.component", "handleEvents").
-				WithField("binding", "stop")
-			logEntry.Infof("trigger Stop HandleEventsFromManagers Loop")
-			return
+		} else {
+			taskLogEntry.Infof("Hook executed successfully")
+			res.Status = "Success"
 		}
-	}
-}
 
-// TasksRunner is a tasks queue handler
-func TasksRunner() {
-	logEntry := log.WithField("operator.component", "taskRunner")
-	for {
-		if TasksQueue.IsEmpty() {
-			time.Sleep(QueueIsEmptyDelay)
-		}
-		for {
-			t, _ := TasksQueue.Peek()
-			if t == nil {
-				break
-			}
+	case EnableKubernetesBindings:
+		hookLogLabels := map[string]string{}
+		hookLogLabels["hook"] = hookMeta.HookName
+		hookLogLabels["binding"] = string(OnKubernetesEvent)
+		hookLogLabels["task"] = "EnableKubernetesBindings"
 
-			switch t.GetType() {
-			case task.HookRun:
-				hookLogLabels := map[string]string{}
-				hookLogLabels["hook"] = t.GetName()
-				hookLogLabels["binding"] = ContextBindingType[t.GetBinding()]
-				hookLogLabels["task"] = "HookRun"
-				taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
-				taskLogEntry.Info("Execute hook")
+		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
 
-				taskHook := HookManager.GetHook(t.GetName())
+		taskLogEntry.Info("Enable kubernetes binding for hook")
 
-				err := taskHook.Run(t.GetBinding(), t.GetBindingContext(), hookLogLabels)
-				if err != nil {
-					hookLabel := taskHook.SafeName()
+		taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
-					if t.GetAllowFailure() {
-						taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
-						MetricsStorage.SendCounterMetric("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
-						TasksQueue.Pop()
-					} else {
-						MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
-						t.IncrementFailureCount()
-						taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
-						delayTask := task.NewTaskDelay(FailedHookDelay)
-						delayTask.Name = t.GetName()
-						delayTask.Binding = t.GetBinding()
-						TasksQueue.Push(delayTask)
-					}
-				} else {
-					taskLogEntry.Infof("Hook executed successfully")
-					TasksQueue.Pop()
-				}
+		hookRunTasks := []task.Task{}
 
-			case task.EnableKubernetesBindings:
-				hookLogLabels := map[string]string{}
-				hookLogLabels["hook"] = t.GetName()
-				hookLogLabels["binding"] = ContextBindingType[OnKubernetesEvent]
-				hookLogLabels["task"] = "EnableKubernetesBindings"
-
-				taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
-
-				taskLogEntry.Info("Enable kubernetes binding for hook")
-
-				taskHook := HookManager.GetHook(t.GetName())
-
-				hookRunTasks := []task.Task{}
-
-				err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
-					newTask := task.NewTask(task.HookRun, taskHook.Name).
-						WithBinding(OnKubernetesEvent).
-						WithBindingContext(info.BindingContext).
-						WithAllowFailure(info.AllowFailure)
-					hookRunTasks = append(hookRunTasks, newTask)
+		err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+			newTask := task.NewTask(HookRun).
+				WithMetadata(HookMetadata{
+					HookName:       taskHook.Name,
+					BindingType:    OnKubernetesEvent,
+					BindingContext: info.BindingContext,
+					AllowFailure:   info.AllowFailure,
 				})
+			hookRunTasks = append(hookRunTasks, newTask)
+		})
 
-				if err != nil {
-					hookLabel := taskHook.SafeName()
-					MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
-					t.IncrementFailureCount()
-					taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
-					delayTask := task.NewTaskDelay(FailedHookDelay)
-					delayTask.Name = t.GetName()
-					delayTask.Binding = t.GetBinding()
-					TasksQueue.Push(delayTask)
-				} else {
-					// Push Synchronization tasks to queue head. Informers can be started now — their events will
-					// be added to the queue tail.
-					taskLogEntry.Infof("Kubernetes binding for hook enabled successfully")
-					TasksQueue.Pop()
-					for _, hookRunTask := range hookRunTasks {
-						TasksQueue.Push(hookRunTask)
-					}
-					HookManager.GetHook(t.GetName()).HookController.StartMonitors()
-				}
-
-			case task.Delay:
-				logEntry := log.
-					WithField("operator.component", "taskRunner").
-					WithField("task", "Delay").
-					WithField("hook", t.GetName()).
-					WithField("binding", ContextBindingType[t.GetBinding()])
-
-				logEntry.Infof("Delay for %s", t.GetDelay().String())
-				TasksQueue.Pop()
-				time.Sleep(t.GetDelay())
-			case task.Stop:
-				log.WithField("operator.component", "taskRunner").
-					WithField("task", "Stop").
-					Infof("Stop TaskRunner loop.")
-				TasksQueue.Pop()
-				return
-			case task.Exit:
-				log.WithField("operator.component", "taskRunner").
-					WithField("task", "Exit").
-					Infof("Program will exit now.")
-				TasksQueue.Pop()
-				os.Exit(1)
-			}
-
-			// Breaking, if the task queue is empty to prevent the infinite loop.
-			if TasksQueue.IsEmpty() {
-				log.WithField("operator.component", "taskRunner").
-					Debug("Task queue is empty. Will sleep now.")
-				break
-			}
+		if err != nil {
+			hookLabel := taskHook.SafeName()
+			op.MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
+			t.IncrementFailureCount()
+			taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
+			res.Status = "Fail"
+		} else {
+			// return Synchronization tasks to add to the queue head.
+			// Informers can be started now — their events will
+			// be added to the tail of the queue.
+			op.HookManager.GetHook(hookMeta.HookName).HookController.StartMonitors()
+			taskLogEntry.Infof("Kubernetes binding for hook enabled successfully")
+			res.Status = "Success"
+			res.HeadTasks = hookRunTasks
 		}
 	}
+
+	return res
 }
 
-func CreateOnStartupTasks() {
-	logEntry := log.
-		WithField("operator.component", "createOnStartupTasks").
-		WithField("binding", ContextBindingType[OnStartup])
+// PrepopulateMainQueue adds tasks to run hooks with OnStartup bindings
+// and tasks to enable kubernetes bindings.
+func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
+	logEntry := log.WithField("operator.component", "initMainQueue")
 
-	onStartupHooks, err := HookManager.GetHooksInOrder(OnStartup)
+	// Prepopulate main queue with 'onStartup' tasks and 'enable kubernetes bindings' tasks.
+	tqs.WithMainName("main")
+	tqs.NewNamedQueue("main", op.TaskHandler)
+
+	mainQueue := tqs.GetMain()
+	mainQueue.ChangesDisable()
+
+	// Add tasks to run OnStartup bindings
+
+	onStartupHooks, err := op.HookManager.GetHooksInOrder(OnStartup)
 	if err != nil {
 		logEntry.Errorf("%v", err)
 		return
@@ -353,25 +336,41 @@ func CreateOnStartupTasks() {
 
 	for _, hookName := range onStartupHooks {
 		bc := BindingContext{
-			Binding: ContextBindingType[OnStartup],
+			Binding: string(OnStartup),
 		}
 		bc.Metadata.BindingType = OnStartup
 
-		newTask := task.NewTask(task.HookRun, hookName).
-			WithBinding(OnStartup).
-			AppendBindingContext(bc)
-		TasksQueue.Add(newTask)
+		newTask := task.NewTask(HookRun).
+			WithMetadata(HookMetadata{
+				HookName:       hookName,
+				BindingType:    OnStartup,
+				BindingContext: []BindingContext{bc},
+			})
+		mainQueue.AddLast(newTask)
 		logEntry.Debugf("new task HookRun@OnStartup '%s'", hookName)
 	}
 
-	return
+	// Add tasks to enable kubernetes monitors
+
+	kubeHooks, _ := op.HookManager.GetHooksInOrder(OnKubernetesEvent)
+	for _, hookName := range kubeHooks {
+		newTask := task.NewTask(EnableKubernetesBindings).
+			WithMetadata(HookMetadata{
+				HookName: hookName,
+			})
+		mainQueue.AddLast(newTask)
+		logEntry.Infof("queue task %s@%s %s", newTask.GetType(), hookName)
+
+	}
+
+	mainQueue.ChangesEnable(true)
 }
 
-func RunMetrics() {
+func (op *ShellOperator) RunMetrics() {
 	// live ticks.
 	go func() {
 		for {
-			MetricsStorage.SendCounterMetric("shell_operator_live_ticks", 1.0, map[string]string{})
+			op.MetricsStorage.SendCounterMetric("shell_operator_live_ticks", 1.0, map[string]string{})
 			time.Sleep(10 * time.Second)
 		}
 	}()
@@ -379,14 +378,14 @@ func RunMetrics() {
 	// task queue length
 	go func() {
 		for {
-			queueLen := float64(TasksQueue.Length())
-			MetricsStorage.SendGaugeMetric("shell_operator_tasks_queue_length", queueLen, map[string]string{})
+			queueLen := float64(op.TaskQueues.GetMain().Length())
+			op.MetricsStorage.SendGaugeMetric("shell_operator_tasks_queue_length", queueLen, map[string]string{})
 			time.Sleep(5 * time.Second)
 		}
 	}()
 }
 
-func InitHttpServer(listenAddr *net.TCPAddr) {
+func (op *ShellOperator) InitHttpServer(listenAddr *net.TCPAddr) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = writer.Write([]byte(fmt.Sprintf(`<html>
     <head><title>Shell operator</title></head>
@@ -400,7 +399,7 @@ func InitHttpServer(listenAddr *net.TCPAddr) {
 	http.Handle("/metrics", promhttp.Handler())
 
 	http.HandleFunc("/queue", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = io.Copy(writer, TasksQueue.DumpReader())
+		_, _ = io.Copy(writer, dump.TaskQueueToReader(op.TaskQueues.GetMain()))
 	})
 
 	go func() {

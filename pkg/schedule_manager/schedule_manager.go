@@ -1,15 +1,19 @@
 package schedule_manager
 
 import (
+	"context"
+
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/robfig/cron.v2"
 )
 
 type ScheduleManager interface {
+	WithContext(ctx context.Context)
+	Stop()
+	Start()
 	Add(entry ScheduleEntry)
 	Remove(entry ScheduleEntry)
-	Run()
 	Ch() chan string
 }
 
@@ -19,8 +23,10 @@ type CronEntry struct {
 }
 
 type scheduleManager struct {
-	ScheduleCh chan string
+	ctx        context.Context
+	cancel     context.CancelFunc
 	cron       *cron.Cron
+	ScheduleCh chan string
 	Entries    map[string]CronEntry
 }
 
@@ -33,6 +39,16 @@ var NewScheduleManager = func() *scheduleManager {
 		Entries:    make(map[string]CronEntry),
 	}
 	return sm
+}
+
+func (sm *scheduleManager) WithContext(ctx context.Context) {
+	sm.ctx, sm.cancel = context.WithCancel(ctx)
+}
+
+func (sm *scheduleManager) Stop() {
+	if sm.cancel != nil {
+		sm.cancel()
+	}
 }
 
 // Add create entry for crontab and id and start scheduled function.
@@ -95,45 +111,15 @@ func (sm *scheduleManager) Remove(delEntry ScheduleEntry) {
 	return
 }
 
-//func (sm *scheduleManager) AddCrontab(crontab string) (string, error) {
-//	logEntry := log.WithField("operator.component", "scheduleManager")
-//
-//	_, ok := sm.entries[crontab]
-//	if !ok {
-//		entryId, err := sm.cron.AddFunc(crontab, func() {
-//			logEntry.Debugf("fire schedule event for entry '%s'", crontab)
-//			ScheduleCh <- crontab
-//		})
-//		if err != nil {
-//			return "", err
-//		}
-//
-//		logEntry.Debugf("entry '%s' added", crontab)
-//
-//		sm.entries[crontab] = entryId
-//	}
-//
-//	return crontab, nil
-//}
-//
-//func (sm *scheduleManager) RemoveEntryId(crontab string) error {
-//	entryID, ok := sm.entries[crontab]
-//	if !ok {
-//		return fmt.Errorf("schedule manager entry '%s' not found", crontab)
-//	}
-//
-//	sm.cron.Remove(entryID)
-//	log.WithField("operator.component", "scheduleManager").Debugf("entry '%s' deleted", crontab)
-//
-//	return nil
-//}
-
-func (sm *scheduleManager) Run() {
+func (sm *scheduleManager) Start() {
 	sm.cron.Start()
-}
-
-func (sm *scheduleManager) stop() {
-	sm.cron.Stop()
+	go func() {
+		select {
+		case <-sm.ctx.Done():
+			sm.cron.Stop()
+			return
+		}
+	}()
 }
 
 func (sm *scheduleManager) Ch() chan string {

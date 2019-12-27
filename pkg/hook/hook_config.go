@@ -278,7 +278,7 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		kubeConfig.Monitor = monitor
 		kubeConfig.AllowFailure = kubeCfg.AllowFailure
 		if kubeCfg.Name == "" {
-			kubeConfig.BindingName = ContextBindingType[OnKubernetesEvent]
+			kubeConfig.BindingName = string(OnKubernetesEvent)
 		} else {
 			kubeConfig.BindingName = kubeCfg.Name
 		}
@@ -347,7 +347,7 @@ func (c *HookConfig) ConvertOnStartup(value interface{}) (*OnStartupConfig, erro
 
 	res := &OnStartupConfig{}
 	res.AllowFailure = false
-	res.BindingName = ContextBindingType[OnStartup]
+	res.BindingName = string(OnStartup)
 	res.Order = *floatValue
 	return res, nil
 }
@@ -358,7 +358,7 @@ func (c *HookConfig) ConvertScheduleV0(schV0 ScheduleConfigV0) (ScheduleConfig, 
 	if schV0.Name != "" {
 		res.BindingName = schV0.Name
 	} else {
-		res.BindingName = ContextBindingType[Schedule]
+		res.BindingName = string(Schedule)
 	}
 
 	res.AllowFailure = schV0.AllowFailure
@@ -376,7 +376,7 @@ func (c *HookConfig) ConvertScheduleV1(schV1 ScheduleConfigV1) (ScheduleConfig, 
 	if schV1.Name != "" {
 		res.BindingName = schV1.Name
 	} else {
-		res.BindingName = ContextBindingType[Schedule]
+		res.BindingName = string(Schedule)
 	}
 
 	res.AllowFailure = schV1.AllowFailure

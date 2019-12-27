@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -10,7 +11,7 @@ import (
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
-	operator "github.com/flant/shell-operator/pkg/shell-operator"
+	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
 
@@ -39,6 +40,8 @@ func main() {
 			jqDone := make(chan struct{})
 			go libjq_go.JqCallLoop(jqDone)
 
+			operator := shell_operator.NewShellOperator()
+			operator.WithContext(context.Background())
 			operator.InitHttpServer(app.ListenAddress)
 
 			err := operator.Init()

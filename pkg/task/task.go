@@ -1,111 +1,38 @@
 package task
 
 import (
-	"bytes"
-	"fmt"
-	"time"
-
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	uuid "gopkg.in/satori/go.uuid.v1"
 )
 
 type TaskType string
 
-const (
-	// a task to run a particular hook
-	HookRun                  TaskType = "TASK_HOOK_RUN"
-	EnableKubernetesBindings TaskType = "TASK_ENABLE_KUBERNETES_BINDINGS"
-
-	// queue control tasks
-	Delay TaskType = "TASK_DELAY"
-	Stop  TaskType = "TASK_STOP"
-
-	// Exit a program
-	Exit TaskType = "TASK_EXIT"
-)
-
 type Task interface {
-	GetName() string
+	GetId() string
 	GetType() TaskType
-	GetBinding() BindingType
-	GetBindingContext() []BindingContext
-	GetFailureCount() int
 	IncrementFailureCount()
-	GetDelay() time.Duration
-	GetAllowFailure() bool
+	GetFailureCount() int
 	GetLogLabels() map[string]string
+	GetMetadata() interface{}
 }
 
 type BaseTask struct {
-	FailureCount   int    // Failed executions count
-	Name           string // hook name
-	Type           TaskType
-	Binding        BindingType
-	BindingContext []BindingContext
-	Delay          time.Duration
-	AllowFailure   bool //Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
-	LogLabels      map[string]string
+	Id           string
+	Type         TaskType
+	LogLabels    map[string]string
+	FailureCount int // Failed executions count
+
+	Metadata interface{}
 }
 
-func NewTask(taskType TaskType, name string) *BaseTask {
+func NewTask(taskType TaskType) *BaseTask {
+	taskId := uuid.NewV4().String()
 	return &BaseTask{
-		FailureCount:   0,
-		Name:           name,
-		Type:           taskType,
-		AllowFailure:   false,
-		BindingContext: make([]BindingContext, 0),
-		LogLabels:      map[string]string{"task.id": uuid.NewV4().String()},
+		Id:           taskId,
+		FailureCount: 0,
+		Type:         taskType,
+		LogLabels:    map[string]string{"task.id": taskId},
 	}
-}
-
-func (t *BaseTask) GetName() string {
-	return t.Name
-}
-
-func (t *BaseTask) GetType() TaskType {
-	return t.Type
-}
-
-func (t *BaseTask) GetBinding() BindingType {
-	return t.Binding
-}
-
-func (t *BaseTask) GetBindingContext() []BindingContext {
-	return t.BindingContext
-}
-
-func (t *BaseTask) GetDelay() time.Duration {
-	return t.Delay
-}
-
-func (t *BaseTask) GetAllowFailure() bool {
-	return t.AllowFailure
-}
-
-func (t *BaseTask) GetLogLabels() map[string]string {
-	return t.LogLabels
-}
-
-func (t *BaseTask) WithBinding(binding BindingType) *BaseTask {
-	t.Binding = binding
-	return t
-}
-
-func (t *BaseTask) WithBindingContext(context []BindingContext) *BaseTask {
-	t.BindingContext = context
-	return t
-}
-
-func (t *BaseTask) AppendBindingContext(context BindingContext) *BaseTask {
-	t.BindingContext = append(t.BindingContext, context)
-	return t
-}
-
-func (t *BaseTask) WithAllowFailure(allowFailure bool) *BaseTask {
-	t.AllowFailure = allowFailure
-	return t
 }
 
 func (t *BaseTask) WithLogLabels(labels map[string]string) *BaseTask {
@@ -113,13 +40,25 @@ func (t *BaseTask) WithLogLabels(labels map[string]string) *BaseTask {
 	return t
 }
 
-func (t *BaseTask) DumpAsText() string {
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("%s '%s'", t.Type, t.Name))
-	if t.FailureCount > 0 {
-		buf.WriteString(fmt.Sprintf(" failed %d times. ", t.FailureCount))
-	}
-	return buf.String()
+func (t *BaseTask) WithMetadata(metadata interface{}) *BaseTask {
+	t.Metadata = metadata
+	return t
+}
+
+func (t *BaseTask) GetId() string {
+	return t.Id
+}
+
+func (t *BaseTask) GetType() TaskType {
+	return t.Type
+}
+
+func (t *BaseTask) GetLogLabels() map[string]string {
+	return t.LogLabels
+}
+
+func (t *BaseTask) GetMetadata() interface{} {
+	return t.Metadata
 }
 
 func (t *BaseTask) GetFailureCount() int {
@@ -128,11 +67,4 @@ func (t *BaseTask) GetFailureCount() int {
 
 func (t *BaseTask) IncrementFailureCount() {
 	t.FailureCount++
-}
-
-func NewTaskDelay(delay time.Duration) *BaseTask {
-	return &BaseTask{
-		Type:  Delay,
-		Delay: delay,
-	}
 }
