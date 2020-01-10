@@ -93,6 +93,7 @@ func (b *BindingContextController) Run() (string, error) {
 
 	b.Manager = manager.NewKubeEventsManager()
 	b.Manager.WithContext(b.Context)
+	b.Manager.WithKubeClient(KubeClient)
 
 	// Use StateController to apply changes
 	stateController, err := NewStateController(b.InitialState)
@@ -109,6 +110,8 @@ func (b *BindingContextController) Run() (string, error) {
 
 	b.HookCtrl = controller.NewHookController()
 	b.HookCtrl.InitKubernetesBindings(testHook.GetConfig().OnKubernetesEvents, b.Manager)
+
+	testHook.WithHookController(b.HookCtrl)
 
 	bindingContexts := make([]BindingContext, 0)
 
