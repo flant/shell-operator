@@ -3,8 +3,10 @@ package kube_events_manager
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
+	"github.com/flant/shell-operator/pkg/kube"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	log "github.com/sirupsen/logrus"
 
@@ -12,6 +14,7 @@ import (
 )
 
 type Monitor interface {
+	WithKubeClient(client kube.KubernetesClient)
 	WithConfig(config *MonitorConfig)
 	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateInformers() error
@@ -23,8 +26,9 @@ type Monitor interface {
 
 // Monitor holds informers for resources and a namespace informer
 type monitor struct {
-	Name   string
-	Config *MonitorConfig
+	Name       string
+	Config     *MonitorConfig
+	KubeClient kube.KubernetesClient
 	// Static list of informers
 	ResourceInformers []ResourceInformer
 	// Namespace informer to get new namespaces
@@ -52,6 +56,10 @@ var NewMonitor = func() Monitor {
 		cancelForNs:       make(map[string]context.CancelFunc, 0),
 		staticNamespaces:  make(map[string]bool, 0),
 	}
+}
+
+func (m *monitor) WithKubeClient(client kube.KubernetesClient) {
+	m.KubeClient = client
 }
 
 func (m *monitor) WithConfig(config *MonitorConfig) {
@@ -98,6 +106,7 @@ func (m *monitor) CreateInformers() error {
 	if m.Config.NamespaceSelector != nil && m.Config.NamespaceSelector.LabelSelector != nil {
 		logEntry.Debugf("Create NamespaceInformer for namespace.labelSelector")
 		m.NamespaceInformer = NewNamespaceInformer(m.Config)
+		m.NamespaceInformer.WithKubeClient(m.KubeClient)
 		err := m.NamespaceInformer.CreateSharedInformer(
 			func(nsName string) {
 				// add function — check, create and run informers for Ns
@@ -185,6 +194,9 @@ func (m *monitor) GetExistedObjects() []ObjectAndFilterResult {
 		}
 	}
 
+	// Sort objects by namespace and name
+	sort.Sort(ByNamespaceAndName(objects))
+
 	return objects
 }
 
@@ -203,6 +215,7 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []Res
 
 	for _, objName := range objNames {
 		informer := NewResourceInformer(m.Config)
+		informer.WithKubeClient(m.KubeClient)
 		informer.WithNamespace(namespace)
 		informer.WithName(objName)
 		informer.WithKubeEventCb(m.eventCb)

@@ -147,7 +147,7 @@ func (c *kubernetesBindingsController) BindingNames() []string {
 	for _, binding := range c.KubernetesBindings {
 		names = append(names, binding.BindingName)
 	}
-	return []string{}
+	return names
 }
 
 func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult {

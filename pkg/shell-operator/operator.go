@@ -32,27 +32,6 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
-//var (
-//	WorkingDir string
-//	TempDir    string
-//
-//	TaskQueues *queue.TaskQueueSet
-//
-//	HookManager hook.HookManager
-//
-//	ScheduleManager   schedule_manager.ScheduleManager
-//	KubeEventsManager kube_events_manager.KubeEventsManager
-//
-//	MetricsStorage *metrics_storage.MetricStorage
-//
-//	ManagersEventsHandler *ManagerEventsHandler
-//
-//	// StopHandleEventsFromManagersCh channel is used to stop loop of the HandleEventsFromManagers.
-//	StopHandleEventsFromManagersCh = make(chan struct{}, 1)
-//
-//	CancelOperator context.CancelFunc
-//)
-
 type ShellOperator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -60,16 +39,17 @@ type ShellOperator struct {
 	HooksDir string
 	TempDir  string
 
-	TaskQueues *queue.TaskQueueSet
-
-	HookManager hook.HookManager
+	MetricStorage *metrics_storage.MetricStorage
+	KubeClient    kube.KubernetesClient
 
 	ScheduleManager   schedule_manager.ScheduleManager
 	KubeEventsManager kube_events_manager.KubeEventsManager
 
-	MetricsStorage *metrics_storage.MetricStorage
+	TaskQueues *queue.TaskQueueSet
 
 	ManagerEventsHandler *ManagerEventsHandler
+
+	HookManager hook.HookManager
 }
 
 func NewShellOperator() *ShellOperator {
@@ -84,14 +64,23 @@ func (op *ShellOperator) WithTempDir(dir string) {
 	op.TempDir = dir
 }
 
-func (op *ShellOperator) WithContext(ctx context.Context) {
+func (op *ShellOperator) WithContext(ctx context.Context) *ShellOperator {
 	op.ctx, op.cancel = context.WithCancel(ctx)
+	return op
 }
 
 func (op *ShellOperator) Stop() {
 	if op.cancel != nil {
 		op.cancel()
 	}
+}
+
+func (op *ShellOperator) WithKubernetesClient(klient kube.KubernetesClient) {
+	op.KubeClient = klient
+}
+
+func (op *ShellOperator) WithMetricStorage(metricStorage *metrics_storage.MetricStorage) {
+	op.MetricStorage = metricStorage
 }
 
 // Init does some basic checks and instantiate managers
@@ -127,25 +116,52 @@ func (op *ShellOperator) Init() (err error) {
 	}
 	log.Infof("Use temporary dir: %s", op.TempDir)
 
-	// Initializing the task queues set with the "main" queue.
+	// init and start metrics gathering loop
+	if op.MetricStorage == nil {
+		op.MetricStorage = metrics_storage.NewMetricStorage()
+		op.MetricStorage.WithContext(op.ctx)
+		// Metric storage and live metrics
+		op.MetricStorage.Start()
+	}
+
+	if op.KubeClient == nil {
+		op.KubeClient = kube.NewKubernetesClient()
+		op.KubeClient.WithContextName(app.KubeContext)
+		op.KubeClient.WithConfigPath(app.KubeConfig)
+		// Initialize kube client for kube events hooks.
+		err = op.KubeClient.Init()
+		if err != nil {
+			log.Errorf("MAIN Fatal: initialize kube client: %s\n", err)
+			return err
+		}
+	}
+
+	// Initialize the task queues set with the "main" queue.
 	op.TaskQueues = queue.NewTaskQueueSet()
 	op.TaskQueues.WithContext(op.ctx)
 
-	// Initializing schedule manager.
+	// Initialize schedule manager.
 	op.ScheduleManager = schedule_manager.NewScheduleManager()
 	op.ScheduleManager.WithContext(op.ctx)
 
-	// Initialize kube client for kube events hooks.
-	err = kube.Init(kube.InitOptions{KubeContext: app.KubeContext, KubeConfig: app.KubeConfig})
-	if err != nil {
-		log.Errorf("MAIN Fatal: initialize kube client: %s\n", err)
-		return err
-	}
-
+	// Initialize kubernetes events manager.
 	op.KubeEventsManager = kube_events_manager.NewKubeEventsManager()
+	op.KubeEventsManager.WithKubeClient(op.KubeClient)
 	op.KubeEventsManager.WithContext(op.ctx)
 
-	// Initializing hook manager (load hooks from WorkingDir)
+	// Initialize events handler that emit tasks to run hooks
+	op.ManagerEventsHandler = NewManagerEventsHandler()
+	op.ManagerEventsHandler.WithContext(op.ctx)
+	op.ManagerEventsHandler.WithTaskQueueSet(op.TaskQueues)
+	op.ManagerEventsHandler.WithScheduleManager(op.ScheduleManager)
+	op.ManagerEventsHandler.WithKubeEventsManager(op.KubeEventsManager)
+
+	return nil
+}
+
+// InitHookManager load hooks from HooksDir and defines event handlers that emit tasks.
+func (op *ShellOperator) InitHookManager() (err error) {
+	// Initialize hook manager (load hooks from HooksDir)
 	op.HookManager = hook.NewHookManager()
 	op.HookManager.WithDirectories(op.HooksDir, op.TempDir)
 	op.HookManager.WithKubeEventManager(op.KubeEventsManager)
@@ -156,11 +172,7 @@ func (op *ShellOperator) Init() (err error) {
 		return err
 	}
 
-	op.ManagerEventsHandler = NewManagerEventsHandler()
-	op.ManagerEventsHandler.WithContext(op.ctx)
-	op.ManagerEventsHandler.WithTaskQueueSet(op.TaskQueues)
-	op.ManagerEventsHandler.WithScheduleManager(op.ScheduleManager)
-	op.ManagerEventsHandler.WithKubeEventsManager(op.KubeEventsManager)
+	// Define event handlers for schedule event and kubernetes event.
 	op.ManagerEventsHandler.WithKubeEventHandler(func(kubeEvent KubeEvent) []task.Task {
 		//logEntry := log.WithField("binding", ContextBindingType[OnKubernetesEvent])
 		//logEntry.Infof("Kubernetes event %s", kubeEvent.String())
@@ -200,19 +212,13 @@ func (op *ShellOperator) Init() (err error) {
 
 		return tasks
 	})
-
-	// Initialiaze prometheus client
-	op.MetricsStorage = metrics_storage.Init()
-
 	return nil
 }
 
-func (op *ShellOperator) Run() {
-	logEntry := log.WithField("operator.component", "mainRun")
-	logEntry.Info("start Run")
+func (op *ShellOperator) Start() {
+	log.Info("start shell-operator")
 
-	// Metric storage and live metrics
-	go op.MetricsStorage.Run()
+	// Start emit "live" metrics
 	op.RunMetrics()
 
 	// Prepopulate main queue with onStartup tasks and enable kubernetes bindings tasks.
@@ -223,12 +229,10 @@ func (op *ShellOperator) Run() {
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
 	op.ManagerEventsHandler.Start()
-	//go HandleEventsFromManagers(op.TaskQueues)
 
 	// add schedules to schedule manager
 	op.HookManager.EnableScheduleBindings()
 	op.ScheduleManager.Start()
-
 }
 
 // TaskHandler
@@ -254,10 +258,10 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 			if hookMeta.AllowFailure {
 				taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
-				op.MetricsStorage.SendCounterMetric("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
+				op.MetricStorage.SendCounterMetric("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
 				res.Status = "Success"
 			} else {
-				op.MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
+				op.MetricStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
 				t.IncrementFailureCount()
 				taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
 				res.Status = "Fail"
@@ -294,7 +298,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 		if err != nil {
 			hookLabel := taskHook.SafeName()
-			op.MetricsStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
+			op.MetricStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
 			t.IncrementFailureCount()
 			taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
 			res.Status = "Fail"
@@ -351,7 +355,6 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 	}
 
 	// Add tasks to enable kubernetes monitors
-
 	kubeHooks, _ := op.HookManager.GetHooksInOrder(OnKubernetesEvent)
 	for _, hookName := range kubeHooks {
 		newTask := task.NewTask(EnableKubernetesBindings).
@@ -360,7 +363,6 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 			})
 		mainQueue.AddLast(newTask)
 		logEntry.Infof("queue task %s@%s %s", newTask.GetType(), hookName)
-
 	}
 
 	mainQueue.ChangesEnable(true)
@@ -370,7 +372,7 @@ func (op *ShellOperator) RunMetrics() {
 	// live ticks.
 	go func() {
 		for {
-			op.MetricsStorage.SendCounterMetric("shell_operator_live_ticks", 1.0, map[string]string{})
+			op.MetricStorage.SendCounterMetric("shell_operator_live_ticks", 1.0, map[string]string{})
 			time.Sleep(10 * time.Second)
 		}
 	}()
@@ -378,14 +380,16 @@ func (op *ShellOperator) RunMetrics() {
 	// task queue length
 	go func() {
 		for {
-			queueLen := float64(op.TaskQueues.GetMain().Length())
-			op.MetricsStorage.SendGaugeMetric("shell_operator_tasks_queue_length", queueLen, map[string]string{})
+			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
+				queueLen := float64(queue.Length())
+				op.MetricStorage.SendGaugeMetric("shell_operator_tasks_queue_length", queueLen, map[string]string{"queue": queue.Name})
+			})
 			time.Sleep(5 * time.Second)
 		}
 	}()
 }
 
-func (op *ShellOperator) InitHttpServer(listenAddr *net.TCPAddr) {
+func (op *ShellOperator) SetupHttpServerHandles() {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = writer.Write([]byte(fmt.Sprintf(`<html>
     <head><title>Shell operator</title></head>
@@ -393,7 +397,7 @@ func (op *ShellOperator) InitHttpServer(listenAddr *net.TCPAddr) {
     <h1>Shell operator</h1>
     <pre>go tool pprof goprofex http://&lt;SHELL_OPERATOR_IP&gt;:%d/debug/pprof/profile</pre>
     </body>
-    </html>`, app.ListenAddress.Port)))
+    </html>`, app.ListenPort)))
 	})
 
 	http.Handle("/metrics", promhttp.Handler())
@@ -401,13 +405,58 @@ func (op *ShellOperator) InitHttpServer(listenAddr *net.TCPAddr) {
 	http.HandleFunc("/queue", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = io.Copy(writer, dump.TaskQueueToReader(op.TaskQueues.GetMain()))
 	})
+}
+
+func (op *ShellOperator) StartHttpServer(ip string, port string) error {
+	address := fmt.Sprintf("%s:%s", ip, port)
+
+	// Check if port is available
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Error("Fail to listen on '%s': %v", address, err)
+		return err
+	}
+
+	log.Infof("Listen on %s", address)
 
 	go func() {
-		logEntry := log.
-			WithField("operator.component", "httpServer")
-		logEntry.Infof("Listen on %s", listenAddr.String())
-		if err := http.ListenAndServe(listenAddr.String(), nil); err != nil {
-			logEntry.Errorf("Starting HTTP server: %s", err)
+		if err := http.Serve(listener, nil); err != nil {
+			log.Errorf("Error starting HTTP server: %s", err)
+			os.Exit(1)
 		}
 	}()
+
+	return nil
+}
+
+func DefaultOperator() *ShellOperator {
+	operator := NewShellOperator()
+	operator.WithContext(context.Background())
+	return operator
+}
+
+func InitAndStart(operator *ShellOperator) error {
+	operator.SetupHttpServerHandles()
+
+	err := operator.StartHttpServer(app.ListenAddress, app.ListenPort)
+	if err != nil {
+		log.Errorf("HTTP SERVER start failed: %v", err)
+		return err
+	}
+
+	err = operator.Init()
+	if err != nil {
+		log.Errorf("INIT failed: %s", err)
+		return err
+	}
+
+	err = operator.InitHookManager()
+	if err != nil {
+		log.Errorf("INIT HookManager failed: %s", err)
+		return err
+	}
+
+	operator.Start()
+
+	return nil
 }

@@ -84,3 +84,22 @@ func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
 		fn(tqs)
 	}
 }
+
+// Iterate run doFn for every task.
+func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
+	if doFn == nil {
+		return
+	}
+	tqs.m.Lock()
+	defer tqs.m.Unlock()
+
+	doFn(tqs.Queues[tqs.MainName])
+
+	// TODO sort names
+
+	for _, t := range tqs.Queues {
+		if t.Name != tqs.MainName {
+			doFn(t)
+		}
+	}
+}

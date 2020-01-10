@@ -2,6 +2,8 @@ package queue
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,6 +36,8 @@ type TaskResult struct {
 	Status    string
 	HeadTasks []task.Task
 	TailTasks []task.Task
+
+	DelayBeforeNextTask time.Duration
 }
 
 type TaskQueue struct {
@@ -215,6 +219,13 @@ func (q *TaskQueue) Start() {
 			var t = q.waitForTask(sleepDelay)
 			log.Debugf("queue %s: get task %s", q.Name, t.GetType())
 
+			// dump queue
+			tasks := []string{}
+			for _, t := range q.items {
+				tasks = append(tasks, fmt.Sprintf("[%s, id %s]", t.GetType(), t.GetId()))
+			}
+			log.Debugf("queue %s: tasks after wait %s", q.Name, strings.Join(tasks, ", "))
+
 			if t == nil {
 				log.Debugf("queue %s: got nil task, stop queue", q.Name)
 				return
@@ -242,6 +253,16 @@ func (q *TaskQueue) Start() {
 					}
 				})
 			}
+			if taskRes.DelayBeforeNextTask != 0 {
+				sleepDelay = taskRes.DelayBeforeNextTask
+			}
+
+			// dump queue
+			tasks = []string{}
+			for _, t := range q.items {
+				tasks = append(tasks, fmt.Sprintf("[%s, id %s]", t.GetType(), t.GetId()))
+			}
+			log.Debugf("queues %s: tasks after handle %s", q.Name, strings.Join(tasks, ", "))
 		}
 	}()
 }

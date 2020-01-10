@@ -3,6 +3,7 @@ package kube_events_manager
 import (
 	"context"
 
+	"github.com/flant/shell-operator/pkg/kube"
 	log "github.com/sirupsen/logrus"
 
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -10,6 +11,7 @@ import (
 
 type KubeEventsManager interface {
 	WithContext(ctx context.Context)
+	WithKubeClient(client kube.KubernetesClient)
 	AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error)
 	HasMonitor(monitorId string) bool
 	GetMonitor(monitorId string) Monitor
@@ -26,6 +28,8 @@ type kubeEventsManager struct {
 	Monitors map[string]Monitor
 	// channel to emit KubeEvent objects
 	KubeEventCh chan KubeEvent
+
+	KubeClient kube.KubernetesClient
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -47,12 +51,17 @@ func (mgr *kubeEventsManager) WithContext(ctx context.Context) {
 	mgr.ctx, mgr.cancel = context.WithCancel(ctx)
 }
 
+func (mgr *kubeEventsManager) WithKubeClient(client kube.KubernetesClient) {
+	mgr.KubeClient = client
+}
+
 // AddMonitor creates a monitor with informers and return a KubeEvent with existing objects.
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error) {
 	log.Debugf("Add MONITOR %+v", monitorConfig)
 	monitor := NewMonitor()
+	monitor.WithKubeClient(mgr.KubeClient)
 	monitor.WithConfig(monitorConfig)
 	monitor.WithKubeEventCb(func(ev KubeEvent) {
 		outEvent := mgr.MakeKubeEvent(monitor, ev)

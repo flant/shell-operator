@@ -15,6 +15,7 @@ import (
 )
 
 type NamespaceInformer interface {
+	WithKubeClient(client kube.KubernetesClient)
 	CreateSharedInformer(addFn func(string), delFn func(string)) error
 	GetExistedObjects() map[string]bool
 	Run(stopCh <-chan struct{})
@@ -22,6 +23,7 @@ type NamespaceInformer interface {
 }
 
 type namespaceInformer struct {
+	KubeClient     kube.KubernetesClient
 	Monitor        *MonitorConfig
 	SharedInformer cache.SharedInformer
 
@@ -37,6 +39,10 @@ var NewNamespaceInformer = func(monitor *MonitorConfig) NamespaceInformer {
 		ExistedObjects: make(map[string]bool, 0),
 	}
 	return informer
+}
+
+func (ni *namespaceInformer) WithKubeClient(client kube.KubernetesClient) {
+	ni.KubeClient = client
 }
 
 func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(string)) error {
@@ -57,12 +63,12 @@ func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func
 		}
 	}
 
-	ni.SharedInformer = corev1.NewFilteredNamespaceInformer(kube.Kubernetes, resyncPeriod, indexers, tweakListOptions)
+	ni.SharedInformer = corev1.NewFilteredNamespaceInformer(ni.KubeClient, resyncPeriod, indexers, tweakListOptions)
 	ni.SharedInformer.AddEventHandler(SharedNamespaceInformerEventHandler(ni, addFn, delFn))
 
 	listOptions := metav1.ListOptions{}
 	tweakListOptions(&listOptions)
-	existedObjects, err := kube.Kubernetes.CoreV1().Namespaces().List(listOptions)
+	existedObjects, err := ni.KubeClient.CoreV1().Namespaces().List(listOptions)
 
 	if err != nil {
 		log.Errorf("list existing namespaces: %v", err)

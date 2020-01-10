@@ -74,6 +74,27 @@ func (o ObjectAndFilterResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.Map())
 }
 
+// ByNamespaceAndName implements sort.Interface for []ObjectAndFilterResult
+// based on Namespace and Name of Object field.
+type ByNamespaceAndName []ObjectAndFilterResult
+
+func (a ByNamespaceAndName) Len() int      { return len(a) }
+func (a ByNamespaceAndName) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByNamespaceAndName) Less(i, j int) bool {
+	p, q := &a[i], &a[j]
+	if p.Object == nil || q.Object == nil {
+		return false
+	}
+	switch {
+	case p.Object.GetNamespace() < q.Object.GetNamespace():
+		return true
+	case p.Object.GetNamespace() > q.Object.GetNamespace():
+		return false
+	}
+	// Namespaces are equal, so compare names.
+	return p.Object.GetName() < q.Object.GetName()
+}
+
 // KubeEvent contains MonitorId from monitor configuration, event type
 // and involved k8s objects.
 type KubeEvent struct {

@@ -19,6 +19,7 @@ import (
 
 // ResourceInformer is a kube informer for particular onKubernetesEvent
 type ResourceInformer interface {
+	WithKubeClient(client kube.KubernetesClient)
 	WithNamespace(string)
 	WithName(string)
 	WithKubeEventCb(eventCb func(KubeEvent))
@@ -29,7 +30,8 @@ type ResourceInformer interface {
 }
 
 type resourceInformer struct {
-	Monitor *MonitorConfig
+	KubeClient kube.KubernetesClient
+	Monitor    *MonitorConfig
 	// Filter by namespace
 	Namespace string
 	// Filter by object name
@@ -57,6 +59,10 @@ var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 	return informer
 }
 
+func (ei *resourceInformer) WithKubeClient(client kube.KubernetesClient) {
+	ei.KubeClient = client
+}
+
 func (ei *resourceInformer) WithNamespace(ns string) {
 	ei.Namespace = ns
 }
@@ -78,7 +84,7 @@ func (ei *resourceInformer) EventCb(ev KubeEvent) {
 func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	// discover GroupVersionResource for informer
 	log.Debugf("%s: discover GVR for apiVersion '%s' kind '%s'...", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind)
-	ei.GroupVersionResource, err = kube.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind)
+	ei.GroupVersionResource, err = ei.KubeClient.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind)
 	if err != nil {
 		log.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 		return err
@@ -115,7 +121,7 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	tweakListOptions(&ei.ListOptions)
 
 	// create informer with add, update, delete callbacks
-	informer := dynamicinformer.NewFilteredDynamicInformer(kube.DynamicClient, ei.GroupVersionResource, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
+	informer := dynamicinformer.NewFilteredDynamicInformer(ei.KubeClient.Dynamic(), ei.GroupVersionResource, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
 	informer.Informer().AddEventHandler(SharedInformerEventHandler(ei))
 	ei.SharedInformer = informer.Informer()
 
@@ -155,7 +161,7 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 // ListExistedObjects get a list of existed objects in namespace that match selectors and
 // fills Checksum map with checksums of existing objects.
 func (ei *resourceInformer) ListExistedObjects() error {
-	objList, err := kube.DynamicClient.
+	objList, err := ei.KubeClient.Dynamic().
 		Resource(ei.GroupVersionResource).
 		Namespace(ei.Namespace).
 		List(ei.ListOptions)

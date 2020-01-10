@@ -25,6 +25,7 @@ require (
 	k8s.io/api v0.0.0-20190409092523-d687e77c8ae9
 	k8s.io/apimachinery v0.0.0-20190409092423-760d1845f48b
 	k8s.io/client-go v0.0.0-20190411052641-7a6b4715b709
+	k8s.io/klog v1.0.0
 	k8s.io/utils v0.0.0-20190308190857-21c4ce38f2a7 // indirect
 	sigs.k8s.io/kind v0.0.0-20191024075107-85a46de11816
 	sigs.k8s.io/yaml v1.1.1-0.20191128155103-745ef44e09d6 // branch master, with fixes in yaml.v2.2.7
@@ -34,3 +35,6 @@ require (
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.4-0.20190926112101-38fbca4ac77f // branch: fix_in_body
 
 //replace github.com/flant/libjq-go => ../libjq-go
+
+// version from k8s.io/client-go
+replace k8s.io/klog => k8s.io/klog v0.0.0-20190306015804-8e90cee79f82
