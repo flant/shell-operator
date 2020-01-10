@@ -8,12 +8,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
-	fakedynamic "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/flant/shell-operator/pkg/hook"
@@ -22,6 +19,8 @@ import (
 	"github.com/flant/shell-operator/pkg/kube"
 	manager "github.com/flant/shell-operator/pkg/kube_events_manager"
 )
+
+var KubeClient kube.KubernetesClient
 
 // convertBindingContexts render json with array of binding contexts
 func convertBindingContexts(bindingContexts []BindingContext) (string, error) {
@@ -82,16 +81,15 @@ func (b *BindingContextController) RegisterCRD(group, version, kind string, name
 
 // BindingContextsGenerator generates binding contexts for hook tests
 func (b *BindingContextController) Run() (string, error) {
-	kube.Kubernetes = fake.NewSimpleClientset()
-	fakeDiscovery, ok := kube.Kubernetes.Discovery().(*fakediscovery.FakeDiscovery)
+	// Create fake clients: typed and dynamic
+	KubeClient = kube.NewFakeKubernetesClient()
+
+	fakeDiscovery, ok := KubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		return "", fmt.Errorf("couldn't convert Discovery() to *FakeDiscovery")
 	}
 	fakeDiscovery.FakedServerVersion = &version.Info{GitCommit: "v1.0.0"}
 	fakeDiscovery.Resources = ClusterResources
-
-	// Configure dynamic client
-	kube.DynamicClient = fakedynamic.NewSimpleDynamicClient(runtime.NewScheme())
 
 	b.Manager = manager.NewKubeEventsManager()
 	b.Manager.WithContext(b.Context)
