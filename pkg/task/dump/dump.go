@@ -1,37 +1,65 @@
 package dump
 
 import (
-	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
-	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
 
-func TaskToString(task task.Task) string {
-	// Implement TextDumper in Metadata objects!
-	var buf bytes.Buffer
-	//buf.WriteString(fmt.Sprintf("%s '%s'", t.Type, t.Name))
-	hm := task_metadata.HookMetadataAccessor(task)
-	buf.WriteString(fmt.Sprintf("%s %s %s", task.GetType(), hm.HookName, hm.BindingType))
+// ByNamespaceAndName implements sort.Interface for []ObjectAndFilterResult
+// based on Namespace and Name of Object field.
+type AsQueueNames []string
 
-	if task.GetFailureCount() > 0 {
-		buf.WriteString(fmt.Sprintf(" failed %d times. ", task.GetFailureCount()))
+func (a AsQueueNames) Len() int      { return len(a) }
+func (a AsQueueNames) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a AsQueueNames) Less(i, j int) bool {
+	p, q := a[i], a[j]
+
+	switch {
+	case q == "main":
+		return true
+	case p == "main":
+		return false
 	}
+	// both names are main or both are not main, so compare as usual.
+	return p < q
+}
+
+func TaskQueueSetToText(tqs *queue.TaskQueueSet) string {
+	var buf strings.Builder
+
+	var names []string
+	tqs.Iterate(func(queue *queue.TaskQueue) {
+		names = append(names, queue.Name)
+	})
+
+	sort.Sort(AsQueueNames(names))
+
+	for _, name := range names {
+		buf.WriteString("\n\n==========\n")
+		q := tqs.GetByName(name)
+		if q == nil {
+			buf.WriteString(fmt.Sprintf("Queue '%s' is not created\n", name))
+		} else {
+			buf.WriteString(TaskQueueToText(q))
+		}
+	}
+
 	return buf.String()
 }
 
 // Dump tasks in queue
-func TaskQueueToReader(q *queue.TaskQueue) string {
+func TaskQueueToText(q *queue.TaskQueue) string {
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("Queue '%s': length %d\n", q.Name, q.Length()))
 	buf.WriteString("\n")
 
 	var index int
 	q.Iterate(func(task task.Task) {
-		buf.WriteString(TaskToString(task))
+		buf.WriteString(task.GetDescription())
 		buf.WriteString("\n")
 		index++
 	})

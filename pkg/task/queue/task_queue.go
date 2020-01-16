@@ -33,9 +33,10 @@ type QueueWatcher interface {
 }
 
 type TaskResult struct {
-	Status    string
-	HeadTasks []task.Task
-	TailTasks []task.Task
+	Status     string
+	HeadTasks  []task.Task
+	TailTasks  []task.Task
+	AfterTasks []task.Task
 
 	DelayBeforeNextTask time.Duration
 }
@@ -151,7 +152,7 @@ func (q *TaskQueue) GetLast() task.Task {
 	return q.items[len(q.items)-1]
 }
 
-// Remove finds element by id and deletes it.
+// Get returns a task by id.
 func (q *TaskQueue) Get(id string) task.Task {
 	q.m.Lock()
 	defer q.m.Unlock()
@@ -162,6 +163,61 @@ func (q *TaskQueue) Get(id string) task.Task {
 	}
 	return nil
 }
+
+//
+func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
+	newItems := make([]task.Task, len(q.items)+1)
+
+	idFound := false
+	for i, t := range q.items {
+		if !idFound {
+			// copy task while id not found
+			newItems[i] = t
+			if t.GetId() == id {
+				idFound = true
+				// when id is found, inject new task after task with equal id
+				newItems[i+1] = newTask
+			}
+		} else {
+			// when id is found, copy other tasks to i+1 position
+			newItems[i+1] = t
+		}
+	}
+
+	q.items = newItems
+	return
+}
+
+//
+func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
+	newItems := make([]task.Task, len(q.items)+1)
+
+	idFound := false
+	for i, t := range q.items {
+		if !idFound {
+			if t.GetId() != id {
+				// copy task while id not found
+				newItems[i] = t
+			} else {
+				idFound = true
+				// when id is found, inject newTask to a current position
+				// and copy current task to i+1 position
+				newItems[i] = newTask
+				newItems[i+1] = t
+			}
+		} else {
+			// when id is found, copy other taskы to i+1 position
+			newItems[i+1] = t
+		}
+	}
+
+	q.items = newItems
+	return
+}
+
+//func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
+//	return
+//}
 
 // Remove finds element by id and deletes it.
 func (q *TaskQueue) Remove(id string) (t task.Task) {
@@ -220,11 +276,7 @@ func (q *TaskQueue) Start() {
 			log.Debugf("queue %s: get task %s", q.Name, t.GetType())
 
 			// dump queue
-			tasks := []string{}
-			for _, t := range q.items {
-				tasks = append(tasks, fmt.Sprintf("[%s:%s id %s]", t.GetType(), t.GetDescription(), t.GetId()))
-			}
-			log.Debugf("queue %s: tasks after wait %s", q.Name, strings.Join(tasks, ", "))
+			log.Debugf("queue %s: tasks after wait %s", q.Name, q.String())
 
 			if t == nil {
 				log.Debugf("queue %s: got nil task, stop queue", q.Name)
@@ -243,9 +295,15 @@ func (q *TaskQueue) Start() {
 				// delay before retry
 				sleepDelay = DelayOnFailedTask
 			case "Success":
+				// add tasks after current task in reverse order
+				for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
+					q.AddAfter(t.GetId(), taskRes.AfterTasks[i])
+				}
+				// Add tasks to the end of the queue
 				for _, newTask := range taskRes.TailTasks {
 					q.AddLast(newTask)
 				}
+				// Remove current task and add tasks to the head
 				q.DoWithHeadLock(func(q *TaskQueue) {
 					q.Remove(t.GetId())
 					for _, newTask := range taskRes.HeadTasks {
@@ -258,11 +316,7 @@ func (q *TaskQueue) Start() {
 			}
 
 			// dump queue
-			tasks = []string{}
-			for _, t := range q.items {
-				tasks = append(tasks, fmt.Sprintf("[%s:%s id %s]", t.GetType(), t.GetDescription(), t.GetId()))
-			}
-			log.Debugf("queues %s: tasks after handle %s", q.Name, strings.Join(tasks, ", "))
+			log.Debugf("queue %s: tasks after handle %s", q.Name, q.String())
 		}
 	}()
 }
@@ -379,4 +433,21 @@ func (q *TaskQueue) ChangesEnable(runCallbackOnPreviousChanges bool) {
 func (q *TaskQueue) ChangesDisable() {
 	q.changesEnabled = false
 	q.changesCount = 0
+}
+
+// Dump tasks in queue to one line
+func (q *TaskQueue) String() string {
+	var buf strings.Builder
+	var index int
+	var qLen = q.Length()
+	q.Iterate(func(t task.Task) {
+		buf.WriteString(fmt.Sprintf("[%s,id=%10.10s]", t.GetDescription(), t.GetId()))
+		index++
+		if index == qLen {
+			return
+		}
+		buf.WriteString(", ")
+	})
+
+	return buf.String()
 }

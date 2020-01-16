@@ -446,19 +446,7 @@ func (op *ShellOperator) SetupHttpServerHandles() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	http.HandleFunc("/queue", func(writer http.ResponseWriter, request *http.Request) {
-		out := strings.Builder{}
-
-		out.WriteString(dump.TaskQueueToReader(op.TaskQueues.GetMain()))
-
-		op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
-			if queue.Name == "main" {
-				return
-			}
-			out.WriteString("\n\n==========\n")
-			out.WriteString(dump.TaskQueueToReader(queue))
-		})
-
-		_, _ = io.Copy(writer, strings.NewReader(out.String()))
+		_, _ = io.Copy(writer, strings.NewReader(dump.TaskQueueSetToText(op.TaskQueues)))
 	})
 }
 

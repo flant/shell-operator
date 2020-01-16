@@ -83,22 +83,12 @@ func (m *ManagerEventsHandler) Start() {
 
 			m.taskQueues.DoWithLock(func(tqs *queue.TaskQueueSet) {
 				for _, resTask := range tailTasks {
-					if resTask.GetQueueName() == "" || resTask.GetQueueName() == "main" {
-						q := tqs.GetMain()
-						if q == nil {
-							log.Errorf("Possible bug!!! Got task for 'main' queue but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
-						} else {
-							q.AddLast(resTask)
-							logEntry.WithField("queue", "main").Infof("queue task %s", resTask.GetDescription())
-						}
+					q := tqs.GetByName(resTask.GetQueueName())
+					if q == nil {
+						log.Errorf("Possible bug!!! Got task for queue '%s' but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
 					} else {
-						q := tqs.GetByName(resTask.GetQueueName())
-						if q == nil {
-							log.Errorf("Possible bug!!! Got task for queue '%s' but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
-						} else {
-							q.AddLast(resTask)
-							logEntry.WithField("queue", resTask.GetQueueName()).Infof("queue task %s", resTask.GetDescription())
-						}
+						q.AddLast(resTask)
+						logEntry.WithField("queue", q.Name).Infof("queue task %s", resTask.GetDescription())
 					}
 				}
 			})
