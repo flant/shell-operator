@@ -20,9 +20,9 @@ func (a AsQueueNames) Less(i, j int) bool {
 
 	switch {
 	case q == "main":
-		return true
-	case p == "main":
 		return false
+	case p == "main":
+		return true
 	}
 	// both names are main or both are not main, so compare as usual.
 	return p < q
