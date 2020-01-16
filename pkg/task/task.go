@@ -1,9 +1,15 @@
 package task
 
 import (
+	"fmt"
+
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	uuid "gopkg.in/satori/go.uuid.v1"
 )
+
+type MetadataDescriptable interface {
+	GetDescription() string
+}
 
 type TaskType string
 
@@ -13,7 +19,9 @@ type Task interface {
 	IncrementFailureCount()
 	GetFailureCount() int
 	GetLogLabels() map[string]string
+	GetQueueName() string
 	GetMetadata() interface{}
+	GetDescription() string
 }
 
 type BaseTask struct {
@@ -21,6 +29,7 @@ type BaseTask struct {
 	Type         TaskType
 	LogLabels    map[string]string
 	FailureCount int // Failed executions count
+	QueueName    string
 
 	Metadata interface{}
 }
@@ -37,6 +46,11 @@ func NewTask(taskType TaskType) *BaseTask {
 
 func (t *BaseTask) WithLogLabels(labels map[string]string) *BaseTask {
 	t.LogLabels = utils.MergeLabels(t.LogLabels, labels)
+	return t
+}
+
+func (t *BaseTask) WithQueueName(name string) *BaseTask {
+	t.QueueName = name
 	return t
 }
 
@@ -57,6 +71,10 @@ func (t *BaseTask) GetLogLabels() map[string]string {
 	return t.LogLabels
 }
 
+func (t *BaseTask) GetQueueName() string {
+	return t.QueueName
+}
+
 func (t *BaseTask) GetMetadata() interface{} {
 	return t.Metadata
 }
@@ -67,4 +85,13 @@ func (t *BaseTask) GetFailureCount() int {
 
 func (t *BaseTask) IncrementFailureCount() {
 	t.FailureCount++
+}
+
+func (t *BaseTask) GetDescription() string {
+	metaDescription := ""
+	if descriptor, ok := t.Metadata.(MetadataDescriptable); ok {
+		metaDescription = ":" + descriptor.GetDescription()
+	}
+
+	return fmt.Sprintf("%s:%s%s", t.GetType(), t.GetQueueName(), metaDescription)
 }

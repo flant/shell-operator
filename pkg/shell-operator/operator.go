@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
+	uuid "gopkg.in/satori/go.uuid.v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
@@ -174,11 +176,14 @@ func (op *ShellOperator) InitHookManager() (err error) {
 
 	// Define event handlers for schedule event and kubernetes event.
 	op.ManagerEventsHandler.WithKubeEventHandler(func(kubeEvent KubeEvent) []task.Task {
-		//logEntry := log.WithField("binding", ContextBindingType[OnKubernetesEvent])
-		//logEntry.Infof("Kubernetes event %s", kubeEvent.String())
+		logLabels := map[string]string{
+			"event.id": uuid.NewV4().String(),
+			"binding":  ContextBindingType[Schedule],
+		}
+		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
+		logEntry.Debugf("Create tasks for 'kubernetes' event '%s'", kubeEvent.String())
 
-		tasks := []task.Task{}
-
+		var tasks []task.Task
 		op.HookManager.HandleKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
@@ -186,29 +191,35 @@ func (op *ShellOperator) InitHookManager() (err error) {
 					BindingType:    OnKubernetesEvent,
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
-				})
+				}).
+				WithLogLabels(logLabels).
+				WithQueueName(info.QueueName)
 			tasks = append(tasks, newTask)
 		})
 
 		return tasks
 	})
 	op.ManagerEventsHandler.WithScheduleEventHandler(func(crontab string) []task.Task {
+		logLabels := map[string]string{
+			"event.id": uuid.NewV4().String(),
+			"binding":  ContextBindingType[Schedule],
+		}
+		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
+		logEntry.Debugf("Create tasks for 'schedule' event '%s'", crontab)
+
 		var tasks []task.Task
-		err := op.HookManager.HandleScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+		op.HookManager.HandleScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
 					HookName:       hook.Name,
 					BindingType:    Schedule,
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
-				})
+				}).
+				WithLogLabels(logLabels).
+				WithQueueName(info.QueueName)
 			tasks = append(tasks, newTask)
 		})
-
-		if err != nil {
-			log.Errorf("handle event from ScheduleManager '%s': %s", crontab, err)
-			return []task.Task{}
-		}
 
 		return tasks
 	})
@@ -225,6 +236,7 @@ func (op *ShellOperator) Start() {
 	op.PrepopulateMainQueue(op.TaskQueues)
 	// Start main task queue handler
 	op.TaskQueues.StartMain()
+	op.InitAndStartHookQueues()
 
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
@@ -247,6 +259,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		hookLogLabels["hook"] = hookMeta.HookName
 		hookLogLabels["binding"] = string(hookMeta.BindingType)
 		hookLogLabels["task"] = "HookRun"
+		hookLogLabels["queue"] = t.GetQueueName()
 		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
 		taskLogEntry.Info("Execute hook")
 
@@ -276,6 +289,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		hookLogLabels["hook"] = hookMeta.HookName
 		hookLogLabels["binding"] = string(OnKubernetesEvent)
 		hookLogLabels["task"] = "EnableKubernetesBindings"
+		hookLogLabels["queue"] = "main"
 
 		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
 
@@ -285,6 +299,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 		hookRunTasks := []task.Task{}
 
+		// Run hook with Synchronization binding context. Ignore queue name here, execute in main queue.
 		err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
@@ -292,7 +307,8 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 					BindingType:    OnKubernetesEvent,
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
-				})
+				}).
+				WithLogLabels(hookLogLabels)
 			hookRunTasks = append(hookRunTasks, newTask)
 		})
 
@@ -305,7 +321,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		} else {
 			// return Synchronization tasks to add to the queue head.
 			// Informers can be started now — their events will
-			// be added to the tail of the queue.
+			// be added to the tail of the main queue or to the other queues.
 			op.HookManager.GetHook(hookMeta.HookName).HookController.StartMonitors()
 			taskLogEntry.Infof("Kubernetes binding for hook enabled successfully")
 			res.Status = "Success"
@@ -368,6 +384,33 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 	mainQueue.ChangesEnable(true)
 }
 
+// CreateQueues create all queues defined in hooks
+func (op *ShellOperator) InitAndStartHookQueues() {
+	schHooks, _ := op.HookManager.GetHooksInOrder(Schedule)
+	for _, hookName := range schHooks {
+		h := op.HookManager.GetHook(hookName)
+		for _, hookBinding := range h.Config.Schedules {
+			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
+				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.TaskHandler)
+				op.TaskQueues.GetByName(hookBinding.Queue).Start()
+			}
+		}
+	}
+
+	kubeHooks, _ := op.HookManager.GetHooksInOrder(OnKubernetesEvent)
+	for _, hookName := range kubeHooks {
+		h := op.HookManager.GetHook(hookName)
+		for _, hookBinding := range h.Config.OnKubernetesEvents {
+			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
+				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.TaskHandler)
+				op.TaskQueues.GetByName(hookBinding.Queue).Start()
+			}
+		}
+	}
+
+	return
+}
+
 func (op *ShellOperator) RunMetrics() {
 	// live ticks.
 	go func() {
@@ -403,7 +446,19 @@ func (op *ShellOperator) SetupHttpServerHandles() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	http.HandleFunc("/queue", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = io.Copy(writer, dump.TaskQueueToReader(op.TaskQueues.GetMain()))
+		out := strings.Builder{}
+
+		out.WriteString(dump.TaskQueueToReader(op.TaskQueues.GetMain()))
+
+		op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
+			if queue.Name == "main" {
+				return
+			}
+			out.WriteString("\n\n==========\n")
+			out.WriteString(dump.TaskQueueToReader(queue))
+		})
+
+		_, _ = io.Copy(writer, strings.NewReader(out.String()))
 	})
 }
 

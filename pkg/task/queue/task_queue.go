@@ -222,7 +222,7 @@ func (q *TaskQueue) Start() {
 			// dump queue
 			tasks := []string{}
 			for _, t := range q.items {
-				tasks = append(tasks, fmt.Sprintf("[%s, id %s]", t.GetType(), t.GetId()))
+				tasks = append(tasks, fmt.Sprintf("[%s:%s id %s]", t.GetType(), t.GetDescription(), t.GetId()))
 			}
 			log.Debugf("queue %s: tasks after wait %s", q.Name, strings.Join(tasks, ", "))
 
@@ -260,7 +260,7 @@ func (q *TaskQueue) Start() {
 			// dump queue
 			tasks = []string{}
 			for _, t := range q.items {
-				tasks = append(tasks, fmt.Sprintf("[%s, id %s]", t.GetType(), t.GetId()))
+				tasks = append(tasks, fmt.Sprintf("[%s:%s id %s]", t.GetType(), t.GetDescription(), t.GetId()))
 			}
 			log.Debugf("queues %s: tasks after handle %s", q.Name, strings.Join(tasks, ", "))
 		}

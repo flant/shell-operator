@@ -3,7 +3,7 @@ package dump
 import (
 	"bytes"
 	"fmt"
-	"io"
+	"strings"
 
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/task"
@@ -24,9 +24,9 @@ func TaskToString(task task.Task) string {
 }
 
 // Dump tasks in queue
-func TaskQueueToReader(q *queue.TaskQueue) io.Reader {
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("Queue length %d\n", q.Length()))
+func TaskQueueToReader(q *queue.TaskQueue) string {
+	var buf strings.Builder
+	buf.WriteString(fmt.Sprintf("Queue '%s': length %d\n", q.Name, q.Length()))
 	buf.WriteString("\n")
 
 	var index int
@@ -36,5 +36,5 @@ func TaskQueueToReader(q *queue.TaskQueue) io.Reader {
 		index++
 	})
 
-	return &buf
+	return buf.String()
 }

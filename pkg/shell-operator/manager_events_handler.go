@@ -5,8 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
-	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -69,49 +67,14 @@ func (m *ManagerEventsHandler) Start() {
 			var logEntry = log.WithField("operator.component", "handleEvents")
 			select {
 			case crontab := <-m.scheduleManager.Ch():
-				logEntry = log.WithField("binding", string(Schedule))
-				logEntry.Infof("Schedule event '%s'", crontab)
-
 				if m.scheduleCb != nil {
 					tailTasks = m.scheduleCb(crontab)
 				}
-				//
-				//err := HookManager.HandleScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-				//	newTask := task.NewTask(HookRun).
-				//		WithMetadata(HookMetadata{
-				//			HookName:       hook.Name,
-				//			BindingType:    Schedule,
-				//			BindingContext: info.BindingContext,
-				//			AllowFailure:   info.AllowFailure,
-				//		})
-				//	tailTasks = append(tailTasks, newTask)
-				//})
-
-				//if err != nil {
-				//	logEntry.Errorf("handle '%s': %s", crontab, err)
-				//	break
-				//}
 
 			case kubeEvent := <-m.kubeEventsManager.Ch():
-				logEntry = log.WithField("binding", string(OnKubernetesEvent))
-				logEntry.Infof("Kubernetes event %s", kubeEvent.String())
-
 				if m.kubeEventCb != nil {
 					tailTasks = m.kubeEventCb(kubeEvent)
 				}
-				//
-				//tasks := []task.Task{}
-				//
-				//HookManager.HandleKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-				//	newTask := task.NewTask(HookRun).
-				//		WithMetadata(HookMetadata{
-				//			HookName:       hook.Name,
-				//			BindingType:    OnKubernetesEvent,
-				//			BindingContext: info.BindingContext,
-				//			AllowFailure:   info.AllowFailure,
-				//		})
-				//	tasks = append(tasks, newTask)
-				//})
 
 			case <-m.ctx.Done():
 				logEntry.Infof("Stop")
@@ -120,12 +83,25 @@ func (m *ManagerEventsHandler) Start() {
 
 			m.taskQueues.DoWithLock(func(tqs *queue.TaskQueueSet) {
 				for _, resTask := range tailTasks {
-					tqs.GetMain().AddLast(resTask)
-					hm := HookMetadataAccessor(resTask)
-					logEntry.Infof("queue task %s@%s %s", resTask.GetType(), hm.BindingType, hm.HookName)
+					if resTask.GetQueueName() == "" || resTask.GetQueueName() == "main" {
+						q := tqs.GetMain()
+						if q == nil {
+							log.Errorf("Possible bug!!! Got task for 'main' queue but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
+						} else {
+							q.AddLast(resTask)
+							logEntry.WithField("queue", "main").Infof("queue task %s", resTask.GetDescription())
+						}
+					} else {
+						q := tqs.GetByName(resTask.GetQueueName())
+						if q == nil {
+							log.Errorf("Possible bug!!! Got task for queue '%s' but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
+						} else {
+							q.AddLast(resTask)
+							logEntry.WithField("queue", resTask.GetQueueName()).Infof("queue task %s", resTask.GetDescription())
+						}
+					}
 				}
 			})
-
 		}
 	}()
 }

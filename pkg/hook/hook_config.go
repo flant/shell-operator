@@ -283,7 +283,11 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 			kubeConfig.BindingName = kubeCfg.Name
 		}
 		kubeConfig.IncludeSnapshotsFrom = kubeCfg.IncludeSnapshotsFrom
-		kubeConfig.Queue = kubeCfg.Queue
+		if kubeCfg.Queue == "" {
+			kubeConfig.Queue = "main"
+		} else {
+			kubeConfig.Queue = kubeCfg.Queue
+		}
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}
@@ -385,7 +389,12 @@ func (c *HookConfig) ConvertScheduleV1(schV1 ScheduleConfigV1) (ScheduleConfig, 
 		Id:      c.ScheduleId(),
 	}
 	res.IncludeKubernetesSnapshotsFrom = schV1.IncludeKubernetesSnapshotsFrom
-	res.Queue = schV1.Queue
+
+	if schV1.Queue == "" {
+		res.Queue = "main"
+	} else {
+		res.Queue = schV1.Queue
+	}
 
 	return res, nil
 }

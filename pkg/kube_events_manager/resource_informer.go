@@ -175,7 +175,9 @@ func (ei *resourceInformer) ListExistedObjects() error {
 		return nil
 	}
 
-	log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
+	// FIXME objList.Items has too much information for log
+	//log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
+	log.Debugf("%s: '%s' initial list: Got %d existing resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, len(objList.Items))
 
 	for _, item := range objList.Items {
 		// copy loop var to avoid duplication of pointer
@@ -187,7 +189,7 @@ func (ei *resourceInformer) ListExistedObjects() error {
 		// save object to the cache
 		ei.CachedObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
-		log.Debugf("%s: first add %s to the cache with checksum %s",
+		log.Debugf("%s: initial list: '%s' is cached with checksum %s",
 			ei.Monitor.Metadata.DebugName,
 			objFilterRes.Metadata.ResourceId,
 			objFilterRes.Metadata.Checksum)

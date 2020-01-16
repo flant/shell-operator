@@ -6,20 +6,26 @@ package executor
 // - use log instead of fmt
 // - lock reaper when cmd.Run or cmd.Output are called
 
+/*
+Even more info:
+https://medium.com/@william.la.martin/dont-fear-the-subreaper-19c8127c031e
+https://github.com/markriggins/dockerfy/blob/master/reaper_unix.go
+https://github.com/krallin/tini/blob/master/src/tini.c
+*/
+
 /*  Note:  This is a *nix only implementation.  */
 
-//  Prefer #include style directives.
 import (
 	"os"
 	"os/signal"
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 type Config struct {
 	Pid              int
-	Options          int
 	DisablePid1Check bool
 }
 
@@ -50,41 +56,52 @@ func sigChildHandler(notifications chan os.Signal) {
 
 //  Be a good parent - clean up behind the children.
 func reapChildren(config Config) {
-	reapLogEntry.Debugf("Start WAIT4 loop")
+	reapLogEntry.Debugf("Start zombie reaper loop")
 
 	var notifications = make(chan os.Signal, 1)
 
 	go sigChildHandler(notifications)
 
 	pid := config.Pid
-	opts := config.Options | syscall.WNOHANG
 
 	for {
-		si := <-notifications
-		reapLogEntry.Debugf("Got '%v' signal", si.String())
-		func() {
-			// Acquire lock
-			ExecutorLock.Lock()
-			defer ExecutorLock.Unlock()
+		<-notifications
 
+		// Lock until all exec.Cmd are stopped.
+		ExecutorLock.Lock()
+
+		//Wait for all orphaned children
+		var orphanned = 0
+		for {
+			done := false
 			var wstatus syscall.WaitStatus
-
-			/*
-			 *  Reap 'em, so that zombies don't accumulate.
-			 *  Plants vs. Zombies!!
-			 */
-			pid, err := syscall.Wait4(pid, &wstatus, opts, nil)
-			for syscall.EINTR == err {
-				pid, err = syscall.Wait4(pid, &wstatus, opts, nil)
+			pid, err := syscall.Wait4(pid, &wstatus, syscall.WNOHANG, nil)
+			switch err {
+			case nil:
+				if pid > 0 {
+					orphanned++
+					reapLogEntry.Debugf("Cleanup pid=%d\n", pid)
+				} else {
+					done = true
+				}
+			case unix.ECHILD:
+				done = true
+			case unix.EINTR:
+				// reaper is interrupted, try again
+			default:
+				// unknown error
+				done = true
 			}
 
-			reapLogEntry.Debugf("Cleanup: pid=%d, wstatus=%+v\n",
-				pid, wstatus)
+			if done {
+				reapLogEntry.Debugf("Cleanup %d zombies\n", orphanned)
+				break
+			}
+		}
 
-		}()
+		ExecutorLock.Unlock()
 	}
-
-} /*   End of function  reapChildren.  */
+}
 
 /*
  *  ======================================================================
@@ -102,7 +119,6 @@ func Reap() {
 	 */
 	Start(Config{
 		Pid:              -1,
-		Options:          0,
 		DisablePid1Check: false,
 	})
 

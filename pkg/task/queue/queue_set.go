@@ -93,13 +93,19 @@ func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
 	tqs.m.Lock()
 	defer tqs.m.Unlock()
 
-	doFn(tqs.Queues[tqs.MainName])
+	if len(tqs.Queues) == 0 {
+		return
+	}
 
+	main := tqs.GetMain()
+	if main != nil {
+		doFn(main)
+	}
 	// TODO sort names
 
-	for _, t := range tqs.Queues {
-		if t.Name != tqs.MainName {
-			doFn(t)
+	for _, q := range tqs.Queues {
+		if q.Name != tqs.MainName {
+			doFn(q)
 		}
 	}
 }

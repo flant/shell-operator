@@ -1,6 +1,8 @@
 package task_metadata
 
 import (
+	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -74,4 +76,8 @@ func (m *HookMetadata) AppendBindingContext(context BindingContext) *HookMetadat
 func (m *HookMetadata) WithAllowFailure(allowFailure bool) *HookMetadata {
 	m.AllowFailure = allowFailure
 	return m
+}
+
+func (m *HookMetadata) GetDescription() string {
+	return fmt.Sprintf("%s:%s", string(m.BindingType), m.HookName)
 }

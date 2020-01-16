@@ -20,6 +20,7 @@ type KubernetesBindingToMonitorLink struct {
 	IncludeSnapshots []string
 	AllowFailure     bool
 	JqFilter         string
+	QueueName        string
 }
 
 // KubernetesBindingsController handles kubernetes bindings for one hook.
@@ -83,6 +84,7 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 			IncludeSnapshots: config.IncludeSnapshotsFrom,
 			AllowFailure:     config.AllowFailure,
 			JqFilter:         config.Monitor.JqFilter,
+			QueueName:        config.Queue,
 		}
 
 		// There is no Synchronization event for 'v0' binding configuration.
@@ -139,6 +141,7 @@ func (c *kubernetesBindingsController) HandleEvent(kubeEvent KubeEvent) BindingE
 		BindingContext:   bindingContext,
 		IncludeSnapshots: link.IncludeSnapshots,
 		AllowFailure:     link.AllowFailure,
+		QueueName:        link.QueueName,
 	}
 }
 

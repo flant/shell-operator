@@ -31,7 +31,7 @@ type HookManager interface {
 	GetHooksInOrder(bindingType BindingType) ([]string, error)
 	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	EnableScheduleBindings()
-	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) error
+	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 }
 
 type hookManager struct {
@@ -247,7 +247,7 @@ func (hm *hookManager) EnableScheduleBindings() {
 	return
 }
 
-func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) error {
+func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	schHooks, _ := hm.GetHooksInOrder(Schedule)
 	for _, hookName := range schHooks {
 		h := hm.GetHook(hookName)
@@ -259,5 +259,4 @@ func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Ho
 			})
 		}
 	}
-	return nil
 }
