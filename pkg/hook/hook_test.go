@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	. "github.com/flant/shell-operator/pkg/hook/types"
+
 	"github.com/stretchr/testify/assert"
 )
 

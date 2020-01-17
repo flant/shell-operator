@@ -1,19 +1,58 @@
 package metrics_storage
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
 
-// Metrics collection methods
-// Antiopa generates the following metrics:
-// hooks errors:
-// - shell_operator_hook_errors{hook="hook_name"} counter increases when hook fails
-// - shell_operator_hook_beareable_errors{hook="xxx"}
-// health counter:
-// - shell_operator_live_ticks counter increases every 5 sec. while shell_operator runs.
-// queue length:
-// - shell_operator_tasks_queue_length
+// MetricStorage is used to synchronously register metric values.
+type MetricStorage struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	MetricChan chan Metric
+	MetricVecs map[string]MetricVec
+}
+
+func NewMetricStorage() *MetricStorage {
+	return &MetricStorage{
+		MetricChan: make(chan Metric, 1000),
+		MetricVecs: make(map[string]MetricVec),
+	}
+}
+
+func (m *MetricStorage) WithContext(ctx context.Context) {
+	m.ctx, m.cancel = context.WithCancel(ctx)
+}
+
+func (m *MetricStorage) Stop() {
+	if m.cancel != nil {
+		m.cancel()
+	}
+}
+
+func (storage *MetricStorage) Start() {
+	go func() {
+		for {
+			select {
+			case metric := <-storage.MetricChan:
+				metric.store(storage)
+			case <-storage.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func (storage *MetricStorage) SendGaugeMetric(metric string, value float64, labels map[string]string) {
+	storage.MetricChan <- NewGaugeMetric(metric, value, labels)
+}
+func (storage *MetricStorage) SendCounterMetric(metric string, value float64, labels map[string]string) {
+	storage.MetricChan <- NewCounterMetric(metric, value, labels)
+}
+
 type Metric interface {
 	store(*MetricStorage)
 }
@@ -152,37 +191,4 @@ func (metricVec *MetricCounterVec) UpdateValue(labels prometheus.Labels, value f
 		}
 	}()
 	metricVec.With(labels).Add(value)
-}
-
-func Init() *MetricStorage {
-	return NewMetricStorage()
-}
-
-// Структура MetricStorage - регистратор результатов
-type MetricStorage struct {
-	MetricChan chan Metric
-	MetricVecs map[string]MetricVec
-}
-
-func NewMetricStorage() *MetricStorage {
-	return &MetricStorage{
-		MetricChan: make(chan Metric, 1000),
-		MetricVecs: make(map[string]MetricVec),
-	}
-}
-
-func (storage *MetricStorage) Run() {
-	for {
-		select {
-		case metric := <-storage.MetricChan:
-			metric.store(storage)
-		}
-	}
-}
-
-func (storage *MetricStorage) SendGaugeMetric(metric string, value float64, labels map[string]string) {
-	storage.MetricChan <- NewGaugeMetric(metric, value, labels)
-}
-func (storage *MetricStorage) SendCounterMetric(metric string, value float64, labels map[string]string) {
-	storage.MetricChan <- NewCounterMetric(metric, value, labels)
 }

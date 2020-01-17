@@ -8,20 +8,21 @@ import (
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+
 	"github.com/flant/shell-operator/pkg/kube"
-	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
-	utils_data "github.com/flant/shell-operator/pkg/utils/data"
 )
 
 // ResourceInformer is a kube informer for particular onKubernetesEvent
 type ResourceInformer interface {
+	WithKubeClient(client kube.KubernetesClient)
 	WithNamespace(string)
 	WithName(string)
+	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateSharedInformer() error
 	GetExistedObjects() []ObjectAndFilterResult
 	Run(stopCh <-chan struct{})
@@ -29,18 +30,20 @@ type ResourceInformer interface {
 }
 
 type resourceInformer struct {
-	Monitor *MonitorConfig
+	KubeClient kube.KubernetesClient
+	Monitor    *MonitorConfig
 	// Filter by namespace
 	Namespace string
 	// Filter by object name
 	Name string
 
-	Checksum       map[string]string
-	ExistedObjects []ObjectAndFilterResult
+	CachedObjects  map[string]*ObjectAndFilterResult
 	SharedInformer cache.SharedInformer
 
 	GroupVersionResource schema.GroupVersionResource
 	ListOptions          metav1.ListOptions
+
+	eventCb func(KubeEvent)
 
 	ctx context.Context
 }
@@ -50,11 +53,14 @@ var _ ResourceInformer = &resourceInformer{}
 
 var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 	informer := &resourceInformer{
-		Monitor:        monitor,
-		Checksum:       make(map[string]string),
-		ExistedObjects: make([]ObjectAndFilterResult, 0),
+		Monitor:       monitor,
+		CachedObjects: make(map[string]*ObjectAndFilterResult, 0),
 	}
 	return informer
+}
+
+func (ei *resourceInformer) WithKubeClient(client kube.KubernetesClient) {
+	ei.KubeClient = client
 }
 
 func (ei *resourceInformer) WithNamespace(ns string) {
@@ -65,10 +71,20 @@ func (ei *resourceInformer) WithName(name string) {
 	ei.Name = name
 }
 
+func (ei *resourceInformer) WithKubeEventCb(eventCb func(KubeEvent)) {
+	ei.eventCb = eventCb
+}
+
+func (ei *resourceInformer) EventCb(ev KubeEvent) {
+	if ei.eventCb != nil {
+		ei.eventCb(ev)
+	}
+}
+
 func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	// discover GroupVersionResource for informer
 	log.Debugf("%s: discover GVR for apiVersion '%s' kind '%s'...", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind)
-	ei.GroupVersionResource, err = kube.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind)
+	ei.GroupVersionResource, err = ei.KubeClient.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind)
 	if err != nil {
 		log.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 		return err
@@ -105,7 +121,7 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	tweakListOptions(&ei.ListOptions)
 
 	// create informer with add, update, delete callbacks
-	informer := dynamicinformer.NewFilteredDynamicInformer(kube.DynamicClient, ei.GroupVersionResource, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
+	informer := dynamicinformer.NewFilteredDynamicInformer(ei.KubeClient.Dynamic(), ei.GroupVersionResource, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
 	informer.Informer().AddEventHandler(SharedInformerEventHandler(ei))
 	ei.SharedInformer = informer.Informer()
 
@@ -118,115 +134,26 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	return nil
 }
 
+// TODO we need locks between HandleEvent and GetExistedObjects
 func (ei *resourceInformer) GetExistedObjects() []ObjectAndFilterResult {
-	return ei.ExistedObjects
+	res := make([]ObjectAndFilterResult, 0)
+	for _, obj := range ei.CachedObjects {
+		res = append(res, *obj)
+	}
+	return res
 }
 
+// TODO make monitor config accessible here to get LogLabels
 var SharedInformerEventHandler = func(informer *resourceInformer) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			objectId, err := runtimeResourceId(obj, informer.Monitor.Kind)
-			if err != nil {
-				log.Errorf("%s: WATCH Added: get object id: %s", informer.Monitor.Metadata.DebugName, err)
-				return
-			}
-
-			filtered, err := ResourceFilter(obj, informer.Monitor.JqFilter)
-			if err != nil {
-				log.Errorf("%s: WATCH Added: apply jqFilter on %s: %s",
-					informer.Monitor.Metadata.DebugName, objectId, err)
-				return
-			}
-
-			checksum := utils_checksum.CalculateChecksum(filtered)
-
-			filteredResult := ""
-			if informer.Monitor.JqFilter != "" {
-				filteredResult = filtered
-			}
-
-			if informer.ShouldHandleEvent(WatchEventAdded) {
-				jqFilterOutput := ""
-				if informer.Monitor.JqFilter != "" {
-					jqFilterOutput = fmt.Sprintf(": jqFilter '%s' output:\n%s",
-						informer.Monitor.JqFilter,
-						utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				}
-				log.Debugf("%s: WATCH Added: %s%s",
-					informer.Monitor.Metadata.DebugName,
-					objectId,
-					jqFilterOutput)
-				informer.HandleKubeEvent(obj, objectId, filteredResult, checksum, WatchEventAdded)
-			}
+			informer.HandleWatchEvent(obj.(*unstructured.Unstructured), WatchEventAdded)
 		},
 		UpdateFunc: func(_ interface{}, obj interface{}) {
-			objectId, err := runtimeResourceId(obj, informer.Monitor.Kind)
-			if err != nil {
-				log.Errorf("%s: WATCH Modified: get object id: %s", informer.Monitor.Metadata.DebugName, err)
-				return
-			}
-
-			filtered, err := ResourceFilter(obj, informer.Monitor.JqFilter)
-			if err != nil {
-				log.Errorf("%s: WATCH Modified: apply jqFilter on %s: %s",
-					informer.Monitor.Metadata.DebugName, objectId, err)
-				return
-			}
-
-			checksum := utils_checksum.CalculateChecksum(filtered)
-
-			filteredResult := ""
-			if informer.Monitor.JqFilter != "" {
-				filteredResult = filtered
-			}
-
-			if informer.ShouldHandleEvent(WatchEventModified) {
-				jqFilterOutput := ""
-				if informer.Monitor.JqFilter != "" {
-					jqFilterOutput = fmt.Sprintf(": jqFilter '%s' output:\n%s",
-						informer.Monitor.JqFilter,
-						utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				}
-				log.Debugf("%s: WATCH Modified: %s object%s",
-					informer.Monitor.Metadata.DebugName,
-					objectId,
-					jqFilterOutput)
-				informer.HandleKubeEvent(obj, objectId, filteredResult, checksum, WatchEventModified)
-			}
-
+			informer.HandleWatchEvent(obj.(*unstructured.Unstructured), WatchEventModified)
 		},
 		DeleteFunc: func(obj interface{}) {
-			objectId, err := runtimeResourceId(obj, informer.Monitor.Kind)
-			if err != nil {
-				log.Errorf("%s: WATCH Deleted: get object id: %s", informer.Monitor.Metadata.DebugName, err)
-				return
-			}
-
-			filtered, err := ResourceFilter(obj, informer.Monitor.JqFilter)
-			if err != nil {
-				log.Errorf("%s: WATCH Modified: apply jqFilter on %s: %s",
-					informer.Monitor.Metadata.DebugName, objectId, err)
-				return
-			}
-
-			filteredResult := ""
-			if informer.Monitor.JqFilter != "" {
-				filteredResult = filtered
-			}
-
-			if informer.ShouldHandleEvent(WatchEventDeleted) {
-				jqFilterOutput := ""
-				if informer.Monitor.JqFilter != "" {
-					jqFilterOutput = fmt.Sprintf(": jqFilter '%s' output:\n%s",
-						informer.Monitor.JqFilter,
-						utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-				}
-				log.Debugf("%s: WATCH Deleted: %s object%s",
-					informer.Monitor.Metadata.DebugName,
-					objectId,
-					jqFilterOutput)
-				informer.HandleKubeEvent(obj, objectId, filteredResult, "", WatchEventDeleted)
-			}
+			informer.HandleWatchEvent(obj.(*unstructured.Unstructured), WatchEventDeleted)
 		},
 	}
 }
@@ -234,7 +161,7 @@ var SharedInformerEventHandler = func(informer *resourceInformer) cache.Resource
 // ListExistedObjects get a list of existed objects in namespace that match selectors and
 // fills Checksum map with checksums of existing objects.
 func (ei *resourceInformer) ListExistedObjects() error {
-	objList, err := kube.DynamicClient.
+	objList, err := ei.KubeClient.Dynamic().
 		Resource(ei.GroupVersionResource).
 		Namespace(ei.Namespace).
 		List(ei.ListOptions)
@@ -248,105 +175,89 @@ func (ei *resourceInformer) ListExistedObjects() error {
 		return nil
 	}
 
-	log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
+	// FIXME objList.Items has too much information for log
+	//log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
+	log.Debugf("%s: '%s' initial list: Got %d existing resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, len(objList.Items))
 
-	for _, obj := range objList.Items {
-		resourceId, err := runtimeResourceId(&obj, ei.Monitor.Kind)
+	for _, item := range objList.Items {
+		// copy loop var to avoid duplication of pointer
+		obj := item
+		objFilterRes, err := ApplyJqFilter(ei.Monitor.JqFilter, &obj)
 		if err != nil {
 			return err
 		}
+		// save object to the cache
+		ei.CachedObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
-		filtered, err := ResourceFilter(obj.Object, ei.Monitor.JqFilter)
-		if err != nil {
-			return err
-		}
-
-		ei.Checksum[resourceId] = utils_checksum.CalculateChecksum(filtered)
-
-		jqFilterOutput := ""
-		if ei.Monitor.JqFilter != "" {
-			jqFilterOutput = fmt.Sprintf(" jqFilter '%s' output:\n%s",
-				ei.Monitor.JqFilter,
-				utils_data.FormatJsonDataOrError(utils_data.FormatPrettyJson(filtered)))
-		}
-		log.Debugf("%s: initial checksum of %s is %s.%s",
+		log.Debugf("%s: initial list: '%s' is cached with checksum %s",
 			ei.Monitor.Metadata.DebugName,
-			resourceId,
-			ei.Checksum[resourceId],
-			jqFilterOutput)
-
-		filterResult := ""
-		if ei.Monitor.JqFilter != "" {
-			filterResult = filtered
-		}
-
-		ei.ExistedObjects = append(ei.ExistedObjects, ObjectAndFilterResult{
-			Object:       obj.Object,
-			FilterResult: filterResult,
-		})
+			objFilterRes.Metadata.ResourceId,
+			objFilterRes.Metadata.Checksum)
 	}
 
 	return nil
 }
 
-// HandleKubeEvent sends new KubeEvent to KubeEventCh
-// obj doesn't contain Kind information, so kind is passed from AddMonitor() argument.
+// HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modifed is enough)
-func (ei *resourceInformer) HandleKubeEvent(obj interface{}, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
+//func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
+func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eventType WatchEventType) {
+	resourceId := ResourceId(obj)
+
+	// Always calculate checksum and update cache, because we need actual state in CachedObjects
+
+	objFilterRes, err := ApplyJqFilter(ei.Monitor.JqFilter, obj)
+	if err != nil {
+		log.Errorf("%s: WATCH %s: %s",
+			ei.Monitor.Metadata.DebugName,
+			eventType,
+			err)
+		return
+	}
+
+	// Ignore Added or Modified if object is in cache and its checksum is equal to the newChecksum.
+	// Delete is never ignored.
 	switch eventType {
 	case WatchEventAdded:
 		fallthrough
 	case WatchEventModified:
-		if ei.Checksum[objectId] != newChecksum {
-			ei.Checksum[objectId] = newChecksum
-		} else {
-			// ignore changes
-			log.Debugf("%s: %+v %s: checksum is not changed, no KubeEvent",
+		cachedObject, objectInCache := ei.CachedObjects[resourceId]
+		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
+			// update object in cache and do not send event
+			ei.CachedObjects[resourceId] = objFilterRes
+			log.Debugf("%s: %s %s: checksum is not changed, no KubeEvent",
 				ei.Monitor.Metadata.DebugName,
 				string(eventType),
-				objectId,
+				resourceId,
 			)
 			return
 		}
+		// save new object and result
+		ei.CachedObjects[resourceId] = objFilterRes
 
 	case WatchEventDeleted:
-		delete(ei.Checksum, objectId)
+		delete(ei.CachedObjects, resourceId)
 	}
 
-	log.Debugf("%s: %+v %s: send KubeEvent",
-		ei.Monitor.Metadata.DebugName,
-		string(eventType),
-		objectId,
-	)
-	// Safe to ignore an error because of previous call to runtimeResourceId()
-	namespace, name, _ := metaFromEventObject(obj.(runtime.Object))
+	// Fire KubeEvent only if needed.
+	if ei.ShouldHandleEvent(eventType) {
+		log.Debugf("%s: %s %s: send KubeEvent",
+			ei.Monitor.Metadata.DebugName,
+			string(eventType),
+			resourceId,
+		)
+		// TODO: should be disabled by default and enabled by a debug feature switch
+		//log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
-	// TODO: should be disabled by default and enabled by a debug feature switch
-	//log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
-
-	var eventObj map[string]interface{}
-	switch v := obj.(type) {
-	case unstructured.Unstructured:
-		eventObj = v.Object
-	case *unstructured.Unstructured:
-		eventObj = v.Object
-	default:
-		eventObj = map[string]interface{}{
-			"object": obj,
-		}
+		// Pass event info to callback
+		ei.EventCb(KubeEvent{
+			MonitorId:   ei.Monitor.Metadata.MonitorId,
+			WatchEvents: []WatchEventType{eventType},
+			Objects:     []ObjectAndFilterResult{*objFilterRes},
+		})
 	}
 
-	KubeEventCh <- KubeEvent{
-		ConfigId:     ei.Monitor.Metadata.ConfigId,
-		Type:         "Event",
-		WatchEvents:  []WatchEventType{eventType},
-		Namespace:    namespace,
-		Kind:         ei.Monitor.Kind,
-		Name:         name,
-		Object:       eventObj,
-		FilterResult: filterResult,
-	}
 	return
 }
 

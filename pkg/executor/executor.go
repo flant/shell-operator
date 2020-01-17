@@ -11,27 +11,29 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
-var ExecutorLock = &sync.Mutex{}
+var ExecutorLock = &sync.RWMutex{}
+
+// This family of methods use ExecutorLock to not be interfered by zombie reaper.
 
 func Run(cmd *exec.Cmd) error {
-	ExecutorLock.Lock()
-	defer ExecutorLock.Unlock()
+	ExecutorLock.RLock()
+	defer ExecutorLock.RUnlock()
 
 	// TODO context: hook name, hook phase, hook binding
-	log.Debugf("Executing command %q in %q dir", strings.Join(cmd.Args, " "), cmd.Dir)
+	log.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
 	return cmd.Run()
 }
 
 func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
-	ExecutorLock.Lock()
-	defer ExecutorLock.Unlock()
+	ExecutorLock.RLock()
+	defer ExecutorLock.RUnlock()
 
 	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 	stdoutLogEntry := logEntry.WithField("output", "stdout")
 	stderrLogEntry := logEntry.WithField("output", "stderr")
 
-	logEntry.Debugf("Executing command %q in %q dir", strings.Join(cmd.Args, " "), cmd.Dir)
+	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
 	var wg sync.WaitGroup
 
@@ -49,6 +51,8 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
 	if err != nil {
 		return err
 	}
+
+	//	cmd.Process.Pid
 
 	wg.Add(2)
 	go func() {
@@ -70,6 +74,7 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
 	wg.Wait()
 
 	err = cmd.Wait()
+
 	if err != nil {
 		return err
 	}
@@ -78,8 +83,8 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
 }
 
 func Output(cmd *exec.Cmd) (output []byte, err error) {
-	ExecutorLock.Lock()
-	defer ExecutorLock.Unlock()
+	ExecutorLock.RLock()
+	defer ExecutorLock.RUnlock()
 
 	output, err = cmd.Output()
 	return

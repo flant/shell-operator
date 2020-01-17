@@ -10,8 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
-
-	"github.com/flant/shell-operator/pkg/kube"
 )
 
 var defaultNamespace = "default"
@@ -104,7 +102,7 @@ func NewStateController(initialState string) (StateController, error) {
 
 func createObject(stateObject StateObject, unstructuredObject unstructured.Unstructured) error {
 	gvr := getGVRByKind(stateObject.Kind)
-	_, err := kube.DynamicClient.Resource(gvr).
+	_, err := KubeClient.Dynamic().Resource(gvr).
 		Namespace(stateObject.namespace).
 		Create(&unstructuredObject, metav1.CreateOptions{}, []string{}...)
 	if err != nil {
@@ -115,7 +113,7 @@ func createObject(stateObject StateObject, unstructuredObject unstructured.Unstr
 
 func deleteObject(stateObject StateObject) error {
 	gvr := getGVRByKind(stateObject.Kind)
-	err := kube.DynamicClient.Resource(gvr).
+	err := KubeClient.Dynamic().Resource(gvr).
 		Namespace(stateObject.namespace).
 		Delete(stateObject.name, &metav1.DeleteOptions{}, []string{}...)
 	if err != nil {
@@ -126,7 +124,7 @@ func deleteObject(stateObject StateObject) error {
 
 func updateObject(stateObject StateObject, unstructuredObject unstructured.Unstructured) error {
 	gvr := getGVRByKind(stateObject.Kind)
-	_, err := kube.DynamicClient.Resource(gvr).
+	_, err := KubeClient.Dynamic().Resource(gvr).
 		Namespace(stateObject.namespace).
 		Update(&unstructuredObject, metav1.UpdateOptions{}, []string{}...)
 	if err != nil {

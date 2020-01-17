@@ -8,13 +8,14 @@ import (
 
 	"github.com/flant/shell-operator/pkg/kube"
 	log "github.com/sirupsen/logrus"
-
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
 type NamespaceInformer interface {
+	WithKubeClient(client kube.KubernetesClient)
 	CreateSharedInformer(addFn func(string), delFn func(string)) error
 	GetExistedObjects() map[string]bool
 	Run(stopCh <-chan struct{})
@@ -22,6 +23,7 @@ type NamespaceInformer interface {
 }
 
 type namespaceInformer struct {
+	KubeClient     kube.KubernetesClient
 	Monitor        *MonitorConfig
 	SharedInformer cache.SharedInformer
 
@@ -37,6 +39,10 @@ var NewNamespaceInformer = func(monitor *MonitorConfig) NamespaceInformer {
 		ExistedObjects: make(map[string]bool, 0),
 	}
 	return informer
+}
+
+func (ni *namespaceInformer) WithKubeClient(client kube.KubernetesClient) {
+	ni.KubeClient = client
 }
 
 func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(string)) error {
@@ -57,12 +63,12 @@ func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func
 		}
 	}
 
-	ni.SharedInformer = corev1.NewFilteredNamespaceInformer(kube.Kubernetes, resyncPeriod, indexers, tweakListOptions)
+	ni.SharedInformer = corev1.NewFilteredNamespaceInformer(ni.KubeClient, resyncPeriod, indexers, tweakListOptions)
 	ni.SharedInformer.AddEventHandler(SharedNamespaceInformerEventHandler(ni, addFn, delFn))
 
 	listOptions := metav1.ListOptions{}
 	tweakListOptions(&listOptions)
-	existedObjects, err := kube.Kubernetes.CoreV1().Namespaces().List(listOptions)
+	existedObjects, err := ni.KubeClient.CoreV1().Namespaces().List(listOptions)
 
 	if err != nil {
 		log.Errorf("list existing namespaces: %v", err)
@@ -83,22 +89,14 @@ func (ni *namespaceInformer) GetExistedObjects() map[string]bool {
 var SharedNamespaceInformerEventHandler = func(informer *namespaceInformer, addFn func(string), delFn func(string)) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			_, nsName, err := metaFromEventObject(obj)
-			if err != nil {
-				log.Errorf("%s: add: get ns name: %s", informer.Monitor.Metadata.DebugName, err)
-				return
-			}
-
-			addFn(nsName)
+			nsObj := obj.(*v1.Namespace)
+			log.Debugf("NamespaceInformer: Added ns/%s", nsObj.Name)
+			addFn(nsObj.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
-			_, nsName, err := metaFromEventObject(obj)
-			if err != nil {
-				log.Errorf("%s: delete: get ns name: %s", informer.Monitor.Metadata.DebugName, err)
-				return
-			}
-
-			delFn(nsName)
+			nsObj := obj.(*v1.Namespace)
+			log.Debugf("NamespaceInformer: Deleted ns/%s", nsObj.Name)
+			delFn(nsObj.Name)
 		},
 	}
 }

@@ -2,15 +2,19 @@ package kube_events_manager
 
 import (
 	log "github.com/sirupsen/logrus"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 // KubeEventMonitorConfig is a config that suits the latest
-// version of OnKuberneteEventConfig.
+// version of OnKubernetesEventConfig.
 type MonitorConfig struct {
 	Metadata struct {
-		ConfigId  string
+		MonitorId string
 		DebugName string
+		LogLabels map[string]string
 	}
 	EventTypes        []WatchEventType
 	ApiVersion        string
@@ -21,6 +25,7 @@ type MonitorConfig struct {
 	FieldSelector     *FieldSelector
 	JqFilter          string
 	LogEntry          *log.Entry
+	Mode              KubeEventMode
 }
 
 func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
@@ -148,4 +153,11 @@ func (c *MonitorConfig) Namespaces() (nsNames []string) {
 
 	nsNames = c.NamespaceSelector.NameSelector.MatchNames
 	return nsNames
+}
+
+func (c *MonitorConfig) WithMode(mode KubeEventMode) {
+	if mode == "" {
+		c.Mode = ModeIncremental
+	}
+	c.Mode = mode
 }

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"net"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -19,7 +18,8 @@ var WorkingDir = ""
 var TempDir = "/tmp/shell-operator"
 var KubeContext = ""
 var KubeConfig = ""
-var ListenAddress, _ = net.ResolveTCPAddr("tcp", "0.0.0.0:9115")
+var ListenAddress = "0.0.0.0"
+var ListenPort = "9115"
 var JqLibraryPath = ""
 
 // Use info level with timestamps and a text output by default
@@ -54,10 +54,14 @@ func SetupGlobalSettings(kpApp *kingpin.Application) {
 		Default(KubeConfig).
 		StringVar(&KubeConfig)
 
-	kpApp.Flag("listen-address", "Address and port to use for HTTP serving.").
+	kpApp.Flag("listen-address", "Address to use to serve metrics to Prometheus.").
 		Envar("SHELL_OPERATOR_LISTEN_ADDRESS").
-		Default(ListenAddress.String()).
-		TCPVar(&ListenAddress)
+		Default(ListenAddress).
+		StringVar(&ListenAddress)
+	kpApp.Flag("listen-port", "Port to use to serve metrics to Prometheus.").
+		Envar("SHELL_OPERATOR_LISTEN_PORT").
+		Default(ListenPort).
+		StringVar(&ListenPort)
 
 	kpApp.Flag("jq-library-path", "Prepend directory to the search list for jq modules (-L flag). (Can be set with $JQ_LIBRARY_PATH).").
 		Envar("JQ_LIBRARY_PATH").

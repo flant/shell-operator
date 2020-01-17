@@ -91,6 +91,14 @@ properties:
         allowFailure:
           type: boolean
           default: false
+        includeKubernetesSnapshotsFrom:
+          type: array
+          additionalItems: false
+          minItems: 1
+          items:
+            type: string
+        queue:
+          type: string
   kubernetes:
     title: kubernetes event bindings
     type: array
@@ -118,6 +126,14 @@ properties:
             - Added
             - Modified
             - Deleted
+        includeSnapshotsFrom:
+          type: array
+          additionalItems: false
+          minItems: 1
+          items:
+            type: string
+        queue:
+          type: string
         jqFilter:
           type: string
           example: ".metadata.labels"

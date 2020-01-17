@@ -1,16 +1,21 @@
 package hook
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/hashicorp/go-multierror"
+	"gopkg.in/robfig/cron.v2"
 	uuid "gopkg.in/satori/go.uuid.v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/yaml"
 
-	kubemgr "github.com/flant/shell-operator/pkg/kube_events_manager"
+	. "github.com/flant/shell-operator/pkg/hook/types"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+
+	"github.com/flant/shell-operator/pkg/hook/config"
+	"github.com/flant/shell-operator/pkg/kube_events_manager"
 )
 
 // HookConfig is a structure with versioned hook configuration
@@ -37,7 +42,7 @@ type HookConfigV0 struct {
 type HookConfigV1 struct {
 	ConfigVersion     string                      `json:"configVersion"`
 	OnStartup         interface{}                 `json:"onStartup"`
-	Schedule          []ScheduleConfigV0          `json:"schedule"`
+	Schedule          []ScheduleConfigV1          `json:"schedule"`
 	OnKubernetesEvent []OnKubernetesEventConfigV1 `json:"kubernetes"`
 }
 
@@ -46,6 +51,15 @@ type ScheduleConfigV0 struct {
 	Name         string `json:"name"`
 	Crontab      string `json:"crontab"`
 	AllowFailure bool   `json:"allowFailure"`
+}
+
+// Schedule configuration
+type ScheduleConfigV1 struct {
+	Name                           string   `json:"name"`
+	Crontab                        string   `json:"crontab"`
+	AllowFailure                   bool     `json:"allowFailure"`
+	IncludeKubernetesSnapshotsFrom []string `json:"includeKubernetesSnapshotsFrom"`
+	Queue                          string   `json:"queue"`
 }
 
 // Legacy version of kubernetes event configuration
@@ -68,7 +82,8 @@ type KubeNamespaceSelectorV0 struct {
 // version 1 of kubernetes event configuration
 type OnKubernetesEventConfigV1 struct {
 	Name                    string                   `json:"name,omitempty"`
-	WatchEventTypes         []kubemgr.WatchEventType `json:"watchEvent,omitempty"`
+	WatchEventTypes         []WatchEventType         `json:"watchEvent,omitempty"`
+	Mode                    KubeEventMode            `json:"mode,omitempty"`
 	ApiVersion              string                   `json:"apiVersion,omitempty"`
 	Kind                    string                   `json:"kind,omitempty"`
 	NameSelector            *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
@@ -78,48 +93,15 @@ type OnKubernetesEventConfigV1 struct {
 	JqFilter                string                   `json:"jqFilter,omitempty"`
 	AllowFailure            bool                     `json:"allowFailure,omitempty"`
 	ResynchronizationPeriod string                   `json:"resynchronizationPeriod,omitempty"`
+	IncludeSnapshotsFrom    []string                 `json:"includeSnapshotsFrom"`
+	Queue                   string                   `json:"queue"`
 }
 
-type KubeNameSelectorV1 kubemgr.NameSelector
+type KubeNameSelectorV1 NameSelector
 
-type KubeFieldSelectorV1 kubemgr.FieldSelector
+type KubeFieldSelectorV1 FieldSelector
 
-type KubeNamespaceSelectorV1 kubemgr.NamespaceSelector
-
-type BindingType string
-
-const (
-	Schedule          BindingType = "SCHEDULE"
-	OnStartup         BindingType = "ON_STARTUP"
-	OnKubernetesEvent BindingType = "ON_KUBERNETES_EVENT"
-)
-
-var ContextBindingType = map[BindingType]string{
-	Schedule:          "schedule",
-	OnStartup:         "onStartup",
-	OnKubernetesEvent: "kubernetes",
-}
-
-// Types for effective binding configs
-type CommonBindingConfig struct {
-	ConfigName   string
-	AllowFailure bool
-}
-
-type OnStartupConfig struct {
-	CommonBindingConfig
-	Order float64
-}
-
-type ScheduleConfig struct {
-	CommonBindingConfig
-	Crontab string
-}
-
-type OnKubernetesEventConfig struct {
-	CommonBindingConfig
-	Monitor *kubemgr.MonitorConfig
-}
+type KubeNamespaceSelectorV1 NamespaceSelector
 
 // LoadAndValidate loads config from bytes and validate it. Returns multierror.
 func (c *HookConfig) LoadAndValidate(data []byte) error {
@@ -155,7 +137,7 @@ func (c *HookConfig) ConvertAndCheck(data []byte) error {
 	switch c.Version {
 	case "v0":
 		configV0 := &HookConfigV0{}
-		err := json.Unmarshal(data, configV0)
+		err := yaml.Unmarshal(data, configV0)
 		if err != nil {
 			return fmt.Errorf("unmarshal HookConfig version 0: %s", err)
 		}
@@ -166,7 +148,7 @@ func (c *HookConfig) ConvertAndCheck(data []byte) error {
 		}
 	case "v1":
 		configV1 := &HookConfigV1{}
-		err := json.Unmarshal(data, configV1)
+		err := yaml.Unmarshal(data, configV1)
 		if err != nil {
 			return fmt.Errorf("unmarshal HookConfig v1: %s", err)
 		}
@@ -192,7 +174,11 @@ func (c *HookConfig) ConvertAndCheckV0() (err error) {
 	}
 
 	c.Schedules = []ScheduleConfig{}
-	for _, rawSchedule := range c.V0.Schedule {
+	for i, rawSchedule := range c.V0.Schedule {
+		err := c.CheckScheduleV0(rawSchedule)
+		if err != nil {
+			return fmt.Errorf("invalid schedule config [%d]: %v", i, err)
+		}
 		schedule, err := c.ConvertScheduleV0(rawSchedule)
 		if err != nil {
 			return err
@@ -207,20 +193,22 @@ func (c *HookConfig) ConvertAndCheckV0() (err error) {
 			return fmt.Errorf("invalid onKubernetesEvent config [%d]: %v", i, err)
 		}
 
-		monitor := &kubemgr.MonitorConfig{}
+		monitor := &kube_events_manager.MonitorConfig{}
 		monitor.Metadata.DebugName = c.MonitorDebugName(kubeCfg.Name, i)
-		monitor.Metadata.ConfigId = c.MonitorConfigId()
+		monitor.Metadata.MonitorId = c.MonitorConfigId()
+		monitor.Metadata.LogLabels = map[string]string{}
+		monitor.WithMode(ModeV0)
 
-		// a quick fix for legacy version.
-		eventTypes := []kubemgr.WatchEventType{}
+		// convert event names from legacy config.
+		eventTypes := []WatchEventType{}
 		for _, eventName := range kubeCfg.EventTypes {
 			switch eventName {
 			case "add":
-				eventTypes = append(eventTypes, kubemgr.WatchEventAdded)
+				eventTypes = append(eventTypes, WatchEventAdded)
 			case "update":
-				eventTypes = append(eventTypes, kubemgr.WatchEventModified)
+				eventTypes = append(eventTypes, WatchEventModified)
 			case "delete":
-				eventTypes = append(eventTypes, kubemgr.WatchEventDeleted)
+				eventTypes = append(eventTypes, WatchEventDeleted)
 			default:
 				return fmt.Errorf("event '%s' is unsupported", eventName)
 			}
@@ -229,13 +217,13 @@ func (c *HookConfig) ConvertAndCheckV0() (err error) {
 
 		monitor.Kind = kubeCfg.Kind
 		if kubeCfg.ObjectName != "" {
-			monitor.WithNameSelector(&kubemgr.NameSelector{
+			monitor.WithNameSelector(&NameSelector{
 				MatchNames: []string{kubeCfg.ObjectName},
 			})
 		}
 		if kubeCfg.NamespaceSelector != nil && !kubeCfg.NamespaceSelector.Any {
-			monitor.WithNamespaceSelector(&kubemgr.NamespaceSelector{
-				NameSelector: &kubemgr.NameSelector{
+			monitor.WithNamespaceSelector(&NamespaceSelector{
+				NameSelector: &NameSelector{
 					MatchNames: kubeCfg.NamespaceSelector.MatchNames,
 				},
 			})
@@ -247,9 +235,9 @@ func (c *HookConfig) ConvertAndCheckV0() (err error) {
 		kubeConfig.Monitor = monitor
 		kubeConfig.AllowFailure = kubeCfg.AllowFailure
 		if kubeCfg.Name == "" {
-			kubeConfig.ConfigName = "onKubernetesEvent"
+			kubeConfig.BindingName = "onKubernetesEvent"
 		} else {
-			kubeConfig.ConfigName = kubeCfg.Name
+			kubeConfig.BindingName = kubeCfg.Name
 		}
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
@@ -265,15 +253,6 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		return err
 	}
 
-	c.Schedules = []ScheduleConfig{}
-	for _, rawSchedule := range c.V1.Schedule {
-		schedule, err := c.ConvertScheduleV0(rawSchedule)
-		if err != nil {
-			return err
-		}
-		c.Schedules = append(c.Schedules, schedule)
-	}
-
 	c.OnKubernetesEvents = []OnKubernetesEventConfig{}
 	for i, kubeCfg := range c.V1.OnKubernetesEvent {
 		err := c.CheckOnKubernetesEventV1(kubeCfg, fmt.Sprintf("kubernetes[%d]", i))
@@ -281,15 +260,17 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 			return fmt.Errorf("invalid kubernetes config [%d]: %v", i, err)
 		}
 
-		monitor := &kubemgr.MonitorConfig{}
+		monitor := &kube_events_manager.MonitorConfig{}
 		monitor.Metadata.DebugName = c.MonitorDebugName(kubeCfg.Name, i)
-		monitor.Metadata.ConfigId = c.MonitorConfigId()
+		monitor.Metadata.MonitorId = c.MonitorConfigId()
+		monitor.Metadata.LogLabels = map[string]string{}
 		monitor.WithEventTypes(kubeCfg.WatchEventTypes)
+		monitor.WithMode(kubeCfg.Mode)
 		monitor.ApiVersion = kubeCfg.ApiVersion
 		monitor.Kind = kubeCfg.Kind
-		monitor.WithNameSelector((*kubemgr.NameSelector)(kubeCfg.NameSelector))
-		monitor.WithFieldSelector((*kubemgr.FieldSelector)(kubeCfg.FieldSelector))
-		monitor.WithNamespaceSelector((*kubemgr.NamespaceSelector)(kubeCfg.Namespace))
+		monitor.WithNameSelector((*NameSelector)(kubeCfg.NameSelector))
+		monitor.WithFieldSelector((*FieldSelector)(kubeCfg.FieldSelector))
+		monitor.WithNamespaceSelector((*NamespaceSelector)(kubeCfg.Namespace))
 		monitor.WithLabelSelector(kubeCfg.LabelSelector)
 		monitor.JqFilter = kubeCfg.JqFilter
 
@@ -297,12 +278,42 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		kubeConfig.Monitor = monitor
 		kubeConfig.AllowFailure = kubeCfg.AllowFailure
 		if kubeCfg.Name == "" {
-			kubeConfig.ConfigName = ContextBindingType[OnKubernetesEvent]
+			kubeConfig.BindingName = string(OnKubernetesEvent)
 		} else {
-			kubeConfig.ConfigName = kubeCfg.Name
+			kubeConfig.BindingName = kubeCfg.Name
+		}
+		kubeConfig.IncludeSnapshotsFrom = kubeCfg.IncludeSnapshotsFrom
+		if kubeCfg.Queue == "" {
+			kubeConfig.Queue = "main"
+		} else {
+			kubeConfig.Queue = kubeCfg.Queue
 		}
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
+	}
+
+	for i, kubeCfg := range c.V1.OnKubernetesEvent {
+		if len(kubeCfg.IncludeSnapshotsFrom) > 0 {
+			err := c.CheckIncludeSnapshots(kubeCfg.IncludeSnapshotsFrom...)
+			if err != nil {
+				return fmt.Errorf("invalid kubernetes config [%d]: includeSnapshots %v", i, err)
+			}
+		}
+	}
+
+	// schedule bindings with includeKubernetesSnapshotsFrom
+	// are depend on kubernetes bindings.
+	c.Schedules = []ScheduleConfig{}
+	for i, rawSchedule := range c.V1.Schedule {
+		err := c.CheckScheduleV1(rawSchedule)
+		if err != nil {
+			return fmt.Errorf("invalid schedule config [%d]: %v", i, err)
+		}
+		schedule, err := c.ConvertScheduleV1(rawSchedule)
+		if err != nil {
+			return err
+		}
+		c.Schedules = append(c.Schedules, schedule)
 	}
 
 	return nil
@@ -340,24 +351,77 @@ func (c *HookConfig) ConvertOnStartup(value interface{}) (*OnStartupConfig, erro
 
 	res := &OnStartupConfig{}
 	res.AllowFailure = false
-	res.ConfigName = ContextBindingType[OnStartup]
+	res.BindingName = string(OnStartup)
 	res.Order = *floatValue
 	return res, nil
 }
 
-func (c *HookConfig) ConvertScheduleV0(schedule ScheduleConfigV0) (ScheduleConfig, error) {
+func (c *HookConfig) ConvertScheduleV0(schV0 ScheduleConfigV0) (ScheduleConfig, error) {
 	res := ScheduleConfig{}
 
-	if schedule.Name != "" {
-		res.ConfigName = schedule.Name
+	if schV0.Name != "" {
+		res.BindingName = schV0.Name
 	} else {
-		res.ConfigName = ContextBindingType[Schedule]
+		res.BindingName = string(Schedule)
 	}
 
-	res.AllowFailure = schedule.AllowFailure
-	res.Crontab = schedule.Crontab
+	res.AllowFailure = schV0.AllowFailure
+	res.ScheduleEntry = ScheduleEntry{
+		Crontab: schV0.Crontab,
+		Id:      c.ScheduleId(),
+	}
 
 	return res, nil
+}
+
+func (c *HookConfig) ConvertScheduleV1(schV1 ScheduleConfigV1) (ScheduleConfig, error) {
+	res := ScheduleConfig{}
+
+	if schV1.Name != "" {
+		res.BindingName = schV1.Name
+	} else {
+		res.BindingName = string(Schedule)
+	}
+
+	res.AllowFailure = schV1.AllowFailure
+	res.ScheduleEntry = ScheduleEntry{
+		Crontab: schV1.Crontab,
+		Id:      c.ScheduleId(),
+	}
+	res.IncludeKubernetesSnapshotsFrom = schV1.IncludeKubernetesSnapshotsFrom
+
+	if schV1.Queue == "" {
+		res.Queue = "main"
+	} else {
+		res.Queue = schV1.Queue
+	}
+
+	return res, nil
+}
+
+func (c *HookConfig) CheckScheduleV0(schV0 ScheduleConfigV0) error {
+	_, err := cron.Parse(schV0.Crontab)
+	if err != nil {
+		return fmt.Errorf("crontab is invalid: %v", err)
+	}
+	return nil
+}
+
+func (c *HookConfig) CheckScheduleV1(schV1 ScheduleConfigV1) (allErr error) {
+	var err error
+	_, err = cron.Parse(schV1.Crontab)
+	if err != nil {
+		allErr = multierror.Append(allErr, fmt.Errorf("crontab is invalid: %v", err))
+	}
+
+	if len(schV1.IncludeKubernetesSnapshotsFrom) > 0 {
+		err = c.CheckIncludeSnapshots(schV1.IncludeKubernetesSnapshotsFrom...)
+		if err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("includeKubernetesSnapshotsFrom is invalid: %v", err))
+		}
+	}
+
+	return allErr
 }
 
 func (c *HookConfig) CheckOnKubernetesEventV0(kubeCfg OnKubernetesEventConfigV0, rootPath string) error {
@@ -373,14 +437,14 @@ func (c *HookConfig) CheckOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1,
 	}
 
 	if kubeCfg.LabelSelector != nil {
-		_, err := kubemgr.FormatLabelSelector(kubeCfg.LabelSelector)
+		_, err := kube_events_manager.FormatLabelSelector(kubeCfg.LabelSelector)
 		if err != nil {
 			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %v", err))
 		}
 	}
 
 	if kubeCfg.FieldSelector != nil {
-		_, err := kubemgr.FormatFieldSelector((*kubemgr.FieldSelector)(kubeCfg.FieldSelector))
+		_, err := kube_events_manager.FormatFieldSelector((*FieldSelector)(kubeCfg.FieldSelector))
 		if err != nil {
 			allErr = multierror.Append(allErr, fmt.Errorf("fieldSelector is invalid: %v", err))
 		}
@@ -399,6 +463,30 @@ func (c *HookConfig) CheckOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1,
 	return allErr
 }
 
+// CheckIncludeSnapshots check if all includes has corresponding kubernetes
+// binding. Rules:
+//
+// - binding name should exists,
+//
+// - binding name should not be repeated.
+func (c *HookConfig) CheckIncludeSnapshots(includes ...string) error {
+	for _, include := range includes {
+		bindings := 0
+		for _, kubeCfg := range c.OnKubernetesEvents {
+			if kubeCfg.BindingName == include {
+				bindings++
+			}
+		}
+		if bindings == 0 {
+			return fmt.Errorf("'%s' binding name not found", include)
+		}
+		if bindings > 1 {
+			return fmt.Errorf("there are %d '%s' binding names", bindings, include)
+		}
+	}
+	return nil
+}
+
 func (c *HookConfig) MonitorDebugName(configName string, configIndex int) string {
 	if configName == "" {
 		return fmt.Sprintf("kubernetes[%d]", configIndex)
@@ -407,6 +495,7 @@ func (c *HookConfig) MonitorDebugName(configName string, configIndex int) string
 	}
 }
 
+// TODO uuid is not a good choise here. Make it more readable.
 func (c *HookConfig) MonitorConfigId() string {
 	return uuid.NewV4().String()
 	//ei.DebugName = uuid.NewV4().String()
@@ -414,6 +503,11 @@ func (c *HookConfig) MonitorConfigId() string {
 	//	ei.DebugName = ei.Monitor.ConfigIdPrefix + "-" + ei.DebugName[len(ei.Monitor.ConfigIdPrefix)+1:]
 	//}
 	//return ei.DebugName
+}
+
+// TODO uuid is not a good choise here. Make it more readable.
+func (c *HookConfig) ScheduleId() string {
+	return uuid.NewV4().String()
 }
 
 func ConvertFloatForBinding(value interface{}, bindingName string) (*float64, error) {
