@@ -53,14 +53,10 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 	}
 
 	if len(bc.Metadata.IncludeSnapshots) > 0 || bc.Metadata.IncludeAllSnapshots {
-		key := "kubernetesSnapshots"
-		if bc.Metadata.BindingType == OnKubernetesEvent {
-			key = "snapshots"
-		}
 		if len(bc.Snapshots) > 0 {
-			res[key] = bc.Snapshots
+			res["snapshots"] = bc.Snapshots
 		} else {
-			res[key] = map[string]string{}
+			res["snapshots"] = map[string]string{}
 		}
 	}
 

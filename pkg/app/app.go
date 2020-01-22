@@ -12,7 +12,7 @@ var AppDescription = "Run your custom cluster-wide scripts in reaction to Kubern
 
 var Version = "dev"
 
-var DebugMessages = "no"
+var DebugKeepTmpFiles = "no"
 
 var WorkingDir = ""
 var TempDir = "/tmp/shell-operator"
@@ -30,9 +30,9 @@ var LogType = "text"
 // SetupGlobalSettings init global flags with default values
 func SetupGlobalSettings(kpApp *kingpin.Application) {
 	kpApp.Flag("debug", "set to yes to turn on debug messages").
-		Envar("SHELL_OPERATOR_DEBUG").
-		Default(DebugMessages).
-		StringVar(&DebugMessages)
+		Envar("DEBUG_KEEP_TMP_FILES").
+		Default(DebugKeepTmpFiles).
+		StringVar(&DebugKeepTmpFiles)
 
 	kpApp.Flag("working-dir", "a path to a hooks file structure").
 		Envar("SHELL_OPERATOR_WORKING_DIR").

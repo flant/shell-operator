@@ -53,7 +53,7 @@ func Test_Validate_V1_With_Error(t *testing.T) {
       "name": "qwe",
       "crontab": "*/5 * * * * *",
       "allowFailure": true,
-      "includeKubernetesSnapshotsFrom": ["monitor pods"],
+      "includeSnapshotsFrom": ["monitor pods"],
       "queue": "offload"
     }
   ],

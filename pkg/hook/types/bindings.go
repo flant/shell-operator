@@ -32,9 +32,9 @@ type OnStartupConfig struct {
 
 type ScheduleConfig struct {
 	CommonBindingConfig
-	ScheduleEntry                  ScheduleEntry
-	IncludeKubernetesSnapshotsFrom []string
-	Queue                          string
+	ScheduleEntry        ScheduleEntry
+	IncludeSnapshotsFrom []string
+	Queue                string
 }
 
 type OnKubernetesEventConfig struct {

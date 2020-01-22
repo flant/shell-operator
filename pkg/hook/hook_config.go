@@ -55,11 +55,11 @@ type ScheduleConfigV0 struct {
 
 // Schedule configuration
 type ScheduleConfigV1 struct {
-	Name                           string   `json:"name"`
-	Crontab                        string   `json:"crontab"`
-	AllowFailure                   bool     `json:"allowFailure"`
-	IncludeKubernetesSnapshotsFrom []string `json:"includeKubernetesSnapshotsFrom"`
-	Queue                          string   `json:"queue"`
+	Name                 string   `json:"name"`
+	Crontab              string   `json:"crontab"`
+	AllowFailure         bool     `json:"allowFailure"`
+	IncludeSnapshotsFrom []string `json:"includeSnapshotsFrom"`
+	Queue                string   `json:"queue"`
 }
 
 // Legacy version of kubernetes event configuration
@@ -301,7 +301,7 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		}
 	}
 
-	// schedule bindings with includeKubernetesSnapshotsFrom
+	// schedule bindings with includeSnapshotsFrom
 	// are depend on kubernetes bindings.
 	c.Schedules = []ScheduleConfig{}
 	for i, rawSchedule := range c.V1.Schedule {
@@ -388,7 +388,7 @@ func (c *HookConfig) ConvertScheduleV1(schV1 ScheduleConfigV1) (ScheduleConfig, 
 		Crontab: schV1.Crontab,
 		Id:      c.ScheduleId(),
 	}
-	res.IncludeKubernetesSnapshotsFrom = schV1.IncludeKubernetesSnapshotsFrom
+	res.IncludeSnapshotsFrom = schV1.IncludeSnapshotsFrom
 
 	if schV1.Queue == "" {
 		res.Queue = "main"
@@ -414,10 +414,10 @@ func (c *HookConfig) CheckScheduleV1(schV1 ScheduleConfigV1) (allErr error) {
 		allErr = multierror.Append(allErr, fmt.Errorf("crontab is invalid: %v", err))
 	}
 
-	if len(schV1.IncludeKubernetesSnapshotsFrom) > 0 {
-		err = c.CheckIncludeSnapshots(schV1.IncludeKubernetesSnapshotsFrom...)
+	if len(schV1.IncludeSnapshotsFrom) > 0 {
+		err = c.CheckIncludeSnapshots(schV1.IncludeSnapshotsFrom...)
 		if err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("includeKubernetesSnapshotsFrom is invalid: %v", err))
+			allErr = multierror.Append(allErr, fmt.Errorf("includeSnapshotsFrom is invalid: %v", err))
 		}
 	}
 
