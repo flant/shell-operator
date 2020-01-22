@@ -9,10 +9,12 @@ import (
 	"strings"
 
 	"github.com/kennygrant/sanitize"
+	uuid "gopkg.in/satori/go.uuid.v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 )
@@ -74,6 +76,13 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 	if err != nil {
 		return err
 	}
+	// remove tmp file on hook exit
+	defer func() {
+		if app.DebugKeepTmpFiles == "yes" {
+			return
+		}
+		os.Remove(contextPath)
+	}()
 
 	envs := []string{}
 	envs = append(envs, os.Environ()...)
@@ -132,7 +141,7 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 		return "", err
 	}
 
-	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context.json", h.SafeName()))
+	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context-%s.json", h.SafeName(), uuid.NewV4().String()))
 
 	err = ioutil.WriteFile(bindingContextPath, data, 0644)
 	if err != nil {

@@ -141,7 +141,7 @@ func (hc *hookController) HandleScheduleEvent(crontab string, createTasksFn func
 		infos := hc.ScheduleController.HandleEvent(crontab)
 		for _, info := range infos {
 			if createTasksFn != nil {
-				// Inject IncludeKubernetesSnapshots to BindingContext
+				// Inject IncludeSnapshots to BindingContext
 				if hc.KubernetesController != nil && len(info.BindingContext) > 0 && len(info.IncludeSnapshots) > 0 {
 					newBc := info.BindingContext[0]
 					newBc.Snapshots = hc.KubernetesController.SnapshotsFrom(info.IncludeSnapshots...)
@@ -203,7 +203,7 @@ func (hc *hookController) KubernetesSnapshotsFor(bindingType BindingType, bindin
 	case Schedule:
 		for _, binding := range hc.scheduleBindings {
 			if bindingName == binding.BindingName {
-				includeSnapshots = binding.IncludeKubernetesSnapshotsFrom
+				includeSnapshots = binding.IncludeSnapshotsFrom
 				break
 			}
 		}

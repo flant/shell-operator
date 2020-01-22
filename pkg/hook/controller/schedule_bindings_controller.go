@@ -14,9 +14,9 @@ type ScheduleBindingToCrontabLink struct {
 	BindingName string
 	Crontab     string
 	// Useful fields to create a BindingContext
-	IncludeKubernetesSnapshots []string
-	AllowFailure               bool
-	QueueName                  string
+	IncludeSnapshots []string
+	AllowFailure     bool
+	QueueName        string
 }
 
 // KubernetesBindingsController handles kubernetes bindings for one hook.
@@ -78,11 +78,11 @@ func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecut
 				Binding: link.BindingName,
 			}
 			bc.Metadata.BindingType = Schedule
-			bc.Metadata.IncludeSnapshots = link.IncludeKubernetesSnapshots
+			bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
 
 			info := BindingExecutionInfo{
 				BindingContext:   []BindingContext{bc},
-				IncludeSnapshots: link.IncludeKubernetesSnapshots,
+				IncludeSnapshots: link.IncludeSnapshots,
 				AllowFailure:     link.AllowFailure,
 				QueueName:        link.QueueName,
 			}
@@ -96,11 +96,11 @@ func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecut
 func (c *scheduleBindingsController) EnableScheduleBindings() {
 	for _, config := range c.ScheduleBindings {
 		c.ScheduleLinks[config.ScheduleEntry.Id] = &ScheduleBindingToCrontabLink{
-			BindingName:                config.BindingName,
-			Crontab:                    config.ScheduleEntry.Crontab,
-			IncludeKubernetesSnapshots: config.IncludeKubernetesSnapshotsFrom,
-			AllowFailure:               config.AllowFailure,
-			QueueName:                  config.Queue,
+			BindingName:      config.BindingName,
+			Crontab:          config.ScheduleEntry.Crontab,
+			IncludeSnapshots: config.IncludeSnapshotsFrom,
+			AllowFailure:     config.AllowFailure,
+			QueueName:        config.Queue,
 		}
 		c.scheduleManager.Add(config.ScheduleEntry)
 	}

@@ -220,7 +220,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 			    {"name":"secrets", "apiVersion":"v1", "kind":"Secret", "queue":"secrets"}
               ],
 			  "schedule":[
-			    {"name":"each 1 min", "crontab":"0 */1 * * * *", "includeKubernetesSnapshotsFrom":["pods", "secrets"]},
+			    {"name":"each 1 min", "crontab":"0 */1 * * * *", "includeSnapshotsFrom":["pods", "secrets"]},
 			    {"name":"each 5 min", "crontab":"0 */5 * * * *"},
 			    {"name":"each 7 sec", "crontab":"*/7 * * * * *", "queue":"off-schedule"}
 			  ]
@@ -241,7 +241,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 				sch1min := hookConfig.Schedules[0]
 				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
 				g.Expect(sch1min.Queue).To(Equal(""))
-				g.Expect(sch1min.IncludeKubernetesSnapshotsFrom).Should(HaveLen(2))
+				g.Expect(sch1min.IncludeSnapshotsFrom).Should(HaveLen(2))
 
 				sch5min := hookConfig.Schedules[1]
 				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
@@ -268,7 +268,7 @@ kubernetes:
 schedule:
 - name: each 1 min
   crontab: "0 */1 * * * *"
-  includeKubernetesSnapshotsFrom: ["pods", "secrets"]
+  includeSnapshotsFrom: ["pods", "secrets"]
 - name: each 5 min
   crontab: "0 */5 * * * *"
 - name: each 7 sec
@@ -292,7 +292,7 @@ schedule:
 				sch1min := hookConfig.Schedules[0]
 				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
 				g.Expect(sch1min.Queue).To(Equal(""))
-				g.Expect(sch1min.IncludeKubernetesSnapshotsFrom).Should(HaveLen(2))
+				g.Expect(sch1min.IncludeSnapshotsFrom).Should(HaveLen(2))
 
 				sch5min := hookConfig.Schedules[1]
 				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))

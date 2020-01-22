@@ -91,7 +91,7 @@ properties:
         allowFailure:
           type: boolean
           default: false
-        includeKubernetesSnapshotsFrom:
+        includeSnapshotsFrom:
           type: array
           additionalItems: false
           minItems: 1

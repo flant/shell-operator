@@ -85,7 +85,7 @@ param1: value1
 			    {"name":"secrets", "apiVersion":"v1", "kind":"Secret", "queue":"secrets"}
               ],
 			  "schedule":[
-			    {"name":"each 1 min", "crontab":"0 */1 * * * *", "includeKubernetesSnapshotsFrom":["pods", "secrets"]},
+			    {"name":"each 1 min", "crontab":"0 */1 * * * *", "includeSnapshotsFrom":["pods", "secrets"]},
 			    {"name":"each 5 min", "crontab":"0 */5 * * * *"},
 			    {"name":"each 7 sec", "crontab":"*/7 * * * * *", "queue":"off-schedule"}
 			  ]
@@ -113,7 +113,7 @@ kubernetes:
 schedule:
 - name: each 1 min
   crontab: "0 */1 * * * *"
-  includeKubernetesSnapshotsFrom: ["pods", "secrets"]
+  includeSnapshotsFrom: ["pods", "secrets"]
 - name: each 5 min
   crontab: "0 */5 * * * *"
 - name: each 7 sec
