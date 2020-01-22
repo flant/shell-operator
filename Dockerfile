@@ -43,6 +43,7 @@ RUN apt-get update && \
     wget https://storage.googleapis.com/kubernetes-release/release/v1.13.5/bin/linux/amd64/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
+ADD frameworks /
 COPY --from=shell-operator /src/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_WORKING_DIR /hooks
