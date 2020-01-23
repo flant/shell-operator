@@ -56,6 +56,11 @@ function context::is_false() {
   context::jq -e "${jqPath} == false" >/dev/null
 }
 
+function context::is_null() {
+  jqPath="$(context::_convert_user_path_to_jq_path "${1:-}")"
+  context::jq -e "${jqPath} == null" >/dev/null
+}
+
 function context::_convert_user_path_to_jq_path() {
   # change single-quote to double-quote (' -> ")
   # loop1 — hide dots in keys, i.e. aaa."bb.bb".ccc -> aaa."bb##DOT##bb".cc
