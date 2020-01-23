@@ -9,7 +9,13 @@ function hook::run() {
   for i in `seq 0 $((CONTEXT_LENGTH - 1))`; do
     export BINDING_CONTEXT_CURRENT_INDEX="${i}"
 
-    HANDLERS=$(hook::_determine_kubernetes_and_scheduler_handlers)
+    case "${BINDING_CONTEXT_CURRENT_BINDING}" in
+    "onStartup")
+      HANDLER="__on_startup"
+    ;;
+    *)
+      HANDLERS=$(hook::_determine_kubernetes_and_scheduler_handlers)
+    esac
     HANDLERS="${HANDLERS} __main__"
 
     hook::_run_first_available_handler "${HANDLERS}"
