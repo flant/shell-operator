@@ -8,14 +8,9 @@ function hook::run() {
   CONTEXT_LENGTH=$(context::global::jq -r 'length')
   for i in `seq 0 $((CONTEXT_LENGTH - 1))`; do
     export BINDING_CONTEXT_CURRENT_INDEX="${i}"
+    export BINDING_CONTEXT_CURRENT_BINDING=$(context::jq -r '.binding // "unknown"')
 
-    case "${BINDING_CONTEXT_CURRENT_BINDING}" in
-    "onStartup")
-      HANDLERS="__on_startup"
-    ;;
-    *)
-      HANDLERS=$(hook::_determine_kubernetes_and_scheduler_handlers)
-    esac
+    HANDLERS=$(hook::_determine_kubernetes_and_scheduler_handlers)
     HANDLERS="${HANDLERS} __main__"
 
     hook::_run_first_available_handler "${HANDLERS}"
@@ -23,10 +18,10 @@ function hook::run() {
 }
 
 function hook::_determine_kubernetes_and_scheduler_handlers() {
-  export BINDING_CONTEXT_CURRENT_BINDING=$(context::jq -r '.binding // "unknown"')
-
+  if [[ "$BINDING_CONTEXT_CURRENT_BINDING" == "onStartup" ]]; then
+    echo __on_startup
   # if current context has .type field
-  if BINDING_CONTEXT_CURRENT_TYPE=$(context::jq -er '.type'); then
+  elif BINDING_CONTEXT_CURRENT_TYPE=$(context::jq -er '.type'); then
     case "${BINDING_CONTEXT_CURRENT_TYPE}" in
     "Synchronization")
       echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}::synchronization
