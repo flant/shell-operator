@@ -11,7 +11,7 @@ function hook::run() {
 
     case "${BINDING_CONTEXT_CURRENT_BINDING}" in
     "onStartup")
-      HANDLER="__on_startup"
+      HANDLERS="__on_startup"
     ;;
     *)
       HANDLERS=$(hook::_determine_kubernetes_and_scheduler_handlers)
