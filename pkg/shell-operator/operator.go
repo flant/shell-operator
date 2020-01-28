@@ -3,14 +3,13 @@ package shell_operator
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
+	"github.com/go-chi/chi"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	uuid "gopkg.in/satori/go.uuid.v1"
@@ -21,6 +20,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
 	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/kube"
@@ -52,6 +52,8 @@ type ShellOperator struct {
 	ManagerEventsHandler *ManagerEventsHandler
 
 	HookManager hook.HookManager
+
+	DebugServer *debug.Server
 }
 
 func NewShellOperator() *ShellOperator {
@@ -94,7 +96,7 @@ func (op *ShellOperator) Init() (err error) {
 	log.Debug("MAIN Init")
 
 	if op.HooksDir == "" {
-		op.HooksDir, err = filepath.Abs(app.WorkingDir)
+		op.HooksDir, err = filepath.Abs(app.HooksDir)
 		if err != nil {
 			log.Errorf("MAIN Fatal: Cannot determine a current dir: %s", err)
 			return err
@@ -104,7 +106,7 @@ func (op *ShellOperator) Init() (err error) {
 			return fmt.Errorf("no working dir")
 		}
 	}
-	log.Infof("Working dir: %s", op.HooksDir)
+	log.Infof("Hooks dir: %s", op.HooksDir)
 
 	if op.TempDir == "" {
 		op.TempDir = app.TempDir
@@ -118,10 +120,20 @@ func (op *ShellOperator) Init() (err error) {
 	}
 	log.Infof("Use temporary dir: %s", op.TempDir)
 
+	op.DebugServer = debug.NewServer()
+	op.DebugServer.WithPrefix("/debug")
+	op.DebugServer.WithSocketPath(app.DebugUnixSocket)
+	err = op.DebugServer.Init()
+	if err != nil {
+		log.Errorf("MAIN Fatal: Cannot create Debug server: %s", err)
+		return err
+	}
+
 	// init and start metrics gathering loop
 	if op.MetricStorage == nil {
 		op.MetricStorage = metrics_storage.NewMetricStorage()
 		op.MetricStorage.WithContext(op.ctx)
+		op.MetricStorage.WithPrefix(app.PrometheusMetricsPrefix)
 		// Metric storage and live metrics
 		op.MetricStorage.Start()
 	}
@@ -271,10 +283,10 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 			if hookMeta.AllowFailure {
 				taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
-				op.MetricStorage.SendCounterMetric("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
+				op.MetricStorage.SendCounter("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
 				res.Status = "Success"
 			} else {
-				op.MetricStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
+				op.MetricStorage.SendCounter("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
 				t.IncrementFailureCount()
 				taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
 				res.Status = "Fail"
@@ -314,7 +326,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 		if err != nil {
 			hookLabel := taskHook.SafeName()
-			op.MetricStorage.SendCounterMetric("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
+			op.MetricStorage.SendCounter("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
 			t.IncrementFailureCount()
 			taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
 			res.Status = "Fail"
@@ -415,7 +427,7 @@ func (op *ShellOperator) RunMetrics() {
 	// live ticks.
 	go func() {
 		for {
-			op.MetricStorage.SendCounterMetric("shell_operator_live_ticks", 1.0, map[string]string{})
+			op.MetricStorage.SendCounter("shell_operator_live_ticks", 1.0, map[string]string{})
 			time.Sleep(10 * time.Second)
 		}
 	}()
@@ -425,11 +437,23 @@ func (op *ShellOperator) RunMetrics() {
 		for {
 			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
 				queueLen := float64(queue.Length())
-				op.MetricStorage.SendGaugeMetric("shell_operator_tasks_queue_length", queueLen, map[string]string{"queue": queue.Name})
+				op.MetricStorage.SendGauge("shell_operator_tasks_queue_length", queueLen, map[string]string{"queue": queue.Name})
 			})
 			time.Sleep(5 * time.Second)
 		}
 	}()
+}
+
+func (op *ShellOperator) SetupDebugServerHandles() {
+	op.DebugServer.Router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprintf(writer, "%s control endpoint is alive", app.AppName)
+	})
+
+	op.DebugServer.Router.Get("/queue/list.{format:(json|yaml|text)}", func(writer http.ResponseWriter, request *http.Request) {
+		format := chi.URLParam(request, "format")
+		debug.GetLogEntry(request).Debugf("queue list using format %s", format)
+		writer.Write([]byte(dump.TaskQueueSetToText(op.TaskQueues)))
+	})
 }
 
 func (op *ShellOperator) SetupHttpServerHandles() {
@@ -444,10 +468,6 @@ func (op *ShellOperator) SetupHttpServerHandles() {
 	})
 
 	http.Handle("/metrics", promhttp.Handler())
-
-	http.HandleFunc("/queue", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = io.Copy(writer, strings.NewReader(dump.TaskQueueSetToText(op.TaskQueues)))
-	})
 }
 
 func (op *ShellOperator) StartHttpServer(ip string, port string) error {
@@ -492,6 +512,8 @@ func InitAndStart(operator *ShellOperator) error {
 		log.Errorf("INIT failed: %s", err)
 		return err
 	}
+
+	operator.SetupDebugServerHandles()
 
 	err = operator.InitHookManager()
 	if err != nil {

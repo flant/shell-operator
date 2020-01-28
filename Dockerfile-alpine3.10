@@ -1,5 +1,5 @@
 # build libjq
-FROM alpine:3.9 AS libjq
+FROM alpine:3.10 AS libjq
 RUN apk --no-cache add git ca-certificates && \
     git clone https://github.com/flant/libjq-go /libjq-go && \
     cd /libjq-go && \
@@ -9,7 +9,7 @@ RUN apk --no-cache add git ca-certificates && \
 
 
 # build shell-operator binary
-FROM golang:1.12-alpine3.9 AS shell-operator
+FROM golang:1.13-alpine3.10 AS shell-operator
 ARG appVersion=latest
 RUN apk --no-cache add git ca-certificates gcc libc-dev
 
@@ -31,7 +31,7 @@ RUN CGO_ENABLED=1 \
 
 
 # build final image
-FROM alpine:3.9
+FROM alpine:3.10
 RUN apk --no-cache add ca-certificates jq bash && \
     wget https://storage.googleapis.com/kubernetes-release/release/v1.13.5/bin/linux/amd64/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \

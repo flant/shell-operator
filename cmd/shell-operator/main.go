@@ -5,6 +5,7 @@ import (
 	"os"
 
 	libjq_go "github.com/flant/libjq-go"
+	"github.com/flant/shell-operator/pkg/debug"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -17,8 +18,8 @@ import (
 func main() {
 	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
 
-	// global defaults
-	app.SetupGlobalSettings(kpApp)
+	// override usage template to reveal additional commands with information about start command
+	kpApp.UsageTemplate(app.OperatorUsageTemplate(app.AppName))
 
 	// print version
 	kpApp.Command("version", "Show version.").Action(func(c *kingpin.ParseContext) error {
@@ -27,7 +28,7 @@ func main() {
 	})
 
 	// start main loop
-	kpApp.Command("start", "Start shell-operator.").
+	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
 		Action(func(c *kingpin.ParseContext) error {
 			app.SetupLogging()
@@ -53,6 +54,9 @@ func main() {
 
 			return nil
 		})
+	app.SetupStartCommandFlags(kpApp, startCmd)
+
+	debug.DefineDebugCommands(kpApp)
 
 	kingpin.MustParse(kpApp.Parse(os.Args[1:]))
 }

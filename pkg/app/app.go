@@ -1,9 +1,8 @@
 package app
 
 import (
-	"strings"
+	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -12,96 +11,63 @@ var AppDescription = "Run your custom cluster-wide scripts in reaction to Kubern
 
 var Version = "dev"
 
-var DebugKeepTmpFiles = "no"
-
-var WorkingDir = ""
+var HooksDir = ""
 var TempDir = "/tmp/shell-operator"
 var KubeContext = ""
 var KubeConfig = ""
 var ListenAddress = "0.0.0.0"
 var ListenPort = "9115"
-var JqLibraryPath = ""
 
-// Use info level with timestamps and a text output by default
-var LogLevel = "info"
-var LogNoTime = false
-var LogType = "text"
+var PrometheusMetricsPrefix = "shell_operator_"
 
-// SetupGlobalSettings init global flags with default values
-func SetupGlobalSettings(kpApp *kingpin.Application) {
-	kpApp.Flag("debug", "set to yes to turn on debug messages").
-		Envar("DEBUG_KEEP_TMP_FILES").
-		Default(DebugKeepTmpFiles).
-		StringVar(&DebugKeepTmpFiles)
+// DefineAppFlags set shell-operator flags for cmd
+func DefineAppFlags(cmd *kingpin.CmdClause) {
+	cmd.Flag("hooks-dir", "A path to a hooks file structure. Can be set with $SHELL_OPERATOR_HOOKS_DIR.").
+		Envar("SHELL_OPERATOR_HOOKS_DIR").
+		Default(HooksDir).
+		StringVar(&HooksDir)
 
-	kpApp.Flag("working-dir", "a path to a hooks file structure").
-		Envar("SHELL_OPERATOR_WORKING_DIR").
-		Default(WorkingDir).
-		StringVar(&WorkingDir)
-
-	kpApp.Flag("tmp-dir", "a path to store temporary files with data for hooks").
+	cmd.Flag("tmp-dir", "A path to store temporary files with data for hooks. Can be set with $SHELL_OPERATOR_HOOKS_DIR.").
 		Envar("SHELL_OPERATOR_TMP_DIR").
 		Default(TempDir).
 		StringVar(&TempDir)
 
-	kpApp.Flag("kube-context", "The name of the kubeconfig context to use (can be set with $SHELL_OPERATOR_KUBE_CONTEXT).").
+	cmd.Flag("kube-context", "The name of the kubeconfig context to use. Can be set with $SHELL_OPERATOR_KUBE_CONTEXT.").
 		Envar("SHELL_OPERATOR_KUBE_CONTEXT").
 		Default(KubeContext).
 		StringVar(&KubeContext)
 
-	kpApp.Flag("kube-config", "Path to the kubeconfig file (can be set with $SHELL_OPERATOR_KUBE_CONFIG).").
+	cmd.Flag("kube-config", "Path to the kubeconfig file. Can be set with $SHELL_OPERATOR_KUBE_CONFIG.").
 		Envar("SHELL_OPERATOR_KUBE_CONFIG").
 		Default(KubeConfig).
 		StringVar(&KubeConfig)
 
-	kpApp.Flag("listen-address", "Address to use to serve metrics to Prometheus.").
+	cmd.Flag("listen-address", "Address to use to serve metrics to Prometheus. Can be set with $SHELL_OPERATOR_LISTEN_ADDRESS.").
 		Envar("SHELL_OPERATOR_LISTEN_ADDRESS").
 		Default(ListenAddress).
 		StringVar(&ListenAddress)
-	kpApp.Flag("listen-port", "Port to use to serve metrics to Prometheus.").
+	cmd.Flag("listen-port", "Port to use to serve metrics to Prometheus. Can be set with $SHELL_OPERATOR_LISTEN_PORT.").
 		Envar("SHELL_OPERATOR_LISTEN_PORT").
 		Default(ListenPort).
 		StringVar(&ListenPort)
 
-	kpApp.Flag("jq-library-path", "Prepend directory to the search list for jq modules (-L flag). (Can be set with $JQ_LIBRARY_PATH).").
-		Envar("JQ_LIBRARY_PATH").
-		Default(JqLibraryPath).
-		StringVar(&JqLibraryPath)
-
-	kpApp.Flag("log-level", "Logging level: debug, info, error. Default is info.").
-		Envar("LOG_LEVEL").
-		Default(LogLevel).
-		StringVar(&LogLevel)
-	kpApp.Flag("log-type", "Logging formatter type: json, text or color. Default is text.").
-		Envar("LOG_TYPE").
-		Default(LogType).
-		StringVar(&LogType)
-	kpApp.Flag("log-no-time", "Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps.").
-		Envar("LOG_NO_TIME").
-		BoolVar(&LogNoTime)
+	cmd.Flag("prometheus-metrics-prefix", "Prefix for Prometheus metrics. Can be set with $SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX.").
+		Envar("SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX").
+		Default(PrometheusMetricsPrefix).
+		StringVar(&PrometheusMetricsPrefix)
 }
 
-// SetupLogging sets logging output
-func SetupLogging() {
-	switch LogType {
-	case "json":
-		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
-	case "text":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true})
-	case "color":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true})
-	default:
-		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
-	}
+func OperatorUsageTemplate(appName string) string {
+	return kingpin.DefaultUsageTemplate + fmt.Sprintf(`
 
-	switch strings.ToLower(LogLevel) {
-	case "debug":
-		log.SetLevel(log.DebugLevel)
-	case "error":
-		log.SetLevel(log.ErrorLevel)
-	case "info":
-		log.SetLevel(log.InfoLevel)
-	default:
-		log.SetLevel(log.InfoLevel)
-	}
+Use "%s debug-options" for a list of debug options for start command.
+`, appName)
+}
+
+// CommandWithDefaultUsageTemplate is used to workaround an absence of per-command usage templates
+func CommandWithDefaultUsageTemplate(kpApp *kingpin.Application, name, help string) *kingpin.CmdClause {
+	return kpApp.Command(name, help).PreAction(func(context *kingpin.ParseContext) error {
+		kpApp.UsageTemplate(kingpin.DefaultUsageTemplate)
+		return nil
+	})
 }
