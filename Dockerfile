@@ -46,7 +46,7 @@ RUN apt-get update && \
 ADD frameworks /
 COPY --from=shell-operator /src/shell-operator /
 WORKDIR /
-ENV SHELL_OPERATOR_WORKING_DIR /hooks
+ENV SHELL_OPERATOR_HOOKS_DIR /hooks
 ENV LOG_TYPE json
 ENTRYPOINT ["/shell-operator"]
 CMD ["start"]

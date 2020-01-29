@@ -14,6 +14,7 @@ type MetricStorage struct {
 
 	MetricChan chan Metric
 	MetricVecs map[string]MetricVec
+	Prefix     string
 }
 
 func NewMetricStorage() *MetricStorage {
@@ -25,6 +26,10 @@ func NewMetricStorage() *MetricStorage {
 
 func (m *MetricStorage) WithContext(ctx context.Context) {
 	m.ctx, m.cancel = context.WithCancel(ctx)
+}
+
+func (m *MetricStorage) WithPrefix(prefix string) {
+	m.Prefix = prefix
 }
 
 func (m *MetricStorage) Stop() {
@@ -46,10 +51,17 @@ func (storage *MetricStorage) Start() {
 	}()
 }
 
-func (storage *MetricStorage) SendGaugeMetric(metric string, value float64, labels map[string]string) {
+func (storage *MetricStorage) SendGauge(metric string, value float64, labels map[string]string) {
+	storage.MetricChan <- NewGaugeMetric(storage.Prefix+metric, value, labels)
+}
+func (storage *MetricStorage) SendCounter(metric string, value float64, labels map[string]string) {
+	storage.MetricChan <- NewCounterMetric(storage.Prefix+metric, value, labels)
+}
+
+func (storage *MetricStorage) SendGaugeNoPrefix(metric string, value float64, labels map[string]string) {
 	storage.MetricChan <- NewGaugeMetric(metric, value, labels)
 }
-func (storage *MetricStorage) SendCounterMetric(metric string, value float64, labels map[string]string) {
+func (storage *MetricStorage) SendCounterNoPrefix(metric string, value float64, labels map[string]string) {
 	storage.MetricChan <- NewCounterMetric(metric, value, labels)
 }
 

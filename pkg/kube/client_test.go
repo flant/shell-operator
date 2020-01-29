@@ -34,3 +34,5 @@ func Test_EqualOneOf(t *testing.T) {
 		})
 	}
 }
+
+// For more tests see test/integration/kubeclient

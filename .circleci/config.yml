@@ -28,6 +28,9 @@ jobs:
     # build and push alpine version
     - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev-alpine -f Dockerfile-alpine3.9 .
     - run: docker push flant/shell-operator:dev-alpine
+    # build and push alpine version 3.10
+    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev-alpine3.10 -f Dockerfile-alpine3.10 .
+    - run: docker push flant/shell-operator:dev-alpine
 
   build_image_latest:
     machine: true
