@@ -3,7 +3,7 @@ module github.com/flant/shell-operator
 go 1.12
 
 require (
-	github.com/flant/libjq-go v0.0.0-20191126154400-1afb898d97a3 // branch: master
+	github.com/flant/libjq-go v1.0.0
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.3

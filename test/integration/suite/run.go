@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/flant/libjq-go"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -19,8 +18,6 @@ var ClusterName string
 var ConfigPath string
 
 func RunIntegrationSuite(t *testing.T, description string, clusterPrefix string) {
-	go JqCallLoop(make(chan struct{}, 1))
-
 	ClusterName = KindClusterName(clusterPrefix)
 
 	RegisterFailHandler(Fail)

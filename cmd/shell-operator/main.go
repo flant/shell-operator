@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	libjq_go "github.com/flant/libjq-go"
 	"github.com/flant/shell-operator/pkg/debug"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -37,9 +36,6 @@ func main() {
 			// Be a good parent - clean up after the child processes
 			// in case if shell-operator is a PID1.
 			go executor.Reap()
-
-			jqDone := make(chan struct{})
-			go libjq_go.JqCallLoop(jqDone)
 
 			defaultOperator := shell_operator.DefaultOperator()
 			err := shell_operator.InitAndStart(defaultOperator)
