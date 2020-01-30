@@ -1,7 +1,6 @@
 package hook
 
 import (
-	"os"
 	"testing"
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
@@ -11,13 +10,6 @@ import (
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
-
-func TestMain(m *testing.M) {
-	jqDone := make(chan struct{})
-	go JqCallLoop(jqDone)
-
-	os.Exit(m.Run())
-}
 
 func JqEqual(t *testing.T, input []byte, program string, expected string) {
 	res, err := Jq().Program(program).Run(string(input))

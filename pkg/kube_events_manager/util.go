@@ -51,7 +51,7 @@ func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (*ObjectAndF
 		} else {
 			filtered, err = Jq().WithLibPath(app.JqLibraryPath).Program(jqFilter).Cached().Run(string(data))
 			if err != nil {
-				return nil, fmt.Errorf("failed jq filter: '%s'", err)
+				return nil, fmt.Errorf("failed jq filter '%s': '%s'", jqFilter, err)
 			}
 		}
 		res.FilterResult = filtered
