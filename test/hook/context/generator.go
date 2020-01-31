@@ -17,7 +17,8 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/kube"
-	manager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
 var KubeClient kube.KubernetesClient
@@ -34,14 +35,15 @@ func convertBindingContexts(bindingContexts []BindingContext) (string, error) {
 }
 
 type BindingContextController struct {
-	HookCtrl     controller.HookController
-	HookMap      map[string]string
-	HookConfig   string
-	InitialState string
-	Controller   StateController
-	Manager      manager.KubeEventsManager
-	Context      context.Context
-	Cancel       context.CancelFunc
+	HookCtrl          controller.HookController
+	HookMap           map[string]string
+	HookConfig        string
+	InitialState      string
+	Controller        StateController
+	KubeEventsManager kubeeventsmanager.KubeEventsManager
+	ScheduleManager   schedulemanager.ScheduleManager
+	Context           context.Context
+	Cancel            context.CancelFunc
 }
 
 func NewBindingContextController(config, initialState string) (BindingContextController, error) {
@@ -91,10 +93,12 @@ func (b *BindingContextController) Run() (string, error) {
 	fakeDiscovery.FakedServerVersion = &version.Info{GitCommit: "v1.0.0"}
 	fakeDiscovery.Resources = ClusterResources
 
-	b.Manager = manager.NewKubeEventsManager()
-	b.Manager.WithContext(b.Context)
-	b.Manager.WithKubeClient(KubeClient)
+	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
+	b.KubeEventsManager.WithContext(b.Context)
+	b.KubeEventsManager.WithKubeClient(KubeClient)
 
+	b.ScheduleManager = schedulemanager.NewScheduleManager()
+	b.ScheduleManager.WithContext(b.Context)
 	// Use StateController to apply changes
 	stateController, err := NewStateController(b.InitialState)
 	if err != nil {
@@ -109,12 +113,13 @@ func (b *BindingContextController) Run() (string, error) {
 	}
 
 	b.HookCtrl = controller.NewHookController()
-	b.HookCtrl.InitKubernetesBindings(testHook.GetConfig().OnKubernetesEvents, b.Manager)
+	b.HookCtrl.InitKubernetesBindings(testHook.GetConfig().OnKubernetesEvents, b.KubeEventsManager)
+	b.HookCtrl.InitScheduleBindings(testHook.GetConfig().Schedules, b.ScheduleManager)
+	b.HookCtrl.EnableScheduleBindings()
 
 	testHook.WithHookController(b.HookCtrl)
 
 	bindingContexts := make([]BindingContext, 0)
-
 	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
 		bindingContexts = append(bindingContexts, b.HookCtrl.UpdateSnapshots(info.BindingContext)...)
 	})
@@ -146,7 +151,7 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 
 	for {
 		select {
-		case ev := <-b.Manager.Ch():
+		case ev := <-b.KubeEventsManager.Ch():
 			b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
 				bindingContexts = append(bindingContexts, info.BindingContext...)
 			})
@@ -159,5 +164,14 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 			break
 		}
 	}
+	return convertBindingContexts(bindingContexts)
+}
+
+func (b *BindingContextController) RunSchedule(crontab string) (string, error) {
+	bindingContexts := make([]BindingContext, 0)
+
+	b.HookCtrl.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
+		bindingContexts = append(bindingContexts, b.HookCtrl.UpdateSnapshots(info.BindingContext)...)
+	})
 	return convertBindingContexts(bindingContexts)
 }

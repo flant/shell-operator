@@ -6,21 +6,24 @@ Usage example:
 1. Declare the hook config
 ```go
 config := `
-{
-  "configVersion":"v1",
-  "kubernetes":[
-	{
-	  "apiVersion":"v1",
-	  "kind":"Pod",
-	  "watchEvent":["Added", "Modified", "Deleted"],
-	  "namespace": {
-		"nameSelector": {
-		  "matchNames": ["default"]
-		}
-	  }
-	}
-  ]
-}`
+configVersion: v1
+schedule:
+- name: every_minute
+  crontab: '* * * * *'
+  includeSnapshotsFrom:
+  - pod
+kubernetes:
+- apiVersion: v1
+  name: pod
+  kind: Pod
+  watchEvent:
+  - Added
+  - Modified
+  - Deleted
+  namespace:
+    nameSelector:
+      matchNames:
+      - default`
 ```
 2. Declare initial state of kubernetes objects
 ```go
@@ -74,4 +77,12 @@ if err != nil {
   return err
 }
 testNewContexts(contexts)
+```
+8. Run schedule to get binding contexts
+```go
+contexts, err = c.RunSchedule("* * * * *")
+if err != nil {
+  return err
+}
+testScheduleContexts(contexts)
 ```
