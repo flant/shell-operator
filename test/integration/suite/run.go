@@ -31,6 +31,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 }, func([]byte) {
 	// Initialize kube client out-of-cluster
 	ConfigPath = KindGetKubeconfigPath(ClusterName)
+	kubeClient := kube.NewKubernetesClient().Init()
 	Ω(kube.Init(kube.InitOptions{KubeContext: "", KubeConfig: ConfigPath})).Should(Succeed())
 })
 
