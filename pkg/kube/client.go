@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -222,22 +223,7 @@ func getInClusterConfig() (config *rest.Config, defaultNs string, err error) {
 	return
 }
 
-func (c *kubernetesClient) GroupVersionResource(apiVersion string, kind string) (schema.GroupVersionResource, error) {
-	if apiVersion == "" {
-		return c.GroupVersionResourceByKind(kind)
-	}
-
-	// Get only desired group
-	gv, err := schema.ParseGroupVersion(apiVersion)
-	if err != nil {
-		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s' is invalid", apiVersion)
-	}
-
-	list, err := c.Discovery().ServerResourcesForGroupVersion(gv.String())
-	if err != nil {
-		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s' has no supported resources in cluster: %v", apiVersion, err)
-	}
-
+func gvrForKindFromAPIResourcesList(list *metav1.APIResourceList, gv schema.GroupVersion, kind string) *schema.GroupVersionResource {
 	var gvrForKind *schema.GroupVersionResource
 	for _, resource := range list.APIResources {
 		if len(resource.Verbs) == 0 {
@@ -257,6 +243,26 @@ func (c *kubernetesClient) GroupVersionResource(apiVersion string, kind string) 
 			}
 		}
 	}
+	return gvrForKind
+}
+
+func (c *kubernetesClient) GroupVersionResource(apiVersion string, kind string) (schema.GroupVersionResource, error) {
+	if apiVersion == "" {
+		return c.GroupVersionResourceByKind(kind)
+	}
+
+	// Get only desired group
+	gv, err := schema.ParseGroupVersion(apiVersion)
+	if err != nil {
+		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s' is invalid", apiVersion)
+	}
+
+	list, err := c.Discovery().ServerResourcesForGroupVersion(gv.String())
+	if err != nil {
+		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s' has no supported resources in cluster: %v", apiVersion, err)
+	}
+
+	gvrForKind := gvrForKindFromAPIResourcesList(list, gv, kind)
 
 	if gvrForKind == nil {
 		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s', kind '%s' is not supported by cluster", apiVersion, kind)
@@ -288,23 +294,8 @@ func (c *kubernetesClient) GroupVersionResourceByKind(kind string) (schema.Group
 			continue
 		}
 
-		for _, resource := range list.APIResources {
-			if len(resource.Verbs) == 0 {
-				continue
-			}
-
-			// Debug mode will list all available CRDs
-			log.Debugf("GVR: %30s %30s %30s", gv.String(), resource.Kind,
-				fmt.Sprintf("%+v", append([]string{resource.Name}, resource.ShortNames...)),
-			)
-
-			if gvrForKind == nil && equalToOneOf(kind, append(resource.ShortNames, resource.Kind, resource.Name)...) {
-				gvrForKind = &schema.GroupVersionResource{
-					Resource: resource.Name,
-					Group:    gv.Group,
-					Version:  gv.Version,
-				}
-			}
+		if gvrForKind == nil {
+			gvrForKind = gvrForKindFromAPIResourcesList(list, gv, kind)
 		}
 	}
 

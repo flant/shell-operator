@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	. "github.com/onsi/gomega"
+
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 )
 
@@ -133,4 +135,52 @@ metadata:
 
 		assert.Equal(t, len(parsedBindingContexts[0].Snapshots["selected_pods"]), 2)
 	})
+}
+
+func Test_RegisterGVR(t *testing.T) {
+	g := NewWithT(t)
+
+	c, err := NewBindingContextController(`configVersion: v1
+kubernetes:
+- apiVersion: my.crd.io/v1alpha1
+  includeSnapshotsFrom:
+  - selected_crds
+  kind: MyResource
+  name: selected_crds
+`, "")
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
+
+	bindingContexts, err := c.Run()
+	//fmt.Printf(bindingContexts)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	g.Expect(bindingContexts).To(ContainSubstring("Synchronization"))
+
+	gvr, err := FakeCluster.FindGVR("MyResource")
+	g.Expect(err).ShouldNot(HaveOccurred())
+	g.Expect(gvr).ShouldNot(BeNil())
+	g.Expect(gvr.Group).To(Equal("my.crd.io"))
+	g.Expect(gvr.GroupVersion().String()).To(Equal("my.crd.io/v1alpha1"))
+
+	bindingContexts, err = c.ChangeState(`
+apiVersion: my.crd.io/v1alpha1
+kind: MyResource
+metadata:
+  name: my-res-obj
+spec:
+  data: foobar
+---
+apiVersion: my.crd.io/v1alpha1
+kind: MyResource
+metadata:
+  name: my-res-obj-2
+spec:
+  data: baz
+`)
+	//fmt.Printf(bindingContexts)
+
+	g.Expect(err).ShouldNot(HaveOccurred())
+	g.Expect(bindingContexts).To(ContainSubstring("MyResource"))
+
 }

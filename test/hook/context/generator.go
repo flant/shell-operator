@@ -3,25 +3,18 @@ package context
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/version"
-	fakediscovery "k8s.io/client-go/discovery/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/flant/shell-operator/pkg/hook"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
-	"github.com/flant/shell-operator/pkg/kube"
+	"github.com/flant/shell-operator/pkg/kube/fake"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
-var KubeClient kube.KubernetesClient
+// FakeCluster is global for now. It can be encapsulated in BindingContextController lately.
+var FakeCluster *fake.FakeCluster
 
 // convertBindingContexts render json with array of binding contexts
 func convertBindingContexts(bindingContexts []BindingContext) (string, error) {
@@ -39,72 +32,47 @@ type BindingContextController struct {
 	HookMap           map[string]string
 	HookConfig        string
 	InitialState      string
-	Controller        StateController
+	Controller        *StateController
 	KubeEventsManager kubeeventsmanager.KubeEventsManager
 	ScheduleManager   schedulemanager.ScheduleManager
 	Context           context.Context
 	Cancel            context.CancelFunc
 }
 
-func NewBindingContextController(config, initialState string) (BindingContextController, error) {
+func NewBindingContextController(config, initialState string) (*BindingContextController, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	c := BindingContextController{
+
+	FakeCluster = fake.NewFakeCluster()
+
+	return &BindingContextController{
 		HookMap:      make(map[string]string),
 		HookConfig:   config,
 		InitialState: initialState,
+		Controller:   NewStateController(),
 		Context:      ctx,
 		Cancel:       cancel,
-	}
-	return c, nil
+	}, nil
 }
 
 // RegisterCRD registers custom resources for the cluster
 func (b *BindingContextController) RegisterCRD(group, version, kind string, namespaced bool) {
-	scheme.Scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: group, Version: version, Kind: kind}, &unstructured.Unstructured{})
-	newResource := metav1.APIResource{
-		Kind:       kind,
-		Name:       strings.ToLower(kind) + "s",
-		Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-		Group:      group,
-		Version:    version,
-		Namespaced: namespaced,
-	}
-	for _, resource := range ClusterResources {
-		if resource.GroupVersion == group+"/"+version {
-			resource.APIResources = append(resource.APIResources, newResource)
-			return
-		}
-	}
-	ClusterResources = append(ClusterResources, &metav1.APIResourceList{
-		GroupVersion: group + "/" + version,
-		APIResources: []metav1.APIResource{newResource},
-	})
+	FakeCluster.RegisterCRD(group, version, kind, namespaced)
 }
 
 // BindingContextsGenerator generates binding contexts for hook tests
 func (b *BindingContextController) Run() (string, error) {
-	// Create fake clients: typed and dynamic
-	KubeClient = kube.NewFakeKubernetesClient()
-
-	fakeDiscovery, ok := KubeClient.Discovery().(*fakediscovery.FakeDiscovery)
-	if !ok {
-		return "", fmt.Errorf("couldn't convert Discovery() to *FakeDiscovery")
-	}
-	fakeDiscovery.FakedServerVersion = &version.Info{GitCommit: "v1.0.0"}
-	fakeDiscovery.Resources = ClusterResources
-
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
 	b.KubeEventsManager.WithContext(b.Context)
-	b.KubeEventsManager.WithKubeClient(KubeClient)
+	b.KubeEventsManager.WithKubeClient(FakeCluster.KubeClient)
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager()
 	b.ScheduleManager.WithContext(b.Context)
+
 	// Use StateController to apply changes
-	stateController, err := NewStateController(b.InitialState)
+	err := b.Controller.SetInitialState(b.InitialState)
 	if err != nil {
 		return "", err
 	}
-	b.Controller = stateController
 
 	testHook := hook.NewHook("test", "test")
 	testHook, err = testHook.WithConfig([]byte(b.HookConfig))

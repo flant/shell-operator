@@ -1,8 +1,30 @@
-package context
+package fake
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"strings"
 
-var ClusterResources = []*metav1.APIResourceList{
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
+
+func FindGvr(resources []*metav1.APIResourceList, kindOrName string) *schema.GroupVersionResource {
+	for _, apiResourceGroup := range resources {
+		for _, apiResource := range apiResourceGroup.APIResources {
+			if strings.ToLower(apiResource.Kind) == strings.ToLower(kindOrName) || strings.ToLower(apiResource.Name) == strings.ToLower(kindOrName) {
+				// ignore parse error, because FakeClusterResources should be valid
+				gv, _ := schema.ParseGroupVersion(apiResourceGroup.GroupVersion)
+				return &schema.GroupVersionResource{
+					Resource: apiResource.Name,
+					Group:    gv.Group,
+					Version:  gv.Version,
+				}
+			}
+		}
+	}
+	return nil
+}
+
+var FakeClusterResources = []*metav1.APIResourceList{
 	{
 		GroupVersion: "v1",
 		APIResources: []metav1.APIResource{
