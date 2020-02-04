@@ -239,6 +239,7 @@ func (c *HookConfig) ConvertAndCheckV0() (err error) {
 		} else {
 			kubeConfig.BindingName = kubeCfg.Name
 		}
+		kubeConfig.Queue = "main"
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}
@@ -370,6 +371,7 @@ func (c *HookConfig) ConvertScheduleV0(schV0 ScheduleConfigV0) (ScheduleConfig, 
 		Crontab: schV0.Crontab,
 		Id:      c.ScheduleId(),
 	}
+	res.Queue = "main"
 
 	return res, nil
 }
