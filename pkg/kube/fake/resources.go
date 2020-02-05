@@ -56,8 +56,8 @@ var FakeClusterResources = []*metav1.APIResourceList{
 				Kind:       "Endpoints",
 				Name:       "endpoints",
 				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-				Group:      "v1",
-				Version:    "",
+				Group:      "",
+				Version:    "v1",
 				Namespaced: true,
 			},
 			{
