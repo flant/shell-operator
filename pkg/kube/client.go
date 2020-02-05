@@ -44,8 +44,9 @@ type KubernetesClient interface {
 	DefaultNamespace() string
 	Dynamic() dynamic.Interface
 
+	APIResourceList(apiVersion string) ([]*metav1.APIResourceList, error)
+	APIResource(apiVersion string, kind string) (metav1.APIResource, error)
 	GroupVersionResource(apiVersion string, kind string) (schema.GroupVersionResource, error)
-	GroupVersionResourceByKind(kind string) (schema.GroupVersionResource, error)
 }
 
 var NewKubernetesClient = func() KubernetesClient {
@@ -223,90 +224,95 @@ func getInClusterConfig() (config *rest.Config, defaultNs string, err error) {
 	return
 }
 
-func gvrForKindFromAPIResourcesList(list *metav1.APIResourceList, gv schema.GroupVersion, kind string) *schema.GroupVersionResource {
-	var gvrForKind *schema.GroupVersionResource
-	for _, resource := range list.APIResources {
-		if len(resource.Verbs) == 0 {
-			continue
+// APIResourceList fetches lists of APIResource objects from cluster. It returns all preferred
+// resources if apiVersion is empty. An array with one list is returned if apiVersion is valid.
+//
+// NOTE that fetching all preferred resources can give errors if there are non-working
+// api controllers in cluster.
+func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.APIResourceList, err error) {
+	if apiVersion == "" {
+		// Get all preferred resources.
+		// Can return errors if api controllers are not available.
+		lists, err = c.Discovery().ServerPreferredResources()
+		if err != nil {
+			return
+		}
+	} else {
+		// Get only resources for desired group and version
+		gv, err := schema.ParseGroupVersion(apiVersion)
+		if err != nil {
+			return nil, fmt.Errorf("apiVersion '%s' is invalid", apiVersion)
 		}
 
-		// Debug mode will list all available CRDs for apiVersion
-		log.Debugf("GVR: %30s %30s %30s", gv.String(), resource.Kind,
-			fmt.Sprintf("%+v", append([]string{resource.Name}, resource.ShortNames...)),
-		)
+		list, err := c.Discovery().ServerResourcesForGroupVersion(gv.String())
+		if err != nil {
+			return nil, fmt.Errorf("apiVersion '%s' has no supported resources in cluster: %v", apiVersion, err)
+		}
+		lists = []*metav1.APIResourceList{list}
+	}
 
-		if gvrForKind == nil && equalToOneOf(kind, append(resource.ShortNames, resource.Kind, resource.Name)...) {
-			gvrForKind = &schema.GroupVersionResource{
-				Resource: resource.Name,
-				Group:    gv.Group,
-				Version:  gv.Version,
+	// TODO should it copy group and version into each resource?
+
+	// TODO create debug command to output this from cli
+	// Debug mode will list all available CRDs for apiVersion
+	//for _, r := range list.APIResources {
+	//	log.Debugf("GVR: %30s %30s %30s", list.GroupVersion, r.Kind,
+	//		fmt.Sprintf("%+v", append([]string{r.Name}, r.ShortNames...)),
+	//	)
+	//}
+
+	return
+}
+
+// APIResource fetches APIResource object from cluster that specifies the name of a resource and whether it is namespaced.
+//
+// NOTE that fetching with empty apiVersion can give errors if there are non-working
+// api controllers in cluster.
+func (c *kubernetesClient) APIResource(apiVersion string, kind string) (res metav1.APIResource, err error) {
+	lists, err := c.APIResourceList(apiVersion)
+	if err != nil {
+		return
+	}
+
+	for _, list := range lists {
+		for _, resource := range list.APIResources {
+			// TODO is it ok to ignore resources with no verbs?
+			if len(resource.Verbs) == 0 {
+				continue
+			}
+
+			if equalLowerCasedToOneOf(kind, append(resource.ShortNames, resource.Kind, resource.Name)...) {
+				gv, _ := schema.ParseGroupVersion(apiVersion)
+				resource.Group = gv.Group
+				resource.Version = gv.Version
+				return resource, nil
 			}
 		}
 	}
-	return gvrForKind
+
+	err = fmt.Errorf("apiVersion '%s', kind '%s' is not supported by cluster", apiVersion, kind)
+	return
 }
 
-func (c *kubernetesClient) GroupVersionResource(apiVersion string, kind string) (schema.GroupVersionResource, error) {
-	if apiVersion == "" {
-		return c.GroupVersionResourceByKind(kind)
-	}
-
-	// Get only desired group
-	gv, err := schema.ParseGroupVersion(apiVersion)
-	if err != nil {
-		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s' is invalid", apiVersion)
-	}
-
-	list, err := c.Discovery().ServerResourcesForGroupVersion(gv.String())
-	if err != nil {
-		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s' has no supported resources in cluster: %v", apiVersion, err)
-	}
-
-	gvrForKind := gvrForKindFromAPIResourcesList(list, gv, kind)
-
-	if gvrForKind == nil {
-		return schema.GroupVersionResource{}, fmt.Errorf("apiVersion '%s', kind '%s' is not supported by cluster", apiVersion, kind)
-	}
-
-	return *gvrForKind, nil
-}
-
-// GroupVersionResourceByKind returns GroupVersionResource object to use with dynamic informer.
+// GroupVersionResource returns a GroupVersionResource object to use with dynamic informer.
 //
 // This method is borrowed from kubectl and kubedog. The difference are:
-// - comparison with kind, name and shortnames
-// - debug messages
-func (c *kubernetesClient) GroupVersionResourceByKind(kind string) (schema.GroupVersionResource, error) {
-	lists, err := c.Discovery().ServerPreferredResources()
+// - lower case comparison with kind, name and all short names
+func (c *kubernetesClient) GroupVersionResource(apiVersion string, kind string) (gvr schema.GroupVersionResource, err error) {
+	apiRes, err := c.APIResource(apiVersion, kind)
 	if err != nil {
-		return schema.GroupVersionResource{}, err
+		return
 	}
 
-	var gvrForKind *schema.GroupVersionResource
+	return schema.GroupVersionResource{
+		Resource: apiRes.Name,
+		Group:    apiRes.Group,
+		Version:  apiRes.Version,
+	}, nil
 
-	for _, list := range lists {
-		if len(list.APIResources) == 0 {
-			continue
-		}
-
-		gv, err := schema.ParseGroupVersion(list.GroupVersion)
-		if err != nil {
-			continue
-		}
-
-		if gvrForKind == nil {
-			gvrForKind = gvrForKindFromAPIResourcesList(list, gv, kind)
-		}
-	}
-
-	if gvrForKind == nil {
-		return schema.GroupVersionResource{}, fmt.Errorf("kind %s is not supported by cluster", kind)
-	}
-
-	return *gvrForKind, nil
 }
 
-func equalToOneOf(term string, choices ...string) bool {
+func equalLowerCasedToOneOf(term string, choices ...string) bool {
 	if len(choices) == 0 {
 		return false
 	}
