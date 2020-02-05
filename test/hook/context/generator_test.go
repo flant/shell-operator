@@ -183,7 +183,7 @@ spec:
 
 }
 
-func Test_PreferedGVR(t *testing.T) {
+func Test_PreferredGVR(t *testing.T) {
 	g := NewWithT(t)
 
 	c, err := NewBindingContextController(`configVersion: v1
@@ -207,6 +207,6 @@ metadata:
 
 	bindingContexts := parseContexts(rawData)
 
-	g.Expect(len(bindingContexts[0].Snapshots["deployment"])).To(Equal(1))
+	g.Expect(bindingContexts[0].Snapshots["deployment"]).To(HaveLen(1))
 	g.Expect(string(bindingContexts[0].Type)).To(Equal("Synchronization"))
 }
