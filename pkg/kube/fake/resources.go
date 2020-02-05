@@ -7,8 +7,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func FindGvr(resources []*metav1.APIResourceList, kindOrName string) *schema.GroupVersionResource {
+func FindGvr(resources []*metav1.APIResourceList, apiVersion, kindOrName string) *schema.GroupVersionResource {
 	for _, apiResourceGroup := range resources {
+		if apiVersion != "" && apiResourceGroup.GroupVersion != apiVersion {
+			continue
+		}
 		for _, apiResource := range apiResourceGroup.APIResources {
 			if strings.ToLower(apiResource.Kind) == strings.ToLower(kindOrName) || strings.ToLower(apiResource.Name) == strings.ToLower(kindOrName) {
 				// ignore parse error, because FakeClusterResources should be valid

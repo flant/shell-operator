@@ -67,22 +67,22 @@ func (fc *FakeCluster) RegisterCRD(group, version, kind string, namespaced bool)
 	})
 }
 
-func (fc *FakeCluster) FindGVR(kind string) (*schema.GroupVersionResource, error) {
-	gvr := FindGvr(fc.Discovery.Resources, kind)
+func (fc *FakeCluster) FindGVR(apiVersion, kind string) (*schema.GroupVersionResource, error) {
+	gvr := FindGvr(fc.Discovery.Resources, apiVersion, kind)
 	if gvr == nil {
 		return nil, fmt.Errorf("GVR for %s is not find", kind)
 	}
 	return gvr, nil
 }
 
-func (fc *FakeCluster) MustFindGVR(kind string) *schema.GroupVersionResource {
-	return FindGvr(fc.Discovery.Resources, kind)
+func (fc *FakeCluster) MustFindGVR(apiVersion, kind string) *schema.GroupVersionResource {
+	return FindGvr(fc.Discovery.Resources, apiVersion, kind)
 }
 
 func (fc *FakeCluster) CreateSimpleNamespaced(ns string, kind string, name string) {
 	fc.CreateNs(ns)
 
-	gvr := fc.MustFindGVR(kind)
+	gvr := fc.MustFindGVR("", kind)
 	obj := manifest.NewManifest(gvr.GroupVersion().String(), kind, name).ToUnstructured()
 
 	_, err := fc.KubeClient.Dynamic().Resource(*gvr).Namespace(ns).Create(obj, metav1.CreateOptions{})
@@ -92,7 +92,7 @@ func (fc *FakeCluster) CreateSimpleNamespaced(ns string, kind string, name strin
 }
 
 func (fc *FakeCluster) DeleteSimpleNamespaced(ns string, kind string, name string) {
-	gvr := fc.MustFindGVR(kind)
+	gvr := fc.MustFindGVR("", kind)
 	err := fc.KubeClient.Dynamic().Resource(*gvr).Namespace(ns).Delete(name, &metav1.DeleteOptions{})
 	if err != nil {
 		panic(err)
@@ -100,7 +100,7 @@ func (fc *FakeCluster) DeleteSimpleNamespaced(ns string, kind string, name strin
 }
 
 func (fc *FakeCluster) Create(ns string, m manifest.Manifest) error {
-	gvr, err := fc.FindGVR(m.Kind())
+	gvr, err := fc.FindGVR(m.ApiVersion(), m.Kind())
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (fc *FakeCluster) Create(ns string, m manifest.Manifest) error {
 }
 
 func (fc *FakeCluster) Delete(ns string, m manifest.Manifest) error {
-	gvr, err := fc.FindGVR(m.Kind())
+	gvr, err := fc.FindGVR(m.ApiVersion(), m.Kind())
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (fc *FakeCluster) Delete(ns string, m manifest.Manifest) error {
 }
 
 func (fc *FakeCluster) Update(ns string, m manifest.Manifest) error {
-	gvr, err := fc.FindGVR(m.Kind())
+	gvr, err := fc.FindGVR(m.ApiVersion(), m.Kind())
 	if err != nil {
 		return err
 	}

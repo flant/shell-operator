@@ -137,7 +137,7 @@ metadata:
 	})
 }
 
-func Test_RegisterGVR(t *testing.T) {
+func Test_RegisterCRD(t *testing.T) {
 	g := NewWithT(t)
 
 	c, err := NewBindingContextController(`configVersion: v1
@@ -153,11 +153,11 @@ kubernetes:
 	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
 
 	bindingContexts, err := c.Run()
-	//fmt.Printf(bindingContexts)
+
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(bindingContexts).To(ContainSubstring("Synchronization"))
 
-	gvr, err := FakeCluster.FindGVR("MyResource")
+	gvr, err := FakeCluster.FindGVR("my.crd.io/v1alpha1", "MyResource")
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(gvr).ShouldNot(BeNil())
 	g.Expect(gvr.Group).To(Equal("my.crd.io"))
@@ -178,9 +178,35 @@ metadata:
 spec:
   data: baz
 `)
-	//fmt.Printf(bindingContexts)
-
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(bindingContexts).To(ContainSubstring("MyResource"))
 
+}
+
+func Test_PreferredGVR(t *testing.T) {
+	g := NewWithT(t)
+
+	c, err := NewBindingContextController(`configVersion: v1
+kubernetes:
+- apiVersion: apps/v1
+  includeSnapshotsFrom:
+  - deployment
+  kind: Deployment
+  name: deployment
+`, `
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-res-obj-2
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	rawData, err := c.Run()
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	bindingContexts := parseContexts(rawData)
+
+	g.Expect(bindingContexts[0].Snapshots["deployment"]).To(HaveLen(1))
+	g.Expect(string(bindingContexts[0].Type)).To(Equal("Synchronization"))
 }
