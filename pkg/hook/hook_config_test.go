@@ -170,7 +170,7 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 
 				sch5min := hookConfig.Schedules[0]
 				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
-				g.Expect(sch5min.Queue).To(Equal(""))
+				g.Expect(sch5min.Queue).To(Equal("main"))
 
 				sch5sec := hookConfig.Schedules[1]
 				g.Expect(sch5sec.BindingName).To(Equal("each 5 sec"))
@@ -240,12 +240,12 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 
 				sch1min := hookConfig.Schedules[0]
 				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
-				g.Expect(sch1min.Queue).To(Equal(""))
+				g.Expect(sch1min.Queue).To(Equal("main"))
 				g.Expect(sch1min.IncludeSnapshotsFrom).Should(HaveLen(2))
 
 				sch5min := hookConfig.Schedules[1]
 				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
-				g.Expect(sch5min.Queue).To(Equal(""))
+				g.Expect(sch5min.Queue).To(Equal("main"))
 
 				sch7sec := hookConfig.Schedules[2]
 				g.Expect(sch7sec.BindingName).To(Equal("each 7 sec"))
@@ -291,12 +291,12 @@ schedule:
 
 				sch1min := hookConfig.Schedules[0]
 				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
-				g.Expect(sch1min.Queue).To(Equal(""))
+				g.Expect(sch1min.Queue).To(Equal("main"))
 				g.Expect(sch1min.IncludeSnapshotsFrom).Should(HaveLen(2))
 
 				sch5min := hookConfig.Schedules[1]
 				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
-				g.Expect(sch5min.Queue).To(Equal(""))
+				g.Expect(sch5min.Queue).To(Equal("main"))
 
 				sch7sec := hookConfig.Schedules[2]
 				g.Expect(sch7sec.BindingName).To(Equal("each 7 sec"))
@@ -445,7 +445,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
             }`,
 			func() {
 				g.Expect(err).Should(HaveOccurred())
-				t.Logf("expected error was: %v\n", err)
+				g.Expect(err.Error()).To(ContainSubstring("kubernetes.watchEvent must be of type array: \"string\""))
 			},
 		},
 		{
@@ -464,7 +464,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
             }`,
 			func() {
 				g.Expect(err).Should(HaveOccurred())
-				t.Logf("expected error was: %v\n", err)
+				g.Expect(err.Error()).To(ContainSubstring("kubernetes.nameSelector.matchNames must be of type string: \"number\""))
 			},
 		},
 		{
@@ -527,7 +527,18 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
             }`,
 			func() {
 				g.Expect(err).Should(HaveOccurred())
-				t.Logf("expected error was: %v\n", err)
+				/*
+									        	* kubernetes.nameSelector.matchNames must be of type string: "number"
+					        	* kubernetes.labelSelector.matchLabels.foo must be of type string: "number"
+					        	* kubernetes.labelSelector.matchExpressions.operand is a forbidden property
+					        	* kubernetes.labelSelector.matchExpressions.operator is required
+					        	* kubernetes.namespace.nameSelector.matchNames must be of type array: "object"
+					        	* kubernetes.namespace.labelSelector.matchExpressions.operator should be one of [In NotIn Exists DoesNotExists]
+					        	* kubernetes.fieldSelector.matchExpressions.operator should be one of [= == Equals != NotEquals]
+					        	* kubernetes.fieldSelector.matchExpressions.value must be of type string: "number"
+
+				*/
+				//t.Logf("expected error was: %v\n", err)
 			},
 		},
 	}

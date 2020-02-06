@@ -12,11 +12,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 )
 
@@ -34,6 +32,7 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 	BeforeEach(func() {
 		KubeEventsManager = kube_events_manager.NewKubeEventsManager()
 		KubeEventsManager.WithContext(context.Background())
+		KubeEventsManager.WithKubeClient(KubeClient)
 	})
 
 	Context("with configVersion: v1", func() {
@@ -47,6 +46,11 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 				EventTypes: []WatchEventType{
 					WatchEventAdded,
 				},
+				NamespaceSelector: &NamespaceSelector{
+					NameSelector: &NameSelector{
+						MatchNames: []string{"default"},
+					},
+				},
 			}
 			monitorConfig.Metadata.MonitorId = "test-abcd"
 
@@ -59,13 +63,13 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 		It("should return KubeEvent Synchronization on AddMonitor", func(done Done) {
 			Ω(ev.MonitorId).To(Equal(monitorConfig.Metadata.MonitorId))
 
-			Ω(ev.Objects).ShouldNot(HaveLen(0))
+			Ω(ev.Objects).Should(HaveLen(0), "No pods in default namespace, synchronization should have no objects")
 
-			bcList := hook.ConvertKubeEventToBindingContext(*ev, "kubernetes")
-			verBcs := hook.ConvertBindingContextList("v1", bcList)
+			//bcList := hook.ConvertKubeEventToBindingContext(*ev, "kubernetes")
+			//verBcs := hook.ConvertBindingContextList("v1", bcList)
 
-			Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, "true"))
-			Ω(verBcs).To(MatchJq(`.[0].objects | map(select(has("filterResult"))) | length`, "0"))
+			//Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, "true"))
+			//Ω(verBcs).To(MatchJq(`.[0].objects | map(select(has("filterResult"))) | length`, "0"))
 
 			close(done)
 
@@ -75,7 +79,7 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 
 			JustBeforeEach(func() {
 				app.SetupLogging()
-				Kubectl(ConfigPath).Apply("default", "testdata/test-pod.yaml")
+				Kubectl(ContextName).Apply("default", "testdata/test-pod.yaml")
 			})
 
 			It("should return KubeEvent with type 'Event'", func(done Done) {
@@ -87,31 +91,34 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 				fmt.Printf("%#v\n", ev)
 
 				Ω(ev.MonitorId).To(Equal(monitorConfig.Metadata.MonitorId))
-				Ω(ev.Type).To(Equal("Event"))
+				Ω(string(ev.Type)).To(Equal("Event"))
 
-				Ω(ev.Objects).Should(BeNil())
-				Ω(ev.Object).ShouldNot(BeNil())
-				Ω(ev.FilterResult).Should(Equal(""))
+				Ω(ev.Objects).ShouldNot(BeNil())
+				Ω(ev.Objects).Should(HaveLen(1))
+				Ω(ev.Objects[0].Object.GetName()).Should(Equal("test"))
 
-				bcList := kube_event.ConvertKubeEventToBindingContext(ev, "kubernetes")
-				verBcs := hook.ConvertBindingContextList("v1", bcList)
+				//Ω(ev.Object).ShouldNot(BeNil())
+				//Ω(ev.FilterResult).Should(Equal(""))
 
-				Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, "false"))
-				Ω(verBcs).To(MatchJq(`.[0] | has("filterResult")`, "false"))
+				//bcList := kube_event.ConvertKubeEventToBindingContext(ev, "kubernetes")
+				//verBcs := hook.ConvertBindingContextList("v1", bcList)
 
-				Ω(verBcs).To(MatchJq(`.[0] | length`, "4"))
-				Ω(verBcs).To(MatchJq(`.[0].binding`, `"kubernetes"`))
-				Ω(verBcs).To(MatchJq(`.[0].type`, `"Event"`))
-				Ω(verBcs).To(MatchJq(`.[0].watchEvent`, `"Added"`))
+				//Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, "false"))
+				//Ω(verBcs).To(MatchJq(`.[0] | has("filterResult")`, "false"))
 
-				Ω(verBcs).To(MatchJq(`.[0] | has("object")`, `true`))
-				Ω(verBcs).To(MatchJq(`.[0].object.metadata.name`, `"test"`))
+				//Ω(verBcs).To(MatchJq(`.[0] | length`, "4"))
+				//Ω(verBcs).To(MatchJq(`.[0].binding`, `"kubernetes"`))
+				//Ω(verBcs).To(MatchJq(`.[0].type`, `"Event"`))
+				//Ω(verBcs).To(MatchJq(`.[0].watchEvent`, `"Added"`))
+
+				//Ω(verBcs).To(MatchJq(`.[0] | has("object")`, `true`))
+				//Ω(verBcs).To(MatchJq(`.[0].object.metadata.name`, `"test"`))
 
 				close(done)
 			}, 25)
 
 			AfterEach(func() {
-				Kubectl(ConfigPath).Delete("default", "pod/test")
+				Kubectl(ContextName).Delete("default", "pod/test")
 			})
 		})
 

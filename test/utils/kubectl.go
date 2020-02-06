@@ -13,12 +13,13 @@ import (
 )
 
 type KubectlCmd struct {
-	ConfigPath string
+	ContextName string
+	ConfigPath  string
 }
 
-func Kubectl(config string) *KubectlCmd {
+func Kubectl(context string) *KubectlCmd {
 	return &KubectlCmd{
-		ConfigPath: config,
+		ContextName: context,
 	}
 }
 
@@ -67,6 +68,9 @@ func (k *KubectlCmd) Delete(ns string, resourceName string) {
 func (k *KubectlCmd) Succeed(cmd *exec.Cmd) {
 	if k.ConfigPath != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", k.ConfigPath))
+	}
+	if k.ContextName != "" {
+		cmd.Args = append(cmd.Args, "--context", k.ContextName)
 	}
 	session, err := gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
 	Ω(err).ShouldNot(HaveOccurred())
