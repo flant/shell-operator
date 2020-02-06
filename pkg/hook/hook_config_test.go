@@ -528,12 +528,12 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
 			func() {
 				g.Expect(err).Should(HaveOccurred())
 				/*
-									        	* kubernetes.nameSelector.matchNames must be of type string: "number"
+								* kubernetes.nameSelector.matchNames must be of type string: "number"
 					        	* kubernetes.labelSelector.matchLabels.foo must be of type string: "number"
 					        	* kubernetes.labelSelector.matchExpressions.operand is a forbidden property
 					        	* kubernetes.labelSelector.matchExpressions.operator is required
 					        	* kubernetes.namespace.nameSelector.matchNames must be of type array: "object"
-					        	* kubernetes.namespace.labelSelector.matchExpressions.operator should be one of [In NotIn Exists DoesNotExists]
+					        	* kubernetes.namespace.labelSelector.matchExpressions.operator should be one of [In NotIn Exists DoesNotExist]
 					        	* kubernetes.fieldSelector.matchExpressions.operator should be one of [= == Equals != NotEquals]
 					        	* kubernetes.fieldSelector.matchExpressions.value must be of type string: "number"
 

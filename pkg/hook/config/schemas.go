@@ -49,7 +49,7 @@ definitions:
               - In
               - NotIn
               - Exists
-              - DoesNotExists
+              - DoesNotExist
             values:
               type: array
               items:
