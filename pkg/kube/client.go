@@ -282,7 +282,7 @@ func (c *kubernetesClient) APIResource(apiVersion string, kind string) (res meta
 			}
 
 			if equalLowerCasedToOneOf(kind, append(resource.ShortNames, resource.Kind, resource.Name)...) {
-				gv, _ := schema.ParseGroupVersion(apiVersion)
+				gv, _ := schema.ParseGroupVersion(list.GroupVersion)
 				resource.Group = gv.Group
 				resource.Version = gv.Version
 				return resource, nil
