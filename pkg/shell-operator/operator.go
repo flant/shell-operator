@@ -390,7 +390,7 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 				HookName: hookName,
 			})
 		mainQueue.AddLast(newTask)
-		logEntry.Infof("queue task %s@%s %s", newTask.GetType(), hookName)
+		logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
 	}
 
 	mainQueue.ChangesEnable(true)
@@ -458,13 +458,13 @@ func (op *ShellOperator) SetupDebugServerHandles() {
 
 func (op *ShellOperator) SetupHttpServerHandles() {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = writer.Write([]byte(fmt.Sprintf(`<html>
+		fmt.Fprintf(writer, `<html>
     <head><title>Shell operator</title></head>
     <body>
     <h1>Shell operator</h1>
-    <pre>go tool pprof goprofex http://&lt;SHELL_OPERATOR_IP&gt;:%d/debug/pprof/profile</pre>
+    <pre>go tool pprof goprofex http://&lt;SHELL_OPERATOR_IP&gt;:%s/debug/pprof/profile</pre>
     </body>
-    </html>`, app.ListenPort)))
+    </html>`, app.ListenPort)
 	})
 
 	http.Handle("/metrics", promhttp.Handler())
@@ -476,7 +476,7 @@ func (op *ShellOperator) StartHttpServer(ip string, port string) error {
 	// Check if port is available
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		log.Error("Fail to listen on '%s': %v", address, err)
+		log.Errorf("Fail to listen on '%s': %v", address, err)
 		return err
 	}
 

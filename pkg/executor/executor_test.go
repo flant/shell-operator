@@ -22,7 +22,6 @@ func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 
 	config := Config{
 		Pid:              -1,
-		Options:          0,
 		DisablePid1Check: true,
 	}
 	go Start(config)
@@ -103,7 +102,6 @@ func Test_Executor_Reaper_And_CmdRun_AreLocked(t *testing.T) {
 
 	config := Config{
 		Pid:              -1,
-		Options:          0,
 		DisablePid1Check: true,
 	}
 	go Start(config)

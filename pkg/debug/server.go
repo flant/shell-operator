@@ -41,19 +41,19 @@ func (s *Server) Init() (err error) {
 
 	err = os.MkdirAll(path.Dir(address), 0700)
 	if err != nil {
-		logrus.Error("Debug HTTP server fail to create socket '%s': %v", address, err)
+		logrus.Errorf("Debug HTTP server fail to create socket '%s': %v", address, err)
 		return err
 	}
 
 	exists, err := utils.FileExists(address)
 	if err != nil {
-		logrus.Error("Debug HTTP server fail to check socket '%s': %v", address, err)
+		logrus.Errorf("Debug HTTP server fail to check socket '%s': %v", address, err)
 		return err
 	}
 	if exists {
 		err = os.Remove(address)
 		if err != nil {
-			logrus.Error("Debug HTTP server fail to remove existing socket '%s': %v", address, err)
+			logrus.Errorf("Debug HTTP server fail to remove existing socket '%s': %v", address, err)
 			return err
 		}
 	}
@@ -61,7 +61,7 @@ func (s *Server) Init() (err error) {
 	// Check if socket is available
 	listener, err := net.Listen("unix", address)
 	if err != nil {
-		logrus.Error("Debug HTTP server fail to listen on '%s': %v", address, err)
+		logrus.Errorf("Debug HTTP server fail to listen on '%s': %v", address, err)
 		return err
 	}
 

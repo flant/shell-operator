@@ -6,67 +6,55 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
-	fakedynamic "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
-type MockResourceInformer struct {
-}
-
-var _ ResourceInformer = &MockResourceInformer{}
-
-func (*MockResourceInformer) WithNamespace(string) {
-	return
-}
-
-func (*MockResourceInformer) WithName(string) {
-	return
-}
-
-func (*MockResourceInformer) CreateSharedInformer() error {
-	return nil
-}
-
-func (*MockResourceInformer) GetExistedObjects() []ObjectAndFilterResult {
-	return nil
-}
-
-func (*MockResourceInformer) Run(stopCh <-chan struct{}) {
-	return
-}
-
-func (*MockResourceInformer) Stop() {
-	return
-}
-
 func Test_MainKubeEventsManager_Run(t *testing.T) {
 	// Init() replacement
-	mgr := NewKubeEventsManager()
 
-	// Mock KubeEventInformer constructor method
-	oldResInf := NewResourceInformer
-	NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
-		return &MockResourceInformer{}
+	kubeClient := kube.NewFakeKubernetesClient()
+
+	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
+	if !ok {
+		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
 	}
-	defer func() {
-		NewResourceInformer = oldResInf
-	}()
+
+	fakeDiscovery.FakedServerVersion = &version.Info{
+		GitCommit: "v1.0.0",
+	}
+
+	fakeDiscovery.Resources = []*metav1.APIResourceList{
+		&metav1.APIResourceList{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{
+					Kind:    "Pod",
+					Name:    "pods",
+					Verbs:   metav1.Verbs{"get", "list", "watch"},
+					Group:   "",
+					Version: "v1",
+				},
+			},
+		},
+	}
+
+	mgr := NewKubeEventsManager()
+	mgr.WithContext(context.Background())
+	mgr.WithKubeClient(kubeClient)
 
 	// monitor with 3 namespaces and 4 object names
 	monitor := &MonitorConfig{
-		Kind: "Pod",
+		ApiVersion: "v1",
+		Kind:       "Pod",
 		NamespaceSelector: &NamespaceSelector{
 			NameSelector: &NameSelector{
 				MatchNames: []string{"default", "prod", "stage"},
@@ -78,7 +66,9 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 	}
 
 	monitor.Metadata.MonitorId = "MonitorId"
-	_, err := mgr.AddMonitor(monitor, log.WithField("test", "MainKubeEventsManager"))
+
+	_, err := mgr.AddMonitor(monitor)
+
 	if assert.NoError(t, err) {
 		assert.Len(t, mgr.Monitors, 1)
 	}
@@ -101,8 +91,8 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kube.Kubernetes = fake.NewSimpleClientset()
-	fakeDiscovery, ok := kube.Kubernetes.Discovery().(*fakediscovery.FakeDiscovery)
+	kubeClient := kube.NewFakeKubernetesClient()
+	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
 	}
@@ -132,11 +122,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 		},
 	}
 
-	// Configure dynamic client
-	scheme := runtime.NewScheme()
-	objs := []runtime.Object{}
-
-	kube.DynamicClient = fakedynamic.NewSimpleDynamicClient(scheme, objs...)
+	dynClient := kubeClient.Dynamic()
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
@@ -148,12 +134,13 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 			"spec": "pod-0",
 		},
 	}
-	_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Create(obj, metav1.CreateOptions{}, []string{}...)
+	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj, metav1.CreateOptions{}, []string{}...)
 
 	// Init() replacement
 	mgr := NewKubeEventsManager()
+	mgr.WithKubeClient(kubeClient)
 	mgr.WithContext(ctx)
-	KubeEventCh = make(chan KubeEvent, 10)
+	mgr.KubeEventCh = make(chan KubeEvent, 10)
 
 	// monitor with 3 namespaces and 4 object names and all event types
 	monitor := &MonitorConfig{
@@ -168,7 +155,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	}
 	monitor.Metadata.MonitorId = "MonitorId"
 
-	_, err := mgr.AddMonitor(monitor, log.WithField("test", "MainKubeEventsManager"))
+	_, err := mgr.AddMonitor(monitor)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
@@ -209,7 +196,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 						"spec": "pod-1",
 					},
 				}
-				_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Create(obj1, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj1, metav1.CreateOptions{}, []string{}...)
 				// Inject second event into the fake client.
 				obj2 := &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -222,7 +209,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 						"spec": "pod-2",
 					},
 				}
-				_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Create(obj2, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj2, metav1.CreateOptions{}, []string{}...)
 				t.Logf("DynamicClient Created pod\n")
 				state.podsCreated = true
 				break
@@ -231,12 +218,13 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 			assert.Equal(t, "Event", ev.Type)
 			assert.Equal(t, "MonitorId", ev.MonitorId)
 			assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
-			metadata := ev.Object["metadata"].(map[string]interface{})
-			assert.Contains(t, metadata, "name")
-			if metadata["name"] == "pod-1" {
+			assert.Len(t, ev.Objects, 1)
+
+			name := ev.Objects[0].Object.GetName()
+			if name == "pod-1" {
 				state.gotPod1 = true
 			}
-			if metadata["name"] == "pod-2" {
+			if name == "pod-2" {
 				state.gotPod2 = true
 			}
 			if state.gotPod1 && state.gotPod2 {
@@ -262,8 +250,8 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kube.Kubernetes = fake.NewSimpleClientset()
-	fakeDiscovery, ok := kube.Kubernetes.Discovery().(*fakediscovery.FakeDiscovery)
+	kubeClient := kube.NewFakeKubernetesClient()
+	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
 	}
@@ -293,11 +281,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 		},
 	}
 
-	// Configure dynamic client
-	scheme := runtime.NewScheme()
-	objs := []runtime.Object{}
-
-	dc := fakedynamic.NewSimpleDynamicClient(scheme, objs...)
+	dynClient := kubeClient.Dynamic()
 	/*
 		dc.PrependWatchReactor("*", func(action testing2.Action) (handled bool, ret watch.Interface, err error) {
 			switch v := action.(type) {
@@ -321,7 +305,6 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 			return false, nil, nil
 		})
 	*/
-	kube.DynamicClient = dc
 
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -334,7 +317,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 			"spec": "pod-0",
 		},
 	}
-	_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Create(obj, metav1.CreateOptions{}, []string{}...)
+	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj, metav1.CreateOptions{}, []string{}...)
 
 	//// Init() replacement
 	mgr := NewKubeEventsManager()
@@ -353,7 +336,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	}
 	monitor.Metadata.MonitorId = "MonitorId"
 
-	_, err := mgr.AddMonitor(monitor, log.WithField("test", "yes"))
+	_, err := mgr.AddMonitor(monitor)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
@@ -385,7 +368,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 
 				obj.Object["spec"] = "pod-0-new-spec"
 
-				_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Update(obj, metav1.UpdateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Update(obj, metav1.UpdateOptions{}, []string{}...)
 
 				// Inject an event into the fake client.
 				obj1 := &unstructured.Unstructured{
@@ -399,7 +382,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 						"spec": "pod-1",
 					},
 				}
-				_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Create(obj1, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj1, metav1.CreateOptions{}, []string{}...)
 				// Inject second event into the fake client.
 				obj2 := &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -412,7 +395,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 						"spec": "pod-2",
 					},
 				}
-				_, _ = kube.DynamicClient.Resource(podGvr).Namespace("default").Create(obj2, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj2, metav1.CreateOptions{}, []string{}...)
 				t.Logf("DynamicClient Created pod\n")
 				state.podsCreated = true
 				break
@@ -421,12 +404,13 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 			assert.Equal(t, "Event", ev.Type)
 			assert.Equal(t, "MonitorId", ev.MonitorId)
 			assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
-			metadata := ev.Object["metadata"].(map[string]interface{})
-			assert.Contains(t, metadata, "name")
-			if metadata["name"] == "pod-1" {
+			assert.Len(t, ev.Objects, 1)
+
+			name := ev.Objects[0].Object.GetName()
+			if name == "pod-1" {
 				state.gotPod1 = true
 			}
-			if metadata["name"] == "pod-2" {
+			if name == "pod-2" {
 				state.gotPod2 = true
 			}
 			if state.gotPod1 && state.gotPod2 {

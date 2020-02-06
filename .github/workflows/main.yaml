@@ -29,7 +29,7 @@ jobs:
       - name: Download and pack Go modules
         if: steps.go-modules-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir gomod
+          mkdir -p gomod
           go mod download
           tar -czf gomod/go_modules.tar.gz -C $HOME/go/pkg/mod .
           echo -n "Unpacked size is: " && du -sh $HOME/go/pkg/mod
@@ -54,8 +54,6 @@ jobs:
         with:
           path: libjq
           key: ${{ runner.os }}-libjq-${{ hashFiles('libjq-go.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-libjq-
 
       - name: Build libjq libraries
         if: steps.libjq-cache.outputs.cache-hit != 'true'
@@ -184,7 +182,9 @@ jobs:
 
       - name: Prepare environment
         run: |
-          go build github.com/onsi/ginkgo/ginkgo
+          # ginkgo with fixes
+          go build github.com/flant/ginkgo/ginkgo
+          ./ginkgo version
           echo ::set-env name=KIND_CLUSTER_VERSION::${{ matrix.k8s_version }}
 
           export COVERAGE_DIR=$GITHUB_WORKSPACE/coverage_reports/integration_tests/${{ matrix.os }}-k8s-${{ matrix.k8s_version }}
@@ -206,11 +206,12 @@ jobs:
         run: |
           ./ginkgo \
             --tags 'integration test'  \
-            -race \
-            -cover \
-            -coverpkg=github.com/flant/shell-operator/pkg/...,github.com/flant/shell-operator/test/utils \
-            -coverprofile=coverage.out \
-            -outputdir=${COVERAGE_DIR} \
+            --vet off \
+            --race \
+            --cover \
+            --coverpkg=github.com/flant/shell-operator/pkg/...,github.com/flant/shell-operator/test/utils \
+            --coverprofile=coverage.out \
+            --outputdir=${COVERAGE_DIR} \
             -p \
             -r test/integration
 
@@ -244,6 +245,6 @@ jobs:
           export COVERAGE_DIR=coverage_reports
           export GIT_BRANCH=${GITHUB_REF:11}
           export GIT_COMMIT_SHA=$GITHUB_SHA
-          ./scripts/ci/codeclimate.sh
+          ./scripts/ci/codeclimate_upload.sh
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}

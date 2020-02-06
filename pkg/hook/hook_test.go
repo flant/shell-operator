@@ -4,12 +4,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	. "github.com/onsi/gomega"
 
-	"github.com/stretchr/testify/assert"
+	. "github.com/flant/shell-operator/pkg/hook/types"
 )
 
 func Test_Hook_SafeName(t *testing.T) {
+	g := NewWithT(t)
+
 	WorkingDir := "/hooks"
 	hookPath := "/hooks/002-cool-hooks/monitor-namespaces.py"
 
@@ -20,10 +22,12 @@ func Test_Hook_SafeName(t *testing.T) {
 
 	h := NewHook(hookName, hookPath)
 
-	assert.Equal(t, "002-cool-hooks-monitor-namespaces-py", h.SafeName())
+	g.Expect(h.SafeName()).To(Equal("002-cool-hooks-monitor-namespaces-py"))
 }
 
 func Test_Hook_WithConfig(t *testing.T) {
+	g := NewWithT(t)
+
 	var hook *Hook
 	var err error
 
@@ -36,20 +40,21 @@ func Test_Hook_WithConfig(t *testing.T) {
 			"simple",
 			`{"onStartup": 10}`,
 			func() {
-				if assert.NoError(t, err) {
-					assert.NotNil(t, hook.Config)
-					assert.Equal(t, []BindingType{OnStartup}, hook.Config.Bindings())
-					assert.NotNil(t, hook.Config.OnStartup)
-					assert.Equal(t, 10.0, hook.Config.OnStartup.Order)
-				}
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(hook.Config).ToNot(BeNil())
+				g.Expect(hook.Config.Bindings()).To(Equal([]BindingType{OnStartup}))
+				g.Expect(hook.Config.OnStartup).ToNot(BeNil())
+				g.Expect(hook.Config.OnStartup.Order).To(Equal(10.0))
 			},
 		},
 		{
 			"with validation error",
 			`{"configVersion":"v1", "onStartup": "10"}`,
 			func() {
-				assert.Error(t, err)
-				t.Logf("expected validation error was: %v", err)
+				g.Expect(err).Should(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("onStartup must be of type integer: \"string\""))
+
+				//t.Logf("expected validation error was: %v", err)
 			},
 		},
 	}

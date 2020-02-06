@@ -15,7 +15,8 @@ import (
 )
 
 var ClusterName string
-var ConfigPath string
+var ContextName string
+var KubeClient kube.KubernetesClient
 
 func RunIntegrationSuite(t *testing.T, description string, clusterPrefix string) {
 	ClusterName = KindClusterName(clusterPrefix)
@@ -30,9 +31,11 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	return []byte{}
 }, func([]byte) {
 	// Initialize kube client out-of-cluster
-	ConfigPath = KindGetKubeconfigPath(ClusterName)
-	kubeClient := kube.NewKubernetesClient().Init()
-	Ω(kube.Init(kube.InitOptions{KubeContext: "", KubeConfig: ConfigPath})).Should(Succeed())
+	ContextName = KindGetKubeContext(ClusterName)
+	KubeClient = kube.NewKubernetesClient()
+	KubeClient.WithContextName(ContextName)
+	err := KubeClient.Init()
+	Ω(err).ShouldNot(HaveOccurred())
 })
 
 var _ = SynchronizedAfterSuite(func() {}, func() {
