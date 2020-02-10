@@ -1,0 +1,64 @@
+name: Publish release images
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+      - 'dev*'
+env:
+  GO111MODULE: on
+
+jobs:
+  publish_release_images:
+    name: Release
+    strategy:
+      fail-fast: false
+      matrix:
+        flavour:
+          - ubuntu
+          - alpine3.9
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Prepare environment
+        env:
+          FLAVOUR: ${{ matrix.flavour }}
+          IMAGE_NAME: flant/shell-operator
+        run: |
+          imageTag=
+          appVersion=
+          dockerFile=Dockerfile
+
+          if [[ ${GITHUB_REF#refs/tags/} != "master" ]] ; then
+            imageTag=${IMAGE_NAME}:${GITHUB_REF#refs/tags/}
+            appVersion=imageTag
+          else
+            # master branch
+            imageTag=${IMAGE_NAME}:latest
+            appVersion=master-${GITHUB_SHA::8}-$FLAVOUR-$(date +'%Y.%m.%d_%H:%M:%S')
+          fi
+
+          case $FLAVOUR in
+          alpine3.9)
+            dockerFile="Dockerfile-alpine3.9"
+            imageTag=${imageTag}-alpine3.9
+            ;;
+          alpine3.10)
+            dockerFile="Dockerfile-alpine3.10"
+            imageTag=${imageTag}-alpine3.10
+            ;;
+          esac
+
+          echo ::set-env name=imageTag::${imageTag}
+          echo ::set-env name=dockerFile::${dockerFile}
+          echo ::set-env name=appVersion::${appVersion}
+
+      - name: Build '${{ matrix.flavour }}' image
+        run: |
+          echo Build $imageTag with version $appVersion using ./$dockerFile
+          docker build --build-arg appVersion=$appVersion -t $imageTag -f $dockerFile .
+
+      - name: Push '${{ matrix.flavour }}' image
+        run: |
+          docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASS }}
+          docker push $imageTag

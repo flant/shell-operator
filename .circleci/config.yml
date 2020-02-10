@@ -7,31 +7,6 @@ executors:
     - image: circleci/golang:1.12
 
 jobs:
-  test:
-    executor: golang
-    working_directory: /tmp/flant/shell-operator
-    steps:
-      - checkout
-      #- run: go mod download
-      #- run: go build -v ./cmd/shell-operator
-      #- run: go test -race -v ./...
-      # TODO add vet, lint, speller
-
-  build_image_branch:
-    machine: true
-    steps:
-    - checkout
-    - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
-    # build and push ubuntu version
-    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev-ubuntu .
-    - run: docker push flant/shell-operator:dev-ubuntu
-    # build and push alpine version
-    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev-alpine -f Dockerfile-alpine3.9 .
-    - run: docker push flant/shell-operator:dev-alpine
-    # build and push alpine version 3.10
-    - run: docker build --build-arg appVersion=$CIRCLE_BRANCH-$CIRCLE_SHA1 -t flant/shell-operator:dev-alpine3.10 -f Dockerfile-alpine3.10 .
-    - run: docker push flant/shell-operator:dev-alpine
-
   build_image_latest:
     machine: true
     steps:
@@ -61,18 +36,9 @@ workflows:
   version: 2
   shell-operator:
     jobs:
-    # run tests on every commit
-    - test:
-        filters:
-          tags:   # required since `build_release_on_tag` has tag filters AND requires `test`
-            only: /.*/
-          branches:
-            only: /.*/
     # test, build and publish latest images from master branch
     - build_image_latest:
         context: hub.docker.com-flant
-        requires:
-        - test
         filters:
           tags:
             ignore: /.*/
@@ -81,32 +47,8 @@ workflows:
     # test, build and publish on every semver tag
     - build_image_on_tag:
         context: hub.docker.com-flant
-        requires:
-        - test
         filters:
           tags:
             only: /^v[0-9]+(\.[0-9]+){2}([-+].+|[^-.]*)$/
           branches:
             ignore: /.*/
-    # test, build and publish a dev image for branches
-    - hold_build_image_branch:
-        type: approval
-        requires:
-          - test
-        filters:
-          tags:
-            ignore: /.*/
-          branches:
-            ignore: master
-
-    # test, build and publish a dev image for branches
-    - build_image_branch:
-        context: hub.docker.com-flant
-        requires:
-          - hold_build_image_branch
-        filters:
-          tags:
-            ignore: /.*/
-          branches:
-            ignore: master
-
