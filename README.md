@@ -1,5 +1,5 @@
 <p align="center">
-<img width="485" height="121" src="docs/shell-operator-logo.png" alt="Addon-operator logo" />
+<img width="485" src="docs/shell-operator-logo.png" alt="Shell-operator logo" />
 </p>
 
 <p align="center">
@@ -25,10 +25,12 @@ Shell-operator provides:
 
 > You need to have a Kubernetes cluster, and the kubectl must be configured to communicate with your cluster.
 
-Steps to setup Shell-operator in your cluster are:
+The simplest setup of Shell-operator in your cluster consists of these steps:
 - build an image with your hooks (scripts)
 - create necessary RBAC objects (for `kubernetes` bindings)
 - run Pod or Deployment with a built image
+
+For more configuration options see [RUNNING](RUNNING.md).
 
 ### Build an image with your hooks
 
@@ -43,16 +45,11 @@ Let's create a small operator that will watch for all Pods in all Namespaces and
 
 if [[ $1 == "--config" ]] ; then
   cat <<EOF
-  {
-    "configVersion":"v1",
-    "kubernetes": [
-      {
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "watchEvent": ["Added"]
-      }
-    ]
-  }
+configVersion: v1
+kubernetes":
+- apiVersion: v1
+  kind: Pod
+  watchEvent: ["Added"]
 EOF
 else
   podName=$(jq -r .[0].object.metadata.name $BINDING_CONTEXT_PATH)
@@ -87,7 +84,7 @@ Push image to the Docker registry accessible by Kubernetes cluster:
 docker push registry.mycompany.com/shell-operator:monitor-pods
 ```
 
-### Install shell-operator in a cluster
+### Create RBAC objects
 
 We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator:
 
@@ -100,6 +97,8 @@ kubectl create clusterrolebinding monitor-pods \
   --clusterrole=monitor-pods \
   --serviceaccount=example-monitor-pods:monitor-pods-acc
 ```
+
+### Install shell-operator in a cluster
 
 Shell-operator can be deployed as a Pod. Put this manifest into the `shell-operator-pod.yaml` file:
 
@@ -122,24 +121,28 @@ Start shell-operator by applying a `shell-operator-pod.yaml` file:
 kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
 ```
 
-For instance, deploy [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) to trigger `kubernetes` hook:
+### It works!
+
+Let's deploy a [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) to trigger  `kubernetes` binding defined in our hook:
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
 ```
 
-Run `kubectl -n example-monitor-pods logs po/shell-operator` and see that the hook will print dashboard pod names:
+Now run `kubectl -n example-monitor-pods logs po/shell-operator` and see that the hook will print dashboard pod name:
 
 ```plain
 ...
-INFO     : QUEUE add TASK_HOOK_RUN@KUBERNETES pods-hook.sh
-INFO     : TASK_RUN HookRun@KUBERNETES pods-hook.sh
-INFO     : Running hook 'pods-hook.sh' binding 'kubernetes' ...
-Pod 'kubernetes-dashboard-769df5545f-99xsb' added
+INFO[0027] queue task HookRun:main                       operator.component=handleEvents queue=main
+INFO[0030] Execute hook                                  binding=kubernetes hook=pods-hook.sh operator.component=taskRunner queue=main task=HookRun
+INFO[0030] Pod 'kubernetes-dashboard-775dd7f59c-hr7kj' added  binding=kubernetes hook=pods-hook.sh output=stdout queue=main task=HookRun
+INFO[0030] Hook executed successfully                    binding=kubernetes hook=pods-hook.sh operator.component=taskRunner queue=main task=HookRun
 ...
 ```
 
-To delete created objects execute:
+> *Note:* hook output is logged with output=stdout label.
+
+To cleanup a cluster, delete namespace and RBAC objects:
 
 ```shell
 kubectl delete ns example-monitor-pods &&
@@ -149,67 +152,15 @@ kubectl delete clusterrolebinding monitor-pods
 
 This example is also available in /examples: [monitor-pods](examples/101-monitor-pods).
 
-### Environment variables
-
-You can configure the operator with the following environment variables:
-
-| Env-Variable name | Default | Description |
-|---|---|---|
-| SHELL_OPERATOR_DEBUG | `'no'` | Set to `yes` to turn on debug messages |
-| SHELL_OPERATOR_WORKING_DIR | `''` | A path to a hooks file structure |
-| SHELL_OPERATOR_TMP_DIR | `'/tmp/shell-operator'` | A path to store temporary files with data for hooks |
-| SHELL_OPERATOR_KUBE_CONTEXT | `''` | The name of the kubeconfig context to use. |
-| SHELL_OPERATOR_KUBE_CONFIG | `''` | Path to the kubeconfig file.. |
-| SHELL_OPERATOR_LISTEN_ADDRESS | `'0.0.0.0:9115'` | Address and port to use for HTTP serving. |
-| JQ_LIBRARY_PATH | `''` | Prepend directory to the search list for jq modules (-L flag). |
-| JQ_EXEC | `''` | Set to `'yes'` to use jq as executable — it is more for **developing purposes**. |
-| LOG_LEVEL | `'info'` | Logging level: `debug`, `info`, `error`. |
-| LOG_TYPE | `'text'` | Logging formatter type: `json`, `text` or `color`. |
-| LOG_NO_TIME | `false` | Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps. |
-
 ## Hook binding types
 
-__onStartup__
-
-This binding has only one parameter: order of execution. Hooks are loaded at start and then hooks with onStartup binding are executed in order defined by parameter. Read more about `onStartup` bindings [here](HOOKS.md#onstartup).
-
-Example `hook --config`:
-
-```json
-{
-  "configVersion": "v1",
-  "onStartup":10
-}
-```
-
-__schedule__
-
-This binding is for periodical running of hooks. Schedule can be defined with granularity of seconds. Read more about `schedule` bindings [here](HOOKS.md#schedule).
-
-Example `hook --config` with 2 schedules:
-
-```json
-{
-  "configVersion": "v1",
-  "schedule": [
-    {
-      "name": "every 10 min",
-      "crontab": "0 */10 * * * *",
-      "allowFailure": true
-    },
-    {
-      "name": "Every Monday at 8:05",
-      "crontab": "5 8 * * 1"
-    }
-  ]
-}
-```
+Every hook should respond with json or yaml configuration of bindings when executed with `--config` flag.
 
 __kubernetes__
 
 This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) expression to filter their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#kubernetes).
 
-Example of `hook --config`:
+Example of json output from `hook --config`:
 
 ```json
 {
@@ -225,7 +176,36 @@ Example of `hook --config`:
 }
 ```
 
-> Note: it is possible to watch custom resources, just use proper values for `apiVersion` and `kind` fields.
+> Note: it is possible to watch Custom Defined Resources, just use proper values for `apiVersion` and `kind` fields.
+
+__onStartup__
+
+This binding has only one parameter: order of execution. Hooks are loaded at the start and then hooks with onStartup binding are executed in the order defined by parameter. Read more about `onStartup` bindings [here](HOOKS.md#onstartup).
+
+Example `hook --config`:
+
+```yaml
+configVersion: v1
+onStartup: 10
+```
+
+__schedule__
+
+This binding is for the periodical running of hooks. A schedule can be defined with a granularity of seconds. Read more about `schedule` bindings [here](HOOKS.md#schedule).
+
+Example `hook --config` with 2 schedules:
+
+```yaml
+configVersion: v1
+schedule:
+- name: "every 10 min"
+  crontab: "*/10 * * * *"
+  allowFailure: true
+- name: "Every Monday at 8:05"
+  crontab: "5 8 * * 1"
+  queue: mondays
+```
+
 
 ## Prometheus target
 
