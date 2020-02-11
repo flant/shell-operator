@@ -38,6 +38,7 @@ type KubernetesClient interface {
 
 	WithContextName(contextName string)
 	WithConfigPath(configPath string)
+	WithRateLimiterSettings(qps float32, burst int)
 
 	Init() error
 
@@ -72,6 +73,8 @@ type kubernetesClient struct {
 	configPath       string
 	defaultNamespace string
 	dynamicClient    dynamic.Interface
+	qps              float32
+	burst            int
 }
 
 func (c *kubernetesClient) WithContextName(name string) {
@@ -80,6 +83,11 @@ func (c *kubernetesClient) WithContextName(name string) {
 
 func (c *kubernetesClient) WithConfigPath(path string) {
 	c.configPath = path
+}
+
+func (c *kubernetesClient) WithRateLimiterSettings(qps float32, burst int) {
+	c.qps = qps
+	c.burst = burst
 }
 
 func (c *kubernetesClient) DefaultNamespace() string {
@@ -111,6 +119,8 @@ func (c *kubernetesClient) Init() error {
 						err = fmt.Errorf("out-of-cluster config error: %v, in-cluster config error: %v", outOfClusterErr, err)
 						logEntry.Errorf("configuration problems: %s", err)
 						return err
+					} else {
+						return fmt.Errorf("in-cluster config is not found")
 					}
 				} else {
 					logEntry.Errorf("in-cluster problem: %s", err)
@@ -122,12 +132,17 @@ func (c *kubernetesClient) Init() error {
 			if outOfClusterErr != nil {
 				logEntry.Errorf("out-of-cluster problem: %s", outOfClusterErr)
 				return outOfClusterErr
+			} else {
+				return fmt.Errorf("no kubernetes client config found")
 			}
 		}
 		configType = "in-cluster"
 	}
 
 	c.defaultNamespace = defaultNs
+
+	config.QPS = c.qps
+	config.Burst = c.burst
 
 	c.Interface, err = kubernetes.NewForConfig(config)
 	if err != nil {
