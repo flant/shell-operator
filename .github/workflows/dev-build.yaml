@@ -1,0 +1,85 @@
+name: Publish dev images
+on:
+  pull_request:
+    types: [labeled]
+env:
+  GO111MODULE: on
+
+jobs:
+  stub:
+    name: Empty job to prevent workflow fail
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.label.id != 1838515600 # not ':robot: build dev images' label
+    steps:
+      - name: stub action
+        run: ": This job is used to prevent the workflow to fail when all other jobs are skipped."
+#      - name: dump label event
+#        run: cat $GITHUB_EVENT_PATH
+#      - name: dump envs
+#        run: export
+
+  unlabel:
+    name: Unlabel
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev images' label
+    steps:
+      - uses: actions/github-script@0.3.0
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const eventLabelName = '${{github.event.label.name}}'
+            const response = await github.issues.listLabelsOnIssue({...context.issue})
+            for (const label of response.data) {
+              if (label.name === eventLabelName) {
+                github.issues.removeLabel({...context.issue, name: eventLabelName})
+                break
+              }
+            }
+
+  build_dev_image:
+    name: Dev image
+    strategy:
+      fail-fast: false
+      matrix:
+        flavour:
+          - ubuntu
+          - alpine3.9
+          - alpine3.10
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev images' label
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Prepare environment
+        env:
+          FLAVOUR: ${{ matrix.flavour }}
+          IMAGE_NAME: flant/shell-operator-dev
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          imageTag=${IMAGE_NAME}:${FLAVOUR}
+          # master-371e2d3b9467fb9b72b515fb5e30d39964519601-2020.02.06_18:37:42
+          appVersion=dev-$FLAVOUR-$GITHUB_HEAD_REF-${HEAD_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
+          dockerFile=Dockerfile
+
+          case $FLAVOUR in
+            alpine3.9)
+              dockerFile="Dockerfile-alpine3.9"
+              ;;
+            alpine3.10)
+              dockerFile="Dockerfile-alpine3.10"
+              ;;
+          esac
+
+          echo ::set-env name=imageTag::${imageTag}
+          echo ::set-env name=dockerFile::${dockerFile}
+          echo ::set-env name=appVersion::${appVersion}
+
+      - name: Build '${{ matrix.flavour }}' image
+        run: |
+          echo Build $imageTag with version $appVersion using ./$dockerFile
+          docker build --build-arg appVersion=$appVersion -t $imageTag -f $dockerFile .
+
+      - name: Push '${{ matrix.flavour }}' image
+        run: |
+          docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASS }}
+          docker push $imageTag
