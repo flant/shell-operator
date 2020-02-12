@@ -1,0 +1,88 @@
+# every push to a branch: build binary
+name: Build
+on:
+  push:
+    branches:
+jobs:
+  build_binary:
+    name: Build shell-operator binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+        id: go
+
+      - name: Check out shell-operator code
+        uses: actions/checkout@v1
+
+      # Restore go_modules.tar.gz from cache or download and pack them, upload archive as artifact for other jobs.
+      # NOTE: cache action is limited to 400Mb artifacts and has a 2Gb space.
+      # As of December 2019, go_modules.tar.gz is 281Mb
+      - name: Cache go modules archive
+        id: go-modules-cache
+        uses: actions/cache@v1
+        with:
+          path: gomod
+          key: ${{ runner.os }}-gomod-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-gomod-
+
+      - name: Download and pack Go modules
+        if: steps.go-modules-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p gomod
+          go mod download
+          tar -czf gomod/go_modules.tar.gz -C $HOME/go/pkg/mod .
+          echo -n "Unpacked size is: " && du -sh $HOME/go/pkg/mod
+          echo -n "Packed size is: " && du -sh gomod/go_modules.tar.gz
+
+      - name: Unpack go modules
+        if: steps.go-modules-cache.outputs.cache-hit == 'true'
+        run: |
+          mkdir -p $HOME/go/pkg/mod && tar -xzf gomod/go_modules.tar.gz -C $HOME/go/pkg/mod
+
+      # Restore libjq-go-build directory from cache or build it, upload it as artifact for other jobs.
+      - name: Extract libjq-go.lock from go.mod
+        run: |
+          grep 'flant/libjq-go' go.mod > libjq-go.lock
+          cat libjq-go.lock
+
+      - name: Cache libjq libraries
+        id: libjq-cache
+        uses: actions/cache@v1
+        with:
+          path: libjq
+          key: ${{ runner.os }}-libjq-${{ hashFiles('libjq-go.lock') }}
+
+      - name: Build libjq libraries
+        if: steps.libjq-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git ca-certificates tree
+
+          git clone https://github.com/flant/libjq-go libjq-go
+          cd libjq-go
+          git submodule update --init
+          sudo ./scripts/install-libjq-dependencies-ubuntu.sh
+
+          ./scripts/build-libjq-static.sh ${GITHUB_WORKSPACE}/libjq-go ${GITHUB_WORKSPACE}/libjq
+
+          tree  ${GITHUB_WORKSPACE}/libjq
+
+      - name: Prepare environment
+        run: |
+          echo ::set-env name=CGO_ENABLED::1
+
+          CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/build/jq/include"
+          echo ::set-env name=CGO_CFLAGS::${CGO_CFLAGS}
+
+          CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/build/onig/lib -L$GITHUB_WORKSPACE/libjq/build/jq/lib"
+          echo ::set-env name=CGO_LDFLAGS::${CGO_LDFLAGS}
+
+          echo ::set-env name=GOOS::linux
+
+      - name: Build binary
+        run: |
+          go build ./cmd/shell-operator
