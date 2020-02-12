@@ -87,11 +87,17 @@ func (op *ShellOperator) WithMetricStorage(metricStorage *metrics_storage.Metric
 	op.MetricStorage = metricStorage
 }
 
-// Init does some basic checks and instantiate managers
+// Init does some basic checks and instantiate dependencies
 //
-// - check settings: directories, kube config
-// - initialize managers: hook manager, kube events manager, schedule manager
-// - create an empty task queue
+// - check directories
+// - start debug server
+// - initialize dependencies:
+//   - metric storage
+//   - kubernetes client config
+//   - empty set of task queues
+//   - hook manager
+//   - kubernetes events manager
+//   - schedule manager
 func (op *ShellOperator) Init() (err error) {
 	log.Debug("MAIN Init")
 
@@ -142,6 +148,7 @@ func (op *ShellOperator) Init() (err error) {
 		op.KubeClient = kube.NewKubernetesClient()
 		op.KubeClient.WithContextName(app.KubeContext)
 		op.KubeClient.WithConfigPath(app.KubeConfig)
+		op.KubeClient.WithRateLimiterSettings(app.KubeClientQps, app.KubeClientBurst)
 		// Initialize kube client for kube events hooks.
 		err = op.KubeClient.Init()
 		if err != nil {

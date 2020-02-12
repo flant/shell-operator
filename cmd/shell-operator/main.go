@@ -50,7 +50,7 @@ func main() {
 
 			return nil
 		})
-	app.SetupStartCommandFlags(kpApp, startCmd)
+	app.DefineStartCommandFlags(kpApp, startCmd)
 
 	debug.DefineDebugCommands(kpApp)
 
