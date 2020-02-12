@@ -20,13 +20,10 @@ jobs:
           - alpine3.9
     runs-on: [ubuntu-latest]
     steps:
-      - name: Prepare environment
+      - name: Build '${{ matrix.flavour }}' image
         env:
           FLAVOUR: ${{ matrix.flavour }}
           IMAGE_NAME: flant/shell-operator
-        run: |
-
-      - name: Build '${{ matrix.flavour }}' image
         run: |
           : Setup imageTag, appVersion and dockerFile envs and build image
           imageTag=
