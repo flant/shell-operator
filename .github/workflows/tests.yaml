@@ -1,5 +1,5 @@
-# every push to fix_, and feat_* : build binary and run unit tests
-# push to master or label: build binary, run all tests and upload coverage.
+# every push to a branch : run unit tests.
+# push to master or label: run all tests and upload a coverage report.
 name: Tests
 on:
   push:
@@ -112,10 +112,6 @@ jobs:
           echo ::set-env name=CGO_LDFLAGS::${CGO_LDFLAGS}
 
           echo ::set-env name=GOOS::linux
-
-      - name: Build binary
-        run: |
-          go build ./cmd/shell-operator
 
       - name: Run unit tests
         run: |

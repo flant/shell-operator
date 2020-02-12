@@ -1,0 +1,37 @@
+# every push to a branch:
+# - check grammar
+# - go fmt
+name: Code checks
+on:
+  push:
+    branches:
+jobs:
+  code_stle:
+    name: Go code style
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+
+      - uses: actions/checkout@v1
+
+      - name: code style
+        run: |
+          gofmt -d $(find . -type f -iname '*.go')
+
+  codespell:
+    name: codespell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+
+      - uses: actions/checkout@v1
+
+      - name: codespell
+        run: |
+          pip install codespell
+          codespell --skip=".git,go.mod,go.sum,*.log,*.gif,*.png" -L witht,eventtypes,uint,uptodate
