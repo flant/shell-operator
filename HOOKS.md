@@ -27,10 +27,10 @@ Next the main cycle is started:
   - `schedule` hooks are added according to the schedule,
   - `kubernetes` and `schedule` hooks are added to the "main" queue or to the named queue if `queue` field was specified.
 
-- Each named queue has an own queue handler which executes hooks strictly sequentially. If hook fails with an error (non-zero exit code), Shell-operator restarts it (every 5 seconds) until success. In case of an erroneous execution of some hook, when other events occur, the queue will be filled with new tasks, but their execution will be blocked until the failing hook succeeds.
+- Each named queue has its own queue handler which executes hooks strictly sequentially. If hook fails with an error (non-zero exit code), Shell-operator restarts it (every 5 seconds) until succeeds. In case of an erroneous execution of some hook, when other events occur, the queue will be filled with new tasks, but their execution will be blocked until the failing hook succeeds.
   - You can change this behavior for a specific hook by adding `allowFailure: true` to the binding configuration (not available for `onStartup` hooks).
   
-- Each hook is executed with binding context, that describe an occurred event: 
+- Each hook is executed with a binding context, that describes an already occurred event: 
   - `kubernetes` hook receives `Event` binding context with object related to the event.
   - `schedule` hook receives a name of triggered schedule binding. 
 
@@ -234,7 +234,7 @@ Parameters:
 
 - `namespace.labelSelector` — this filter works like `labelSelector` but for namespaces and Shell-operator dynamically subscribes to events from matched namespaces.
 
-- `jqFilter` —  an optional parameter that specifies *event filtering* with [jq syntax](https://stedolan.github.io/jq/manual/). The hook will be triggered on Modified event only if the filter result is changed after the last event. See example [102-monitor-namespaces](examples/102-monitor-namespaces).
+- `jqFilter` —  an optional parameter that specifies *event filtering* using [jq syntax](https://stedolan.github.io/jq/manual/). The hook will be triggered on Modified event only if the filter result is changed after the last event. See example [102-monitor-namespaces](examples/102-monitor-namespaces).
 
 - `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 

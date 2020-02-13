@@ -154,13 +154,13 @@ This example is also available in /examples: [monitor-pods](examples/101-monitor
 
 ## Hook binding types
 
-Every hook should respond with json or yaml configuration of bindings when executed with `--config` flag.
+Every hook should respond with JSON or YAML configuration of bindings when executed with `--config` flag.
 
 __kubernetes__
 
 This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) expression to filter their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#kubernetes).
 
-Example of json output from `hook --config`:
+Example of JSON output from `hook --config`:
 
 ```json
 {
