@@ -86,8 +86,6 @@ jobs:
 
       - name: Run golangci-lint
         run: |
+          # Use 1.17.1 because of go 1.12
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.17.1
-          echo
-          ./golangci-lint --version
-          echo
-          GL_DEBUG=linters_output GOPACKAGESPRINTGOLISTERRORS=1 ./golangci-lint run -v
+          ./golangci-lint run
