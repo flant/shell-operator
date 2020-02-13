@@ -84,6 +84,7 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 				res["filterResult"] = ""
 			}
 		} else {
+			// Copy object and filterResult from the first item.
 			obj := bc.Objects[0]
 			objMap := obj.Map()
 			for k, v := range objMap {

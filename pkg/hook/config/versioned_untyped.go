@@ -40,7 +40,7 @@ func NewDefaultVersionedUntyped() *VersionedUntyped {
 func (u *VersionedUntyped) Load(data []byte) error {
 	err := yaml.Unmarshal(data, &u.Obj)
 	if err != nil {
-		return fmt.Errorf("json unmarshal: %v", err)
+		return fmt.Errorf("config unmarshal: %v", err)
 	}
 
 	// detect version
