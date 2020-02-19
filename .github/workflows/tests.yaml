@@ -301,8 +301,8 @@ jobs:
 
       - name: Prepare environment
         run: |
-          # ginkgo with fixes
-          go build github.com/flant/ginkgo/ginkgo
+          # note that onsi/ginkgo is replaced by flant/ginkgo with fixes for combining coverage
+          go build github.com/onsi/ginkgo/ginkgo
           ./ginkgo version
           echo ::set-env name=KIND_CLUSTER_VERSION::${{ matrix.k8s_version }}
 

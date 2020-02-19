@@ -3,7 +3,6 @@ module github.com/flant/shell-operator
 go 1.12
 
 require (
-	github.com/flant/ginkgo v1.11.1-0.20200206071017-2216da3b016c // fix_coverage_combining
 	github.com/flant/libjq-go v1.0.1-0.20200205115921-27e93c18c17f // downgrade jq to 1.6
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-openapi/errors v0.19.2
@@ -20,7 +19,6 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/sys v0.0.0-20200113162924-86b910548bc1
-	golang.org/x/tools v0.0.0-20190617190820-da514acc4774
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/satori/go.uuid.v1 v1.2.0
@@ -34,6 +32,8 @@ require (
 
 // replace github.com/go-openapi/validate => ../go-openapi-validate
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.4-0.20190926112101-38fbca4ac77f // branch: fix_in_body
+
+replace github.com/onsi/ginkgo v1.11.0 => github.com/flant/ginkgo v1.11.1-0.20200206071017-2216da3b016c // fix_coverage_combining
 
 //replace github.com/flant/libjq-go => ../libjq-go
 
