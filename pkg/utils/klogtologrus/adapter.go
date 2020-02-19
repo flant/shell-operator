@@ -15,10 +15,12 @@ import (
 //     _ "github.com/flant/shell-operator/pkg/utils/klogtologrus"
 //   )
 func init() {
-	// turn off logging to stderr and set Info writer to catch all messages.
+	// - turn off logging to stderr
+	// - default stderr threshold is ERROR and it outputs errors to stderr, set it to FATAL
+	// - set writer for INFO severity to catch all messages
 	klogFlagSet := flag.NewFlagSet("klog", flag.ContinueOnError)
 	klog.InitFlags(klogFlagSet)
-	_ = klogFlagSet.Parse([]string{"-logtostderr=false"})
+	_ = klogFlagSet.Parse([]string{"-logtostderr=false", "-stderrthreshold=FATAL"})
 	klog.SetOutputBySeverity("INFO", &klogToLogrusWriter{})
 }
 
