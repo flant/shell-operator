@@ -5,6 +5,7 @@ function hook::run() {
     __config__
     exit 0
   fi
+
   CONTEXT_LENGTH=$(context::global::jq -r 'length')
   for i in `seq 0 $((CONTEXT_LENGTH - 1))`; do
     export BINDING_CONTEXT_CURRENT_INDEX="${i}"
@@ -20,7 +21,6 @@ function hook::run() {
 function hook::_determine_kubernetes_and_scheduler_handlers() {
   if [[ "$BINDING_CONTEXT_CURRENT_BINDING" == "onStartup" ]]; then
     echo __on_startup
-  # if current context has .type field
   elif BINDING_CONTEXT_CURRENT_TYPE=$(context::jq -er '.type'); then
     case "${BINDING_CONTEXT_CURRENT_TYPE}" in
     "Synchronization")
@@ -53,7 +53,7 @@ function hook::_run_first_available_handler() {
 
   for handler in ${HANDLERS}; do
     if type $handler >/dev/null 2>&1; then
-      $handler
+      ($handler) # brackets is to run handler as subprocess
       return $?
     fi
   done
