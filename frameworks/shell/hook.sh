@@ -53,7 +53,7 @@ function hook::_run_first_available_handler() {
 
   for handler in ${HANDLERS}; do
     if type $handler >/dev/null 2>&1; then
-      ($handler) # brackets is to run handler as subprocess
+      ($handler) # brackets are to run handler as subprocess
       return $?
     fi
   done
