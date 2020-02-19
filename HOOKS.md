@@ -111,6 +111,8 @@ Syntax:
       "name": "every 10 seconds",
       "crontab": "*/10 * * * * *",
       "allowFailure": true|false,
+      "queue": "every-ten",
+      "includeSnapshotsFrom": "monitor-pods"
     },
     ...
   ]
@@ -127,7 +129,7 @@ Parameters:
 
 `queue` — a name of a separate queue. It can be used to execute long-running hooks in parallel with other hooks.
 
-`includeSnapshotsFrom` — a list of names of `kubernetes` bindings. When specified, all monitored objects will be added to the binding context.
+`includeSnapshotsFrom` — a list of names of `kubernetes` bindings. When specified, all monitored objects will be added to the binding context in a `snapshots` field.
 
 ### kubernetes
 
@@ -240,7 +242,7 @@ Parameters:
 
 - `queue` — a name of a separate queue. It can be used to execute long-running hooks in parallel with hooks in "main" queue.
 
-- `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from that bindings will be added to the binding context. Self-include is also possible.
+- `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from that bindings will be added to the binding context in a `snapshots` field. Self-include is also possible.
 
 YAML example:
 ```yaml
