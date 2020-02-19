@@ -11,6 +11,7 @@ import (
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
+	"github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type ManagerEventsHandler struct {
@@ -88,7 +89,9 @@ func (m *ManagerEventsHandler) Start() {
 						log.Errorf("Possible bug!!! Got task for queue '%s' but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
 					} else {
 						q.AddLast(resTask)
-						logEntry.WithField("queue", q.Name).Infof("queue task %s", resTask.GetDescription())
+						logEntry.WithFields(utils.LabelsToLogFields(resTask.GetLogLabels())).
+							WithField("queue", q.Name).
+							Infof("queue task %s", resTask.GetDescription())
 					}
 				}
 			})
