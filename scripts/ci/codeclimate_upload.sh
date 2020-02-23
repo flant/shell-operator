@@ -5,6 +5,8 @@ curl -Ls https://codeclimate.com/downloads/test-reporter/test-reporter-latest-li
 chmod +x ./cc-test-reporter
 ./cc-test-reporter --version
 
+COVERAGE_PREFIX=${COVERAGE_PREFIX:-github.com/flant/shell-operator}
+
 coverage_files=$(find $COVERAGE_DIR -name '*.out')
 for file in ${coverage_files[@]}
 do
@@ -13,7 +15,7 @@ do
   ./cc-test-reporter format-coverage \
     -t=gocov \
     -o="cc-coverage/$file_name.codeclimate.json" \
-    -p=github.com/flant/shell-operator \
+    -p=${COVERAGE_PREFIX} \
     "$file"
 done
 
