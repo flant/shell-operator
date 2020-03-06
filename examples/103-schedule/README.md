@@ -6,22 +6,22 @@ Example of hooks with schedule bindings. 5 fields and 6 fields for crontab are s
 
 Build shell-operator image with custom scripts:
 
-```
-$ docker build -t "registry.mycompany.com/shell-operator:schedule" .
-$ docker push registry.mycompany.com/shell-operator:schedule
+```shell
+docker build -t "registry.mycompany.com/shell-operator:schedule" .
+docker push registry.mycompany.com/shell-operator:schedule
 ```
 
 Edit image in shell-operator-pod.yaml and apply manifests:
 
-```
-$ kubectl create ns example-schedule
-$ kubectl -n example-schedule apply -f shell-operator-pod.yaml
+```shell
+kubectl create ns example-schedule
+kubectl -n example-schedule apply -f shell-operator-pod.yaml
 ```
 
-See in logs that schedule-hook.sh was run:
+Verify that schedule-hook.sh was run:
 
-```
-$ kubectl -n example-schedule logs -f po/shell-operator
+```text
+kubectl -n example-schedule logs -f po/shell-operator
 ...
 INFO     : Running schedule manager entry '*/5 * * * * *' ...
 INFO     : Running schedule manager entry '*/10 * * * * *' ...
@@ -36,7 +36,7 @@ Message from 'schedule' hook with 6 fields crontab: [{"binding":"every 10 sec"}]
 
 ### cleanup
 
-```
-$ kubectl delete ns/example-schedule
-$ docker rmi registry.mycompany.com/shell-operator:schedule
+```shell
+kubectl delete ns/example-schedule
+docker rmi registry.mycompany.com/shell-operator:schedule
 ```

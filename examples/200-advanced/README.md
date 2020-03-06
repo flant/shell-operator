@@ -2,33 +2,32 @@
 
 Use Deployment to install shell-operator with several hooks.
 
-
-### Run 
+### Run
 
 Build shell-operator image with custom scripts:
 
-```
-$ docker build -t "registry.mycompany.com/shell-operator:advanced" .
-$ docker push registry.mycompany.com/shell-operator:advanced
+```shell
+docker build -t "registry.mycompany.com/shell-operator:advanced" .
+docker push registry.mycompany.com/shell-operator:advanced
 ```
 
 Edit image in shell-operator-pod.yaml and apply manifests:
 
-```
-$ kubectl create ns example-advanced
-$ kubectl -n example-advanced apply -f shell-operator-rbac.yaml  
-$ kubectl -n example-advanced apply -f shell-operator-deploy.yaml
+```shell
+kubectl create ns example-advanced
+kubectl -n example-advanced apply -f shell-operator-rbac.yaml
+kubectl -n example-advanced apply -f shell-operator-deploy.yaml
 ```
 
 Create ns to trigger onKubernetesEvent:
 
-```
-$ kubectl create ns foobar
+```shell
+kubectl create ns foobar
 ```
 
 See in logs that startup hooks are run in order and all other hooks are triggered:
 
-```
+```text
 $ kubectl -n example-advanced logs deploy/shell-operator
 ...
 INFO     : TASK_RUN HookRun@ON_STARTUP namespace-hook.sh
@@ -50,7 +49,7 @@ Namespace qweqwe was created
 
 ### cleanup
 
-```
+```shell
 $ kubectl delete ns/example-advanced
 $ docker rmi registry.mycompany.com/shell-operator:advanced
 ```

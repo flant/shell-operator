@@ -32,9 +32,9 @@ Steps to setup Shell-operator in your cluster are:
 
 ### Build an image with your hooks
 
-A hook is a script that, when executed with `--config` option, returns configuration in JSON. Learn [more](HOOKS.md) about hooks.
+A hook is a script that, when executed with `--config` option, returns configuration in JSON format. Learn [more](HOOKS.md) about hooks.
 
-Let's create a small operator that will watch for all Pods in all Namespaces and simply log a name of a new Pod.
+Let's create a small operator that will watch for all Pods in all Namespaces and simply log the name of a new Pod.
 
 "kubernetes" binding is used to tell Shell-operator about objects that we want to watch. Create the `pods-hook.sh` file with the following content:
 
@@ -66,7 +66,7 @@ Make the `pods-hook.sh` executable:
 chmod +x pods-hook.sh
 ```
 
-You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the `Dockerfile`.
+You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build your own image. You just need to ADD your hook into `/hooks` directory in the `Dockerfile`.
 
 Create the following `Dockerfile` in the directory where you created the `pods-hook.sh` file:
 
@@ -75,7 +75,7 @@ FROM flant/shell-operator:latest
 ADD pods-hook.sh /hooks
 ```
 
-Build image (change image tag according your Docker registry):
+Build an image (change image tag according to your Docker registry):
 
 ```shell
 docker build -t "registry.mycompany.com/shell-operator:monitor-pods" .
