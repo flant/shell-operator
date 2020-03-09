@@ -8,37 +8,38 @@
 <a href="https://t.me/kubeoperator"><img src="https://img.shields.io/badge/telegram-RU%20chat-179cde.svg?logo=telegram" alt="Telegram chat RU"/></a>
 </p>
 
-
 **Shell-operator** is a tool for running event-driven scripts in a Kubernetes cluster.
 
-This operator is not an operator for a _particular software product_ as prometheus-operator or kafka-operator. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an operator-sdk but for scripts.
+This operator is not an operator for a _particular software product_ such as `prometheus-operator` or `kafka-operator`. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an `operator-sdk` but for scripts.
 
-Shell-operator is used as a base for more advanced [Addon-operator](https://github.com/flant/addon-operator) that supports helm charts and value storages.
+Shell-operator is used as a base for more advanced [Addon-operator](https://github.com/flant/addon-operator) that supports Helm charts and value storages.
 
 Shell-operator provides:
-- __Ease the management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, kubectl, etc.
-- __Kubernetes object events__: hook can be triggered by add, update or delete events. **Learn [more](HOOKS.md) about hooks.**
-- __Object selector and properties filter__: Shell-operator can monitor only particular objects and detect changes in their properties.
-- __Simple configuration__: hook binding definition is a JSON structure on stdout.
+
+- __Ease of management of a Kubernetes cluster__: use the tools that Ops are familiar with. It can be bash, python, kubectl, etc.
+- __Kubernetes object events__: hook can be triggered by `add`, `update` or `delete` events. **Learn [more](HOOKS.md) about hooks.**
+- __Object selector and properties filter__: Shell-operator can monitor a particular set of objects and detect changes in their properties.
+- __Simple configuration__: hook binding definition is a JSON or YAML document on script's stdout.
 
 ## Quickstart
 
-> You need to have a Kubernetes cluster, and the kubectl must be configured to communicate with your cluster.
+> You need to have a Kubernetes cluster, and the `kubectl` must be configured to communicate with your cluster.
 
 The simplest setup of Shell-operator in your cluster consists of these steps:
+
 - build an image with your hooks (scripts)
 - create necessary RBAC objects (for `kubernetes` bindings)
-- run Pod or Deployment with a built image
+- run Pod or Deployment with the built image
 
 For more configuration options see [RUNNING](RUNNING.md).
 
 ### Build an image with your hooks
 
-A hook is a script that, when executed with `--config` option, returns configuration in JSON. Learn [more](HOOKS.md) about hooks.
+A hook is a script that, when executed with `--config` option, outputs configuration to stdout in YAML or JSON format. Learn [more](HOOKS.md) about hooks.
 
-Let's create a small operator that will watch for all Pods in all Namespaces and simply log a name of a new Pod.
+Let's create a small operator that will watch for all Pods in all Namespaces and simply log the name of a new Pod.
 
-"kubernetes" binding is used to tell Shell-operator about objects that we want to watch. Create the `pods-hook.sh` file with the following content:
+`kubernetes` binding is used to tell Shell-operator about objects that we want to watch. Create the `pods-hook.sh` file with the following content:
 
 ```bash
 #!/usr/bin/env bash
@@ -63,7 +64,7 @@ Make the `pods-hook.sh` executable:
 chmod +x pods-hook.sh
 ```
 
-You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to ADD your hook into `/hooks` directory in the `Dockerfile`.
+You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to `ADD` your hook into `/hooks` directory in the `Dockerfile`.
 
 Create the following `Dockerfile` in the directory where you created the `pods-hook.sh` file:
 
@@ -72,13 +73,13 @@ FROM flant/shell-operator:latest
 ADD pods-hook.sh /hooks
 ```
 
-Build image (change image tag according your Docker registry):
+Build an image (change image tag according to your Docker registry):
 
 ```shell
 docker build -t "registry.mycompany.com/shell-operator:monitor-pods" .
 ```
 
-Push image to the Docker registry accessible by Kubernetes cluster:
+Push image to the Docker registry accessible by the Kubernetes cluster:
 
 ```shell
 docker push registry.mycompany.com/shell-operator:monitor-pods
@@ -89,16 +90,13 @@ docker push registry.mycompany.com/shell-operator:monitor-pods
 We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator:
 
 ```shell
-kubectl create namespace example-monitor-pods &&
-kubectl create serviceaccount monitor-pods-acc \
-  --namespace example-monitor-pods &&
-kubectl create clusterrole monitor-pods --verb=get,watch,list --resource=pods &&
-kubectl create clusterrolebinding monitor-pods \
-  --clusterrole=monitor-pods \
-  --serviceaccount=example-monitor-pods:monitor-pods-acc
+kubectl create namespace example-monitor-pods
+kubectl create serviceaccount monitor-pods-acc --namespace example-monitor-pods
+kubectl create clusterrole monitor-pods --verb=get,watch,list --resource=pods
+kubectl create clusterrolebinding monitor-pods --clusterrole=monitor-pods --serviceaccount=example-monitor-pods:monitor-pods-acc
 ```
 
-### Install shell-operator in a cluster
+### Install Shell-operator in a cluster
 
 Shell-operator can be deployed as a Pod. Put this manifest into the `shell-operator-pod.yaml` file:
 
@@ -115,13 +113,13 @@ spec:
   serviceAccountName: monitor-pods-acc
 ```
 
-Start shell-operator by applying a `shell-operator-pod.yaml` file:
+Start Shell-operator by applying a `shell-operator-pod.yaml` file:
 
 ```shell
 kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
 ```
 
-### It works!
+### It all comes together
 
 Let's deploy a [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) to trigger  `kubernetes` binding defined in our hook:
 
@@ -129,7 +127,7 @@ Let's deploy a [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-ap
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
 ```
 
-Now run `kubectl -n example-monitor-pods logs po/shell-operator` and see that the hook will print dashboard pod name:
+Now run `kubectl -n example-monitor-pods logs po/shell-operator` and observe that the hook will print dashboard pod name:
 
 ```plain
 ...
@@ -142,11 +140,11 @@ INFO[0030] Hook executed successfully                    binding=kubernetes hook
 
 > *Note:* hook output is logged with output=stdout label.
 
-To cleanup a cluster, delete namespace and RBAC objects:
+To clean up a cluster, delete namespace and RBAC objects:
 
 ```shell
-kubectl delete ns example-monitor-pods &&
-kubectl delete clusterrole monitor-pods &&
+kubectl delete ns example-monitor-pods
+kubectl delete clusterrole monitor-pods
 kubectl delete clusterrolebinding monitor-pods
 ```
 
@@ -156,7 +154,7 @@ This example is also available in /examples: [monitor-pods](examples/101-monitor
 
 Every hook should respond with JSON or YAML configuration of bindings when executed with `--config` flag.
 
-__kubernetes__
+### kubernetes
 
 This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) expression to filter their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#kubernetes).
 
@@ -178,7 +176,7 @@ Example of JSON output from `hook --config`:
 
 > Note: it is possible to watch Custom Defined Resources, just use proper values for `apiVersion` and `kind` fields.
 
-__onStartup__
+### onStartup
 
 This binding has only one parameter: order of execution. Hooks are loaded at the start and then hooks with onStartup binding are executed in the order defined by parameter. Read more about `onStartup` bindings [here](HOOKS.md#onstartup).
 
@@ -189,9 +187,9 @@ configVersion: v1
 onStartup: 10
 ```
 
-__schedule__
+### schedule
 
-This binding is for the periodical running of hooks. A schedule can be defined with a granularity of seconds. Read more about `schedule` bindings [here](HOOKS.md#schedule).
+This binding is used to execute hooks periodically. A schedule can be defined with a granularity of seconds. Read more about `schedule` bindings [here](HOOKS.md#schedule).
 
 Example `hook --config` with 2 schedules:
 
@@ -206,10 +204,9 @@ schedule:
   queue: mondays
 ```
 
-
 ## Prometheus target
 
-Shell-operator provides `/metrics` endpoint. More on this in [METRICS](METRICS.md) document.
+Shell-operator provides a `/metrics` endpoint. More on this in [METRICS](METRICS.md) document.
 
 ## Examples
 
