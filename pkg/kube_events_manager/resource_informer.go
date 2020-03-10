@@ -3,6 +3,7 @@ package kube_events_manager
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -38,6 +39,7 @@ type resourceInformer struct {
 	Name string
 
 	CachedObjects  map[string]*ObjectAndFilterResult
+	cacheLock      sync.RWMutex
 	SharedInformer cache.SharedInformer
 
 	GroupVersionResource schema.GroupVersionResource
@@ -55,6 +57,7 @@ var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 	informer := &resourceInformer{
 		Monitor:       monitor,
 		CachedObjects: make(map[string]*ObjectAndFilterResult, 0),
+		cacheLock:     sync.RWMutex{},
 	}
 	return informer
 }
@@ -136,6 +139,8 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 
 // TODO we need locks between HandleEvent and GetExistedObjects
 func (ei *resourceInformer) GetExistedObjects() []ObjectAndFilterResult {
+	ei.cacheLock.RLock()
+	defer ei.cacheLock.RUnlock()
 	res := make([]ObjectAndFilterResult, 0)
 	for _, obj := range ei.CachedObjects {
 		res = append(res, *obj)
@@ -179,6 +184,8 @@ func (ei *resourceInformer) ListExistedObjects() error {
 	//log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
 	log.Debugf("%s: '%s' initial list: Got %d existing resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, len(objList.Items))
 
+	var filteredObjects = make(map[string]*ObjectAndFilterResult, 0)
+
 	for _, item := range objList.Items {
 		// copy loop var to avoid duplication of pointer
 		obj := item
@@ -187,7 +194,8 @@ func (ei *resourceInformer) ListExistedObjects() error {
 			return err
 		}
 		// save object to the cache
-		ei.CachedObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
+
+		filteredObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
 		log.Debugf("%s: initial list: '%s' is cached with checksum %s",
 			ei.Monitor.Metadata.DebugName,
@@ -195,12 +203,18 @@ func (ei *resourceInformer) ListExistedObjects() error {
 			objFilterRes.Metadata.Checksum)
 	}
 
+	ei.cacheLock.Lock()
+	defer ei.cacheLock.Unlock()
+	for k, v := range filteredObjects {
+		ei.CachedObjects[k] = v
+	}
+
 	return nil
 }
 
 // HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
-// TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modifed is enough)
+// TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 //func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eventType WatchEventType) {
 	resourceId := ResourceId(obj)
@@ -222,22 +236,29 @@ func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eve
 	case WatchEventAdded:
 		fallthrough
 	case WatchEventModified:
+		// Update object in cache
+		ei.cacheLock.Lock()
 		cachedObject, objectInCache := ei.CachedObjects[resourceId]
+		skipEvent := false
 		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
 			// update object in cache and do not send event
-			ei.CachedObjects[resourceId] = objFilterRes
 			log.Debugf("%s: %s %s: checksum is not changed, no KubeEvent",
 				ei.Monitor.Metadata.DebugName,
 				string(eventType),
 				resourceId,
 			)
+			skipEvent = true
+		}
+		ei.CachedObjects[resourceId] = objFilterRes
+		ei.cacheLock.Unlock()
+		if skipEvent {
 			return
 		}
-		// save new object and result
-		ei.CachedObjects[resourceId] = objFilterRes
 
 	case WatchEventDeleted:
+		ei.cacheLock.Lock()
 		delete(ei.CachedObjects, resourceId)
+		ei.cacheLock.Unlock()
 	}
 
 	// Fire KubeEvent only if needed.
