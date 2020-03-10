@@ -37,6 +37,7 @@ type BindingContextController struct {
 	ScheduleManager   schedulemanager.ScheduleManager
 	Context           context.Context
 	Cancel            context.CancelFunc
+	Timeout           time.Duration
 }
 
 func NewBindingContextController(config, initialState string) (*BindingContextController, error) {
@@ -51,6 +52,7 @@ func NewBindingContextController(config, initialState string) (*BindingContextCo
 		Controller:   NewStateController(),
 		Context:      ctx,
 		Cancel:       cancel,
+		Timeout:      3 * time.Second,
 	}, nil
 }
 
@@ -100,36 +102,27 @@ func (b *BindingContextController) Run() (string, error) {
 }
 
 func (b *BindingContextController) ChangeState(newState ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), b.Timeout)
 	defer cancel()
 
 	bindingContexts := make([]BindingContext, 0)
 
-	done := false
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		for _, state := range newState {
-			err := b.Controller.ChangeState(state)
-			if err != nil {
-				break
-			}
+	for _, state := range newState {
+		generatedEvents, err := b.Controller.ChangeState(state)
+		if err != nil {
+			return "", fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
 		}
-		done = true
-	}()
 
-	for {
-		select {
-		case ev := <-b.KubeEventsManager.Ch():
-			b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
-				bindingContexts = append(bindingContexts, info.BindingContext...)
-			})
-			continue
-		case <-ctx.Done():
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-		if done {
-			break
+		for receivedEvents := 0; receivedEvents < generatedEvents; receivedEvents++ {
+			select {
+			case ev := <-b.KubeEventsManager.Ch():
+				b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
+					bindingContexts = append(bindingContexts, info.BindingContext...)
+				})
+				continue
+			case <-ctx.Done():
+				return convertBindingContexts(bindingContexts)
+			}
 		}
 	}
 	return convertBindingContexts(bindingContexts)

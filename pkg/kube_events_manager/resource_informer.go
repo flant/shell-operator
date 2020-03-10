@@ -200,7 +200,7 @@ func (ei *resourceInformer) ListExistedObjects() error {
 
 // HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
-// TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modifed is enough)
+// TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 //func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eventType WatchEventType) {
 	resourceId := ResourceId(obj)

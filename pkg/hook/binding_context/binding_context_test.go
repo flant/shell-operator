@@ -132,7 +132,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				obj.Metadata.JqFilter = ".metadata.labels"
 				bc.Objects = append(bc.Objects, obj)
 
-				// object with jqfilter and with emoty result should have filterResult field
+				// object with jqfilter and with empty result should have filterResult field
 				obj = ObjectAndFilterResult{
 					Object: &unstructured.Unstructured{
 						Object: map[string]interface{}{

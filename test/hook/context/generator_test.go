@@ -4,22 +4,21 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	. "github.com/onsi/gomega"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 )
 
 func parseContexts(contexts string) []BindingContext {
-	parsedBindingContexts := []BindingContext{}
-	json.Unmarshal([]byte(contexts), &parsedBindingContexts)
+	var parsedBindingContexts []BindingContext
+	_ = json.Unmarshal([]byte(contexts), &parsedBindingContexts)
 	return parsedBindingContexts
 }
 
 func Test_BindingContextGenerator(t *testing.T) {
-	t.Run("Binding context generator test", func(t *testing.T) {
-		c, err := NewBindingContextController(`
+	g := NewWithT(t)
+
+	c, err := NewBindingContextController(`
 configVersion: v1
 kubernetes:
 - apiVersion: v1
@@ -44,20 +43,20 @@ kind: Pod
 metadata:
   name: pod2
 `)
-		assert.Equal(t, err, nil)
+	g.Expect(err).ShouldNot(HaveOccurred())
 
-		// Synchronization contexts
-		contexts, err := c.Run()
-		assert.Equal(t, err, nil)
+	// Synchronization contexts
+	contexts, err := c.Run()
+	g.Expect(err).ShouldNot(HaveOccurred())
 
-		parsedBindingContexts := parseContexts(contexts)
+	parsedBindingContexts := parseContexts(contexts)
 
-		assert.Equal(t, string(parsedBindingContexts[0].Type), "Synchronization")
-		assert.Equal(t, len(parsedBindingContexts[0].Objects), 2)
-		assert.Equal(t, len(parsedBindingContexts[0].Snapshots["selected_pods"]), 2)
+	g.Expect(string(parsedBindingContexts[0].Type)).To(Equal("Synchronization"))
+	g.Expect(parsedBindingContexts[0].Objects).To(HaveLen(2))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
-		// Object added
-		contexts, err = c.ChangeState(`
+	// Object added
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
@@ -76,14 +75,14 @@ metadata:
 spec:
   containers: []
 `)
-		assert.Equal(t, err, nil)
-		parsedBindingContexts = parseContexts(contexts)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts)
 
-		assert.Equal(t, string(parsedBindingContexts[0].WatchEvent), "Added")
-		assert.Equal(t, len(parsedBindingContexts[0].Snapshots["selected_pods"]), 3)
+	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Added"))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
-		// Object modified
-		contexts, err = c.ChangeState(`
+	// Object modified
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
@@ -103,14 +102,14 @@ spec:
   containers:
   - name: test
 `)
-		assert.Equal(t, err, nil)
-		parsedBindingContexts = parseContexts(contexts)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts)
 
-		assert.Equal(t, string(parsedBindingContexts[0].WatchEvent), "Modified")
-		assert.Equal(t, len(parsedBindingContexts[0].Snapshots["selected_pods"]), 3)
+	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Modified"))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
-		// Object deleted
-		contexts, err = c.ChangeState(`
+	// Object deleted
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
@@ -122,19 +121,18 @@ kind: Pod
 metadata:
   name: pod2
 `)
-		assert.Equal(t, err, nil)
-		parsedBindingContexts = parseContexts(contexts)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts)
 
-		assert.Equal(t, string(parsedBindingContexts[0].WatchEvent), "Deleted")
-		assert.Equal(t, len(parsedBindingContexts[0].Snapshots["selected_pods"]), 2)
+	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Deleted"))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
-		// Run schedule
-		contexts, err = c.RunSchedule("* * * * *")
-		assert.Equal(t, err, nil)
-		parsedBindingContexts = parseContexts(contexts)
+	// Run schedule
+	contexts, err = c.RunSchedule("* * * * *")
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts)
 
-		assert.Equal(t, len(parsedBindingContexts[0].Snapshots["selected_pods"]), 2)
-	})
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 }
 
 func Test_RegisterCRD(t *testing.T) {
