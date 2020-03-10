@@ -294,8 +294,8 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 				res.Status = "Success"
 			} else {
 				op.MetricStorage.SendCounter("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
-				t.IncrementFailureCount()
-				taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
+				t.UpdateFailureMessage(err.Error())
+				taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
 				res.Status = "Fail"
 			}
 		} else {
@@ -334,8 +334,8 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		if err != nil {
 			hookLabel := taskHook.SafeName()
 			op.MetricStorage.SendCounter("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
-			t.IncrementFailureCount()
-			taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount(), err)
+			t.UpdateFailureMessage(err.Error())
+			taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
 			res.Status = "Fail"
 		} else {
 			// return Synchronization tasks to add to the queue head.

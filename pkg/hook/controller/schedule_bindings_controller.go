@@ -19,7 +19,7 @@ type ScheduleBindingToCrontabLink struct {
 	QueueName        string
 }
 
-// KubernetesBindingsController handles kubernetes bindings for one hook.
+// ScheduleBindingsController handles schedule bindings for one hook.
 type ScheduleBindingsController interface {
 	WithScheduleBindings([]ScheduleConfig)
 	WithScheduleManager(schedule_manager.ScheduleManager)

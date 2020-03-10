@@ -17,6 +17,7 @@ type Task interface {
 	GetId() string
 	GetType() TaskType
 	IncrementFailureCount()
+	UpdateFailureMessage(msg string)
 	GetFailureCount() int
 	GetLogLabels() map[string]string
 	GetQueueName() string
@@ -25,11 +26,12 @@ type Task interface {
 }
 
 type BaseTask struct {
-	Id           string
-	Type         TaskType
-	LogLabels    map[string]string
-	FailureCount int // Failed executions count
-	QueueName    string
+	Id             string
+	Type           TaskType
+	LogLabels      map[string]string
+	FailureCount   int // Failed executions count
+	FailureMessage string
+	QueueName      string
 
 	Metadata interface{}
 }
@@ -87,11 +89,22 @@ func (t *BaseTask) IncrementFailureCount() {
 	t.FailureCount++
 }
 
+func (t *BaseTask) UpdateFailureMessage(msg string) {
+	t.FailureMessage = msg
+}
+
 func (t *BaseTask) GetDescription() string {
 	metaDescription := ""
 	if descriptor, ok := t.Metadata.(MetadataDescriptable); ok {
 		metaDescription = ":" + descriptor.GetDescription()
 	}
+	failDescription := ""
+	if t.FailureCount > 0 {
+		failDescription = fmt.Sprintf(":failures %d", t.FailureCount)
+		if t.FailureMessage != "" {
+			failDescription += ":" + t.FailureMessage
+		}
+	}
 
-	return fmt.Sprintf("%s:%s%s", t.GetType(), t.GetQueueName(), metaDescription)
+	return fmt.Sprintf("%s:%s%s%s", t.GetType(), t.GetQueueName(), metaDescription, failDescription)
 }
