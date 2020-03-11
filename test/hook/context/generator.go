@@ -41,7 +41,7 @@ type BindingContextController struct {
 }
 
 func NewBindingContextController(config, initialState string) (*BindingContextController, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 
 	FakeCluster = fake.NewFakeCluster()
 
@@ -52,7 +52,7 @@ func NewBindingContextController(config, initialState string) (*BindingContextCo
 		Controller:   NewStateController(),
 		Context:      ctx,
 		Cancel:       cancel,
-		Timeout:      3 * time.Second,
+		Timeout:      1500 * time.Millisecond,
 	}, nil
 }
 
