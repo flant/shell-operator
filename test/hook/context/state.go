@@ -43,14 +43,15 @@ func (c *StateController) SetInitialState(initialState string) error {
 }
 
 // ChangeState apply changes to current objects state
-func (c *StateController) ChangeState(newRawState string) error {
+func (c *StateController) ChangeState(newRawState string) (int, error) {
 	newManifests, err := manifest.GetManifestListFromYamlDocuments(newRawState)
 	if err != nil {
-		return fmt.Errorf("error while changing state: %v", err)
+		return 0, fmt.Errorf("error while changing state: %v", err)
 	}
 
 	var newState = make(map[string]manifest.Manifest)
 
+	generatedEvents := 0
 	// Create new objects in FakeCluster
 	for _, m := range newManifests {
 		// save manifest to new State
@@ -62,17 +63,19 @@ func (c *StateController) ChangeState(newRawState string) error {
 			err = FakeCluster.Create(defaultNamespace, m)
 			//err := createObject(newStateObject, newUnstructuredObject)
 			if err != nil {
-				return err
+				return generatedEvents, err
 			}
 			c.CurrentState[m.Id()] = m
+			generatedEvents++
 		} else {
 			// Update object if changed
 			if !reflect.DeepEqual(currM, m) {
 				err := FakeCluster.Update(defaultNamespace, m)
 				if err != nil {
-					return err
+					return generatedEvents, err
 				}
 				c.CurrentState[m.Id()] = m
+				generatedEvents++
 			}
 		}
 	}
@@ -82,10 +85,11 @@ func (c *StateController) ChangeState(newRawState string) error {
 			// Delete object
 			err := FakeCluster.Delete(defaultNamespace, currM)
 			if err != nil {
-				return err
+				return generatedEvents, err
 			}
 			delete(c.CurrentState, currId)
+			generatedEvents++
 		}
 	}
-	return nil
+	return generatedEvents, nil
 }

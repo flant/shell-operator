@@ -47,7 +47,7 @@ func sigChildHandler(notifications chan os.Signal) {
 			 *  Notifications channel full - drop it to the
 			 *  floor. This ensures we don't fill up the SIGCHLD
 			 *  queue. The reaper just waits for any child
-			 *  process (pid=-1), so we ain't loosing it!! ;^)
+			 *  process (pid=-1), so we ain't losing it!! ;^)
 			 */
 		}
 	}

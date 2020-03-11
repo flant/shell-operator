@@ -33,7 +33,7 @@ func NewFakeCluster() *FakeCluster {
 		panic("couldn't convert Discovery() to *FakeDiscovery")
 	}
 	fc.Discovery.FakedServerVersion = &version.Info{GitCommit: "v1.17.0"}
-	fc.Discovery.Resources = FakeClusterResources
+	fc.Discovery.Resources = ClusterResources()
 
 	return fc
 }

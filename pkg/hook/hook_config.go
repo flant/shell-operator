@@ -497,7 +497,7 @@ func (c *HookConfig) MonitorDebugName(configName string, configIndex int) string
 	}
 }
 
-// TODO uuid is not a good choise here. Make it more readable.
+// TODO uuid is not a good choice here. Make it more readable.
 func (c *HookConfig) MonitorConfigId() string {
 	return uuid.NewV4().String()
 	//ei.DebugName = uuid.NewV4().String()
@@ -507,7 +507,7 @@ func (c *HookConfig) MonitorConfigId() string {
 	//return ei.DebugName
 }
 
-// TODO uuid is not a good choise here. Make it more readable.
+// TODO uuid is not a good choice here. Make it more readable.
 func (c *HookConfig) ScheduleId() string {
 	return uuid.NewV4().String()
 }
