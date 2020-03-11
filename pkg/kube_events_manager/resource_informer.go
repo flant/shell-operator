@@ -262,7 +262,7 @@ func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eve
 	}
 
 	// Fire KubeEvent only if needed.
-	if ei.ShouldHandleEvent(eventType) {
+	if ei.ShouldFireEvent(eventType) {
 		log.Debugf("%s: %s %s: send KubeEvent",
 			ei.Monitor.Metadata.DebugName,
 			string(eventType),
@@ -311,7 +311,7 @@ func (ei *resourceInformer) adjustFieldSelector(selector *FieldSelector, objName
 	return selectorCopy
 }
 
-func (ei *resourceInformer) ShouldHandleEvent(checkEvent WatchEventType) bool {
+func (ei *resourceInformer) ShouldFireEvent(checkEvent WatchEventType) bool {
 	for _, event := range ei.Monitor.EventTypes {
 		if event == checkEvent {
 			return true

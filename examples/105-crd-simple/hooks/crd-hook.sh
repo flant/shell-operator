@@ -7,7 +7,7 @@ if [[ $1 == "--config" ]] ; then
   "kubernetes":[{
     "apiVersion": "stable.example.com/v1",
     "kind": "Crontab",
-    "watchEvent":["Added"]
+    "executeHookOnEvent":["Added"]
   }]
 }
 EOF

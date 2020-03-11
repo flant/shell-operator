@@ -29,7 +29,7 @@ type MonitorConfig struct {
 }
 
 func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
-	if types == nil || len(types) == 0 {
+	if types == nil {
 		c.EventTypes = []WatchEventType{
 			WatchEventAdded,
 			WatchEventModified,
@@ -48,7 +48,7 @@ func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
 func (c *MonitorConfig) WithNameSelector(nSel *NameSelector) {
 	if nSel != nil {
 		c.NameSelector = &NameSelector{
-			nSel.MatchNames,
+			MatchNames: nSel.MatchNames,
 		}
 	}
 }
@@ -59,13 +59,13 @@ func (c *MonitorConfig) WithNamespaceSelector(nsSel *NamespaceSelector) {
 		c.NamespaceSelector = &NamespaceSelector{}
 		if nsSel.NameSelector != nil {
 			c.NamespaceSelector.NameSelector = &NameSelector{
-				nsSel.NameSelector.MatchNames,
+				MatchNames: nsSel.NameSelector.MatchNames,
 			}
 		}
 		if nsSel.LabelSelector != nil {
 			c.NamespaceSelector.LabelSelector = &metav1.LabelSelector{
-				nsSel.LabelSelector.MatchLabels,
-				nsSel.LabelSelector.MatchExpressions,
+				MatchLabels:      nsSel.LabelSelector.MatchLabels,
+				MatchExpressions: nsSel.LabelSelector.MatchExpressions,
 			}
 		}
 	}
@@ -75,7 +75,7 @@ func (c *MonitorConfig) WithNamespaceSelector(nsSel *NamespaceSelector) {
 func (c *MonitorConfig) WithFieldSelector(fieldSel *FieldSelector) {
 	if fieldSel != nil {
 		c.FieldSelector = &FieldSelector{
-			fieldSel.MatchExpressions,
+			MatchExpressions: fieldSel.MatchExpressions,
 		}
 	}
 }
@@ -83,7 +83,7 @@ func (c *MonitorConfig) WithFieldSelector(fieldSel *FieldSelector) {
 func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, value string) {
 	if c.FieldSelector == nil {
 		c.FieldSelector = &FieldSelector{
-			[]FieldSelectorRequirement{},
+			MatchExpressions: []FieldSelectorRequirement{},
 		}
 	}
 	if c.FieldSelector.MatchExpressions == nil {
@@ -91,9 +91,9 @@ func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, val
 	}
 
 	req := FieldSelectorRequirement{
-		field,
-		op,
-		value,
+		Field:    field,
+		Operator: op,
+		Value:    value,
 	}
 
 	c.FieldSelector.MatchExpressions = append(c.FieldSelector.MatchExpressions, req)
@@ -103,8 +103,8 @@ func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, val
 func (c *MonitorConfig) WithLabelSelector(labelSel *metav1.LabelSelector) {
 	if labelSel != nil {
 		c.LabelSelector = &metav1.LabelSelector{
-			labelSel.MatchLabels,
-			labelSel.MatchExpressions,
+			MatchLabels:      labelSel.MatchLabels,
+			MatchExpressions: labelSel.MatchExpressions,
 		}
 	}
 }
