@@ -4,7 +4,7 @@ Example of a hook written as bash script.
 
 ### run
 
-Build shell-operator image with custom scripts:
+Build Shell-operator image with custom scripts:
 
 ```
 docker build -t "registry.mycompany.com/shell-operator:startup-shell" .

@@ -1,12 +1,12 @@
-# Running shell-operator
+# Running Shell-operator
 
 ## Configuration
 
 ### Run in a cluster
 
-- Build image from flant/shell-operator:v1.0.0-beta.7, copy your hooks in /hooks directory,
-- Apply RBAC manifests,
-- Apply Pod or Deployment manifest with built image.
+- Build an image from flant/shell-operator:v1.0.0-beta.7, copy your hooks to `/hooks` directory.
+- Apply RBAC manifests.
+- Apply Pod or Deployment manifest with the built image.
 
 More detailed explanation is available in [README](README.md#quickstart), also see [examples](/examples).
 
@@ -22,7 +22,7 @@ It is not recommended for production but can be useful while debugging hooks. A 
 # Start local cluster
 kind create cluster
 
-# Start shell-operator from outside the cluster
+# Start Shell-operator from outside the cluster
 shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type color
 
 ```
