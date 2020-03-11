@@ -83,6 +83,7 @@ type KubeNamespaceSelectorV0 struct {
 type OnKubernetesEventConfigV1 struct {
 	Name                    string                   `json:"name,omitempty"`
 	WatchEventTypes         []WatchEventType         `json:"watchEvent,omitempty"`
+	ExecuteHookOnEvents     []WatchEventType         `json:"executeHookOnEvent,omitempty"`
 	Mode                    KubeEventMode            `json:"mode,omitempty"`
 	ApiVersion              string                   `json:"apiVersion,omitempty"`
 	Kind                    string                   `json:"kind,omitempty"`
@@ -265,7 +266,6 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		monitor.Metadata.DebugName = c.MonitorDebugName(kubeCfg.Name, i)
 		monitor.Metadata.MonitorId = c.MonitorConfigId()
 		monitor.Metadata.LogLabels = map[string]string{}
-		monitor.WithEventTypes(kubeCfg.WatchEventTypes)
 		monitor.WithMode(kubeCfg.Mode)
 		monitor.ApiVersion = kubeCfg.ApiVersion
 		monitor.Kind = kubeCfg.Kind
@@ -274,6 +274,16 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		monitor.WithNamespaceSelector((*NamespaceSelector)(kubeCfg.Namespace))
 		monitor.WithLabelSelector(kubeCfg.LabelSelector)
 		monitor.JqFilter = kubeCfg.JqFilter
+		// executeHookOnEvent is a priority
+		if kubeCfg.ExecuteHookOnEvents != nil {
+			monitor.WithEventTypes(kubeCfg.ExecuteHookOnEvents)
+		} else {
+			if kubeCfg.WatchEventTypes != nil {
+				monitor.WithEventTypes(kubeCfg.WatchEventTypes)
+			} else {
+				monitor.WithEventTypes(nil)
+			}
+		}
 
 		kubeConfig := OnKubernetesEventConfig{}
 		kubeConfig.Monitor = monitor

@@ -140,9 +140,9 @@ Syntax:
       "name": "Monitor pods in cache tier",
       "apiVersion": "v1",
       "kind": "Pod",
-      "watchEvent": [ "Added", "Modified", "Deleted" ],
+      "executeHookOnEvent": [ "Added", "Modified", "Deleted" ],
       "nameSelector": {
-        "matchNames": ["pod-0", "pod-1"],
+        "matchNames": ["pod-0", "pod-1"]
       },
       "labelSelector": {
         "matchLabels": {
@@ -154,7 +154,7 @@ Syntax:
           {
             "key": "tier",
             "operator": "In",
-            "values": ["cache"],
+            "values": ["cache"]
           },
           ...
         ],
@@ -164,15 +164,15 @@ Syntax:
           {
             "field": "status.phase",
             "operator": "Equals",
-            "value": "Pending",
+            "value": "Pending"
           },
           ...
         ],
       },
       "namespace": {
         "nameSelector": {
-          "matchNames": ["somenamespace", "proj-production", proj-stage"],
-        }
+          "matchNames": ["somenamespace", "proj-production", "proj-stage"]
+        },
         "labelSelector": {
           "matchLabels": {
             "myLabel": "myLabelValue",
@@ -183,7 +183,7 @@ Syntax:
             {
               "key": "env",
               "operator": "In",
-              "values": ["production"],
+              "values": ["production"]
             },
             ...
           ],
@@ -191,8 +191,7 @@ Syntax:
       "jqFilter": ".metadata.labels",
       "includeSnapshotsFrom": ["Monitor pods in cache tier", "another-binding-name", ...],
       "allowFailure": true|false,
-      "queue": "cache-pods",
-
+      "queue": "cache-pods"
     },
     {"name":"monitor Pods", "kind": "pod", ...},
     ...
@@ -217,7 +216,7 @@ Parameters:
   "kind": "ds"
   ```
 
-- `watchEvent` — the list of monitored events (Added, Modified, Deleted). By default, all events will be monitored. Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta).
+- `executeHookOnEvent` — the list of events which led to a hook's execution. By default, all events are used to execute a hook: "Added", "Modified" and "Deleted". Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta). Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.
 
 - `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of a specified Kind are monitored.
 
@@ -248,7 +247,7 @@ kubernetes:
 # Trigger on labels changes of Pods with myLabel:myLabelValue in any namespace
 - name: "label-changes-of-mylabel-pods"
   kind: pod
-  watchEvent: ["Modified"]
+  executeHookOnEvent: ["Modified"]
   labelSelector:
     matchLabels:
       myLabel: "myLabelValue"
@@ -338,7 +337,7 @@ Temporary files have unique names to prevent collisions between queues and are d
 There are some extra fields for `kubernetes`-type events:
 
 - `type` - "Synchronization" or "Event". "Synchronization" binding context contains all objects that match selectors in a hook's configuration. "Event" binding context contains a watch event type, an event related object and a jq filter result.
-- `watchEvent` — the possible value is one of the values you can pass in `watchEvent` binding parameter: “Added”, “Modified” or “Deleted”. This value is set if the `type` field is set to "Event".
+- `watchEvent` — the possible value is one of the values you can pass in `executeHookOnEvent` binding parameter: “Added”, “Modified” or “Deleted”. This value is set if the `type` field is set to "Event".
 - `object` — the whole object related to the event. It contains an exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta) response, so it's the object state **at the moment of the event** (not at the moment of the hook execution).
 - `filterResult` — the result of `jq` execution with specified `jqFilter` on the abovementioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
 - `objects` — a list of existing objects that match selectors. Each item of this list contains `object` and `filterResult` fields. If the list is empty, the value of `objects` is an empty array.

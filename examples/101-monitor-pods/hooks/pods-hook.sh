@@ -2,14 +2,12 @@
 
 if [[ $1 == "--config" ]] ; then
   cat <<EOF
-{
-  "configVersion":"v1",
-  "kubernetes":[{
-    "apiVersion": "v1",
-    "kind": "Pod",
-    "watchEvent":["Added"]
-  }]
-}
+configVersion: v1
+kubernetes:
+- apiVersion: v1
+  kind: Pod
+  executeHookOnEvent:
+  - Added
 EOF
 else
   type=$(jq -r '.[0].type' $BINDING_CONTEXT_PATH)

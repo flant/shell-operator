@@ -109,6 +109,17 @@ properties:
       additionalProperties: false
       required:
       - kind
+      patternProperties:
+        "^(watchEvent|executeHookOnEvent)$":
+          type: array
+          additionalItems: false
+          minItems: 0
+          items:
+            type: string
+            enum:
+            - Added
+            - Modified
+            - Deleted
       properties:
         name:
           type: string
@@ -116,16 +127,6 @@ properties:
           type: string
         kind:
           type: string
-        watchEvent:
-          type: array
-          additionalItems: false
-          minItems: 1
-          items:
-            type: string
-            enum:
-            - Added
-            - Modified
-            - Deleted
         includeSnapshotsFrom:
           type: array
           additionalItems: false

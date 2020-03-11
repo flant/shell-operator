@@ -50,7 +50,7 @@ configVersion: v1
 kubernetes":
 - apiVersion: v1
   kind: Pod
-  watchEvent: ["Added"]
+  executeHookOnEvent: ["Added"]
 EOF
 else
   podName=$(jq -r .[0].object.metadata.name $BINDING_CONTEXT_PATH)
@@ -167,7 +167,7 @@ Example of JSON output from `hook --config`:
     {
       "name":"Execute on changes of namespace labels",
       "kind": "namespace",
-      "watchEvent":["Modified"],
+      "executeHookOnEvent":["Modified"],
       "jqFilter":".metadata.labels"
     }
   ]

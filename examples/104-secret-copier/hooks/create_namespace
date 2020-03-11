@@ -8,8 +8,9 @@ hook::config() {
   "configVersion":"v1",
   "kubernetes": [
     {
+      "apiVersion": "v1",
       "kind": "namespace",
-      "watchEvent": [
+      "executeHookOnEvent": [
         "Added"
       ]
     }

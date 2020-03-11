@@ -432,6 +432,83 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
 			},
 		},
 		{
+			"watch event is empty array",
+			`{
+              "configVersion":"v1",
+              "kubernetes":[
+                {
+                  "apiVersion":"v1",
+                  "kind":"Pod",
+                  "watchEvent":[]
+                }
+              ]
+            }`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].WatchEventTypes).ShouldNot(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).Should(HaveLen(0))
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).ShouldNot(BeNil())
+			},
+		},
+		{
+			"executeHookOnEvent is array",
+			`{
+              "configVersion":"v1",
+              "kubernetes":[
+                {
+                  "apiVersion":"v1",
+                  "kind":"Pod",
+                  "executeHookOnEvent":["Added", "Modified"]
+                }
+              ]
+            }`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].WatchEventTypes).Should(BeNil())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].ExecuteHookOnEvents).ShouldNot(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).Should(HaveLen(2))
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).ShouldNot(BeNil())
+			},
+		},
+		{
+			"executeHookOnEvent is empty array",
+			`{
+              "configVersion":"v1",
+              "kubernetes":[
+                {
+                  "apiVersion":"v1",
+                  "kind":"Pod",
+                  "executeHookOnEvent":[]
+                }
+              ]
+            }`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].WatchEventTypes).Should(BeNil())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].ExecuteHookOnEvents).ShouldNot(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).Should(HaveLen(0))
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).ShouldNot(BeNil())
+			},
+		},
+		{
+			"no watch event or executeHookOnEvent",
+			`{
+              "configVersion":"v1",
+              "kubernetes":[
+                {
+                  "apiVersion":"v1",
+                  "kind":"Pod"
+                }
+              ]
+            }`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].WatchEventTypes).Should(BeNil())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].ExecuteHookOnEvents).Should(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).Should(HaveLen(3))
+			},
+		},
+		{
 			"bad watch event",
 			`{
               "configVersion":"v1",

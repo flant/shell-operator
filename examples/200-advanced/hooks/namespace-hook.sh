@@ -8,13 +8,15 @@ if [[ $1 == "--config" ]] ; then
   "kubernetes": [
     {
       "name":"OnCreateDeleteNamespace",
+      "apiVersion": "v1",
       "kind": "namespace",
-      "watchEvent":["Added", "Deleted"]
+      "executeHookOnEvent":["Added", "Deleted"]
     },
     {
       "name": "OnModifiedNamespace",
+      "apiVersion": "v1",
       "kind": "namespace",
-      "watchEvent": ["Modified"],
+      "executeHookOnEvent": ["Modified"],
       "jqFilter": ".metadata.labels"
   }
 ]}

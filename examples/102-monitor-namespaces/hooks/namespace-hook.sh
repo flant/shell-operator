@@ -2,21 +2,20 @@
 
 if [[ $1 == "--config" ]] ; then
   cat <<EOF
-{
-  "configVersion":"v1",
-  "kubernetes":[
-  {
-    "name":"OnCreateDeleteNamespace",
-    "kind": "namespace",
-    "watchEvent":["Added", "Deleted"]
-  },
-  {
-    "name":"OnModifiedNamespace",
-    "kind": "namespace",
-    "watchEvent":["Modified"],
-    "jqFilter": ".metadata.labels"
-  }
-]}
+configVersion: v1
+kubernetes:
+- name: OnCreateDeleteNamespace
+  apiVersion: v1
+  kind: Namespace
+  executeHookOnEvent:
+  - Added
+  - Deleted
+- name: OnModifiedNamespace
+  apiVersion: v1
+  kind: Namespace
+  executeHookOnEvent:
+  - Modified
+  jqFilter: ".metadata.labels"
 EOF
 else
   # ignore Synchronization for simplicity
