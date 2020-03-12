@@ -22,6 +22,7 @@ type Task interface {
 	GetLogLabels() map[string]string
 	GetQueueName() string
 	GetMetadata() interface{}
+	UpdateMetadata(interface{})
 	GetDescription() string
 }
 
@@ -79,6 +80,10 @@ func (t *BaseTask) GetQueueName() string {
 
 func (t *BaseTask) GetMetadata() interface{} {
 	return t.Metadata
+}
+
+func (t *BaseTask) UpdateMetadata(meta interface{}) {
+	t.Metadata = meta
 }
 
 func (t *BaseTask) GetFailureCount() int {

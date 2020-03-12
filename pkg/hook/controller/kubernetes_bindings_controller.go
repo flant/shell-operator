@@ -21,6 +21,7 @@ type KubernetesBindingToMonitorLink struct {
 	AllowFailure     bool
 	JqFilter         string
 	QueueName        string
+	SkipKey          string
 }
 
 // KubernetesBindingsController handles kubernetes bindings for one hook.
@@ -85,6 +86,7 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 			AllowFailure:     config.AllowFailure,
 			JqFilter:         config.Monitor.JqFilter,
 			QueueName:        config.Queue,
+			SkipKey:          config.SkipKey,
 		}
 
 		// There is no Synchronization event for 'v0' binding configuration.
@@ -135,7 +137,7 @@ func (c *kubernetesBindingsController) HandleEvent(kubeEvent KubeEvent) BindingE
 		}
 	}
 
-	bindingContext := ConvertKubeEventToBindingContext(kubeEvent, link.BindingName, link.JqFilter, link.IncludeSnapshots)
+	bindingContext := ConvertKubeEventToBindingContext(kubeEvent, link)
 
 	return BindingExecutionInfo{
 		BindingContext:   bindingContext,
@@ -176,33 +178,35 @@ func (c *kubernetesBindingsController) Snapshots() map[string][]ObjectAndFilterR
 	return c.SnapshotsFrom(c.BindingNames()...)
 }
 
-func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, bindingName string, jqFilter string, includeSnapshots []string) []BindingContext {
+func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, link *KubernetesBindingToMonitorLink) []BindingContext {
 	bindingContexts := make([]BindingContext, 0)
 
 	switch kubeEvent.Type {
 	case TypeSynchronization:
 		bc := BindingContext{
-			Binding: bindingName,
+			Binding: link.BindingName,
 			Type:    kubeEvent.Type,
 			Objects: kubeEvent.Objects,
 		}
-		bc.Metadata.JqFilter = jqFilter
+		bc.Metadata.JqFilter = link.JqFilter
 		bc.Metadata.BindingType = OnKubernetesEvent
-		bc.Metadata.IncludeSnapshots = includeSnapshots
+		bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
+		bc.Metadata.SkipKey = link.SkipKey
 
 		bindingContexts = append(bindingContexts, bc)
 
 	case TypeEvent:
 		for _, kEvent := range kubeEvent.WatchEvents {
 			bc := BindingContext{
-				Binding:    bindingName,
+				Binding:    link.BindingName,
 				Type:       kubeEvent.Type,
 				WatchEvent: kEvent,
 				Objects:    kubeEvent.Objects,
 			}
-			bc.Metadata.JqFilter = jqFilter
+			bc.Metadata.JqFilter = link.JqFilter
 			bc.Metadata.BindingType = OnKubernetesEvent
-			bc.Metadata.IncludeSnapshots = includeSnapshots
+			bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
+			bc.Metadata.SkipKey = link.SkipKey
 
 			bindingContexts = append(bindingContexts, bc)
 		}
