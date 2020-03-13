@@ -33,7 +33,7 @@ RUN CGO_ENABLED=1 \
 # build final image
 FROM alpine:3.10
 RUN apk --no-cache add ca-certificates jq bash && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.13.5/bin/linux/amd64/kubectl -O /bin/kubectl && \
+    wget https://storage.googleapis.com/kubernetes-release/release/v1.17.4/bin/linux/amd64/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 ADD frameworks /
