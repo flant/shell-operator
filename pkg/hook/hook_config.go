@@ -60,6 +60,7 @@ type ScheduleConfigV1 struct {
 	AllowFailure         bool     `json:"allowFailure"`
 	IncludeSnapshotsFrom []string `json:"includeSnapshotsFrom"`
 	Queue                string   `json:"queue"`
+	SkipKey              string   `json:"skipKey,omitempty"`
 }
 
 // Legacy version of kubernetes event configuration
@@ -94,8 +95,9 @@ type OnKubernetesEventConfigV1 struct {
 	JqFilter                string                   `json:"jqFilter,omitempty"`
 	AllowFailure            bool                     `json:"allowFailure,omitempty"`
 	ResynchronizationPeriod string                   `json:"resynchronizationPeriod,omitempty"`
-	IncludeSnapshotsFrom    []string                 `json:"includeSnapshotsFrom"`
-	Queue                   string                   `json:"queue"`
+	IncludeSnapshotsFrom    []string                 `json:"includeSnapshotsFrom,omitempty"`
+	Queue                   string                   `json:"queue,omitempty"`
+	SkipKey                 string                   `json:"skipKey,omitempty"`
 }
 
 type KubeNameSelectorV1 NameSelector
@@ -299,6 +301,7 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		} else {
 			kubeConfig.Queue = kubeCfg.Queue
 		}
+		kubeConfig.SkipKey = kubeCfg.SkipKey
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}
@@ -407,6 +410,7 @@ func (c *HookConfig) ConvertScheduleV1(schV1 ScheduleConfigV1) (ScheduleConfig, 
 	} else {
 		res.Queue = schV1.Queue
 	}
+	res.SkipKey = schV1.SkipKey
 
 	return res, nil
 }

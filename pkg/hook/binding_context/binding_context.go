@@ -17,6 +17,7 @@ type BindingContext struct {
 		JqFilter            string
 		IncludeSnapshots    []string
 		IncludeAllSnapshots bool
+		SkipKey             string
 	}
 
 	// name of binding or kubeEventType if binding has no 'name' field

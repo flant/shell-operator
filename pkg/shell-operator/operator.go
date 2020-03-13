@@ -282,8 +282,12 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
 		taskLogEntry.Info("Execute hook")
 
-		taskHook := op.HookManager.GetHook(hookMeta.HookName)
+		newMeta := op.CombineBingingContextForHook(t)
+		if newMeta != nil {
+			t.UpdateMetadata(*newMeta)
+		}
 
+		taskHook := op.HookManager.GetHook(hookMeta.HookName)
 		err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
 		if err != nil {
 			hookLabel := taskHook.SafeName()
@@ -349,6 +353,75 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 	}
 
 	return res
+}
+
+func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata {
+	var hookMeta = HookMetadataAccessor(t)
+	var tasks = make([]task.Task, 0)
+	var hms = make([]HookMetadata, 0)
+	var stopIterate = false
+	op.TaskQueues.GetByName(t.GetQueueName()).Iterate(func(tsk task.Task) {
+		if stopIterate {
+			return
+		}
+		// ignore current task
+		if tsk.GetId() == t.GetId() {
+			return
+		}
+		hm := HookMetadataAccessor(tsk)
+		if hm.HookName != hookMeta.HookName {
+			stopIterate = true
+			return
+		}
+		tasks = append(tasks, tsk)
+		hms = append(hms, hm)
+	})
+
+	//
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	// Combine binding context and make a map to delete excess tasks
+	var combinedContext = make([]BindingContext, 0)
+	var tasksFilter = make(map[string]bool, 0)
+
+	combinedContext = append(combinedContext, hookMeta.BindingContext...)
+	// current task always remain in queue
+	tasksFilter[t.GetId()] = true
+	for i, hm := range hms {
+		combinedContext = append(combinedContext, hm.BindingContext...)
+		tasksFilter[tasks[i].GetId()] = false
+	}
+
+	// Delete tasks with false in tasksFilter map
+	op.TaskQueues.GetByName(t.GetQueueName()).Filter(func(tsk task.Task) bool {
+		if v, ok := tasksFilter[tsk.GetId()]; ok {
+			return v
+		}
+		return true
+	})
+
+	// TODO skipKey can be used to compact binding contexts when only snapshots are needed
+	//var compactedContext = make([]BindingContext, 0)
+	//for i:=0 ; i < len(combinedContext) ; i++ {
+	//	var shouldSkip = true
+	//	if i == len(combinedContext)-1 {
+	//		shouldSkip = false
+	//	} else if combinedContext[i].Metadata.SkipKey == "" {
+	//		shouldSkip = false
+	//	} else if combinedContext[i].Metadata.SkipKey != combinedContext[i+1].Metadata.SkipKey {
+	//		shouldSkip = false
+	//	}
+	//	if shouldSkip {
+	//		continue
+	//	} else {
+	//		compactedContext = append(compactedContext, combinedContext[i])
+	//	}
+	//}
+
+	hookMeta.WithBindingContext(combinedContext)
+	return &hookMeta
 }
 
 // PrepopulateMainQueue adds tasks to run hooks with OnStartup bindings
