@@ -46,7 +46,7 @@ type KubernetesClient interface {
 	Dynamic() dynamic.Interface
 
 	APIResourceList(apiVersion string) ([]*metav1.APIResourceList, error)
-	APIResource(apiVersion string, kind string) (metav1.APIResource, error)
+	APIResource(apiVersion string, kind string) (*metav1.APIResource, error)
 	GroupVersionResource(apiVersion string, kind string) (schema.GroupVersionResource, error)
 }
 
@@ -104,7 +104,7 @@ func (c *kubernetesClient) Init() error {
 	var err error
 	var config *rest.Config
 	var configType = "out-of-cluster"
-	var defaultNs = ""
+	var defaultNs string
 
 	// Try to load from kubeconfig in flags or from ~/.kube/config
 	config, defaultNs, outOfClusterErr := getOutOfClusterConfig(c.contextName, c.configPath)
@@ -248,10 +248,7 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 	if apiVersion == "" {
 		// Get all preferred resources.
 		// Can return errors if api controllers are not available.
-		lists, err = c.Discovery().ServerPreferredResources()
-		if err != nil {
-			return
-		}
+		return c.Discovery().ServerPreferredResources()
 	} else {
 		// Get only resources for desired group and version
 		gv, err := schema.ParseGroupVersion(apiVersion)
@@ -283,10 +280,11 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 //
 // NOTE that fetching with empty apiVersion can give errors if there are non-working
 // api controllers in cluster.
-func (c *kubernetesClient) APIResource(apiVersion string, kind string) (res metav1.APIResource, err error) {
+func (c *kubernetesClient) APIResource(apiVersion string, kind string) (res *metav1.APIResource, err error) {
 	lists, err := c.APIResourceList(apiVersion)
-	if err != nil {
-		return
+	if err != nil && len(lists) == 0 {
+		// apiVersion is defined and there is a ServerResourcesForGroupVersion error
+		return nil, err
 	}
 
 	for _, list := range lists {
@@ -300,13 +298,18 @@ func (c *kubernetesClient) APIResource(apiVersion string, kind string) (res meta
 				gv, _ := schema.ParseGroupVersion(list.GroupVersion)
 				resource.Group = gv.Group
 				resource.Version = gv.Version
-				return resource, nil
+				return &resource, nil
 			}
 		}
 	}
 
-	err = fmt.Errorf("apiVersion '%s', kind '%s' is not supported by cluster", apiVersion, kind)
-	return
+	// If resource is not found, append additional error, may be the custom API of the resource is not available.
+	additionalErr := ""
+	if err != nil {
+		additionalErr = fmt.Sprintf(", additional error: %s", err.Error())
+	}
+	err = fmt.Errorf("apiVersion '%s', kind '%s' is not supported by cluster%s", apiVersion, kind, additionalErr)
+	return nil, err
 }
 
 // GroupVersionResource returns a GroupVersionResource object to use with dynamic informer.
