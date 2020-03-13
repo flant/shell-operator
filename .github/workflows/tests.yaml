@@ -248,8 +248,9 @@ jobs:
 
       - name: Run unit tests
         run: |
-          go get -u github.com/ory/go-acc
-          go-acc -o $COVERAGE_DIR/coverage.out \
+          curl https://github.com/flant/go-acc/releases/download/v0.2.1/go-acc-2.1.0-linux-amd64 -Ls -O go-acc
+          chmod +x go-acc
+          ./go-acc -o $COVERAGE_DIR/coverage.out \
             github.com/flant/shell-operator/... -- -tags test -v
 
       - name: Upload coverage artifact

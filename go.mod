@@ -7,9 +7,9 @@ require (
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.3
-	github.com/go-openapi/strfmt v0.19.2
+	github.com/go-openapi/strfmt v0.19.3
 	github.com/go-openapi/swag v0.19.5
-	github.com/go-openapi/validate v0.19.3
+	github.com/go-openapi/validate v0.19.7
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/kennygrant/sanitize v1.2.4
@@ -31,7 +31,7 @@ require (
 )
 
 // replace github.com/go-openapi/validate => ../go-openapi-validate
-replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.4-0.20190926112101-38fbca4ac77f // branch: fix_in_body
+replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.4-0.20200313141509-0c0fba4d39e1 // branch: fix_in_body_0_19_7
 
 replace github.com/onsi/ginkgo v1.11.0 => github.com/flant/ginkgo v1.11.1-0.20200206071017-2216da3b016c // fix_coverage_combining
 
