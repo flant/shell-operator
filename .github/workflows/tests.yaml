@@ -248,7 +248,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          curl https://github.com/flant/go-acc/releases/download/v0.2.1/go-acc-2.1.0-linux-amd64 -Ls -O go-acc
+          curl https://github.com/flant/go-acc/releases/download/v0.2.1/go-acc-2.1.0-linux-amd64 -LSs -o go-acc
           chmod +x go-acc
           ./go-acc -o $COVERAGE_DIR/coverage.out \
             github.com/flant/shell-operator/... -- -tags test -v
