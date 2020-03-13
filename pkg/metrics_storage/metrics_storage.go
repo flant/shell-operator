@@ -77,7 +77,7 @@ type BaseMetric struct {
 
 func (metric *BaseMetric) LabelsNames() []string {
 	variableLabelNames := make([]string, 0)
-	for labelName, _ := range metric.Labels {
+	for labelName := range metric.Labels {
 		variableLabelNames = append(variableLabelNames, labelName)
 	}
 	return variableLabelNames
@@ -162,9 +162,7 @@ type MetricGaugeVec struct {
 
 func NewMetricGaugeVec(gauge *prometheus.GaugeVec, name string, labelNames []string) *MetricGaugeVec {
 	metricGaugeVec := &MetricGaugeVec{gauge, name, make([]string, 0)}
-	for _, labelName := range labelNames {
-		metricGaugeVec.LabelNames = append(metricGaugeVec.LabelNames, labelName)
-	}
+	metricGaugeVec.LabelNames = append(metricGaugeVec.LabelNames, labelNames...)
 	return metricGaugeVec
 }
 
@@ -176,9 +174,7 @@ type MetricCounterVec struct {
 
 func NewMetricCounterVec(counter *prometheus.CounterVec, name string, labelNames []string) *MetricCounterVec {
 	metricCounterVec := &MetricCounterVec{counter, name, make([]string, 0)}
-	for _, labelName := range labelNames {
-		metricCounterVec.LabelNames = append(metricCounterVec.LabelNames, labelName)
-	}
+	metricCounterVec.LabelNames = append(metricCounterVec.LabelNames, labelNames...)
 	return metricCounterVec
 }
 

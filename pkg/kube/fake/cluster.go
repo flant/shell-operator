@@ -41,7 +41,7 @@ func NewFakeCluster() *FakeCluster {
 func (fc *FakeCluster) CreateNs(ns string) {
 	nsObj := &corev1.Namespace{}
 	nsObj.Name = ns
-	fc.KubeClient.CoreV1().Namespaces().Create(nsObj)
+	_, _ = fc.KubeClient.CoreV1().Namespaces().Create(nsObj)
 }
 
 // RegisterCRD registers custom resources for the cluster

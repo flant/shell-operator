@@ -107,18 +107,13 @@ func (sm *scheduleManager) Remove(delEntry ScheduleEntry) {
 		sm.cron.Remove(sm.Entries[delEntry.Crontab].EntryID)
 		log.WithField("operator.component", "scheduleManager").Debugf("entry '%s' deleted", delEntry.Crontab)
 	}
-
-	return
 }
 
 func (sm *scheduleManager) Start() {
 	sm.cron.Start()
 	go func() {
-		select {
-		case <-sm.ctx.Done():
-			sm.cron.Stop()
-			return
-		}
+		<-sm.ctx.Done()
+		sm.cron.Stop()
 	}()
 }
 

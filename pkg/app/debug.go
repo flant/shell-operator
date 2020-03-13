@@ -22,7 +22,7 @@ func DefineDebugFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
 		StringVar(&DebugKeepTmpFiles)
 
 	// A command to show help about hidden debug-* flags
-	kpApp.Command("debug-options", "Show help for debug flags of a start command.").Hidden().PreAction(func(context *kingpin.ParseContext) error {
+	kpApp.Command("debug-options", "Show help for debug flags of a start command.").Hidden().PreAction(func(_ *kingpin.ParseContext) error {
 		context, err := kpApp.ParseContext([]string{"start"})
 		if err != nil {
 			return err

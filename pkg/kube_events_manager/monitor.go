@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 
 	"github.com/flant/shell-operator/pkg/kube"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
@@ -45,16 +44,14 @@ type monitor struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
-
-	l sync.Mutex
 }
 
 var NewMonitor = func() Monitor {
 	return &monitor{
 		ResourceInformers: make([]ResourceInformer, 0),
-		VaryingInformers:  make(map[string][]ResourceInformer, 0),
-		cancelForNs:       make(map[string]context.CancelFunc, 0),
-		staticNamespaces:  make(map[string]bool, 0),
+		VaryingInformers:  make(map[string][]ResourceInformer),
+		cancelForNs:       make(map[string]context.CancelFunc),
+		staticNamespaces:  make(map[string]bool),
 	}
 }
 
@@ -249,8 +246,6 @@ func (m *monitor) Start(parentCtx context.Context) {
 	if m.NamespaceInformer != nil {
 		go m.NamespaceInformer.Run(m.ctx.Done())
 	}
-
-	return
 }
 
 // Stop stops all informers

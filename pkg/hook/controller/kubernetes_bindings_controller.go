@@ -48,7 +48,6 @@ type kubernetesBindingsController struct {
 
 	// dependencies
 	kubeEventsManager kube_events_manager.KubeEventsManager
-	logEntry          *log.Entry
 }
 
 // kubernetesHooksController should implement the KubernetesHooksController

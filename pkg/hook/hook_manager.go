@@ -55,9 +55,9 @@ var _ HookManager = &hookManager{}
 
 func NewHookManager() *hookManager {
 	return &hookManager{
-		hooksByName:      make(map[string]*Hook, 0),
+		hooksByName:      make(map[string]*Hook),
 		hookNamesInOrder: make([]string, 0),
-		hooksInOrder:     make(map[BindingType][]*Hook, 0),
+		hooksInOrder:     make(map[BindingType][]*Hook),
 	}
 }
 
@@ -243,8 +243,6 @@ func (hm *hookManager) EnableScheduleBindings() {
 		h := hm.GetHook(hookName)
 		h.HookController.EnableScheduleBindings()
 	}
-
-	return
 }
 
 func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {

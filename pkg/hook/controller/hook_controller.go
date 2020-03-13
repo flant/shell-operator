@@ -133,25 +133,25 @@ func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 			createTasksFn(execInfo)
 		}
 	}
-	return
 }
 
 func (hc *hookController) HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo)) {
-	if hc.ScheduleController != nil {
-		infos := hc.ScheduleController.HandleEvent(crontab)
-		for _, info := range infos {
-			if createTasksFn != nil {
-				// Inject IncludeSnapshots to BindingContext
-				if hc.KubernetesController != nil && len(info.BindingContext) > 0 && len(info.IncludeSnapshots) > 0 {
-					newBc := info.BindingContext[0]
-					newBc.Snapshots = hc.KubernetesController.SnapshotsFrom(info.IncludeSnapshots...)
-					info.BindingContext[0] = newBc
-				}
-				createTasksFn(info)
-			}
-		}
+	if hc.ScheduleController == nil {
+		return
 	}
-	return
+	infos := hc.ScheduleController.HandleEvent(crontab)
+	if createTasksFn == nil {
+		return
+	}
+	for _, info := range infos {
+		// Inject IncludeSnapshots to BindingContext
+		if hc.KubernetesController != nil && len(info.BindingContext) > 0 && len(info.IncludeSnapshots) > 0 {
+			newBc := info.BindingContext[0]
+			newBc.Snapshots = hc.KubernetesController.SnapshotsFrom(info.IncludeSnapshots...)
+			info.BindingContext[0] = newBc
+		}
+		createTasksFn(info)
+	}
 }
 
 func (hc *hookController) StartMonitors() {
@@ -170,14 +170,12 @@ func (hc *hookController) EnableScheduleBindings() {
 	if hc.ScheduleController != nil {
 		hc.ScheduleController.EnableScheduleBindings()
 	}
-	return
 }
 
 func (hc *hookController) DisableScheduleBindings() {
 	if hc.ScheduleController != nil {
 		hc.ScheduleController.DisableScheduleBindings()
 	}
-	return
 }
 
 // KubernetesSnapshots returns all exited objects for all registered kubernetes bindings.

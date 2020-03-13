@@ -41,7 +41,7 @@ var _ KubeEventsManager = &kubeEventsManager{}
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
 var NewKubeEventsManager = func() *kubeEventsManager {
 	em := &kubeEventsManager{
-		Monitors:    make(map[string]Monitor, 0),
+		Monitors:    make(map[string]Monitor),
 		KubeEventCh: make(chan KubeEvent, 1),
 	}
 	return em

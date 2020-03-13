@@ -46,7 +46,7 @@ func (bc BindingContext) Map() map[string]interface{} {
 }
 
 func (bc BindingContext) MapV1() map[string]interface{} {
-	res := make(map[string]interface{}, 0)
+	res := make(map[string]interface{})
 	res["binding"] = bc.Binding
 
 	if bc.Metadata.BindingType == OnStartup {
@@ -98,7 +98,7 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 }
 
 func (bc BindingContext) MapV0() map[string]interface{} {
-	res := make(map[string]interface{}, 0)
+	res := make(map[string]interface{})
 	res["binding"] = bc.Binding
 	if bc.Metadata.BindingType != OnKubernetesEvent {
 		return res

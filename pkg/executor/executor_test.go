@@ -91,7 +91,6 @@ func Test_CmdRun_And_Reaper_PoC_Code(t *testing.T) {
 		exitCode = ws.ExitStatus()
 	}
 	log.Debugf("command result, stdout: %v, stderr: %v, exitCode: %v, echild: %v", stdout, stderr, exitCode, echild)
-	return
 }
 
 // Check that reaper and cmd.Run are locked.
@@ -160,16 +159,11 @@ func Test_Executor_Reaper_And_CmdRun_AreLocked(t *testing.T) {
 	counter := 0
 WAIT_LOOP:
 	for {
-		select {
-		case <-stopCh:
-			log.Info("Got stopCh")
-			counter++
-			if counter == 10 {
-				break WAIT_LOOP
-			}
-
+		<-stopCh
+		log.Info("Got stopCh")
+		counter++
+		if counter == 10 {
+			break WAIT_LOOP
 		}
 	}
-
-	return
 }

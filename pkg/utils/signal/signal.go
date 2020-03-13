@@ -30,20 +30,18 @@ func WaitForProcessInterruption(cb ...func()) {
 
 	signal.Notify(interruptCh, syscall.SIGINT, syscall.SIGTERM)
 	for {
-		select {
-		case sig := <-interruptCh:
-			allowedCount--
-			switch allowedCount {
-			case 0:
-				if len(cb) > 0 {
-					log.Infof("Grace shutdown by '%s' signal", sig.String())
-					cb[0]()
-				} else {
-					forcedExit(sig)
-				}
-			case -1:
+		sig := <-interruptCh
+		allowedCount--
+		switch allowedCount {
+		case 0:
+			if len(cb) > 0 {
+				log.Infof("Grace shutdown by '%s' signal", sig.String())
+				cb[0]()
+			} else {
 				forcedExit(sig)
 			}
+		case -1:
+			forcedExit(sig)
 		}
 	}
 }

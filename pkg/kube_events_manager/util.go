@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	. "github.com/flant/libjq-go"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -86,27 +85,6 @@ func execJq(jqFilter string, jsonData []byte) (stdout string, stderr string, err
 	stderr = strings.TrimSpace(stderrBuf.String())
 
 	return
-}
-
-// metaFromEventObject returns name and namespace from api object
-func metaFromEventObject(obj interface{}) (namespace string, name string, err error) {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		err = fmt.Errorf("get ns and name from Object: %s", err)
-		return
-	}
-	namespace = accessor.GetNamespace()
-	name = accessor.GetName()
-	return
-}
-
-func runtimeResourceId(obj interface{}, kind string) (string, error) {
-	namespace, name, err := metaFromEventObject(obj)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s/%s/%s", namespace, kind, name), nil
 }
 
 func ResourceId(obj *unstructured.Unstructured) string {

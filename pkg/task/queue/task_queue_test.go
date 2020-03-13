@@ -98,9 +98,7 @@ func Test_TasksQueue_Remove(t *testing.T) {
 	q.Remove("task_02")
 	g.Expect(q.Length()).To(Equal(4))
 
-	var idsDump string
-
-	idsDump = DumpTaskIds(q)
+	idsDump := DumpTaskIds(q)
 
 	g.Expect(idsDump).To(And(
 		ContainSubstring("task_00"),

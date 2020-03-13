@@ -19,7 +19,7 @@ type TaskQueueSet struct {
 
 func NewTaskQueueSet() *TaskQueueSet {
 	return &TaskQueueSet{
-		Queues: make(map[string]*TaskQueue, 0),
+		Queues: make(map[string]*TaskQueue),
 		m:      sync.Mutex{},
 	}
 }
