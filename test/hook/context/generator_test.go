@@ -150,17 +150,19 @@ kubernetes:
 
 	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
 
-	bindingContexts, err := c.Run()
-
-	g.Expect(err).ShouldNot(HaveOccurred())
-	g.Expect(bindingContexts).To(ContainSubstring("Synchronization"))
-
 	gvr, err := FakeCluster.FindGVR("my.crd.io/v1alpha1", "MyResource")
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(gvr).ShouldNot(BeNil())
 	g.Expect(gvr.Group).To(Equal("my.crd.io"))
 	g.Expect(gvr.GroupVersion().String()).To(Equal("my.crd.io/v1alpha1"))
 
+	// Synchronization phase
+	bindingContexts, err := c.Run()
+
+	g.Expect(err).ShouldNot(HaveOccurred())
+	g.Expect(bindingContexts).To(ContainSubstring("Synchronization"))
+
+	// Event phase
 	bindingContexts, err = c.ChangeState(`
 apiVersion: my.crd.io/v1alpha1
 kind: MyResource

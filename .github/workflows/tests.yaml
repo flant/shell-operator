@@ -248,12 +248,9 @@ jobs:
 
       - name: Run unit tests
         run: |
-          go test \
-            -tags test \
-            -coverpkg=./... \
-            -coverprofile=$COVERAGE_DIR/coverage.out  \
-            -v \
-            ./cmd/... ./pkg/... ./test/utils
+          go get -u github.com/ory/go-acc
+          go-acc -o $COVERAGE_DIR/coverage.out \
+            github.com/flant/shell-operator/... -- -tags test -v
 
       - name: Upload coverage artifact
         #if: (github.event_name == 'push' && github.event.ref == "refs/heads/master") || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
