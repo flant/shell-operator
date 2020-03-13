@@ -453,19 +453,19 @@ func (op *ShellOperator) RunMetrics() {
 
 func (op *ShellOperator) SetupDebugServerHandles() {
 	op.DebugServer.Router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
-		fmt.Fprintf(writer, "%s control endpoint is alive", app.AppName)
+		_, _ = fmt.Fprintf(writer, "%s control endpoint is alive", app.AppName)
 	})
 
 	op.DebugServer.Router.Get("/queue/list.{format:(json|yaml|text)}", func(writer http.ResponseWriter, request *http.Request) {
 		format := chi.URLParam(request, "format")
 		debug.GetLogEntry(request).Debugf("queue list using format %s", format)
-		writer.Write([]byte(dump.TaskQueueSetToText(op.TaskQueues)))
+		_, _ = writer.Write([]byte(dump.TaskQueueSetToText(op.TaskQueues)))
 	})
 }
 
 func (op *ShellOperator) SetupHttpServerHandles() {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		fmt.Fprintf(writer, `<html>
+		_, _ = fmt.Fprintf(writer, `<html>
     <head><title>Shell operator</title></head>
     <body>
     <h1>Shell operator</h1>
