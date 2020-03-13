@@ -45,6 +45,7 @@ jobs:
           - ubuntu
           - alpine3.9
           - alpine3.10
+          - alpine3.11
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev images' label
     steps:
@@ -67,6 +68,9 @@ jobs:
               ;;
             alpine3.10)
               dockerFile="Dockerfile-alpine3.10"
+              ;;
+            alpine3.11)
+              dockerFile="Dockerfile-alpine3.11"
               ;;
           esac
 
