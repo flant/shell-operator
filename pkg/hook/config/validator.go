@@ -1,16 +1,15 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 
-	openapierrors "github.com/go-openapi/errors"
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 	"github.com/hashicorp/go-multierror"
 )
 
+// See https://github.com/kubernetes/apiextensions-apiserver/blob/1bb376f70aa2c6f2dec9a8c7f05384adbfac7fbb/pkg/apiserver/validation/validation.go#L47
 func ValidateConfig(dataObj interface{}, s *spec.Schema, rootName string) (multiErr error) {
 	if s == nil {
 		return fmt.Errorf("validate config: schema is not provided")
@@ -24,31 +23,8 @@ func ValidateConfig(dataObj interface{}, s *spec.Schema, rootName string) (multi
 	}
 
 	var allErrs *multierror.Error
-
 	for _, err := range result.Errors {
-		switch err := err.(type) {
-		case *openapierrors.Validation:
-			switch err.Code() {
-			case openapierrors.RequiredFailCode:
-				allErrs = multierror.Append(allErrs, err)
-
-			case openapierrors.EnumFailCode:
-				values := []string{}
-				for _, allowedValue := range err.Values {
-					if s, ok := allowedValue.(string); ok {
-						values = append(values, s)
-					} else {
-						allowedJSON, _ := json.Marshal(allowedValue)
-						values = append(values, string(allowedJSON))
-					}
-				}
-				allErrs = multierror.Append(allErrs, err)
-			default:
-				allErrs = multierror.Append(allErrs, err)
-			}
-		default:
-			allErrs = multierror.Append(allErrs, err)
-		}
+		allErrs = multierror.Append(allErrs, err)
 	}
 	// NOTE: no validation errors, but config is not valid!
 	if allErrs.Len() == 0 {

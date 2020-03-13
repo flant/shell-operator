@@ -1,7 +1,6 @@
 package kube_events_manager
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -47,7 +46,8 @@ type resourceInformer struct {
 
 	eventCb func(KubeEvent)
 
-	ctx context.Context
+	// TODO resourceInformer should be stoppable (think of deleted namespaces and disabled modules in addon-operator)
+	//ctx context.Context
 }
 
 // resourceInformer should implement ResourceInformer
@@ -56,7 +56,7 @@ var _ ResourceInformer = &resourceInformer{}
 var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 	informer := &resourceInformer{
 		Monitor:       monitor,
-		CachedObjects: make(map[string]*ObjectAndFilterResult, 0),
+		CachedObjects: make(map[string]*ObjectAndFilterResult),
 		cacheLock:     sync.RWMutex{},
 	}
 	return informer
@@ -184,7 +184,7 @@ func (ei *resourceInformer) ListExistedObjects() error {
 	//log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
 	log.Debugf("%s: '%s' initial list: Got %d existing resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, len(objList.Items))
 
-	var filteredObjects = make(map[string]*ObjectAndFilterResult, 0)
+	var filteredObjects = make(map[string]*ObjectAndFilterResult)
 
 	for _, item := range objList.Items {
 		// copy loop var to avoid duplication of pointer
@@ -278,8 +278,6 @@ func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eve
 			Objects:     []ObjectAndFilterResult{*objFilterRes},
 		})
 	}
-
-	return
 }
 
 func (ei *resourceInformer) adjustFieldSelector(selector *FieldSelector, objName string) *FieldSelector {

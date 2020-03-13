@@ -37,9 +37,7 @@ func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
 		}
 	} else {
 		c.EventTypes = []WatchEventType{}
-		for _, eventType := range types {
-			c.EventTypes = append(c.EventTypes, eventType)
-		}
+		c.EventTypes = append(c.EventTypes, types...)
 	}
 	return c
 }

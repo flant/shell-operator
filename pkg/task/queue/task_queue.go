@@ -185,7 +185,6 @@ func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 	}
 
 	q.items = newItems
-	return
 }
 
 //
@@ -212,7 +211,6 @@ func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 	}
 
 	q.items = newItems
-	return
 }
 
 //func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
@@ -267,6 +265,9 @@ func (q *TaskQueue) Stop() {
 }
 
 func (q *TaskQueue) Start() {
+	if q.started {
+		return
+	}
 	go func() {
 		var sleepDelay time.Duration
 		for {
@@ -274,6 +275,7 @@ func (q *TaskQueue) Start() {
 			var t = q.waitForTask(sleepDelay)
 			if t == nil {
 				log.Debugf("queue %s: got nil task, stop queue", q.Name)
+				q.started = false
 				return
 			}
 
@@ -320,6 +322,7 @@ func (q *TaskQueue) Start() {
 			log.Debugf("queue %s: tasks after handle %s", q.Name, q.String())
 		}
 	}()
+	q.started = true
 }
 
 // waitForTask returns a task that can be processed or a nil if context is canceled.

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"io"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -77,7 +77,8 @@ func Test_klog_should_not_output_to_Stderr(t *testing.T) {
 	log.SetOutput(ioutil.Discard)
 
 	stderr := captureStderr(func() {
-		service.DoWithCallToKlogPoweredLib()
+		fmt.Fprintf(os.Stderr, "asdasdasd")
+		//service.DoWithCallToKlogPoweredLib()
 	})
 
 	g.Expect(stderr).ShouldNot(ContainSubstring("klog powered lib"))
@@ -101,16 +102,28 @@ func captureStderr(f func()) string {
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go func() {
-		var buf bytes.Buffer
+		var started = true
 		go func() {
 			f()
-			wg.Done()
+			started = false
 		}()
-		io.Copy(&buf, reader)
+
+		var buf bytes.Buffer
+		var b = make([]byte, 1024)
+		for {
+			n, err := reader.Read(b)
+			if n > 0 {
+				buf.Write(b[0:n])
+			}
+			if err != nil || n < len(b) || !started {
+				break
+			}
+		}
 		out = buf.String()
+
 		wg.Done()
 	}()
 	wg.Wait()
-	writer.Close()
+	_ = writer.Close()
 	return out
 }

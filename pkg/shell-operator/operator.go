@@ -384,7 +384,7 @@ func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata
 
 	// Combine binding context and make a map to delete excess tasks
 	var combinedContext = make([]BindingContext, 0)
-	var tasksFilter = make(map[string]bool, 0)
+	var tasksFilter = make(map[string]bool)
 
 	combinedContext = append(combinedContext, hookMeta.BindingContext...)
 	// current task always remain in queue
@@ -499,8 +499,6 @@ func (op *ShellOperator) InitAndStartHookQueues() {
 			}
 		}
 	}
-
-	return
 }
 
 func (op *ShellOperator) RunMetrics() {

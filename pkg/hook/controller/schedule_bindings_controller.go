@@ -111,5 +111,4 @@ func (c *scheduleBindingsController) DisableScheduleBindings() {
 		c.scheduleManager.Remove(config.ScheduleEntry)
 		delete(c.ScheduleLinks, config.ScheduleEntry.Id)
 	}
-	return
 }

@@ -599,6 +599,10 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
                       }
                     ]
                   }
+                },{
+                  "apiVersion":"v1",
+                  "kind":"Pod",
+                  "executeHookOnEvent": ["Added", "updated"]
                 }
               ]
             }`,

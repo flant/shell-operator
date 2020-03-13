@@ -13,7 +13,7 @@ func FindGvr(resources []*metav1.APIResourceList, apiVersion, kindOrName string)
 			continue
 		}
 		for _, apiResource := range apiResourceGroup.APIResources {
-			if strings.ToLower(apiResource.Kind) == strings.ToLower(kindOrName) || strings.ToLower(apiResource.Name) == strings.ToLower(kindOrName) {
+			if strings.EqualFold(apiResource.Kind, kindOrName) || strings.EqualFold(apiResource.Name, kindOrName) {
 				// ignore parse error, because FakeClusterResources should be valid
 				gv, _ := schema.ParseGroupVersion(apiResourceGroup.GroupVersion)
 				return &schema.GroupVersionResource{

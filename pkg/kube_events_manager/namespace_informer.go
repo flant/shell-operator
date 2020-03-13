@@ -36,7 +36,7 @@ var _ NamespaceInformer = &namespaceInformer{}
 var NewNamespaceInformer = func(monitor *MonitorConfig) NamespaceInformer {
 	informer := &namespaceInformer{
 		Monitor:        monitor,
-		ExistedObjects: make(map[string]bool, 0),
+		ExistedObjects: make(map[string]bool),
 	}
 	return informer
 }
@@ -109,5 +109,4 @@ func (ni *namespaceInformer) Run(stopCh <-chan struct{}) {
 }
 
 func (ni *namespaceInformer) Stop() {
-	return
 }
