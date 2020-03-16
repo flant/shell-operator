@@ -386,7 +386,7 @@ During startup, the hook will be executed with "Synchronization" binding context
     "objects": [
       {
         "object": {
-          "kind": "Pod,
+          "kind": "Pod",
           "metadata":{
             "name":"etcd-...",
             "namespace":"kube-system",
@@ -396,7 +396,7 @@ During startup, the hook will be executed with "Synchronization" binding context
       },
       {
         "object": {
-          "kind": "Pod,
+          "kind": "Pod",
           "metadata":{
             "name":"kube-proxy-...",
             "namespace":"kube-system",
