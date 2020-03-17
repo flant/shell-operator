@@ -4,10 +4,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/gomega"
 )
 
 func Test_Sort_ByNamespaceAndName(t *testing.T) {
+	g := NewWithT(t)
 	sorted := []string{
 		"main",
 		"asd",
@@ -16,7 +17,7 @@ func Test_Sort_ByNamespaceAndName(t *testing.T) {
 		"str",
 	}
 
-	assert.True(t, sort.IsSorted(AsQueueNames(sorted)))
+	g.Expect(sort.IsSorted(AsQueueNames(sorted))).To(BeTrue())
 
 	input := []string{
 		"str",
@@ -29,6 +30,6 @@ func Test_Sort_ByNamespaceAndName(t *testing.T) {
 	sort.Sort(AsQueueNames(input))
 
 	for i, s := range sorted {
-		assert.Equal(t, s, input[i], "input index %d", i)
+		g.Expect(input[i]).Should(Equal(s), "fail on 'input' index %d", i)
 	}
 }

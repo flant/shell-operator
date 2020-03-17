@@ -99,7 +99,7 @@ properties:
             type: string
         queue:
           type: string
-        skipKey:
+        group:
           type: string
   kubernetes:
     title: kubernetes event bindings
@@ -169,7 +169,7 @@ properties:
                     enum: ["=", "==", "Equals", "!=", "NotEquals"]
                   value:
                     type: string
-        skipKey:
+        group:
           type: string
         namespace:
           type: object

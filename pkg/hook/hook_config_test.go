@@ -372,6 +372,69 @@ schedule:
 				g.Expect(err).Should(HaveOccurred())
 			},
 		},
+		{
+			"v1 includeSnapshotsFrom for group",
+			`
+              configVersion: v1
+              schedule:
+              - crontab: "* * * * *"
+                group: pods
+              kubernetes:
+              - name: monitor_pods
+                apiVersion: v1
+                kind: Pod
+                group: pods
+              - name: monitor_configmaps
+                apiVersion: v1
+                kind: ConfigMap
+                group: pods
+            `,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				// Version
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+				// Sections
+				g.Expect(hookConfig.OnStartup).To(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(2))
+				g.Expect(hookConfig.Schedules).Should(HaveLen(1))
+
+				// Schedule binding should has includeSnapshotsFrom
+				s := hookConfig.Schedules[0]
+				//g.Expect(s.BindingName).To(Equal("each 1 min"))
+				g.Expect(s.Queue).To(Equal("main"))
+				g.Expect(s.IncludeSnapshotsFrom).Should(HaveLen(2))
+
+				kPods := hookConfig.OnKubernetesEvents[0]
+				g.Expect(kPods.IncludeSnapshotsFrom).Should(HaveLen(2))
+				kPods = hookConfig.OnKubernetesEvents[1]
+				g.Expect(kPods.IncludeSnapshotsFrom).Should(HaveLen(2))
+			},
+		},
+		{
+			"v1 kubernetes error on group and includeSnapshotsFrom",
+			`
+              configVersion: v1
+              schedule:
+              - crontab: "* * * * *"
+                group: pods
+                includeSnapshotsFrom:
+                - monitor_pods
+			  kubernetes:
+              - name: monitor_pods
+                apiVersion: v1
+                kind: Pod
+                group: pods
+              - name: monitor_configmaps
+                apiVersion: v1
+                kind: ConfigMap
+                group: pods`,
+			func() {
+				g.Expect(err).Should(HaveOccurred())
+			},
+		},
 	}
 
 	for _, test := range tests {

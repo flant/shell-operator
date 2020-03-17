@@ -176,3 +176,116 @@ func Test_CombineBindingContext_OneHook(t *testing.T) {
 	g.Expect(hm).Should(BeNil())
 	g.Expect(op.TaskQueues.GetByName("test_one_hook").Length()).Should(Equal(3))
 }
+
+func Test_CombineBindingContext_Group(t *testing.T) {
+	g := NewWithT(t)
+
+	op := NewShellOperator()
+	op.TaskQueues = queue.NewTaskQueueSet()
+	op.TaskQueues.WithContext(context.Background())
+	op.TaskQueues.NewNamedQueue("test_multiple_hooks", func(tsk task.Task) queue.TaskResult {
+		return queue.TaskResult{
+			Status: "Success",
+		}
+	})
+
+	var tasks = make([]task.Task, 0)
+
+	bcMeta := hook.BindingContext{}.Metadata
+	bcMeta.Group = "pods"
+
+	currTask := task.NewTask(HookRun).
+		WithQueueName("test_multiple_hooks").
+		WithMetadata(HookMetadata{
+			HookName: "hook1.sh",
+			BindingContext: []hook.BindingContext{
+				{
+					Metadata: bcMeta,
+					Binding:  "kubernetes",
+					Type:     TypeEvent,
+				},
+			},
+		})
+
+	tasks = append(tasks, currTask)
+
+	tasks = append(tasks, []task.Task{
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook1.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Metadata: bcMeta,
+						Binding:  "kubernetes",
+						Type:     TypeEvent,
+					},
+				},
+			}),
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook1.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Metadata: bcMeta,
+						Binding:  "schedule",
+					},
+				},
+			}),
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook1.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Binding: "kubernetes",
+						Type:    TypeEvent,
+					},
+				},
+			}),
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook2.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Binding: "kubernetes",
+						Type:    TypeEvent,
+					},
+				},
+			}),
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook2.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Binding: "kubernetes",
+						Type:    TypeEvent,
+					},
+				},
+			}),
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook1.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Binding: "kubernetes",
+						Type:    TypeEvent,
+					},
+				},
+			}),
+	}...)
+
+	//hm.BindingContext[0].Metadata.Group = "pods"
+
+	for _, tsk := range tasks {
+		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
+	}
+
+	hm := op.CombineBingingContextForHook(currTask)
+	g.Expect(hm.BindingContext).Should(HaveLen(2))
+	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(4))
+}

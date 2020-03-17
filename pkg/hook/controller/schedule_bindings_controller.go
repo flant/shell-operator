@@ -15,7 +15,7 @@ type ScheduleBindingToCrontabLink struct {
 	IncludeSnapshots []string
 	AllowFailure     bool
 	QueueName        string
-	SkipKey          string
+	Group            string
 }
 
 // ScheduleBindingsController handles schedule bindings for one hook.
@@ -77,13 +77,15 @@ func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecut
 			}
 			bc.Metadata.BindingType = Schedule
 			bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
-			bc.Metadata.SkipKey = link.SkipKey
+			bc.Metadata.Group = link.Group
 
 			info := BindingExecutionInfo{
 				BindingContext:   []BindingContext{bc},
 				IncludeSnapshots: link.IncludeSnapshots,
 				AllowFailure:     link.AllowFailure,
 				QueueName:        link.QueueName,
+				Binding:          link.BindingName,
+				Group:            link.Group,
 			}
 			res = append(res, info)
 		}
@@ -100,7 +102,7 @@ func (c *scheduleBindingsController) EnableScheduleBindings() {
 			IncludeSnapshots: config.IncludeSnapshotsFrom,
 			AllowFailure:     config.AllowFailure,
 			QueueName:        config.Queue,
-			SkipKey:          config.SkipKey,
+			Group:            config.Group,
 		}
 		c.scheduleManager.Add(config.ScheduleEntry)
 	}

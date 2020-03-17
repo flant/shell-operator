@@ -35,7 +35,7 @@ type ScheduleConfig struct {
 	ScheduleEntry        ScheduleEntry
 	IncludeSnapshotsFrom []string
 	Queue                string
-	SkipKey              string
+	Group                string
 }
 
 type OnKubernetesEventConfig struct {
@@ -43,5 +43,5 @@ type OnKubernetesEventConfig struct {
 	Monitor              *kube_events_manager.MonitorConfig
 	IncludeSnapshotsFrom []string
 	Queue                string
-	SkipKey              string
+	Group                string
 }

@@ -54,6 +54,7 @@ type TaskQueue struct {
 	Name     string
 	Handler  func(task.Task) TaskResult
 	HeadLock sync.Mutex
+	Status   string
 }
 
 func NewTasksQueue() *TaskQueue {
@@ -269,11 +270,13 @@ func (q *TaskQueue) Start() {
 		return
 	}
 	go func() {
+		q.Status = ""
 		var sleepDelay time.Duration
 		for {
 			log.Debugf("queue %s: wait for task, delay %d", q.Name, sleepDelay)
 			var t = q.waitForTask(sleepDelay)
 			if t == nil {
+				q.Status = "stop"
 				log.Debugf("queue %s: got nil task, stop queue", q.Name)
 				q.started = false
 				return
@@ -287,14 +290,16 @@ func (q *TaskQueue) Start() {
 			if q.Handler == nil {
 				continue
 			}
-
 			var nextSleepDelay time.Duration
+			q.Status = "run first task"
 			taskRes := q.Handler(t)
+
 			switch taskRes.Status {
 			case "Fail":
 				t.IncrementFailureCount()
 				// delay before retry
 				nextSleepDelay = DelayOnFailedTask
+				q.Status = fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String())
 			case "Success":
 				// add tasks after current task in reverse order
 				for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
@@ -311,9 +316,11 @@ func (q *TaskQueue) Start() {
 						q.AddFirst(newTask)
 					}
 				})
+				q.Status = ""
 			}
 			if taskRes.DelayBeforeNextTask != 0 {
 				nextSleepDelay = taskRes.DelayBeforeNextTask
+				q.Status = fmt.Sprintf("sleep for %s", nextSleepDelay.String())
 			}
 
 			sleepDelay = nextSleepDelay
@@ -326,10 +333,12 @@ func (q *TaskQueue) Start() {
 }
 
 // waitForTask returns a task that can be processed or a nil if context is canceled.
-// sleepDelay is used to sleep between tasks, e.g. in case of failed task.
+// sleepDelay is used to sleep before check a task, e.g. in case of failed previous task.
 // If queue is empty, than it will be checked every DelayOnQueueIsEmpty.
 func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	// Wait for non empty queue or closed Done channel
+	origStatus := q.Status
+	waitBegin := time.Now()
 	for {
 		// Skip this loop if sleep is not needed and there is a task to process.
 		if !q.IsEmpty() && sleepDelay == 0 {
@@ -344,15 +353,30 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			newDelay = sleepDelay
 		}
 		delayTicker := time.NewTicker(newDelay)
-		select {
-		case <-q.ctx.Done():
-			return nil
-		case <-delayTicker.C:
-			delayTicker.Stop()
-			// reset sleepDelay
-			sleepDelay = 0
-			break
+		secondTicker := time.NewTicker(time.Second)
+		var stop = false
+		for {
+			select {
+			case <-delayTicker.C:
+				// reset sleepDelay
+				sleepDelay = 0
+				stop = true
+			case <-q.ctx.Done():
+				return nil
+			case <-secondTicker.C:
+				waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
+				if sleepDelay == 0 {
+					q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
+				} else {
+					q.Status = fmt.Sprintf("%s (elapsed %s)", origStatus, waitSeconds)
+				}
+			}
+			if stop {
+				break
+			}
 		}
+		delayTicker.Stop()
+		secondTicker.Stop()
 	}
 }
 

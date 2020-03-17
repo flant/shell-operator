@@ -18,6 +18,8 @@ const (
 
 type HookMetadata struct {
 	HookName       string // hook name
+	Binding        string // binding name
+	Group          string
 	BindingType    BindingType
 	BindingContext []BindingContext
 	AllowFailure   bool //Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
@@ -78,6 +80,13 @@ func (m *HookMetadata) WithAllowFailure(allowFailure bool) *HookMetadata {
 	return m
 }
 
-func (m *HookMetadata) GetDescription() string {
-	return fmt.Sprintf("%s:%s", string(m.BindingType), m.HookName)
+func (m HookMetadata) GetDescription() string {
+	additional := ""
+	if m.Group != "" {
+		additional += ":group=" + m.Group
+	}
+	if m.Binding != "" {
+		additional += ":" + m.Binding
+	}
+	return fmt.Sprintf("%s:%s%s", string(m.BindingType), m.HookName, additional)
 }
