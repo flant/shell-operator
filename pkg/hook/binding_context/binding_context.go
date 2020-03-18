@@ -63,6 +63,10 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 
 	if bc.Metadata.Group != "" {
 		res["binding"] = bc.Metadata.Group
+		// Preserve Synchronization for grouped bindings
+		if bc.Type == TypeSynchronization {
+			res["type"] = bc.Type
+		}
 		return res
 	}
 

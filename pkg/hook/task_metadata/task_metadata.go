@@ -14,6 +14,7 @@ const (
 	// a task to run a particular hook
 	HookRun                  task.TaskType = "HookRun"
 	EnableKubernetesBindings task.TaskType = "EnableKubernetesBindings"
+	EnableScheduleBindings   task.TaskType = "EnableScheduleBindings"
 )
 
 type HookMetadata struct {

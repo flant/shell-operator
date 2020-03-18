@@ -255,6 +255,98 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 			},
 		},
 		{
+			"grouped Synchronization",
+			func() []BindingContext {
+				var bcs = []BindingContext{}
+
+				bc := BindingContext{
+					Binding:   "monitor_config_maps",
+					Type:      TypeSynchronization,
+					Objects:   []ObjectAndFilterResult{},
+					Snapshots: map[string][]ObjectAndFilterResult{},
+				}
+				bc.Metadata.BindingType = OnKubernetesEvent
+				bc.Metadata.Group = "pods"
+				bc.Metadata.IncludeSnapshots = []string{"monitor_config_maps"}
+				// object without jqfilter should not have filterResult field
+				obj := ObjectAndFilterResult{
+					Object: &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"namespace": "default",
+								"name":      "pod-qwe",
+							},
+							"kind": "Pod",
+						},
+					},
+					FilterResult: "asd",
+				}
+				bc.Objects = append(bc.Objects, obj)
+				bc.Snapshots["monitor_config_maps"] = append(bc.Snapshots["monitor_config_maps"], obj)
+				bcs = append(bcs, bc)
+
+				bc = BindingContext{
+					Binding: "monitor_pods",
+					Type:    TypeSynchronization,
+					Objects: []ObjectAndFilterResult{},
+				}
+				bc.Metadata.BindingType = OnKubernetesEvent
+				// object without jqfilter should not have filterResult field
+				obj = ObjectAndFilterResult{
+					Object: &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"namespace": "default",
+								"name":      "pod-qwe",
+							},
+							"kind": "Pod",
+						},
+					},
+					FilterResult: "asd",
+				}
+				bc.Objects = append(bc.Objects, obj)
+
+				bcs = append(bcs, bc)
+				return bcs
+			},
+			func() {
+				g.Expect(bcList).Should(HaveLen(2))
+
+				g.Expect(bcList[0]).Should(HaveLen(3))
+				g.Expect(bcList[0]).Should(HaveKey("binding"))
+				g.Expect(bcList[0]["binding"]).Should(Equal("pods"))
+				g.Expect(bcList[0]).Should(HaveKey("type"))
+				g.Expect(bcList[0]["type"]).Should(Equal(TypeSynchronization))
+				g.Expect(bcList[0]).Should(HaveKey("snapshots"))
+				g.Expect(bcList[0]["snapshots"]).Should(HaveLen(1))
+
+				g.Expect(bcList[1]).Should(HaveLen(3))
+				g.Expect(bcList[1]).Should(HaveKey("binding"))
+				g.Expect(bcList[1]).Should(HaveKey("type"))
+				g.Expect(bcList[1]["type"]).Should(Equal(TypeSynchronization))
+				g.Expect(bcList[1]).Should(HaveKey("objects"))
+				g.Expect(bcList[1]["objects"]).Should(HaveLen(1))
+			},
+			[][]string{
+				{`. | length`, `2`},
+
+				// grouped binding context contains binding==group, type and snapshots
+				{`.[0] | length`, `3`}, // Only two fields
+				{`.[0].binding`, `"pods"`},
+				{`.[0].type`, `"Synchronization"`},
+				{`.[0].snapshots | has("monitor_config_maps")`, `true`},
+				{`.[0].snapshots."monitor_config_maps" | length`, `1`},
+
+				// usual Synchronization has 4 fields: binding, type and objects.
+				{`.[1] | length`, `3`},
+				{`.[1].binding`, `"monitor_pods"`},
+				{`.[1].type`, `"Synchronization"`},
+				{`.[1].objects | length`, `1`},
+				{`.[1].objects[0].object.metadata.namespace`, `"default"`},
+				{`.[1].objects[0].object.metadata.name`, `"pod-qwe"`},
+			},
+		},
+		{
 			"kubernetes Synchronization with empty objects",
 			func() []BindingContext {
 				bc := BindingContext{

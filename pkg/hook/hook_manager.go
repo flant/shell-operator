@@ -28,9 +28,9 @@ type HookManager interface {
 	WorkingDir() string
 	TempDir() string
 	GetHook(name string) *Hook
+	GetHookNames() []string
 	GetHooksInOrder(bindingType BindingType) ([]string, error)
 	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
-	EnableScheduleBindings()
 	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 }
 
@@ -192,6 +192,10 @@ func (hm *hookManager) GetHook(name string) *Hook {
 	}
 }
 
+func (hm *hookManager) GetHookNames() []string {
+	return hm.hookNamesInOrder
+}
+
 func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error) {
 	hooks, ok := hm.hooksInOrder[bindingType]
 	if !ok {
@@ -232,16 +236,6 @@ func (hm *hookManager) HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*H
 				}
 			})
 		}
-	}
-}
-
-// EnableScheduleBindings add all schedules to scheduleManager
-func (hm *hookManager) EnableScheduleBindings() {
-	schHooks, _ := hm.GetHooksInOrder(Schedule)
-
-	for _, hookName := range schHooks {
-		h := hm.GetHook(hookName)
-		h.HookController.EnableScheduleBindings()
 	}
 }
 

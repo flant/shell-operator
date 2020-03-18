@@ -29,6 +29,9 @@ Next, the main cycle is started:
 - Each hook is executed with a binding context, that describes an already occurred event:
   - `kubernetes` hook receives `Event` binding context with an object related to the event.
   - `schedule` hook receives a name of triggered schedule binding.
+  
+- If there is a sequence of hook executions in a queue, then hook is executed once with array of binding contexts.
+  - If binding contains `group` key, then a sequence of binding context with similar `group` key is compacted into one binding context.
 
 - Several metrics are available for monitoring the activity of the queues and hooks: queues size, number of execution errors for specific hooks, etc. See [METRICS](METRICS.md) for more details.
 
@@ -89,42 +92,44 @@ Scheduled execution. You can bind a hook to any number of schedules.
 
 Syntax:
 
-```json
-{
-  "configVersion": "v1",
-  "schedule": [
-    {
-      "crontab": "*/5 * * * *",
-      "allowFailure": true|false,
-    },
-    {
-      "name": "Every 20 minutes",
-      "crontab": "*/20 * * * *",
-      "allowFailure": true|false,
-    },
-    {
-      "name": "every 10 seconds",
-      "crontab": "*/10 * * * * *",
-      "allowFailure": true|false,
-      "queue": "every-ten",
-      "includeSnapshotsFrom": "monitor-pods"
-    },
-    ...
-  ]
-}
+```yaml
+configVersion: v1
+
+schedule:
+
+- crontab: "*/5 * * * *"
+  allowFailure: true|false
+
+- name: "Every 20 minutes"
+  crontab: "*/20 * * * *"
+  allowFailure: true|false
+
+- name: "every 10 seconds",
+  crontab: "*/10 * * * * *"
+  allowFailure: true|false
+  queue: "every-ten"
+  includeSnapshotsFrom: "monitor-pods"
+
+- name: "every minute"
+  crontab: "* * * * *"
+  allowFailure: true|false
+  group: "pods"
+  ...
 ```
 
 Parameters:
 
-`name` — is an optional identifier. It is used to distinguish between multiple schedules during runtime. For more information see [binding context](#binding-context).
+- `name` — is an optional identifier. It is used to distinguish between multiple schedules during runtime. For more information see [binding context](#binding-context).
 
-`crontab` – is a mandatory schedule with a regular crontab syntax with 5 fields. 6 fields style crontab also supported, for more information see [documentation on robfig/cron.v2 library](https://godoc.org/gopkg.in/robfig/cron.v2).
+- `crontab` – is a mandatory schedule with a regular crontab syntax with 5 fields. 6 fields style crontab also supported, for more information see [documentation on robfig/cron.v2 library](https://godoc.org/gopkg.in/robfig/cron.v2).
 
-`allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
+- `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
-`queue` — a name of a separate queue. It can be used to execute long-running hooks in parallel with other hooks.
+- `queue` — a name of a separate queue. It can be used to execute long-running hooks in parallel with other hooks.
 
-`includeSnapshotsFrom` — a list of names of `kubernetes` bindings. When specified, all monitored objects will be added to the binding context in a `snapshots` field.
+- `includeSnapshotsFrom` — a list of names of `kubernetes` bindings. When specified, all monitored objects will be added to the binding context in a `snapshots` field.
+
+- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group). `group` is mutually exclusive with `includeSnapshotsFrom`.
 
 ### kubernetes
 
@@ -191,7 +196,8 @@ Syntax:
       "jqFilter": ".metadata.labels",
       "includeSnapshotsFrom": ["Monitor pods in cache tier", "another-binding-name", ...],
       "allowFailure": true|false,
-      "queue": "cache-pods"
+      "queue": "cache-pods",
+      "group": "pods",
     },
     {"name":"monitor Pods", "kind": "pod", ...},
     ...
@@ -238,6 +244,8 @@ Parameters:
 - `queue` — a name of a separate queue. It can be used to execute long-running hooks in parallel with hooks in the "main" queue.
 
 - `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from that bindings will be added to the binding context in a `snapshots` field. Self-include is also possible.
+
+- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group). `group` is mutually exclusive with `includeSnapshotsFrom`.
 
 YAML example:
 
@@ -331,8 +339,8 @@ Temporary files have unique names to prevent collisions between queues and are d
 
  Binging context is a JSON-array of structures with the following fields:
 
-- `binding` is a string from the `name` parameter. If the parameter has not been set in the binding configuration, then strings `schedule` or `kubernetes` are used. For a hook executed at startup, this value is always `onStartup`.
-- `snapshots` — binding context for `kubernetes` and `schedule` hooks contains a `snapshots` field if `includeSnapshotsFrom` is defined. `snapshots` object contains a list of objects for each binding name from `includeSnapshotsFrom`. If the list is empty, the named field is omitted.
+- `binding` — a string from the `name` or `group` parameter. If these parameters has not been set in the binding configuration, then strings `schedule` or `kubernetes` are used. For a hook executed at startup, this value is always `onStartup`.
+- `snapshots` — a map with object lists if `includeSnapshotsFrom` or `group` are defined. This map contains a list of objects for each binding name from `includeSnapshotsFrom` or for each `kubernetes` binding in a group. If `includeSnapshotsFrom` list is empty, the named field is omitted.
 
 There are some extra fields for `kubernetes`-type events:
 
@@ -462,7 +470,7 @@ During startup, the hook will be executed with the "Synchronization" binding con
     "objects": [
       {
         "object": {
-          "kind": "Pod,
+          "kind": "Pod",
           "metadata":{
             "name":"etcd-...",
             "namespace":"kube-system",
@@ -477,7 +485,7 @@ During startup, the hook will be executed with the "Synchronization" binding con
       },
       {
         "object": {
-          "kind": "Pod,
+          "kind": "Pod",
           "metadata":{
             "name":"kube-proxy-...",
             "namespace":"kube-system",
@@ -495,7 +503,7 @@ During startup, the hook will be executed with the "Synchronization" binding con
       "monitor-pods": [
         {
           "object": {
-            "kind": "Pod,
+            "kind": "Pod",
             "metadata":{
               "name":"etcd-...",
               "namespace":"kube-system",
@@ -537,7 +545,7 @@ If pod `pod-321d12` is then added into the "default" namespace, then the hook wi
       "monitor-pods": [
         {
           "object": {
-            "kind": "Pod,
+            "kind": "Pod",
             "metadata":{
               "name":"etcd-...",
               "namespace":"kube-system",
@@ -563,7 +571,7 @@ at 12:02, it will be executed with the following binding context:
       "monitor-pods": [
         {
           "object": {
-            "kind": "Pod,
+            "kind": "Pod",
             "metadata":{
               "name":"etcd-...",
               "namespace":"kube-system",
@@ -572,6 +580,129 @@ at 12:02, it will be executed with the following binding context:
           },
           "filterResult": { ... },
         },
+        ...
+      ]
+    }
+  }
+]
+```
+
+### An example of a binding context with `group`
+
+Consider the hook that monitors changes of labels of all Pods, changes in ConfigMap and do something interesting on schedule:
+
+```yaml
+configVersion: v1
+schedule:
+- name: incremental
+  crontab: "* * * * *"
+  group: "pods"
+kubernetes:
+- name: monitor_pods
+  apiVersion: v1
+  kind: Pod
+  jqFilter: '.metadata.labels'
+  group: "pods"
+- name: monitor_configmap
+  apiVersion: v1
+  kind: ConfigMap
+  jqFilter: '.data'
+  group: "pods" 
+```
+
+
+During startup, the hook will be executed with the "Synchronization" binding context with `snapshots` JSON object:
+
+```json
+[
+  {
+    "binding": "pods",
+    "type": "Synchronization",
+    "snapshots": {
+      "monitor_pods": [
+        {
+          "object": {
+            "kind": "Pod",
+            "metadata":{
+              "name":"etcd-...",
+              "namespace":"kube-system",
+              ...
+            },
+          },
+          "filterResult": { ... },
+        },
+        ...
+      ],
+      "monitor_configmap": [
+        {
+          "object": {
+            "kind": "ConfigMap",
+            "metadata":{
+              "name":"etcd-...",
+              "namespace":"kube-system",
+              ...
+            },
+          },
+          "filterResult": { ... },
+        },
+        ...
+      ]
+    }
+  }
+]
+```
+
+If pod `pod-dfbd12` is then added into the "default" namespace, then the hook will be executed with the binding context with `binding` and `snapshots` fields:
+
+```json
+[
+  {
+    "binding": "pods",
+    "snapshots": {
+      "monitor_pods": [
+        {
+          "object": {
+            "kind": "Pod",
+            "metadata":{
+              "name":"etcd-...",
+              "namespace":"kube-system",
+              ...
+            },
+          },
+          "filterResult": { ... },
+        },
+        ...
+      ],
+      "monitor_configmap": [
+        {
+          "object": {
+            "kind": "ConfigMap",
+            "metadata":{
+              "name":"etcd-...",
+              "namespace":"kube-system",
+              ...
+            },
+          },
+          "filterResult": { ... },
+        },
+        ...
+      ]
+    }
+  }
+]
+```
+
+Every minute it will be executed with the same binding context with fresh snapshots:
+
+```json
+[
+  {
+    "binding": "pods",
+    "snapshots": {
+      "monitor_pods": [
+        ...
+      ],
+      "monitor_configmaps": [
         ...
       ]
     }
