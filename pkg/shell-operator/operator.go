@@ -265,8 +265,7 @@ func (op *ShellOperator) Start() {
 	// Start it before start all informers to catch all kubernetes events (#42)
 	op.ManagerEventsHandler.Start()
 
-	// add schedules to schedule manager
-	op.HookManager.EnableScheduleBindings()
+	// Unlike KubeEventsManager, ScheduleManager has one go-routine.
 	op.ScheduleManager.Start()
 }
 
@@ -289,6 +288,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		newMeta := op.CombineBingingContextForHook(t)
 		if newMeta != nil {
 			t.UpdateMetadata(*newMeta)
+			hookMeta = *newMeta
 		}
 
 		taskHook := op.HookManager.GetHook(hookMeta.HookName)
@@ -337,7 +337,8 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 					Binding:        info.Binding,
 					Group:          info.Group,
 				}).
-				WithLogLabels(hookLogLabels)
+				WithLogLabels(hookLogLabels).
+				WithQueueName("main")
 			hookRunTasks = append(hookRunTasks, newTask)
 		})
 
@@ -356,6 +357,19 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 			res.Status = "Success"
 			res.HeadTasks = hookRunTasks
 		}
+	case EnableScheduleBindings:
+		hookLogLabels := map[string]string{}
+		hookLogLabels["hook"] = hookMeta.HookName
+		hookLogLabels["binding"] = string(Schedule)
+		hookLogLabels["task"] = "EnableScheduleBindings"
+		hookLogLabels["queue"] = "main"
+
+		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
+
+		taskHook := op.HookManager.GetHook(hookMeta.HookName)
+		taskHook.HookController.EnableScheduleBindings()
+		taskLogEntry.Infof("Schedule binding for hook enabled successfully")
+		res.Status = "Success"
 	}
 
 	return res
@@ -379,7 +393,7 @@ func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata
 			return
 		}
 		hm := HookMetadataAccessor(tsk)
-		if hm.HookName != hookMeta.HookName {
+		if hm.HookName != hookMeta.HookName || t.GetType() != tsk.GetType() {
 			stopIterate = true
 			return
 		}
@@ -403,6 +417,7 @@ func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata
 		combinedContext = append(combinedContext, hm.BindingContext...)
 		tasksFilter[tasks[i].GetId()] = false
 	}
+	log.Infof("Will delete %d tasks from queue '%s'", len(tasksFilter)-1, t.GetQueueName())
 
 	// Delete tasks with false in tasksFilter map
 	op.TaskQueues.GetByName(t.GetQueueName()).Filter(func(tsk task.Task) bool {
@@ -444,10 +459,8 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 	tqs.NewNamedQueue("main", op.TaskHandler)
 
 	mainQueue := tqs.GetMain()
-	mainQueue.ChangesDisable()
 
 	// Add tasks to run OnStartup bindings
-
 	onStartupHooks, err := op.HookManager.GetHooksInOrder(OnStartup)
 	if err != nil {
 		logEntry.Errorf("%v", err)
@@ -472,19 +485,30 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 		logEntry.Debugf("new task HookRun@OnStartup '%s'", hookName)
 	}
 
-	// Add tasks to enable kubernetes monitors
-	kubeHooks, _ := op.HookManager.GetHooksInOrder(OnKubernetesEvent)
-	for _, hookName := range kubeHooks {
-		newTask := task.NewTask(EnableKubernetesBindings).
-			WithMetadata(HookMetadata{
-				HookName: hookName,
-				Binding:  string(EnableKubernetesBindings),
-			})
-		mainQueue.AddLast(newTask)
-		logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
-	}
+	// Add tasks to enable kubernetes monitors and schedules for each hook
+	for _, hookName := range op.HookManager.GetHookNames() {
+		h := op.HookManager.GetHook(hookName)
 
-	mainQueue.ChangesEnable(true)
+		if h.GetConfig().HasBinding(OnKubernetesEvent) {
+			newTask := task.NewTask(EnableKubernetesBindings).
+				WithMetadata(HookMetadata{
+					HookName: hookName,
+					Binding:  string(EnableKubernetesBindings),
+				})
+			mainQueue.AddLast(newTask)
+			logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
+		}
+
+		if h.GetConfig().HasBinding(Schedule) {
+			newTask := task.NewTask(EnableScheduleBindings).
+				WithMetadata(HookMetadata{
+					HookName: hookName,
+					Binding:  string(EnableScheduleBindings),
+				})
+			mainQueue.AddLast(newTask)
+			logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
+		}
+	}
 }
 
 // CreateQueues create all queues defined in hooks
