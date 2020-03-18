@@ -15,6 +15,8 @@ type BindingExecutionInfo struct {
 	IncludeAllSnapshots bool
 	AllowFailure        bool
 	QueueName           string
+	Binding             string
+	Group               string
 }
 
 // В каждый хук надо будет положить этот объект.

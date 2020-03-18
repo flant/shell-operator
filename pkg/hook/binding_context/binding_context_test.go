@@ -3,12 +3,14 @@ package hook
 import (
 	"testing"
 
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
-	. "github.com/flant/libjq-go"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	. "github.com/flant/libjq-go"
+	. "github.com/flant/shell-operator/pkg/hook/types"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 func JqEqual(t *testing.T, input []byte, program string, expected string) {
@@ -20,23 +22,25 @@ func JqEqual(t *testing.T, input []byte, program string, expected string) {
 
 // Test conversion of BindingContext for v1, also test json marshal of v1 binding contexts.
 func Test_ConvertBindingContextList_v1(t *testing.T) {
+	g := NewWithT(t)
+
 	var bcList BindingContextList
 	var bcJson []byte
 
 	tests := []struct {
 		name        string
-		bc          func() BindingContext
+		bc          func() []BindingContext
 		fn          func()
 		jqAsertions [][]string
 	}{
 		{
 			"OnStartup binding",
-			func() BindingContext {
+			func() []BindingContext {
 				bc := BindingContext{
 					Binding: "onStartup",
 				}
 				bc.Metadata.BindingType = OnStartup
-				return bc
+				return []BindingContext{bc}
 			},
 			func() {
 				assert.Equal(t, "onStartup", bcList[0]["binding"])
@@ -48,7 +52,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 		},
 		{
 			"kubernetes Event binding",
-			func() BindingContext {
+			func() []BindingContext {
 				bc := BindingContext{
 					Binding:    "kubernetes",
 					Type:       TypeEvent,
@@ -68,7 +72,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 					},
 				}
 				bc.Metadata.BindingType = OnKubernetesEvent
-				return bc
+				return []BindingContext{bc}
 			},
 
 			func() {
@@ -92,7 +96,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 		},
 		{
 			"kubernetes Synchronization event",
-			func() BindingContext {
+			func() []BindingContext {
 				bc := BindingContext{
 					Binding: "kubernetes",
 					Type:    TypeSynchronization,
@@ -147,7 +151,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				obj.Metadata.JqFilter = ".metadata.labels"
 				bc.Objects = append(bc.Objects, obj)
 
-				return bc
+				return []BindingContext{bc}
 			},
 			func() {
 				assert.Len(t, bcList[0], 3)
@@ -170,15 +174,96 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 			},
 		},
 		{
+			"binding context with group",
+			func() []BindingContext {
+				var bcs = []BindingContext{}
+
+				bc := BindingContext{
+					Binding:    "monitor_pods",
+					Type:       TypeEvent,
+					WatchEvent: WatchEventAdded,
+					Objects:    []ObjectAndFilterResult{},
+					Snapshots:  map[string][]ObjectAndFilterResult{},
+				}
+				bc.Metadata.BindingType = OnKubernetesEvent
+				bc.Metadata.Group = "pods"
+				bc.Metadata.IncludeSnapshots = []string{"monitor_pods"}
+				// object without jqfilter should not have filterResult field
+				obj := ObjectAndFilterResult{
+					Object: &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"namespace": "default",
+								"name":      "pod-qwe",
+							},
+							"kind": "Pod",
+						},
+					},
+					FilterResult: "asd",
+				}
+				bc.Objects = append(bc.Objects, obj)
+				bc.Snapshots["monitor_pods"] = append(bc.Snapshots["monitor_pods"], obj)
+				bcs = append(bcs, bc)
+
+				bc = BindingContext{
+					Binding:    "monitor_pods",
+					Type:       TypeEvent,
+					WatchEvent: WatchEventAdded,
+					Objects:    []ObjectAndFilterResult{},
+				}
+				bc.Metadata.BindingType = OnKubernetesEvent
+				// object without jqfilter should not have filterResult field
+				obj = ObjectAndFilterResult{
+					Object: &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"namespace": "default",
+								"name":      "pod-qwe",
+							},
+							"kind": "Pod",
+						},
+					},
+					FilterResult: "asd",
+				}
+				bc.Objects = append(bc.Objects, obj)
+
+				bcs = append(bcs, bc)
+				return bcs
+			},
+			func() {
+				g.Expect(bcList[0]).Should(HaveKey("binding"))
+				g.Expect(bcList[0]).Should(HaveKey("snapshots"))
+				g.Expect(bcList[0]).ShouldNot(HaveKey("objects"))
+				g.Expect(bcList[0]).ShouldNot(HaveKey("type"))
+			},
+			[][]string{
+				{`. | length`, `2`},
+
+				// grouped binding context contains only binding and snapshots
+				{`.[0] | length`, `2`}, // Only two fields
+				{`.[0].snapshots | has("monitor_pods")`, `true`},
+				{`.[0].snapshots."monitor_pods" | length`, `1`},
+				{`.[0].binding`, `"pods"`},
+
+				// JSON dump should has only 4 fields: binding, type, watchEvent and object.
+				{`.[1] | length`, `4`},
+				{`.[1].binding`, `"monitor_pods"`},
+				{`.[1].type`, `"Event"`},
+				{`.[1].watchEvent`, `"Added"`},
+				{`.[1].object.metadata.namespace`, `"default"`},
+				{`.[1].object.metadata.name`, `"pod-qwe"`},
+			},
+		},
+		{
 			"kubernetes Synchronization with empty objects",
-			func() BindingContext {
+			func() []BindingContext {
 				bc := BindingContext{
 					Binding: "kubernetes",
 					Type:    TypeSynchronization,
 					Objects: []ObjectAndFilterResult{},
 				}
 				bc.Metadata.BindingType = OnKubernetesEvent
-				return bc
+				return []BindingContext{bc}
 			},
 			func() {
 				assert.Len(t, bcList[0]["objects"], 0)
@@ -201,8 +286,8 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bcList = ConvertBindingContextList("v1", []BindingContext{tt.bc()})
-			assert.Len(t, bcList, 1)
+			bcList = ConvertBindingContextList("v1", tt.bc())
+			//assert.Len(t, bcList, 1)
 
 			var err error
 			bcJson, err = bcList.Json()

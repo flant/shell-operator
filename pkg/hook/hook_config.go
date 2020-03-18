@@ -60,7 +60,7 @@ type ScheduleConfigV1 struct {
 	AllowFailure         bool     `json:"allowFailure"`
 	IncludeSnapshotsFrom []string `json:"includeSnapshotsFrom"`
 	Queue                string   `json:"queue"`
-	SkipKey              string   `json:"skipKey,omitempty"`
+	Group                string   `json:"group,omitempty"`
 }
 
 // Legacy version of kubernetes event configuration
@@ -97,7 +97,7 @@ type OnKubernetesEventConfigV1 struct {
 	ResynchronizationPeriod string                   `json:"resynchronizationPeriod,omitempty"`
 	IncludeSnapshotsFrom    []string                 `json:"includeSnapshotsFrom,omitempty"`
 	Queue                   string                   `json:"queue,omitempty"`
-	SkipKey                 string                   `json:"skipKey,omitempty"`
+	Group                   string                   `json:"group,omitempty"`
 }
 
 type KubeNameSelectorV1 NameSelector
@@ -301,7 +301,7 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		} else {
 			kubeConfig.Queue = kubeCfg.Queue
 		}
-		kubeConfig.SkipKey = kubeCfg.SkipKey
+		kubeConfig.Group = kubeCfg.Group
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}
@@ -329,6 +329,34 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		}
 		c.Schedules = append(c.Schedules, schedule)
 	}
+
+	// Update IncludeSnapshotsFrom for groups
+	var groupSnapshots = make(map[string][]string)
+	for _, kubeCfg := range c.OnKubernetesEvents {
+		if kubeCfg.Group == "" {
+			continue
+		}
+		if _, ok := groupSnapshots[kubeCfg.Group]; !ok {
+			groupSnapshots[kubeCfg.Group] = make([]string, 0)
+		}
+		groupSnapshots[kubeCfg.Group] = append(groupSnapshots[kubeCfg.Group], kubeCfg.BindingName)
+	}
+	newKubeEvents := make([]OnKubernetesEventConfig, 0)
+	for _, cfg := range c.OnKubernetesEvents {
+		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
+			cfg.IncludeSnapshotsFrom = snapshots
+		}
+		newKubeEvents = append(newKubeEvents, cfg)
+	}
+	c.OnKubernetesEvents = newKubeEvents
+	newSchedules := make([]ScheduleConfig, 0)
+	for _, cfg := range c.Schedules {
+		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
+			cfg.IncludeSnapshotsFrom = snapshots
+		}
+		newSchedules = append(newSchedules, cfg)
+	}
+	c.Schedules = newSchedules
 
 	return nil
 }
@@ -410,7 +438,7 @@ func (c *HookConfig) ConvertScheduleV1(schV1 ScheduleConfigV1) (ScheduleConfig, 
 	} else {
 		res.Queue = schV1.Queue
 	}
-	res.SkipKey = schV1.SkipKey
+	res.Group = schV1.Group
 
 	return res, nil
 }
@@ -474,6 +502,10 @@ func (c *HookConfig) CheckOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1,
 				}
 			}
 		}
+	}
+
+	if kubeCfg.Group != "" && len(kubeCfg.IncludeSnapshotsFrom) > 0 {
+		allErr = multierror.Append(allErr, fmt.Errorf("group and includeSnapshotsFrom are mutually exclusive"))
 	}
 
 	return allErr

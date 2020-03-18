@@ -21,7 +21,7 @@ type KubernetesBindingToMonitorLink struct {
 	AllowFailure     bool
 	JqFilter         string
 	QueueName        string
-	SkipKey          string
+	Group            string
 }
 
 // KubernetesBindingsController handles kubernetes bindings for one hook.
@@ -85,7 +85,7 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 			AllowFailure:     config.AllowFailure,
 			JqFilter:         config.Monitor.JqFilter,
 			QueueName:        config.Queue,
-			SkipKey:          config.SkipKey,
+			Group:            config.Group,
 		}
 
 		// There is no Synchronization event for 'v0' binding configuration.
@@ -143,6 +143,8 @@ func (c *kubernetesBindingsController) HandleEvent(kubeEvent KubeEvent) BindingE
 		IncludeSnapshots: link.IncludeSnapshots,
 		AllowFailure:     link.AllowFailure,
 		QueueName:        link.QueueName,
+		Binding:          link.BindingName,
+		Group:            link.Group,
 	}
 }
 
@@ -190,7 +192,7 @@ func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, link *KubernetesBindi
 		bc.Metadata.JqFilter = link.JqFilter
 		bc.Metadata.BindingType = OnKubernetesEvent
 		bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
-		bc.Metadata.SkipKey = link.SkipKey
+		bc.Metadata.Group = link.Group
 
 		bindingContexts = append(bindingContexts, bc)
 
@@ -205,7 +207,7 @@ func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, link *KubernetesBindi
 			bc.Metadata.JqFilter = link.JqFilter
 			bc.Metadata.BindingType = OnKubernetesEvent
 			bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
-			bc.Metadata.SkipKey = link.SkipKey
+			bc.Metadata.Group = link.Group
 
 			bindingContexts = append(bindingContexts, bc)
 		}

@@ -210,6 +210,8 @@ func (op *ShellOperator) InitHookManager() (err error) {
 					BindingType:    OnKubernetesEvent,
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
+					Binding:        info.Binding,
+					Group:          info.Group,
 				}).
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
@@ -234,6 +236,8 @@ func (op *ShellOperator) InitHookManager() (err error) {
 					BindingType:    Schedule,
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
+					Binding:        info.Binding,
+					Group:          info.Group,
 				}).
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
@@ -330,6 +334,8 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 					BindingType:    OnKubernetesEvent,
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
+					Binding:        info.Binding,
+					Group:          info.Group,
 				}).
 				WithLogLabels(hookLogLabels)
 			hookRunTasks = append(hookRunTasks, newTask)
@@ -360,7 +366,11 @@ func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata
 	var tasks = make([]task.Task, 0)
 	var hms = make([]HookMetadata, 0)
 	var stopIterate = false
-	op.TaskQueues.GetByName(t.GetQueueName()).Iterate(func(tsk task.Task) {
+	q := op.TaskQueues.GetByName(t.GetQueueName())
+	if q == nil {
+		return nil
+	}
+	q.Iterate(func(tsk task.Task) {
 		if stopIterate {
 			return
 		}
@@ -402,25 +412,25 @@ func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata
 		return true
 	})
 
-	// TODO skipKey can be used to compact binding contexts when only snapshots are needed
-	//var compactedContext = make([]BindingContext, 0)
-	//for i:=0 ; i < len(combinedContext) ; i++ {
-	//	var shouldSkip = true
-	//	if i == len(combinedContext)-1 {
-	//		shouldSkip = false
-	//	} else if combinedContext[i].Metadata.SkipKey == "" {
-	//		shouldSkip = false
-	//	} else if combinedContext[i].Metadata.SkipKey != combinedContext[i+1].Metadata.SkipKey {
-	//		shouldSkip = false
-	//	}
-	//	if shouldSkip {
-	//		continue
-	//	} else {
-	//		compactedContext = append(compactedContext, combinedContext[i])
-	//	}
-	//}
+	// TODO group is used to compact binding contexts when only snapshots are needed
+	var compactedContext = make([]BindingContext, 0)
+	for i := 0; i < len(combinedContext); i++ {
+		var shouldSkip = true
+		if i == len(combinedContext)-1 {
+			shouldSkip = false
+		} else if combinedContext[i].Metadata.Group == "" {
+			shouldSkip = false
+		} else if combinedContext[i].Metadata.Group != combinedContext[i+1].Metadata.Group {
+			shouldSkip = false
+		}
+		if shouldSkip {
+			continue
+		} else {
+			compactedContext = append(compactedContext, combinedContext[i])
+		}
+	}
 
-	hookMeta.WithBindingContext(combinedContext)
+	hookMeta.WithBindingContext(compactedContext)
 	return &hookMeta
 }
 
@@ -468,6 +478,7 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 		newTask := task.NewTask(EnableKubernetesBindings).
 			WithMetadata(HookMetadata{
 				HookName: hookName,
+				Binding:  string(EnableKubernetesBindings),
 			})
 		mainQueue.AddLast(newTask)
 		logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)

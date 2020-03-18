@@ -17,10 +17,10 @@ type BindingContext struct {
 		JqFilter            string
 		IncludeSnapshots    []string
 		IncludeAllSnapshots bool
-		SkipKey             string
+		Group               string
 	}
 
-	// name of binding or kubeEventType if binding has no 'name' field
+	// name of a binding or a group or kubeEventType if binding has no 'name' field
 	Binding string
 	// additional fields for 'kubernetes' binding
 	Type       KubeEventType
@@ -59,6 +59,11 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		} else {
 			res["snapshots"] = map[string]string{}
 		}
+	}
+
+	if bc.Metadata.Group != "" {
+		res["binding"] = bc.Metadata.Group
+		return res
 	}
 
 	if bc.Metadata.BindingType != OnKubernetesEvent || bc.Type == "" {
