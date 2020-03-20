@@ -58,6 +58,6 @@ function hook::_run_first_available_handler() {
     fi
   done
 
-  >&2 printf "ERROR: Can't find any handler from the list: %s\n." "$(echo ${HANDLERS} | sed -re 's/\s+/, /g')"
+  >&2 printf "ERROR: Can't find any handler from the list: %s\n." "$(echo ${HANDLERS} | sed -E 's/[[:space:]]+/, /g')"
   return 1
 }
