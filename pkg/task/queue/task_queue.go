@@ -39,6 +39,8 @@ type TaskResult struct {
 	AfterTasks []task.Task
 
 	DelayBeforeNextTask time.Duration
+
+	AfterHandle func()
 }
 
 type TaskQueue struct {
@@ -324,6 +326,10 @@ func (q *TaskQueue) Start() {
 			}
 
 			sleepDelay = nextSleepDelay
+
+			if taskRes.AfterHandle != nil {
+				taskRes.AfterHandle()
+			}
 
 			// dump queue
 			log.Debugf("queue %s: tasks after handle %s", q.Name, q.String())
