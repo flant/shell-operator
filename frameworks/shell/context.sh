@@ -68,7 +68,7 @@ function context::_convert_user_path_to_jq_path() {
   # loop3 — convert array addresation from myArray.0 to myArray[0]
   # loop4 — return original dots from ##DOT##, i.e. aaa."bb##DOT##bb".cc -> aa."bb.bb".cc
 
-  jqPath=".$(sed -r \
+  jqPath=".$(sed -E \
     -e s/\'/\"/g \
     -e ':loop1' -e 's/"([^".]+)\.([^"]+)"/"\1##DOT##\2"/g' -e 't loop1' \
     -e ':loop2' -e 's/(^|\.)([^."]*-[^."]*)(\.|$)/\1"\2"\3/g' -e 't loop2' \
@@ -81,16 +81,16 @@ function context::_convert_user_path_to_jq_path() {
 
 function context::_dirname() {
   # loop1 — hide dots in keys, i.e. aaa."bb.bb".ccc -> aaa."bb##DOT##bb".cc
-  splittable_path="$(sed -r -e s/\'/\"/g -e ':loop1' -e 's/"([^".]+)\.([^"]+)"/"\1##DOT##\2"/g' -e 't loop1' <<< ${1:-})"
+  splittable_path="$(sed -E -e s/\'/\"/g -e ':loop1' -e 's/"([^".]+)\.([^"]+)"/"\1##DOT##\2"/g' -e 't loop1' <<< ${1:-})"
 
   # loop2 — return original dots from ##DOT##, i.e. aaa."bb##DOT##bb".cc -> aa."bb.bb".cc
-  rev <<< "${splittable_path}" | cut -d. -f2- | rev | sed -r -e ':loop2' -e 's/(^|\.)"([^"]+)##DOT##([^"]+)"(\.|$)/\1"\2.\3"\4/g' -e 't loop2'
+  rev <<< "${splittable_path}" | cut -d. -f2- | rev | sed -E -e ':loop2' -e 's/(^|\.)"([^"]+)##DOT##([^"]+)"(\.|$)/\1"\2.\3"\4/g' -e 't loop2'
 }
 
 function context::_basename() {
   # loop1 — hide dots in keys, i.e. aaa."bb.bb".ccc -> aaa."bb##DOT##bb".cc
-  splittable_path="$(sed -r -e s/\'/\"/g -e ':loop1' -e 's/"([^".]+)\.([^"]+)"/"\1##DOT##\2"/g' -e 't loop1' <<< ${1:-})"
+  splittable_path="$(sed -E -e s/\'/\"/g -e ':loop1' -e 's/"([^".]+)\.([^"]+)"/"\1##DOT##\2"/g' -e 't loop1' <<< ${1:-})"
 
   # loop2 — return original dots from ##DOT##, i.e. "bb##DOT##bb" -> bb.bb
-  rev <<< "${splittable_path}" | cut -d. -f1 | rev | sed -r -e ':loop2' -e 's/^"([^"]+)##DOT##([^"]+)"$/\1.\2/g' -e 't loop2'
+  rev <<< "${splittable_path}" | cut -d. -f1 | rev | sed -E -e ':loop2' -e 's/^"([^"]+)##DOT##([^"]+)"$/\1.\2/g' -e 't loop2'
 }
