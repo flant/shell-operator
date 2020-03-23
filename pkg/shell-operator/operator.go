@@ -285,10 +285,10 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
 		taskLogEntry.Info("Execute hook")
 
-		newMeta := op.CombineBingingContextForHook(t)
-		if newMeta != nil {
-			t.UpdateMetadata(*newMeta)
-			hookMeta = *newMeta
+		bcs := op.CombineBingingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t)
+		if bcs != nil {
+			hookMeta.BindingContext = bcs
+			t.UpdateMetadata(hookMeta)
 		}
 
 		taskHook := op.HookManager.GetHook(hookMeta.HookName)
@@ -375,15 +375,24 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 	return res
 }
 
-func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata {
-	var hookMeta = HookMetadataAccessor(t)
-	var tasks = make([]task.Task, 0)
-	var hms = make([]HookMetadata, 0)
-	var stopIterate = false
-	q := op.TaskQueues.GetByName(t.GetQueueName())
+// CombineBingingContextForHook combines binding contexts from a sequence of task with similar
+// hook name and task type into array of binding context and delete excess tasks from queue.
+// Also, compacts sequences of binding contexts with similar group.
+// If input task has no metadata, result will be nil.
+// Metadata should implement HookNameAccessor and BindingContextAccessor interfaces.
+func (op *ShellOperator) CombineBingingContextForHook(q *queue.TaskQueue, t task.Task) []BindingContext {
 	if q == nil {
 		return nil
 	}
+	var taskMeta = t.GetMetadata()
+	if taskMeta == nil {
+		// Ignore task without metadata
+		return nil
+	}
+	var hookName = taskMeta.(HookNameAccessor).GetHookName()
+
+	var otherTasks = make([]task.Task, 0)
+	var stopIterate = false
 	q.Iterate(func(tsk task.Task) {
 		if stopIterate {
 			return
@@ -392,30 +401,33 @@ func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata
 		if tsk.GetId() == t.GetId() {
 			return
 		}
-		hm := HookMetadataAccessor(tsk)
-		if hm.HookName != hookMeta.HookName || t.GetType() != tsk.GetType() {
+		hm := tsk.GetMetadata()
+		if hm == nil {
 			stopIterate = true
 			return
 		}
-		tasks = append(tasks, tsk)
-		hms = append(hms, hm)
+		nextHookName := hm.(HookNameAccessor).GetHookName()
+		if nextHookName != hookName || t.GetType() != tsk.GetType() {
+			stopIterate = true
+			return
+		}
+		otherTasks = append(otherTasks, tsk)
 	})
 
-	//
-	if len(tasks) == 0 {
+	// no tasks found to combine
+	if len(otherTasks) == 0 {
 		return nil
 	}
 
 	// Combine binding context and make a map to delete excess tasks
 	var combinedContext = make([]BindingContext, 0)
 	var tasksFilter = make(map[string]bool)
-
-	combinedContext = append(combinedContext, hookMeta.BindingContext...)
 	// current task always remain in queue
+	combinedContext = append(combinedContext, taskMeta.(BindingContextAccessor).GetBindingContext()...)
 	tasksFilter[t.GetId()] = true
-	for i, hm := range hms {
-		combinedContext = append(combinedContext, hm.BindingContext...)
-		tasksFilter[tasks[i].GetId()] = false
+	for _, tsk := range otherTasks {
+		combinedContext = append(combinedContext, tsk.GetMetadata().(BindingContextAccessor).GetBindingContext()...)
+		tasksFilter[tsk.GetId()] = false
 	}
 	log.Infof("Will delete %d tasks from queue '%s'", len(tasksFilter)-1, t.GetQueueName())
 
@@ -427,7 +439,7 @@ func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata
 		return true
 	})
 
-	// TODO group is used to compact binding contexts when only snapshots are needed
+	// group is used to compact binding contexts when only snapshots are needed
 	var compactedContext = make([]BindingContext, 0)
 	for i := 0; i < len(combinedContext); i++ {
 		var shouldSkip = true
@@ -445,8 +457,7 @@ func (op *ShellOperator) CombineBingingContextForHook(t task.Task) *HookMetadata
 		}
 	}
 
-	hookMeta.WithBindingContext(compactedContext)
-	return &hookMeta
+	return compactedContext
 }
 
 // PrepopulateMainQueue adds tasks to run hooks with OnStartup bindings

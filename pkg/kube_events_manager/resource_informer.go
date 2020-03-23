@@ -125,7 +125,7 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 
 	// create informer with add, update, delete callbacks
 	informer := dynamicinformer.NewFilteredDynamicInformer(ei.KubeClient.Dynamic(), ei.GroupVersionResource, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
-	informer.Informer().AddEventHandler(SharedInformerEventHandler(ei))
+	informer.Informer().AddEventHandler(ei)
 	ei.SharedInformer = informer.Informer()
 
 	err = ei.ListExistedObjects()
@@ -146,21 +146,6 @@ func (ei *resourceInformer) GetExistedObjects() []ObjectAndFilterResult {
 		res = append(res, *obj)
 	}
 	return res
-}
-
-// TODO make monitor config accessible here to get LogLabels
-var SharedInformerEventHandler = func(informer *resourceInformer) cache.ResourceEventHandlerFuncs {
-	return cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			informer.HandleWatchEvent(obj.(*unstructured.Unstructured), WatchEventAdded)
-		},
-		UpdateFunc: func(_ interface{}, obj interface{}) {
-			informer.HandleWatchEvent(obj.(*unstructured.Unstructured), WatchEventModified)
-		},
-		DeleteFunc: func(obj interface{}) {
-			informer.HandleWatchEvent(obj.(*unstructured.Unstructured), WatchEventDeleted)
-		},
-	}
 }
 
 // ListExistedObjects get a list of existed objects in namespace that match selectors and
@@ -212,11 +197,28 @@ func (ei *resourceInformer) ListExistedObjects() error {
 	return nil
 }
 
+func (ei *resourceInformer) OnAdd(obj interface{}) {
+	ei.HandleWatchEvent(obj, WatchEventAdded)
+}
+
+func (ei *resourceInformer) OnUpdate(oldObj, newObj interface{}) {
+	ei.HandleWatchEvent(newObj, WatchEventModified)
+}
+
+func (ei *resourceInformer) OnDelete(obj interface{}) {
+	ei.HandleWatchEvent(obj, WatchEventDeleted)
+}
+
 // HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 //func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
-func (ei *resourceInformer) HandleWatchEvent(obj *unstructured.Unstructured, eventType WatchEventType) {
+func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType WatchEventType) {
+	if staleObj, stale := object.(cache.DeletedFinalStateUnknown); stale {
+		object = staleObj.Obj
+	}
+	var obj = object.(*unstructured.Unstructured)
+
 	resourceId := ResourceId(obj)
 
 	// Always calculate checksum and update cache, because we need actual state in CachedObjects

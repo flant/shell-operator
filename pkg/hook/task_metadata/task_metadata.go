@@ -17,6 +17,14 @@ const (
 	EnableScheduleBindings   task.TaskType = "EnableScheduleBindings"
 )
 
+type HookNameAccessor interface {
+	GetHookName() string
+}
+
+type BindingContextAccessor interface {
+	GetBindingContext() []BindingContext
+}
+
 type HookMetadata struct {
 	HookName       string // hook name
 	Binding        string // binding name
@@ -25,6 +33,10 @@ type HookMetadata struct {
 	BindingContext []BindingContext
 	AllowFailure   bool //Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
 }
+
+var _ HookNameAccessor = HookMetadata{}
+var _ BindingContextAccessor = HookMetadata{}
+var _ task.MetadataDescriptable = HookMetadata{}
 
 func HookMetadataAccessor(t task.Task) (hookMeta HookMetadata) {
 	meta := t.GetMetadata()
@@ -40,19 +52,19 @@ func HookMetadataAccessor(t task.Task) (hookMeta HookMetadata) {
 	return
 }
 
-func (m *HookMetadata) GetHookName() string {
+func (m HookMetadata) GetHookName() string {
 	return m.HookName
 }
 
-func (m *HookMetadata) GetBinding() BindingType {
+func (m HookMetadata) GetBinding() BindingType {
 	return m.BindingType
 }
 
-func (m *HookMetadata) GetBindingContext() []BindingContext {
+func (m HookMetadata) GetBindingContext() []BindingContext {
 	return m.BindingContext
 }
 
-func (m *HookMetadata) GetAllowFailure() bool {
+func (m HookMetadata) GetAllowFailure() bool {
 	return m.AllowFailure
 }
 

@@ -94,6 +94,9 @@ var SharedNamespaceInformerEventHandler = func(informer *namespaceInformer, addF
 			addFn(nsObj.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
+			if staleObj, stale := obj.(cache.DeletedFinalStateUnknown); stale {
+				obj = staleObj.Obj
+			}
 			nsObj := obj.(*v1.Namespace)
 			log.Debugf("NamespaceInformer: Deleted ns/%s", nsObj.Name)
 			delFn(nsObj.Name)

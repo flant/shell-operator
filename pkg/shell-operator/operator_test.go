@@ -112,9 +112,8 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
 	}
 
-	hm := op.CombineBingingContextForHook(currTask)
-	g.Expect(hm.BindingContext).Should(HaveLen(4))
-	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(4))
+	bcs := op.CombineBingingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask)
+	g.Expect(bcs).Should(HaveLen(4))
 }
 
 func Test_CombineBindingContext_OneHook(t *testing.T) {
@@ -172,9 +171,8 @@ func Test_CombineBindingContext_OneHook(t *testing.T) {
 		op.TaskQueues.GetByName("test_one_hook").AddLast(tsk)
 	}
 
-	hm := op.CombineBingingContextForHook(currTask)
-	g.Expect(hm).Should(BeNil())
-	g.Expect(op.TaskQueues.GetByName("test_one_hook").Length()).Should(Equal(3))
+	bcs := op.CombineBingingContextForHook(op.TaskQueues.GetByName("test_one_hook"), currTask)
+	g.Expect(bcs).Should(BeNil())
 }
 
 func Test_CombineBindingContext_Group(t *testing.T) {
@@ -285,7 +283,6 @@ func Test_CombineBindingContext_Group(t *testing.T) {
 		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
 	}
 
-	hm := op.CombineBingingContextForHook(currTask)
-	g.Expect(hm.BindingContext).Should(HaveLen(2))
-	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(4))
+	bcList := op.CombineBingingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask)
+	g.Expect(bcList).Should(HaveLen(2))
 }
