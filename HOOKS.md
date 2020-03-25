@@ -341,14 +341,17 @@ Temporary files have unique names to prevent collisions between queues and are d
 
 - `binding` — a string from the `name` or `group` parameter. If these parameters has not been set in the binding configuration, then strings `schedule` or `kubernetes` are used. For a hook executed at startup, this value is always `onStartup`.
 - `snapshots` — a map with object lists if `includeSnapshotsFrom` or `group` are defined. This map contains a list of objects for each binding name from `includeSnapshotsFrom` or for each `kubernetes` binding in a group. If `includeSnapshotsFrom` list is empty, the named field is omitted.
+- `type` — "Schedule" for `schedule` bindings. "Group" or "Synchronization" if `group` is defined.
 
-There are some extra fields for `kubernetes`-type events:
+There are more fields for `kubernetes`-type events:
 
 - `type` - "Synchronization" or "Event". "Synchronization" binding context contains all objects that match selectors in a hook's configuration. "Event" binding context contains a watch event type, an event related object and a jq filter result.
 - `watchEvent` — the possible value is one of the values you can pass in `executeHookOnEvent` binding parameter: “Added”, “Modified” or “Deleted”. This value is set if the `type` field is set to "Event".
 - `object` — the whole object related to the event. It contains an exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta) response, so it's the object state **at the moment of the event** (not at the moment of the hook execution).
 - `filterResult` — the result of `jq` execution with specified `jqFilter` on the abovementioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
 - `objects` — a list of existing objects that match selectors. Each item of this list contains `object` and `filterResult` fields. If the list is empty, the value of `objects` is an empty array.
+
+Also, `schedule` events has 
 
 ### `onStartup` binding context example
 
@@ -567,6 +570,7 @@ at 12:02, it will be executed with the following binding context:
 [
   {
     "binding": "incremental",
+    "type": "Schedule",
     "snapshots": {
       "monitor-pods": [
         {
@@ -652,12 +656,13 @@ During startup, the hook will be executed with the "Synchronization" binding con
 ]
 ```
 
-If pod `pod-dfbd12` is then added into the "default" namespace, then the hook will be executed with the binding context with `binding` and `snapshots` fields:
+If pod `pod-dfbd12` is then added into the "default" namespace, then the hook will be executed with the "Group" binding context:
 
 ```json
 [
   {
     "binding": "pods",
+    "type": "Group",
     "snapshots": {
       "monitor_pods": [
         {
@@ -698,6 +703,7 @@ Every minute it will be executed with the same binding context with fresh snapsh
 [
   {
     "binding": "pods",
+    "type": "Group",
     "snapshots": {
       "monitor_pods": [
         ...

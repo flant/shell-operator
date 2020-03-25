@@ -534,6 +534,26 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
 			},
 		},
 		{
+			"executeHookOnEvent is array in YAML",
+			`
+              configVersion: v1
+              kubernetes:
+              - name: OnCreateDeleteNamespace
+                apiVersion: v1
+                kind: Namespace
+                executeHookOnEvent:
+                - Added
+                - Deleted
+            `,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].WatchEventTypes).Should(BeNil())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].ExecuteHookOnEvents).ShouldNot(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).Should(HaveLen(2))
+				g.Expect(hookConfig.OnKubernetesEvents[0].Monitor.EventTypes).ShouldNot(BeNil())
+			},
+		},
+		{
 			"executeHookOnEvent is empty array",
 			`{
               "configVersion":"v1",
