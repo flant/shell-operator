@@ -3,7 +3,7 @@
 Use Deployment to install shell-operator with several hooks.
 
 
-### Run 
+### Run
 
 Build shell-operator image with custom scripts:
 
@@ -16,7 +16,7 @@ Edit image in shell-operator-pod.yaml and apply manifests:
 
 ```
 $ kubectl create ns example-advanced
-$ kubectl -n example-advanced apply -f shell-operator-rbac.yaml  
+$ kubectl -n example-advanced apply -f shell-operator-rbac.yaml
 $ kubectl -n example-advanced apply -f shell-operator-deploy.yaml
 ```
 
