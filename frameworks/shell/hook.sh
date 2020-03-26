@@ -25,26 +25,33 @@ function hook::_determine_kubernetes_and_scheduler_handlers() {
     case "${BINDING_CONTEXT_CURRENT_TYPE}" in
     "Synchronization")
       echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}::synchronization
+      echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}
     ;;
     "Event")
       case "$(context::jq -r '.watchEvent')" in
       "Added")
         echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}::added
         echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}::added_or_modified
+        echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}
       ;;
       "Modified")
         echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}::modified
         echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}::added_or_modified
+        echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}
       ;;
       "Deleted")
         echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}::deleted
+        echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}
       ;;
       esac
     ;;
+    "Group")
+      echo __on_group::${BINDING_CONTEXT_CURRENT_BINDING}
+    ;;
+    "Schedule")
+      echo __on_schedule::${BINDING_CONTEXT_CURRENT_BINDING}
+    ;;
     esac
-    echo __on_kubernetes::${BINDING_CONTEXT_CURRENT_BINDING}
-  else
-    echo __on_schedule::${BINDING_CONTEXT_CURRENT_BINDING}
   fi
 }
 
