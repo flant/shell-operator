@@ -28,10 +28,10 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 	var bcJson []byte
 
 	tests := []struct {
-		name        string
-		bc          func() []BindingContext
-		fn          func()
-		jqAsertions [][]string
+		name         string
+		bc           func() []BindingContext
+		fn           func()
+		jqAssertions [][]string
 	}{
 		{
 			"OnStartup binding",
@@ -187,6 +187,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				}
 				bc.Metadata.BindingType = OnKubernetesEvent
 				bc.Metadata.Group = "pods"
+				bc.Metadata.GroupType = "Group"
 				bc.Metadata.IncludeSnapshots = []string{"monitor_pods"}
 				// object without jqfilter should not have filterResult field
 				obj := ObjectAndFilterResult{
@@ -233,17 +234,18 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 			func() {
 				g.Expect(bcList[0]).Should(HaveKey("binding"))
 				g.Expect(bcList[0]).Should(HaveKey("snapshots"))
+				g.Expect(bcList[0]).Should(HaveKey("type"))
 				g.Expect(bcList[0]).ShouldNot(HaveKey("objects"))
-				g.Expect(bcList[0]).ShouldNot(HaveKey("type"))
 			},
 			[][]string{
 				{`. | length`, `2`},
 
-				// grouped binding context contains only binding and snapshots
-				{`.[0] | length`, `2`}, // Only two fields
+				// grouped binding context contains binding, type and snapshots
+				{`.[0] | length`, `3`}, // Only 3 fields
 				{`.[0].snapshots | has("monitor_pods")`, `true`},
 				{`.[0].snapshots."monitor_pods" | length`, `1`},
 				{`.[0].binding`, `"pods"`},
+				{`.[0].type`, `"Group"`},
 
 				// JSON dump should has only 4 fields: binding, type, watchEvent and object.
 				{`.[1] | length`, `4`},
@@ -267,6 +269,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				}
 				bc.Metadata.BindingType = OnKubernetesEvent
 				bc.Metadata.Group = "pods"
+				bc.Metadata.GroupType = "Synchronization"
 				bc.Metadata.IncludeSnapshots = []string{"monitor_config_maps"}
 				// object without jqfilter should not have filterResult field
 				obj := ObjectAndFilterResult{
@@ -316,7 +319,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				g.Expect(bcList[0]).Should(HaveKey("binding"))
 				g.Expect(bcList[0]["binding"]).Should(Equal("pods"))
 				g.Expect(bcList[0]).Should(HaveKey("type"))
-				g.Expect(bcList[0]["type"]).Should(Equal(TypeSynchronization))
+				g.Expect(bcList[0]["type"]).Should(Equal(string(TypeSynchronization)))
 				g.Expect(bcList[0]).Should(HaveKey("snapshots"))
 				g.Expect(bcList[0]["snapshots"]).Should(HaveLen(1))
 
@@ -331,13 +334,13 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				{`. | length`, `2`},
 
 				// grouped binding context contains binding==group, type and snapshots
-				{`.[0] | length`, `3`}, // Only two fields
+				{`.[0] | length`, `3`}, // Only 3 fields
 				{`.[0].binding`, `"pods"`},
 				{`.[0].type`, `"Synchronization"`},
 				{`.[0].snapshots | has("monitor_config_maps")`, `true`},
 				{`.[0].snapshots."monitor_config_maps" | length`, `1`},
 
-				// usual Synchronization has 4 fields: binding, type and objects.
+				// usual Synchronization has 3 fields: binding, type and objects.
 				{`.[1] | length`, `3`},
 				{`.[1].binding`, `"monitor_pods"`},
 				{`.[1].type`, `"Synchronization"`},
@@ -385,7 +388,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 			bcJson, err = bcList.Json()
 			assert.NoError(t, err)
 
-			for _, jqAssertion := range tt.jqAsertions {
+			for _, jqAssertion := range tt.jqAssertions {
 				JqEqual(t, bcJson, jqAssertion[0], jqAssertion[1])
 			}
 

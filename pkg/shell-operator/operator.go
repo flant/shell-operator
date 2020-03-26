@@ -285,13 +285,15 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
 		taskLogEntry.Info("Execute hook")
 
-		bcs := op.CombineBingingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t)
-		if bcs != nil {
-			hookMeta.BindingContext = bcs
-			t.UpdateMetadata(hookMeta)
+		taskHook := op.HookManager.GetHook(hookMeta.HookName)
+		if taskHook.Config.Version == "v1" {
+			bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t)
+			if bcs != nil {
+				hookMeta.BindingContext = bcs
+				t.UpdateMetadata(hookMeta)
+			}
 		}
 
-		taskHook := op.HookManager.GetHook(hookMeta.HookName)
 		err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
 		if err != nil {
 			hookLabel := taskHook.SafeName()
@@ -375,12 +377,12 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 	return res
 }
 
-// CombineBingingContextForHook combines binding contexts from a sequence of task with similar
+// CombineBindingContextForHook combines binding contexts from a sequence of task with similar
 // hook name and task type into array of binding context and delete excess tasks from queue.
 // Also, compacts sequences of binding contexts with similar group.
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor and BindingContextAccessor interfaces.
-func (op *ShellOperator) CombineBingingContextForHook(q *queue.TaskQueue, t task.Task) []BindingContext {
+func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task.Task) []BindingContext {
 	if q == nil {
 		return nil
 	}
@@ -441,18 +443,33 @@ func (op *ShellOperator) CombineBingingContextForHook(q *queue.TaskQueue, t task
 
 	// group is used to compact binding contexts when only snapshots are needed
 	var compactedContext = make([]BindingContext, 0)
+	var isGroup = false
+	var groupHasSynchronization = false
 	for i := 0; i < len(combinedContext); i++ {
-		var shouldSkip = true
-		if i == len(combinedContext)-1 {
-			shouldSkip = false
-		} else if combinedContext[i].Metadata.Group == "" {
-			shouldSkip = false
-		} else if combinedContext[i].Metadata.Group != combinedContext[i+1].Metadata.Group {
-			shouldSkip = false
+		var shouldSkip = false
+		var groupName = combinedContext[i].Metadata.Group
+
+		// binding context is ignore for similar group
+		if groupName != "" && (i+1 <= len(combinedContext)-1) && combinedContext[i+1].Metadata.Group == groupName {
+			shouldSkip = true
+			isGroup = true
 		}
+		if isGroup && combinedContext[i].Type == TypeSynchronization {
+			groupHasSynchronization = true
+		}
+
 		if shouldSkip {
 			continue
 		} else {
+			if isGroup {
+				if groupHasSynchronization {
+					combinedContext[i].Metadata.GroupType = string(TypeSynchronization)
+				} else {
+					combinedContext[i].Metadata.GroupType = "Group"
+				}
+			}
+			isGroup = false
+			groupHasSynchronization = false
 			compactedContext = append(compactedContext, combinedContext[i])
 		}
 	}
