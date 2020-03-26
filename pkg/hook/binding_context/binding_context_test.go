@@ -187,7 +187,6 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				}
 				bc.Metadata.BindingType = OnKubernetesEvent
 				bc.Metadata.Group = "pods"
-				bc.Metadata.GroupType = "Group"
 				bc.Metadata.IncludeSnapshots = []string{"monitor_pods"}
 				// object without jqfilter should not have filterResult field
 				obj := ObjectAndFilterResult{
@@ -269,7 +268,6 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				}
 				bc.Metadata.BindingType = OnKubernetesEvent
 				bc.Metadata.Group = "pods"
-				bc.Metadata.GroupType = "Synchronization"
 				bc.Metadata.IncludeSnapshots = []string{"monitor_config_maps"}
 				// object without jqfilter should not have filterResult field
 				obj := ObjectAndFilterResult{
@@ -319,7 +317,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				g.Expect(bcList[0]).Should(HaveKey("binding"))
 				g.Expect(bcList[0]["binding"]).Should(Equal("pods"))
 				g.Expect(bcList[0]).Should(HaveKey("type"))
-				g.Expect(bcList[0]["type"]).Should(Equal(string(TypeSynchronization)))
+				g.Expect(bcList[0]["type"]).Should(Equal("Group"))
 				g.Expect(bcList[0]).Should(HaveKey("snapshots"))
 				g.Expect(bcList[0]["snapshots"]).Should(HaveLen(1))
 
@@ -336,7 +334,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				// grouped binding context contains binding==group, type and snapshots
 				{`.[0] | length`, `3`}, // Only 3 fields
 				{`.[0].binding`, `"pods"`},
-				{`.[0].type`, `"Synchronization"`},
+				{`.[0].type`, `"Group"`},
 				{`.[0].snapshots | has("monitor_config_maps")`, `true`},
 				{`.[0].snapshots."monitor_config_maps" | length`, `1`},
 

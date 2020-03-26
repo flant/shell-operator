@@ -18,7 +18,6 @@ type BindingContext struct {
 		IncludeSnapshots    []string
 		IncludeAllSnapshots bool
 		Group               string
-		GroupType           string
 	}
 
 	// name of a binding or a group or kubeEventType if binding has no 'name' field
@@ -64,7 +63,7 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 
 	if bc.Metadata.Group != "" {
 		res["binding"] = bc.Metadata.Group
-		res["type"] = bc.Metadata.GroupType
+		res["type"] = "Group"
 		return res
 	}
 

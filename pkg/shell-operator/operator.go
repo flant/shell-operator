@@ -443,33 +443,18 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 
 	// group is used to compact binding contexts when only snapshots are needed
 	var compactedContext = make([]BindingContext, 0)
-	var isGroup = false
-	var groupHasSynchronization = false
 	for i := 0; i < len(combinedContext); i++ {
 		var shouldSkip = false
 		var groupName = combinedContext[i].Metadata.Group
 
-		// binding context is ignore for similar group
+		// binding context is ignored for similar group
 		if groupName != "" && (i+1 <= len(combinedContext)-1) && combinedContext[i+1].Metadata.Group == groupName {
 			shouldSkip = true
-			isGroup = true
-		}
-		if isGroup && combinedContext[i].Type == TypeSynchronization {
-			groupHasSynchronization = true
 		}
 
 		if shouldSkip {
 			continue
 		} else {
-			if isGroup {
-				if groupHasSynchronization {
-					combinedContext[i].Metadata.GroupType = string(TypeSynchronization)
-				} else {
-					combinedContext[i].Metadata.GroupType = "Group"
-				}
-			}
-			isGroup = false
-			groupHasSynchronization = false
 			compactedContext = append(compactedContext, combinedContext[i])
 		}
 	}
