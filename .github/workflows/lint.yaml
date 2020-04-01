@@ -47,8 +47,7 @@ jobs:
       # Restore libjq-go-build directory from cache or build it, upload it as artifact for other jobs.
       - name: Extract libjq-go.lock from go.mod
         run: |
-          grep 'flant/libjq-go' go.mod > libjq-go.lock
-          cat libjq-go.lock
+          go list -m github.com/flant/libjq-go | tee > libjq-go.lock
 
       - name: Cache libjq libraries
         id: libjq-cache
@@ -65,7 +64,7 @@ jobs:
 
           git clone https://github.com/flant/libjq-go libjq-go
           cd libjq-go
-          git submodule update --init
+          git submodule update --init --recursive
           sudo ./scripts/install-libjq-dependencies-ubuntu.sh
 
           ./scripts/build-libjq-static.sh ${GITHUB_WORKSPACE}/libjq-go ${GITHUB_WORKSPACE}/libjq
@@ -76,10 +75,10 @@ jobs:
         run: |
           echo ::set-env name=CGO_ENABLED::1
 
-          CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/build/jq/include"
+          CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
           echo ::set-env name=CGO_CFLAGS::${CGO_CFLAGS}
 
-          CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/build/onig/lib -L$GITHUB_WORKSPACE/libjq/build/jq/lib"
+          CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
           echo ::set-env name=CGO_LDFLAGS::${CGO_LDFLAGS}
 
           echo ::set-env name=GOOS::linux

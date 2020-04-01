@@ -3,9 +3,9 @@ FROM alpine:3.11 AS libjq
 RUN apk --no-cache add git ca-certificates && \
     git clone https://github.com/flant/libjq-go /libjq-go && \
     cd /libjq-go && \
-    git submodule update --init && \
+    git submodule update --init --recursive && \
     /libjq-go/scripts/install-libjq-dependencies-alpine.sh && \
-    /libjq-go/scripts/build-libjq-static.sh /libjq-go /out
+    /libjq-go/scripts/build-libjq-static.sh /libjq-go /libjq
 
 
 # build shell-operator binary
@@ -18,12 +18,12 @@ ADD go.mod go.sum /src/shell-operator/
 WORKDIR /src/shell-operator
 RUN go mod download
 
-COPY --from=libjq /out/build /build
+COPY --from=libjq /libjq /libjq
 ADD . /src/shell-operator
 
 RUN CGO_ENABLED=1 \
-    CGO_CFLAGS="-I/build/jq/include" \
-    CGO_LDFLAGS="-L/build/onig/lib -L/build/jq/lib" \
+    CGO_CFLAGS="-I/libjq/include" \
+    CGO_LDFLAGS="-L/libjq/lib" \
     GOOS=linux \
     go build -ldflags="-s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" \
              -o shell-operator \
