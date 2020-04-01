@@ -40,8 +40,9 @@ type ScheduleConfig struct {
 
 type OnKubernetesEventConfig struct {
 	CommonBindingConfig
-	Monitor              *kube_events_manager.MonitorConfig
-	IncludeSnapshotsFrom []string
-	Queue                string
-	Group                string
+	Monitor                      *kube_events_manager.MonitorConfig
+	IncludeSnapshotsFrom         []string
+	Queue                        string
+	Group                        string
+	ExecuteHookOnSynchronization bool
 }

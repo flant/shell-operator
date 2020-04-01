@@ -60,7 +60,8 @@ func Test_Validate_V1_With_Error(t *testing.T) {
   "kubernetes": [
     {
       "name": "monitor pods",
-      "watchEvent": ["Added", "Deleted", "Modified"],
+      "executeHookOnEvent": ["Added", "Deleted", "Modified"],
+      "executeHookOnSynchronization": false,
       "apiVersion": "v1",
       "kind": "Pod",
       "includeSnapshotsFrom": ["monitor pods"],

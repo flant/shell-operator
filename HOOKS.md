@@ -146,6 +146,7 @@ Syntax:
       "apiVersion": "v1",
       "kind": "Pod",
       "executeHookOnEvent": [ "Added", "Modified", "Deleted" ],
+      "executeHookOnSynchronization": true|false,
       "nameSelector": {
         "matchNames": ["pod-0", "pod-1"]
       },
@@ -223,6 +224,8 @@ Parameters:
   ```
 
 - `executeHookOnEvent` — the list of events which led to a hook's execution. By default, all events are used to execute a hook: "Added", "Modified" and "Deleted". Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta). Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.
+
+- `executeHookOnSynchronization` — if `false`, Shell-operator skips the hook execution with Synchronization binding context. See [binding context](#binding-context).
 
 - `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of a specified Kind are monitored.
 

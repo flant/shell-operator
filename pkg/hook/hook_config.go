@@ -82,22 +82,23 @@ type KubeNamespaceSelectorV0 struct {
 
 // version 1 of kubernetes event configuration
 type OnKubernetesEventConfigV1 struct {
-	Name                    string                   `json:"name,omitempty"`
-	WatchEventTypes         []WatchEventType         `json:"watchEvent,omitempty"`
-	ExecuteHookOnEvents     []WatchEventType         `json:"executeHookOnEvent,omitempty"`
-	Mode                    KubeEventMode            `json:"mode,omitempty"`
-	ApiVersion              string                   `json:"apiVersion,omitempty"`
-	Kind                    string                   `json:"kind,omitempty"`
-	NameSelector            *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
-	LabelSelector           *metav1.LabelSelector    `json:"labelSelector,omitempty"`
-	FieldSelector           *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
-	Namespace               *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
-	JqFilter                string                   `json:"jqFilter,omitempty"`
-	AllowFailure            bool                     `json:"allowFailure,omitempty"`
-	ResynchronizationPeriod string                   `json:"resynchronizationPeriod,omitempty"`
-	IncludeSnapshotsFrom    []string                 `json:"includeSnapshotsFrom,omitempty"`
-	Queue                   string                   `json:"queue,omitempty"`
-	Group                   string                   `json:"group,omitempty"`
+	Name                         string                   `json:"name,omitempty"`
+	WatchEventTypes              []WatchEventType         `json:"watchEvent,omitempty"`
+	ExecuteHookOnEvents          []WatchEventType         `json:"executeHookOnEvent,omitempty"`
+	ExecuteHookOnSynchronization string                   `json:"executeHookOnSynchronization,omitempty"`
+	Mode                         KubeEventMode            `json:"mode,omitempty"`
+	ApiVersion                   string                   `json:"apiVersion,omitempty"`
+	Kind                         string                   `json:"kind,omitempty"`
+	NameSelector                 *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
+	LabelSelector                *metav1.LabelSelector    `json:"labelSelector,omitempty"`
+	FieldSelector                *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
+	Namespace                    *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
+	JqFilter                     string                   `json:"jqFilter,omitempty"`
+	AllowFailure                 bool                     `json:"allowFailure,omitempty"`
+	ResynchronizationPeriod      string                   `json:"resynchronizationPeriod,omitempty"`
+	IncludeSnapshotsFrom         []string                 `json:"includeSnapshotsFrom,omitempty"`
+	Queue                        string                   `json:"queue,omitempty"`
+	Group                        string                   `json:"group,omitempty"`
 }
 
 type KubeNameSelectorV1 NameSelector
@@ -302,6 +303,12 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 			kubeConfig.Queue = kubeCfg.Queue
 		}
 		kubeConfig.Group = kubeCfg.Group
+
+		if kubeCfg.ExecuteHookOnSynchronization == "false" {
+			kubeConfig.ExecuteHookOnSynchronization = false
+		} else {
+			kubeConfig.ExecuteHookOnSynchronization = true
+		}
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}

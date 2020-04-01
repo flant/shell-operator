@@ -435,6 +435,67 @@ schedule:
 				g.Expect(err).Should(HaveOccurred())
 			},
 		},
+		{
+			"v1 executeHookOnSynchronization",
+			`
+              configVersion: v1
+              kubernetes:
+              - name: monitor_pods
+                apiVersion: v1
+                kind: Pod
+                executeHookOnSynchronization: false
+              - name: monitor_configmaps
+                apiVersion: v1
+                kind: ConfigMap
+                executeHookOnSynchronization: true
+              - name: monitor_secrets
+                apiVersion: v1
+                kind: Secret
+            `,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				// Version
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+
+				// Sections
+				g.Expect(hookConfig.OnStartup).To(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(3))
+
+				pods := hookConfig.OnKubernetesEvents[0]
+				g.Expect(pods.ExecuteHookOnSynchronization).Should(BeFalse())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[0].ExecuteHookOnSynchronization).Should(Equal("false"))
+
+				cms := hookConfig.OnKubernetesEvents[1]
+				g.Expect(cms.ExecuteHookOnSynchronization).Should(BeTrue())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[1].ExecuteHookOnSynchronization).Should(Equal("true"))
+
+				secrets := hookConfig.OnKubernetesEvents[2]
+				g.Expect(secrets.ExecuteHookOnSynchronization).Should(BeTrue())
+				g.Expect(hookConfig.V1.OnKubernetesEvent[2].ExecuteHookOnSynchronization).Should(Equal(""))
+
+				//g.Expect(kPods.IncludeSnapshotsFrom).Should(HaveLen(2))
+				//kPods = hookConfig.OnKubernetesEvents[1]
+				//g.Expect(kPods.IncludeSnapshotsFrom).Should(HaveLen(2))
+			},
+		},
+		{
+			"v1 bad executeHookOnSynchronization",
+			`
+              configVersion: v1
+              kubernetes:
+              - name: monitor_pods
+                apiVersion: v1
+                kind: Pod
+                executeHookOnSynchronization: ok
+            `,
+			func() {
+				g.Expect(err).Should(HaveOccurred())
+				g.Expect(err.Error()).Should(ContainSubstring("executeHookOnSynchronization"))
+			},
+		},
 	}
 
 	for _, test := range tests {

@@ -93,6 +93,11 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 			continue
 		}
 
+		// Ignore hooks with disabled execution on Synchronization
+		if !config.ExecuteHookOnSynchronization {
+			continue
+		}
+
 		info := c.HandleEvent(*firstKubeEvent)
 		res = append(res, info)
 	}

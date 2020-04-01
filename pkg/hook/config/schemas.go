@@ -142,6 +142,8 @@ properties:
           example: ".metadata.labels"
         allowFailure:
           type: boolean
+        executeHookOnSynchronization:
+          type: boolean
         resynchronizationPeriod:
           type: string
         nameSelector:
