@@ -328,7 +328,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 		hookRunTasks := []task.Task{}
 
-		// Run hook with Synchronization binding context. Ignore queue name here, execute in main queue.
+		// Run hook for each binding with Synchronization binding context. Ignore queue name here, execute in main queue.
 		err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
