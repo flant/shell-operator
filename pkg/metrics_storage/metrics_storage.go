@@ -2,7 +2,9 @@ package metrics_storage
 
 import (
 	"context"
+	"fmt"
 
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
@@ -38,31 +40,49 @@ func (m *MetricStorage) Stop() {
 	}
 }
 
-func (storage *MetricStorage) Start() {
+func (m *MetricStorage) Start() {
 	go func() {
 		for {
 			select {
-			case metric := <-storage.MetricChan:
-				metric.store(storage)
-			case <-storage.ctx.Done():
+			case metric := <-m.MetricChan:
+				metric.store(m)
+			case <-m.ctx.Done():
 				return
 			}
 		}
 	}()
 }
 
-func (storage *MetricStorage) SendGauge(metric string, value float64, labels map[string]string) {
-	storage.MetricChan <- NewGaugeMetric(storage.Prefix+metric, value, labels)
+func (m *MetricStorage) SendGauge(metric string, value float64, labels map[string]string) {
+	m.MetricChan <- NewGaugeMetric(m.Prefix+metric, value, labels)
 }
-func (storage *MetricStorage) SendCounter(metric string, value float64, labels map[string]string) {
-	storage.MetricChan <- NewCounterMetric(storage.Prefix+metric, value, labels)
+func (m *MetricStorage) SendCounter(metric string, value float64, labels map[string]string) {
+	m.MetricChan <- NewCounterMetric(m.Prefix+metric, value, labels)
 }
 
-func (storage *MetricStorage) SendGaugeNoPrefix(metric string, value float64, labels map[string]string) {
-	storage.MetricChan <- NewGaugeMetric(metric, value, labels)
+func (m *MetricStorage) SendGaugeNoPrefix(metric string, value float64, labels map[string]string) {
+	m.MetricChan <- NewGaugeMetric(metric, value, labels)
 }
-func (storage *MetricStorage) SendCounterNoPrefix(metric string, value float64, labels map[string]string) {
-	storage.MetricChan <- NewCounterMetric(metric, value, labels)
+func (m *MetricStorage) SendCounterNoPrefix(metric string, value float64, labels map[string]string) {
+	m.MetricChan <- NewCounterMetric(metric, value, labels)
+}
+
+func (m *MetricStorage) SendBatch(ops []MetricOperation, labels map[string]string) error {
+	// Apply metric operations
+	for _, metricOp := range ops {
+		labels := utils.MergeLabels(metricOp.Labels, labels)
+
+		if metricOp.Add != nil {
+			m.SendCounterNoPrefix(metricOp.Name, *metricOp.Add, labels)
+			continue
+		}
+		if metricOp.Set != nil {
+			m.SendGaugeNoPrefix(metricOp.Name, *metricOp.Set, labels)
+			continue
+		}
+		return fmt.Errorf("no operation in metric from module hook, name=%s", metricOp.Name)
+	}
+	return nil
 }
 
 type Metric interface {

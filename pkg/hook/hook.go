@@ -17,6 +17,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
+	"github.com/flant/shell-operator/pkg/metrics_storage"
 )
 
 type CommonHook interface {
@@ -66,7 +67,7 @@ func (h *Hook) GetHookController() controller.HookController {
 	return h.HookController
 }
 
-func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) error {
+func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) ([]metrics_storage.MetricOperation, error) {
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
@@ -74,30 +75,42 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 
 	contextPath, err := h.prepareBindingContextJsonFile(versionedContextList)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	metricsPath, err := h.prepareMetricsFile()
+	if err != nil {
+		return nil, err
+	}
+
 	// remove tmp file on hook exit
 	defer func() {
-		if app.DebugKeepTmpFiles == "yes" {
-			return
+		if app.DebugKeepTmpFiles != "yes" {
+			os.Remove(contextPath)
+			os.Remove(metricsPath)
 		}
-		os.Remove(contextPath)
 	}()
 
 	envs := []string{}
 	envs = append(envs, os.Environ()...)
 	if contextPath != "" {
 		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
+		envs = append(envs, fmt.Sprintf("METRICS_PATH=%s", metricsPath))
 	}
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
 	err = executor.RunAndLogLines(hookCmd, logLabels)
 	if err != nil {
-		return fmt.Errorf("%s FAILED: %s", h.Name, err)
+		return nil, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
 
-	return nil
+	metrics, err := metrics_storage.MetricOperationsFromFile(metricsPath)
+	if err != nil {
+		return nil, fmt.Errorf("got bad metrics: %s", err)
+	}
+
+	return metrics, nil
 }
 
 func (h *Hook) SafeName() string {
@@ -149,4 +162,15 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 	}
 
 	return bindingContextPath, nil
+}
+
+func (h *Hook) prepareMetricsFile() (string, error) {
+	metricsPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-metrics-%s.json", h.SafeName(), uuid.NewV4().String()))
+
+	err := ioutil.WriteFile(metricsPath, []byte{}, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	return metricsPath, nil
 }

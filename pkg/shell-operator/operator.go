@@ -294,7 +294,14 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 			}
 		}
 
-		err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+		metrics, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+
+		if err == nil {
+			err = op.MetricStorage.SendBatch(metrics, map[string]string{
+				"hook": hookMeta.HookName,
+			})
+		}
+
 		if err != nil {
 			hookLabel := taskHook.SafeName()
 
