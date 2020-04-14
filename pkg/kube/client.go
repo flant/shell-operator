@@ -38,6 +38,7 @@ type KubernetesClient interface {
 
 	WithContextName(contextName string)
 	WithConfigPath(configPath string)
+	WithServer(server string)
 	WithRateLimiterSettings(qps float32, burst int)
 
 	Init() error
@@ -75,6 +76,11 @@ type kubernetesClient struct {
 	dynamicClient    dynamic.Interface
 	qps              float32
 	burst            int
+	server           string
+}
+
+func (c *kubernetesClient) WithServer(server string) {
+	c.server = server
 }
 
 func (c *kubernetesClient) WithContextName(name string) {
@@ -106,37 +112,48 @@ func (c *kubernetesClient) Init() error {
 	var configType = "out-of-cluster"
 	var defaultNs string
 
-	// Try to load from kubeconfig in flags or from ~/.kube/config
-	config, defaultNs, outOfClusterErr := getOutOfClusterConfig(c.contextName, c.configPath)
+	if c.server == "" {
+		// Try to load from kubeconfig in flags or from ~/.kube/config
+		var outOfClusterErr error
+		config, defaultNs, outOfClusterErr = getOutOfClusterConfig(c.contextName, c.configPath)
 
-	if config == nil {
-		if hasInClusterConfig() {
-			// Try to configure as inCluster
-			config, defaultNs, err = getInClusterConfig()
-			if err != nil {
-				if c.configPath != "" || c.contextName != "" {
-					if outOfClusterErr != nil {
-						err = fmt.Errorf("out-of-cluster config error: %v, in-cluster config error: %v", outOfClusterErr, err)
-						logEntry.Errorf("configuration problems: %s", err)
-						return err
+		if config == nil {
+			if hasInClusterConfig() {
+				// Try to configure as inCluster
+				config, defaultNs, err = getInClusterConfig()
+				if err != nil {
+					if c.configPath != "" || c.contextName != "" {
+						if outOfClusterErr != nil {
+							err = fmt.Errorf("out-of-cluster config error: %v, in-cluster config error: %v", outOfClusterErr, err)
+							logEntry.Errorf("configuration problems: %s", err)
+							return err
+						} else {
+							return fmt.Errorf("in-cluster config is not found")
+						}
 					} else {
-						return fmt.Errorf("in-cluster config is not found")
+						logEntry.Errorf("in-cluster problem: %s", err)
+						return err
 					}
+				}
+			} else {
+				// if not in cluster return outOfCluster error
+				if outOfClusterErr != nil {
+					logEntry.Errorf("out-of-cluster problem: %s", outOfClusterErr)
+					return outOfClusterErr
 				} else {
-					logEntry.Errorf("in-cluster problem: %s", err)
-					return err
+					return fmt.Errorf("no kubernetes client config found")
 				}
 			}
-		} else {
-			// if not in cluster return outOfCluster error
-			if outOfClusterErr != nil {
-				logEntry.Errorf("out-of-cluster problem: %s", outOfClusterErr)
-				return outOfClusterErr
-			} else {
-				return fmt.Errorf("no kubernetes client config found")
-			}
+			configType = "in-cluster"
 		}
-		configType = "in-cluster"
+	} else {
+		// use specific server to connect to API
+		config = &rest.Config{
+			Host: c.server,
+		}
+		_ = rest.SetKubernetesDefaults(config)
+		defaultNs = "default"
+		configType = "server"
 	}
 
 	c.defaultNamespace = defaultNs

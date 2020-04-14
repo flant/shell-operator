@@ -4,6 +4,7 @@ import "gopkg.in/alecthomas/kingpin.v2"
 
 var KubeContext = ""
 var KubeConfig = ""
+var KubeServer = ""
 var KubeClientQpsDefault = "5" // DefaultQPS from k8s.io/client-go/rest/config.go
 var KubeClientQps float32
 var KubeClientBurstDefault = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
@@ -29,4 +30,9 @@ func DefineKubeClientFlags(cmd *kingpin.CmdClause) {
 		Envar("KUBE_CLIENT_BURST").
 		Default(KubeClientBurstDefault).
 		IntVar(&KubeClientBurst)
+
+	cmd.Flag("kube-server", "The address and port of the Kubernetes API server. Can be set with $KUBE_SERVER.").
+		Envar("KUBE_SERVER").
+		Default(KubeServer).
+		StringVar(&KubeServer)
 }
