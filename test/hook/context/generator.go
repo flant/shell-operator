@@ -18,8 +18,30 @@ var FakeCluster *fake.FakeCluster
 
 // convertBindingContexts render json with array of binding contexts
 func convertBindingContexts(bindingContexts []BindingContext) (string, error) {
+	// Compact groups
+	lastGroup := ""
+	lastGroupIndex := 0
+	compactedBindingContexts := make([]BindingContext, 0, len(bindingContexts))
+
+	for _, bindingContext := range bindingContexts {
+		if bindingContext.Metadata.Group == "" {
+			lastGroup = ""
+			compactedBindingContexts = append(compactedBindingContexts, bindingContext)
+			continue
+		}
+
+		if lastGroup != bindingContext.Metadata.Group {
+			compactedBindingContexts = append(compactedBindingContexts, bindingContext)
+			lastGroup = bindingContext.Metadata.Group
+			lastGroupIndex = len(compactedBindingContexts) - 1
+			continue
+		}
+
+		compactedBindingContexts[lastGroupIndex] = bindingContext
+	}
+
 	// Only v1 binding contexts supported by now
-	bcList := ConvertBindingContextList("v1", bindingContexts)
+	bcList := ConvertBindingContextList("v1", compactedBindingContexts)
 	data, err := bcList.Json()
 	if err != nil {
 		return "", fmt.Errorf("marshaling binding context error: %v", err)

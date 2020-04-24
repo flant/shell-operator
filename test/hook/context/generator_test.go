@@ -210,3 +210,41 @@ metadata:
 	g.Expect(bindingContexts[0].Snapshots["deployment"]).To(HaveLen(1))
 	g.Expect(string(bindingContexts[0].Type)).To(Equal("Synchronization"))
 }
+
+func Test_Groups(t *testing.T) {
+	g := NewWithT(t)
+
+	c, err := NewBindingContextController(`configVersion: v1
+kubernetes:
+- apiVersion: apps/v1
+  group: main
+  kind: Deployment
+  name: deployment
+- apiVersion: v1
+  group: main
+  kind: Secret
+  name: secret
+`, `
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-res-obj-2
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-secret-obj-2
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	rawData, err := c.Run()
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	bindingContexts := parseContexts(rawData)
+
+	g.Expect(bindingContexts).To(HaveLen(1))
+	g.Expect(string(bindingContexts[0].Type)).To(Equal("Group"))
+	g.Expect(bindingContexts[0].Snapshots).To(HaveKey("secret"))
+	g.Expect(bindingContexts[0].Snapshots).To(HaveKey("deployment"))
+}
