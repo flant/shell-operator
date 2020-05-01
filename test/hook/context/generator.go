@@ -150,6 +150,32 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 	return convertBindingContexts(bindingContexts)
 }
 
+func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQuantity int, newState string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	bindingContexts := make([]BindingContext, 0)
+
+	_, err := b.Controller.ChangeState(newState)
+	if err != nil {
+		return "", fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
+	}
+
+	for len(bindingContexts) != desiredQuantity {
+		select {
+		case ev := <-b.KubeEventsManager.Ch():
+			b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
+				bindingContexts = append(bindingContexts, info.BindingContext...)
+			})
+			continue
+		case <-ctx.Done():
+			return "", fmt.Errorf("timeout occurred while waiting for binding contexts")
+		}
+	}
+
+	return convertBindingContexts(bindingContexts)
+}
+
 func (b *BindingContextController) RunSchedule(crontab string) (string, error) {
 	bindingContexts := make([]BindingContext, 0)
 
