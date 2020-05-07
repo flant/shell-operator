@@ -84,7 +84,7 @@ function context::_dirname() {
   splittable_path="$(sed -E -e s/\'/\"/g -e ':loop1' -e 's/"([^".]+)\.([^"]+)"/"\1##DOT##\2"/g' -e 't loop1' <<< ${1:-})"
 
   # loop2 — return original dots from ##DOT##, i.e. aaa."bb##DOT##bb".cc -> aa."bb.bb".cc
-  rev <<< "${splittable_path}" | cut -d. -f2- | rev | sed -E -e ':loop2' -e 's/(^|\.)"([^"]+)##DOT##([^"]+)"(\.|$)/\1"\2.\3"\4/g' -e 't loop2'
+  rev <<< ".${splittable_path}" | cut -d. -f2- | rev | sed -E -e ':loop2' -e 's/(^|\.)"([^"]+)##DOT##([^"]+)"(\.|$)/\1"\2.\3"\4/g' -e 't loop2' -e 's/^.//'
 }
 
 function context::_basename() {
@@ -92,5 +92,6 @@ function context::_basename() {
   splittable_path="$(sed -E -e s/\'/\"/g -e ':loop1' -e 's/"([^".]+)\.([^"]+)"/"\1##DOT##\2"/g' -e 't loop1' <<< ${1:-})"
 
   # loop2 — return original dots from ##DOT##, i.e. "bb##DOT##bb" -> bb.bb
-  rev <<< "${splittable_path}" | cut -d. -f1 | rev | sed -E -e ':loop2' -e 's/^"([^"]+)##DOT##([^"]+)"$/\1.\2/g' -e 't loop2'
+  rev <<< ".${splittable_path}" | cut -d. -f1 | rev | sed -E -e ':loop2' -e 's/^"([^"]+)##DOT##([^"]+)"$/\1.\2/g' -e 't loop2'
 }
+
