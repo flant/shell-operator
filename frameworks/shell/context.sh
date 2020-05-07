@@ -94,4 +94,3 @@ function context::_basename() {
   # loop2 — return original dots from ##DOT##, i.e. "bb##DOT##bb" -> bb.bb
   rev <<< ".${splittable_path}" | cut -d. -f1 | rev | sed -E -e ':loop2' -e 's/^"([^"]+)##DOT##([^"]+)"$/\1.\2/g' -e 't loop2'
 }
-
