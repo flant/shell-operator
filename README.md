@@ -47,7 +47,7 @@ Let's create a small operator that will watch for all Pods in all Namespaces and
 if [[ $1 == "--config" ]] ; then
   cat <<EOF
 configVersion: v1
-kubernetes":
+kubernetes:
 - apiVersion: v1
   kind: Pod
   executeHookOnEvent: ["Added"]
