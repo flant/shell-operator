@@ -45,4 +45,5 @@ type OnKubernetesEventConfig struct {
 	Queue                        string
 	Group                        string
 	ExecuteHookOnSynchronization bool
+	WaitForSynchronization       bool
 }

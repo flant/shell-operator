@@ -144,6 +144,8 @@ properties:
           type: boolean
         executeHookOnSynchronization:
           type: boolean
+        waitForSynchronization:
+          type: boolean
         resynchronizationPeriod:
           type: string
         nameSelector:

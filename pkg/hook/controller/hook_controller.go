@@ -10,13 +10,14 @@ import (
 )
 
 type BindingExecutionInfo struct {
-	BindingContext      []BindingContext
-	IncludeSnapshots    []string
-	IncludeAllSnapshots bool
-	AllowFailure        bool
-	QueueName           string
-	Binding             string
-	Group               string
+	BindingContext         []BindingContext
+	IncludeSnapshots       []string
+	IncludeAllSnapshots    bool
+	AllowFailure           bool
+	QueueName              string
+	Binding                string
+	Group                  string
+	WaitForSynchronization bool
 }
 
 // В каждый хук надо будет положить этот объект.

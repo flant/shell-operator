@@ -31,6 +31,9 @@ type Config struct {
 
 var reapLogEntry = log.WithField("operator.component", "zombieReaper")
 
+// Reap orphaned processes after unlocking
+var ReapLocked = true
+
 //  Handle death of child (SIGCHLD) messages. Pushes the signal onto the
 //  notifications channel if there is a waiter.
 func sigChildHandler(notifications chan os.Signal) {
@@ -64,8 +67,16 @@ func reapChildren(config Config) {
 
 	pid := config.Pid
 
+	// TODO RWMutex is not appropriate here: call to Lock blocks subsequent RLock calls. Reaper should wait for orpahs on 'zero locks' event similar to WaitGroup but without Wait limitations
+
+	// TODO may be allow syscall.Wait only after some condition is met (for example, after all Synchronization are done or after all converge tasks are done)?
+
 	for {
 		<-notifications
+
+		if ReapLocked {
+			continue
+		}
 
 		// Lock until all exec.Cmd are stopped.
 		ExecutorLock.Lock()

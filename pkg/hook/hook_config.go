@@ -86,6 +86,7 @@ type OnKubernetesEventConfigV1 struct {
 	WatchEventTypes              []WatchEventType         `json:"watchEvent,omitempty"`
 	ExecuteHookOnEvents          []WatchEventType         `json:"executeHookOnEvent,omitempty"`
 	ExecuteHookOnSynchronization string                   `json:"executeHookOnSynchronization,omitempty"`
+	WaitForSynchronization       string                   `json:"waitForSynchronization,omitempty"`
 	Mode                         KubeEventMode            `json:"mode,omitempty"`
 	ApiVersion                   string                   `json:"apiVersion,omitempty"`
 	Kind                         string                   `json:"kind,omitempty"`
@@ -308,6 +309,13 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 			kubeConfig.ExecuteHookOnSynchronization = false
 		} else {
 			kubeConfig.ExecuteHookOnSynchronization = true
+		}
+
+		// Disable WaitForSynchronization makes sense only for named queues.
+		if kubeCfg.WaitForSynchronization == "false" && kubeCfg.Queue != "" {
+			kubeConfig.WaitForSynchronization = false
+		} else {
+			kubeConfig.WaitForSynchronization = true
 		}
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)

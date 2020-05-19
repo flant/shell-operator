@@ -287,7 +287,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 		taskHook := op.HookManager.GetHook(hookMeta.HookName)
 		if taskHook.Config.Version == "v1" {
-			bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t)
+			bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
 			if bcs != nil {
 				hookMeta.BindingContext = bcs
 				t.UpdateMetadata(hookMeta)
@@ -389,7 +389,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 // Also, compacts sequences of binding contexts with similar group.
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor and BindingContextAccessor interfaces.
-func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task.Task) []BindingContext {
+func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) []BindingContext {
 	if q == nil {
 		return nil
 	}
@@ -416,11 +416,18 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 			return
 		}
 		nextHookName := hm.(HookNameAccessor).GetHookName()
-		if nextHookName != hookName || t.GetType() != tsk.GetType() {
+		// Only tasks for the same hook and of the same type can be combined.
+		// Using stopCombineFn function more stricter combine rules can be defined.
+		if nextHookName == hookName && t.GetType() == tsk.GetType() {
+			if stopCombineFn != nil {
+				stopIterate = stopCombineFn(tsk)
+			}
+		} else {
 			stopIterate = true
-			return
 		}
-		otherTasks = append(otherTasks, tsk)
+		if !stopIterate {
+			otherTasks = append(otherTasks, tsk)
+		}
 	})
 
 	// no tasks found to combine
