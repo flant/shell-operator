@@ -113,7 +113,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
 	}
 
-	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask)
+	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask, nil)
 	g.Expect(bcs).Should(HaveLen(4))
 }
 
@@ -284,7 +284,7 @@ func Test_CombineBindingContext_Group(t *testing.T) {
 		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
 	}
 
-	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask)
+	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask, nil)
 	g.Expect(bcList).Should(HaveLen(2))
 }
 
@@ -443,7 +443,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
 	}
 
-	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask)
+	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask, nil)
 
 	g.Expect(bcList).Should(HaveLen(5))
 
