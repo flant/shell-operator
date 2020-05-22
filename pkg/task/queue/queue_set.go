@@ -109,3 +109,13 @@ func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
 		}
 	}
 }
+
+func (tqs *TaskQueueSet) Remove(name string) {
+	ts, exists := tqs.Queues[name]
+	if exists {
+		ts.Stop()
+	}
+	tqs.m.Lock()
+	defer tqs.m.Unlock()
+	delete(tqs.Queues, name)
+}

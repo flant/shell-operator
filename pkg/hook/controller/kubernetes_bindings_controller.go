@@ -13,15 +13,17 @@ import (
 )
 
 // A link between a hook and a kube monitor
+// TODO replace "Useful fields" with OnKubernetesEventConfig
 type KubernetesBindingToMonitorLink struct {
 	BindingName string
 	MonitorId   string
 	// Useful fields to create a BindingContext
-	IncludeSnapshots []string
-	AllowFailure     bool
-	JqFilter         string
-	QueueName        string
-	Group            string
+	IncludeSnapshots       []string
+	AllowFailure           bool
+	JqFilter               string
+	QueueName              string
+	Group                  string
+	WaitForSynchronization bool
 }
 
 // KubernetesBindingsController handles kubernetes bindings for one hook.
@@ -79,13 +81,14 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 			return nil, fmt.Errorf("run monitor: %s", err)
 		}
 		c.BindingMonitorLinks[config.Monitor.Metadata.MonitorId] = &KubernetesBindingToMonitorLink{
-			MonitorId:        config.Monitor.Metadata.MonitorId,
-			BindingName:      config.BindingName,
-			IncludeSnapshots: config.IncludeSnapshotsFrom,
-			AllowFailure:     config.AllowFailure,
-			JqFilter:         config.Monitor.JqFilter,
-			QueueName:        config.Queue,
-			Group:            config.Group,
+			MonitorId:              config.Monitor.Metadata.MonitorId,
+			BindingName:            config.BindingName,
+			IncludeSnapshots:       config.IncludeSnapshotsFrom,
+			AllowFailure:           config.AllowFailure,
+			JqFilter:               config.Monitor.JqFilter,
+			QueueName:              config.Queue,
+			Group:                  config.Group,
+			WaitForSynchronization: config.WaitForSynchronization,
 		}
 
 		// There is no Synchronization event for 'v0' binding configuration.
@@ -144,12 +147,13 @@ func (c *kubernetesBindingsController) HandleEvent(kubeEvent KubeEvent) BindingE
 	bindingContext := ConvertKubeEventToBindingContext(kubeEvent, link)
 
 	return BindingExecutionInfo{
-		BindingContext:   bindingContext,
-		IncludeSnapshots: link.IncludeSnapshots,
-		AllowFailure:     link.AllowFailure,
-		QueueName:        link.QueueName,
-		Binding:          link.BindingName,
-		Group:            link.Group,
+		BindingContext:         bindingContext,
+		IncludeSnapshots:       link.IncludeSnapshots,
+		AllowFailure:           link.AllowFailure,
+		QueueName:              link.QueueName,
+		Binding:                link.BindingName,
+		Group:                  link.Group,
+		WaitForSynchronization: link.WaitForSynchronization,
 	}
 }
 

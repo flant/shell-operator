@@ -35,6 +35,7 @@ func main() {
 
 			// Be a good parent - clean up after the child processes
 			// in case if shell-operator is a PID1.
+			executor.ReapLocked = false
 			go executor.Reap()
 
 			defaultOperator := shell_operator.DefaultOperator()

@@ -26,6 +26,7 @@ config parameter.
 var (
 	DelayOnQueueIsEmpty = 3 * time.Second
 	DelayOnFailedTask   = 5 * time.Second
+	DelayOnRepeat       = 25 * time.Millisecond
 )
 
 type QueueWatcher interface {
@@ -92,7 +93,6 @@ func (q *TaskQueue) AddFirst(t task.Task) {
 	q.m.Lock()
 	q.items = append([]task.Task{t}, q.items...)
 	q.m.Unlock()
-	q.queueChanged()
 }
 
 // RemoveFirst deletes a head element, so head is moved.
@@ -105,7 +105,6 @@ func (q *TaskQueue) RemoveFirst() (t task.Task) {
 	t = q.items[0]
 	q.items = q.items[1:]
 	q.m.Unlock()
-	q.queueChanged()
 	return t
 }
 
@@ -124,7 +123,6 @@ func (q *TaskQueue) AddLast(task task.Task) {
 	q.m.Lock()
 	q.items = append(q.items, task)
 	q.m.Unlock()
-	q.queueChanged()
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
@@ -141,7 +139,6 @@ func (q *TaskQueue) RemoveLast() (t task.Task) {
 		q.items = q.items[:len(q.items)-1]
 	}
 	q.m.Unlock()
-	q.queueChanged()
 	return t
 }
 
@@ -167,7 +164,7 @@ func (q *TaskQueue) Get(id string) task.Task {
 	return nil
 }
 
-//
+// AddAfter inserts a task after the task with specified id.
 func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 	newItems := make([]task.Task, len(q.items)+1)
 
@@ -190,7 +187,7 @@ func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 	q.items = newItems
 }
 
-//
+// AddBefore inserts a task before the task with specified id.
 func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 	newItems := make([]task.Task, len(q.items)+1)
 
@@ -215,10 +212,6 @@ func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 
 	q.items = newItems
 }
-
-//func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
-//	return
-//}
 
 // Remove finds element by id and deletes it.
 func (q *TaskQueue) Remove(id string) (t task.Task) {
@@ -319,7 +312,12 @@ func (q *TaskQueue) Start() {
 					}
 				})
 				q.Status = ""
+			case "Repeat":
+				// repeat a current task after a small delay
+				nextSleepDelay = DelayOnRepeat
+				q.Status = "repeat head task"
 			}
+
 			if taskRes.DelayBeforeNextTask != 0 {
 				nextSleepDelay = taskRes.DelayBeforeNextTask
 				q.Status = fmt.Sprintf("sleep for %s", nextSleepDelay.String())
@@ -414,60 +412,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 	q.items = newItems
 }
 
-// Watcher functions
-
-// AddWatcher adds queue watcher.
-func (q *TaskQueue) AddWatcher(queueWatcher QueueWatcher) {
-	q.queueWatchers = append(q.queueWatchers, queueWatcher)
-}
-
-// queueChanged must be called every time the queue is changed.
-func (q *TaskQueue) queueChanged() {
-	// TODO
-	// if q.changesSuspended { return }
-
-	if len(q.queueWatchers) == 0 {
-		return
-	}
-
-	if q.changesEnabled {
-		for _, watcher := range q.queueWatchers {
-			watcher.QueueChangeCallback()
-		}
-	} else {
-		q.changesCount++
-	}
-	// TODO
-	// Send changes signal asynchronously.
-	// go func(){
-	// for _, watcher := range q.watchers {
-	//   watcher.Ch() <- true
-	// }
-	// }()
-}
-
-// TODO
-//func (q *TaskQueue) DoWithSuspendedWatchers(action func (Task)) {
-//
-//
-//}
-
-// Включить вызов QueueChangeCallback при каждом изменении
-// В паре с ChangesDisabled могут быть использованы, чтобы
-// производить массовые изменения. Если runCallbackOnPreviousChanges true,
-// то будет вызвана QueueChangeCallback
-func (q *TaskQueue) ChangesEnable(runCallbackOnPreviousChanges bool) {
-	q.changesEnabled = true
-	if runCallbackOnPreviousChanges && q.changesCount > 0 {
-		q.changesCount = 0
-		q.queueChanged()
-	}
-}
-
-func (q *TaskQueue) ChangesDisable() {
-	q.changesEnabled = false
-	q.changesCount = 0
-}
+// TODO define mapping method with QueueAction to insert, modify and delete tasks.
 
 // Dump tasks in queue to one line
 func (q *TaskQueue) String() string {
