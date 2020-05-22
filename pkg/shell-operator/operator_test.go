@@ -172,7 +172,7 @@ func Test_CombineBindingContext_OneHook(t *testing.T) {
 		op.TaskQueues.GetByName("test_one_hook").AddLast(tsk)
 	}
 
-	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_one_hook"), currTask)
+	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_one_hook"), currTask, nil)
 	g.Expect(bcs).Should(BeNil())
 }
 
