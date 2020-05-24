@@ -32,7 +32,7 @@ RUN CGO_ENABLED=1 \
 
 # build final image
 FROM alpine:3.10
-RUN apk --no-cache add ca-certificates jq bash sed && \
+RUN apk --no-cache add ca-certificates jq bash sed tini && \
     wget https://storage.googleapis.com/kubernetes-release/release/v1.17.4/bin/linux/amd64/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
@@ -41,5 +41,5 @@ COPY --from=shell-operator /src/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_HOOKS_DIR /hooks
 ENV LOG_TYPE json
-ENTRYPOINT ["/shell-operator"]
+ENTRYPOINT ["/sbin/tini", "--", "/shell-operator"]
 CMD ["start"]

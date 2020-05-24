@@ -43,9 +43,7 @@ jobs:
       matrix:
         flavour:
           - ubuntu
-          - alpine3.9
-          - alpine3.10
-          - alpine3.11
+          - alpine
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev images' label
     steps:
@@ -63,13 +61,7 @@ jobs:
           dockerFile=Dockerfile
 
           case $FLAVOUR in
-            alpine3.9)
-              dockerFile="Dockerfile-alpine3.9"
-              ;;
-            alpine3.10)
-              dockerFile="Dockerfile-alpine3.10"
-              ;;
-            alpine3.11)
+            alpine)
               dockerFile="Dockerfile-alpine3.11"
               ;;
           esac

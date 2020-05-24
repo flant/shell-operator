@@ -34,6 +34,7 @@ RUN CGO_ENABLED=1 \
              -o shell-operator \
              ./cmd/shell-operator
 
+FROM krallin/ubuntu-tini:bionic AS tini
 
 # build final image
 FROM ubuntu:18.04
@@ -44,9 +45,10 @@ RUN apt-get update && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 ADD frameworks /
+COPY --from=tini /usr/local/bin/tini /sbin/tini
 COPY --from=shell-operator /src/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_HOOKS_DIR /hooks
 ENV LOG_TYPE json
-ENTRYPOINT ["/shell-operator"]
+ENTRYPOINT ["/sbin/tini", "--", "/shell-operator"]
 CMD ["start"]
