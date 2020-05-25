@@ -11,24 +11,16 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
-var ExecutorLock = &sync.RWMutex{}
-
-// This family of methods use ExecutorLock to not be interfered by zombie reaper.
-
 func Run(cmd *exec.Cmd) error {
-	ExecutorLock.RLock()
-	defer ExecutorLock.RUnlock()
-
 	// TODO context: hook name, hook phase, hook binding
+	// TODO observability
 	log.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
 	return cmd.Run()
 }
 
 func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
-	ExecutorLock.RLock()
-	defer ExecutorLock.RUnlock()
-
+	// TODO observability
 	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 	stdoutLogEntry := logEntry.WithField("output", "stdout")
 	stderrLogEntry := logEntry.WithField("output", "stderr")
@@ -83,9 +75,9 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
 }
 
 func Output(cmd *exec.Cmd) (output []byte, err error) {
-	ExecutorLock.RLock()
-	defer ExecutorLock.RUnlock()
-
+	// TODO context: hook name, hook phase, hook binding
+	// TODO observability
+	log.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 	output, err = cmd.Output()
 	return
 }

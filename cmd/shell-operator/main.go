@@ -9,7 +9,6 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/executor"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
@@ -32,11 +31,6 @@ func main() {
 		Action(func(c *kingpin.ParseContext) error {
 			app.SetupLogging()
 			log.Infof("%s %s", app.AppName, app.Version)
-
-			// Be a good parent - clean up after the child processes
-			// in case if shell-operator is a PID1.
-			executor.ReapLocked = false
-			go executor.Reap()
 
 			defaultOperator := shell_operator.DefaultOperator()
 			err := shell_operator.InitAndStart(defaultOperator)
