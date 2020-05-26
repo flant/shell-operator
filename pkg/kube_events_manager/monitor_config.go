@@ -12,9 +12,10 @@ import (
 // version of OnKubernetesEventConfig.
 type MonitorConfig struct {
 	Metadata struct {
-		MonitorId string
-		DebugName string
-		LogLabels map[string]string
+		MonitorId    string
+		DebugName    string
+		LogLabels    map[string]string
+		MetricLabels map[string]string
 	}
 	EventTypes        []WatchEventType
 	ApiVersion        string

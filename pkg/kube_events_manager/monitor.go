@@ -5,15 +5,17 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flant/shell-operator/pkg/kube"
-	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metrics_storage"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type Monitor interface {
 	WithKubeClient(client kube.KubernetesClient)
+	WithMetricStorage(mstor *metrics_storage.MetricStorage)
 	WithConfig(config *MonitorConfig)
 	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateInformers() error
@@ -42,8 +44,9 @@ type monitor struct {
 
 	cancelForNs map[string]context.CancelFunc
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx           context.Context
+	cancel        context.CancelFunc
+	metricStorage *metrics_storage.MetricStorage
 }
 
 var NewMonitor = func() Monitor {
@@ -57,6 +60,10 @@ var NewMonitor = func() Monitor {
 
 func (m *monitor) WithKubeClient(client kube.KubernetesClient) {
 	m.KubeClient = client
+}
+
+func (m *monitor) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+	m.metricStorage = mstor
 }
 
 func (m *monitor) WithConfig(config *MonitorConfig) {
@@ -213,6 +220,7 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []Res
 	for _, objName := range objNames {
 		informer := NewResourceInformer(m.Config)
 		informer.WithKubeClient(m.KubeClient)
+		informer.WithMetricStorage(m.metricStorage)
 		informer.WithNamespace(namespace)
 		informer.WithName(objName)
 		informer.WithKubeEventCb(m.eventCb)

@@ -18,6 +18,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	. "github.com/flant/shell-operator/pkg/utils/measure"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
@@ -143,6 +144,11 @@ func (op *ShellOperator) Init() (err error) {
 		// Metric storage and live metrics
 		op.MetricStorage.Start()
 	}
+	// define buckets
+	op.MetricStorage.DefineHistogramBuckets("queue_hist", []float64{0.0, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0})                                        // 1 microsend to 1 millisecond
+	op.MetricStorage.DefineHistogramBuckets("hook_run_hist", []float64{0.0, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0})            // 1ms to 10s
+	op.MetricStorage.DefineHistogramBuckets("kube_jq_hist", []float64{0.0, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0})             // 1ms to 10s
+	op.MetricStorage.DefineHistogramBuckets("kube_event_duration_hist", []float64{0.0, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0}) // 1ms to 10s
 
 	if op.KubeClient == nil {
 		op.KubeClient = kube.NewKubernetesClient()
@@ -160,6 +166,7 @@ func (op *ShellOperator) Init() (err error) {
 	// Initialize the task queues set with the "main" queue.
 	op.TaskQueues = queue.NewTaskQueueSet()
 	op.TaskQueues.WithContext(op.ctx)
+	op.TaskQueues.WithMetricStorage(op.MetricStorage)
 
 	// Initialize schedule manager.
 	op.ScheduleManager = schedule_manager.NewScheduleManager()
@@ -169,6 +176,7 @@ func (op *ShellOperator) Init() (err error) {
 	op.KubeEventsManager = kube_events_manager.NewKubeEventsManager()
 	op.KubeEventsManager.WithKubeClient(op.KubeClient)
 	op.KubeEventsManager.WithContext(op.ctx)
+	op.KubeEventsManager.WithMetricStorage(op.MetricStorage)
 
 	// Initialize events handler that emit tasks to run hooks
 	op.ManagerEventsHandler = NewManagerEventsHandler()
@@ -277,95 +285,11 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 	switch t.GetType() {
 	case HookRun:
-		hookLogLabels := map[string]string{}
-		hookLogLabels["hook"] = hookMeta.HookName
-		hookLogLabels["binding"] = string(hookMeta.BindingType)
-		hookLogLabels["task"] = "HookRun"
-		hookLogLabels["queue"] = t.GetQueueName()
-		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
-		taskLogEntry.Info("Execute hook")
-
-		taskHook := op.HookManager.GetHook(hookMeta.HookName)
-		if taskHook.Config.Version == "v1" {
-			bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
-			if bcs != nil {
-				hookMeta.BindingContext = bcs
-				t.UpdateMetadata(hookMeta)
-			}
-		}
-
-		metrics, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
-
-		if err == nil {
-			err = op.MetricStorage.SendBatch(metrics, map[string]string{
-				"hook": hookMeta.HookName,
-			})
-		}
-
-		if err != nil {
-			hookLabel := taskHook.SafeName()
-
-			if hookMeta.AllowFailure {
-				taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
-				op.MetricStorage.SendCounter("shell_operator_hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
-				res.Status = "Success"
-			} else {
-				op.MetricStorage.SendCounter("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
-				t.UpdateFailureMessage(err.Error())
-				taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
-				res.Status = "Fail"
-			}
-		} else {
-			taskLogEntry.Infof("Hook executed successfully")
-			res.Status = "Success"
-		}
+		res = op.TaskHandleHookRun(t)
 
 	case EnableKubernetesBindings:
-		hookLogLabels := map[string]string{}
-		hookLogLabels["hook"] = hookMeta.HookName
-		hookLogLabels["binding"] = string(OnKubernetesEvent)
-		hookLogLabels["task"] = "EnableKubernetesBindings"
-		hookLogLabels["queue"] = "main"
+		res = op.TaskHandleEnableKubernetesBindings(t)
 
-		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
-
-		taskLogEntry.Info("Enable kubernetes binding for hook")
-
-		taskHook := op.HookManager.GetHook(hookMeta.HookName)
-
-		hookRunTasks := []task.Task{}
-
-		// Run hook for each binding with Synchronization binding context. Ignore queue name here, execute in main queue.
-		err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
-			newTask := task.NewTask(HookRun).
-				WithMetadata(HookMetadata{
-					HookName:       taskHook.Name,
-					BindingType:    OnKubernetesEvent,
-					BindingContext: info.BindingContext,
-					AllowFailure:   info.AllowFailure,
-					Binding:        info.Binding,
-					Group:          info.Group,
-				}).
-				WithLogLabels(hookLogLabels).
-				WithQueueName("main")
-			hookRunTasks = append(hookRunTasks, newTask)
-		})
-
-		if err != nil {
-			hookLabel := taskHook.SafeName()
-			op.MetricStorage.SendCounter("shell_operator_hook_errors", 1.0, map[string]string{"hook": hookLabel})
-			t.UpdateFailureMessage(err.Error())
-			taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
-			res.Status = "Fail"
-		} else {
-			// return Synchronization tasks to add to the queue head.
-			// Informers can be started now — their events will
-			// be added to the tail of the main queue or to the other queues.
-			op.HookManager.GetHook(hookMeta.HookName).HookController.StartMonitors()
-			taskLogEntry.Infof("Kubernetes binding for hook enabled successfully")
-			res.Status = "Success"
-			res.HeadTasks = hookRunTasks
-		}
 	case EnableScheduleBindings:
 		hookLogLabels := map[string]string{}
 		hookLogLabels["hook"] = hookMeta.HookName
@@ -378,6 +302,128 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 		taskHook := op.HookManager.GetHook(hookMeta.HookName)
 		taskHook.HookController.EnableScheduleBindings()
 		taskLogEntry.Infof("Schedule binding for hook enabled successfully")
+		res.Status = "Success"
+	}
+
+	return res
+}
+
+func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.TaskResult {
+	var hookMeta = HookMetadataAccessor(t)
+
+	metricLabels := map[string]string{
+		"hook":    hookMeta.HookName,
+		"binding": hookMeta.Binding,
+	}
+	defer MeasureTimeMs(func(ms float64) {
+		op.MetricStorage.SendGauge("enable_kubernetes_bindings_ms", ms, metricLabels)
+	})()
+
+	var res queue.TaskResult
+	hookLogLabels := map[string]string{}
+	hookLogLabels["hook"] = hookMeta.HookName
+	hookLogLabels["binding"] = string(OnKubernetesEvent)
+	hookLogLabels["task"] = "EnableKubernetesBindings"
+	hookLogLabels["queue"] = "main"
+
+	taskLogEntry := log.WithFields(utils.LabelsToLogFields(hookLogLabels))
+
+	taskLogEntry.Info("Enable kubernetes binding for hook")
+
+	taskHook := op.HookManager.GetHook(hookMeta.HookName)
+
+	hookRunTasks := []task.Task{}
+
+	// Run hook for each binding with Synchronization binding context. Ignore queue name here, execute in main queue.
+	err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+		newTask := task.NewTask(HookRun).
+			WithMetadata(HookMetadata{
+				HookName:       taskHook.Name,
+				BindingType:    OnKubernetesEvent,
+				BindingContext: info.BindingContext,
+				AllowFailure:   info.AllowFailure,
+				Binding:        info.Binding,
+				Group:          info.Group,
+			}).
+			WithLogLabels(hookLogLabels).
+			WithQueueName("main")
+		hookRunTasks = append(hookRunTasks, newTask)
+	})
+
+	if err != nil {
+		hookLabel := taskHook.SafeName()
+		op.MetricStorage.SendCounter("hook_errors", 1.0, map[string]string{"hook": hookLabel})
+		t.UpdateFailureMessage(err.Error())
+		taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
+		res.Status = "Fail"
+	} else {
+		// return Synchronization tasks to add to the queue head.
+		// Informers can be started now — their events will
+		// be added to the tail of the main queue or to the other queues.
+		op.HookManager.GetHook(hookMeta.HookName).HookController.StartMonitors()
+		taskLogEntry.Infof("Kubernetes binding for hook enabled successfully")
+		res.Status = "Success"
+		res.HeadTasks = hookRunTasks
+	}
+
+	return res
+}
+
+func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
+	var hookMeta = HookMetadataAccessor(t)
+
+	metricLabels := map[string]string{
+		"hook":    hookMeta.HookName,
+		"binding": string(hookMeta.BindingType),
+		"queue":   t.GetQueueName(),
+	}
+	defer MeasureTimeMs(func(ms float64) {
+		op.MetricStorage.ObserveHistogram("hook_run_hist", ms, metricLabels)
+	})()
+
+	var res queue.TaskResult
+
+	hookLogLabels := map[string]string{}
+	hookLogLabels["hook"] = hookMeta.HookName
+	hookLogLabels["binding"] = string(hookMeta.BindingType)
+	hookLogLabels["task"] = "HookRun"
+	hookLogLabels["queue"] = t.GetQueueName()
+
+	taskLogEntry := log.WithFields(utils.LabelsToLogFields(hookLogLabels))
+	taskLogEntry.Info("Execute hook")
+
+	taskHook := op.HookManager.GetHook(hookMeta.HookName)
+	if taskHook.Config.Version == "v1" {
+		bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
+		if bcs != nil {
+			hookMeta.BindingContext = bcs
+			t.UpdateMetadata(hookMeta)
+		}
+	}
+
+	metrics, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+
+	if err == nil {
+		err = op.MetricStorage.SendBatch(metrics, map[string]string{
+			"hook": hookMeta.HookName,
+		})
+	}
+
+	if err != nil {
+		hookLabel := taskHook.SafeName()
+
+		if hookMeta.AllowFailure {
+			taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
+			op.MetricStorage.SendCounter("hook_allowed_errors", 1.0, map[string]string{"hook": hookLabel})
+			res.Status = "Success"
+		} else {
+			op.MetricStorage.SendCounter("hook_errors", 1.0, map[string]string{"hook": hookLabel})
+			t.UpdateFailureMessage(err.Error())
+			taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
+			res.Status = "Fail"
+		}
+	} else {
+		taskLogEntry.Infof("Hook executed successfully")
 		res.Status = "Success"
 	}
 
@@ -567,7 +613,7 @@ func (op *ShellOperator) RunMetrics() {
 	// live ticks.
 	go func() {
 		for {
-			op.MetricStorage.SendCounter("shell_operator_live_ticks", 1.0, map[string]string{})
+			op.MetricStorage.SendCounter("live_ticks", 1.0, map[string]string{})
 			time.Sleep(10 * time.Second)
 		}
 	}()
@@ -577,7 +623,7 @@ func (op *ShellOperator) RunMetrics() {
 		for {
 			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
 				queueLen := float64(queue.Length())
-				op.MetricStorage.SendGauge("shell_operator_tasks_queue_length", queueLen, map[string]string{"queue": queue.Name})
+				op.MetricStorage.SendGauge("tasks_queue_length", queueLen, map[string]string{"queue": queue.Name})
 			})
 			time.Sleep(5 * time.Second)
 		}

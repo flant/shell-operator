@@ -2,15 +2,18 @@ package kube_events_manager
 
 import (
 	"context"
+	"runtime/trace"
 
-	"github.com/flant/shell-operator/pkg/kube"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metrics_storage"
 )
 
 type KubeEventsManager interface {
 	WithContext(ctx context.Context)
+	WithMetricStorage(mstor *metrics_storage.MetricStorage)
 	WithKubeClient(client kube.KubernetesClient)
 	AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error)
 	HasMonitor(monitorId string) bool
@@ -31,8 +34,9 @@ type kubeEventsManager struct {
 
 	KubeClient kube.KubernetesClient
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx           context.Context
+	cancel        context.CancelFunc
+	metricStorage *metrics_storage.MetricStorage
 }
 
 // kubeEventsManager should implement KubeEventsManager.
@@ -51,6 +55,10 @@ func (mgr *kubeEventsManager) WithContext(ctx context.Context) {
 	mgr.ctx, mgr.cancel = context.WithCancel(ctx)
 }
 
+func (mgr *kubeEventsManager) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+	mgr.metricStorage = mstor
+}
+
 func (mgr *kubeEventsManager) WithKubeClient(client kube.KubernetesClient) {
 	mgr.KubeClient = client
 }
@@ -62,8 +70,10 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) (*KubeEve
 	log.Debugf("Add MONITOR %+v", monitorConfig)
 	monitor := NewMonitor()
 	monitor.WithKubeClient(mgr.KubeClient)
+	monitor.WithMetricStorage(mgr.metricStorage)
 	monitor.WithConfig(monitorConfig)
 	monitor.WithKubeEventCb(func(ev KubeEvent) {
+		defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
 		outEvent := mgr.MakeKubeEvent(monitor, ev)
 		if outEvent != nil {
 			mgr.KubeEventCh <- *outEvent

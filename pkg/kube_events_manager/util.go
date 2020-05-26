@@ -2,10 +2,12 @@ package kube_events_manager
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime/trace"
 	"strings"
 
 	. "github.com/flant/libjq-go"
@@ -24,6 +26,8 @@ import (
 // over result and return ObjectAndFilterResult. If jqFilter is empty, no filter
 // is required and checksum is calculated over full json representation of the object.
 func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (*ObjectAndFilterResult, error) {
+	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
+
 	res := &ObjectAndFilterResult{
 		Object: obj,
 	}
