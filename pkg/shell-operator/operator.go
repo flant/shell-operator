@@ -35,6 +35,8 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
+var WaitQueuesTimeout = time.Second * 10
+
 type ShellOperator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -710,4 +712,13 @@ func InitAndStart(operator *ShellOperator) error {
 	operator.Start()
 
 	return nil
+}
+
+// Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
+func (op *ShellOperator) Shutdown() {
+	op.ScheduleManager.Stop()
+	op.KubeEventsManager.PauseHandleEvents()
+	op.TaskQueues.Stop()
+	// Wait for queues to stop, but no more than 10 seconds
+	op.TaskQueues.WaitStopWithTimeout(WaitQueuesTimeout)
 }

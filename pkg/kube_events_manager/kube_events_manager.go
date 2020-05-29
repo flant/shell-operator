@@ -23,6 +23,7 @@ type KubeEventsManager interface {
 
 	StopMonitor(configId string) error
 	Ch() chan KubeEvent
+	PauseHandleEvents()
 }
 
 // kubeEventsManager is a main implementation of KubeEventsManager.
@@ -69,6 +70,7 @@ func (mgr *kubeEventsManager) WithKubeClient(client kube.KubernetesClient) {
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error) {
 	log.Debugf("Add MONITOR %+v", monitorConfig)
 	monitor := NewMonitor()
+	monitor.WithContext(mgr.ctx)
 	monitor.WithKubeClient(mgr.KubeClient)
 	monitor.WithMetricStorage(mgr.metricStorage)
 	monitor.WithConfig(monitorConfig)
@@ -150,18 +152,11 @@ func (mgr *kubeEventsManager) Ch() chan KubeEvent {
 	return mgr.KubeEventCh
 }
 
-func (mgr *kubeEventsManager) StopAll() {
-	mgr.cancel()
-	// wait?
-	//
-	//informers, ok := mgr.InformersStore[configId]
-	//if ok {
-	//	for _, informer := range informers {
-	//		informer.Stop()
-	//	}
-	//	delete(mgr.InformersStore, configId)
-	//} else {
-	//	log.Errorf("configId '%s' has no informers to stop", configId)
-	//}
-	//return nil
+// PauseHandleEvents set flags for all informers to ignore incoming events.
+// Useful for shutdown without panicking.
+// Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
+func (mgr *kubeEventsManager) PauseHandleEvents() {
+	for _, monitor := range mgr.Monitors {
+		monitor.PauseHandleEvents()
+	}
 }

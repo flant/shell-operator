@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/flant/shell-operator/pkg/metrics_storage"
 	"github.com/flant/shell-operator/pkg/task"
@@ -126,4 +127,29 @@ func (tqs *TaskQueueSet) Remove(name string) {
 	tqs.m.Lock()
 	defer tqs.m.Unlock()
 	delete(tqs.Queues, name)
+}
+
+func (tqs *TaskQueueSet) WaitStopWithTimeout(timeout time.Duration) {
+	checkTick := time.NewTicker(time.Millisecond * 100)
+	defer checkTick.Stop()
+	timeoutTick := time.NewTicker(timeout)
+	defer timeoutTick.Stop()
+
+	for {
+		select {
+		case <-checkTick.C:
+			stopped := true
+			for _, q := range tqs.Queues {
+				if q.Status != "stop" {
+					stopped = false
+					break
+				}
+			}
+			if stopped {
+				return
+			}
+		case <-timeoutTick.C:
+			return
+		}
+	}
 }

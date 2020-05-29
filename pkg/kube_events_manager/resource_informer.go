@@ -22,6 +22,7 @@ import (
 
 // ResourceInformer is a kube informer for particular onKubernetesEvent
 type ResourceInformer interface {
+	WithContext(ctx context.Context)
 	WithKubeClient(client kube.KubernetesClient)
 	WithMetricStorage(mstor *metrics_storage.MetricStorage)
 	WithNamespace(string)
@@ -29,8 +30,9 @@ type ResourceInformer interface {
 	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateSharedInformer() error
 	GetExistedObjects() []ObjectAndFilterResult
-	Run(stopCh <-chan struct{})
+	Start()
 	Stop()
+	PauseHandleEvents()
 }
 
 type resourceInformer struct {
@@ -51,9 +53,13 @@ type resourceInformer struct {
 	eventCb func(KubeEvent)
 
 	// TODO resourceInformer should be stoppable (think of deleted namespaces and disabled modules in addon-operator)
-	//ctx context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	metricStorage *metrics_storage.MetricStorage
+
+	// a flag to stop handle events after Stop()
+	stopped bool
 }
 
 // resourceInformer should implement ResourceInformer
@@ -66,6 +72,10 @@ var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 		cacheLock:     sync.RWMutex{},
 	}
 	return informer
+}
+
+func (ei *resourceInformer) WithContext(ctx context.Context) {
+	ei.ctx, ei.cancel = context.WithCancel(ctx)
 }
 
 func (ei *resourceInformer) WithKubeClient(client kube.KubernetesClient) {
@@ -235,6 +245,11 @@ func (ei *resourceInformer) OnDelete(obj interface{}) {
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 //func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType WatchEventType) {
+	// check if stop
+	if ei.stopped {
+		return
+	}
+
 	defer MeasureTime(func(nanos Nanos) {
 		ei.metricStorage.ObserveHistogram("kube_event_duration_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
 	})()
@@ -353,11 +368,27 @@ func (ei *resourceInformer) ShouldFireEvent(checkEvent WatchEventType) bool {
 	return false
 }
 
-func (ei *resourceInformer) Run(stopCh <-chan struct{}) {
+func (ei *resourceInformer) Start() {
 	log.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
+	stopCh := make(chan struct{}, 1)
+	go func() {
+		<-ei.ctx.Done()
+		ei.stopped = true
+		close(stopCh)
+	}()
+
 	ei.SharedInformer.Run(stopCh)
 }
 
 func (ei *resourceInformer) Stop() {
 	log.Debugf("%s: STOP resource informer", ei.Monitor.Metadata.DebugName)
+	if ei.cancel != nil {
+		ei.cancel()
+	}
+	ei.stopped = true
+}
+
+func (ei *resourceInformer) PauseHandleEvents() {
+	log.Debugf("%s: PAUSE resource informer", ei.Monitor.Metadata.DebugName)
+	ei.stopped = true
 }

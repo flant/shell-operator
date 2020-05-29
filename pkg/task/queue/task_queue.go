@@ -296,8 +296,7 @@ func (q *TaskQueue) Start() {
 			var t = q.waitForTask(sleepDelay)
 			if t == nil {
 				q.Status = "stop"
-				log.Debugf("queue %s: got nil task, stop queue", q.Name)
-				q.started = false
+				log.Infof("queue '%s' stopped", q.Name)
 				return
 			}
 
@@ -312,6 +311,15 @@ func (q *TaskQueue) Start() {
 			var nextSleepDelay time.Duration
 			q.Status = "run first task"
 			taskRes := q.Handler(t)
+
+			// Check Done channel after long running operation.
+			select {
+			case <-q.ctx.Done():
+				log.Infof("queue '%s' stopped after task handling", q.Name)
+				q.Status = "stop"
+				return
+			default:
+			}
 
 			switch taskRes.Status {
 			case "Fail":
@@ -364,6 +372,13 @@ func (q *TaskQueue) Start() {
 // sleepDelay is used to sleep before check a task, e.g. in case of failed previous task.
 // If queue is empty, than it will be checked every DelayOnQueueIsEmpty.
 func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
+	// Check Done channel to be able to stop queue
+	select {
+	case <-q.ctx.Done():
+		return nil
+	default:
+	}
+
 	// Wait for non empty queue or closed Done channel
 	origStatus := q.Status
 	waitBegin := time.Now()

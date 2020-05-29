@@ -14,6 +14,7 @@ import (
 )
 
 type Monitor interface {
+	WithContext(ctx context.Context)
 	WithKubeClient(client kube.KubernetesClient)
 	WithMetricStorage(mstor *metrics_storage.MetricStorage)
 	WithConfig(config *MonitorConfig)
@@ -21,6 +22,7 @@ type Monitor interface {
 	CreateInformers() error
 	Start(context.Context)
 	Stop()
+	PauseHandleEvents()
 	GetExistedObjects() []ObjectAndFilterResult
 	GetConfig() *MonitorConfig
 }
@@ -56,6 +58,10 @@ var NewMonitor = func() Monitor {
 		cancelForNs:       make(map[string]context.CancelFunc),
 		staticNamespaces:  make(map[string]bool),
 	}
+}
+
+func (m *monitor) WithContext(ctx context.Context) {
+	m.ctx, m.cancel = context.WithCancel(ctx)
 }
 
 func (m *monitor) WithKubeClient(client kube.KubernetesClient) {
@@ -110,6 +116,7 @@ func (m *monitor) CreateInformers() error {
 	if m.Config.NamespaceSelector != nil && m.Config.NamespaceSelector.LabelSelector != nil {
 		logEntry.Debugf("Create NamespaceInformer for namespace.labelSelector")
 		m.NamespaceInformer = NewNamespaceInformer(m.Config)
+		m.NamespaceInformer.WithContext(m.ctx)
 		m.NamespaceInformer.WithKubeClient(m.KubeClient)
 		err := m.NamespaceInformer.CreateSharedInformer(
 			func(nsName string) {
@@ -136,7 +143,8 @@ func (m *monitor) CreateInformers() error {
 				ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
 
 				for _, informer := range m.VaryingInformers[nsName] {
-					go informer.Run(ctx.Done())
+					informer.WithContext(ctx)
+					go informer.Start()
 				}
 			},
 			func(nsName string) {
@@ -219,6 +227,7 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []Res
 
 	for _, objName := range objNames {
 		informer := NewResourceInformer(m.Config)
+		informer.WithContext(m.ctx)
 		informer.WithKubeClient(m.KubeClient)
 		informer.WithMetricStorage(m.metricStorage)
 		informer.WithNamespace(namespace)
@@ -240,23 +249,44 @@ func (m *monitor) Start(parentCtx context.Context) {
 	m.ctx, m.cancel = context.WithCancel(parentCtx)
 
 	for _, informer := range m.ResourceInformers {
-		go informer.Run(m.ctx.Done())
+		go informer.Start()
 	}
 
 	for nsName := range m.VaryingInformers {
 		var ctx context.Context
 		ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
 		for _, informer := range m.VaryingInformers[nsName] {
-			go informer.Run(ctx.Done())
+			informer.WithContext(ctx)
+			go informer.Start()
 		}
 	}
 
 	if m.NamespaceInformer != nil {
-		go m.NamespaceInformer.Run(m.ctx.Done())
+		go m.NamespaceInformer.Start()
 	}
 }
 
 // Stop stops all informers
 func (m *monitor) Stop() {
 	m.cancel()
+}
+
+// PauseHandleEvents set flags for all informers to ignore incoming events.
+// Useful for shutdown without panicking.
+// Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
+func (m *monitor) PauseHandleEvents() {
+	for _, informer := range m.ResourceInformers {
+		informer.PauseHandleEvents()
+	}
+
+	for _, informers := range m.VaryingInformers {
+		for _, informer := range informers {
+			informer.PauseHandleEvents()
+		}
+	}
+
+	if m.NamespaceInformer != nil {
+		m.NamespaceInformer.PauseHandleEvents()
+	}
+
 }
