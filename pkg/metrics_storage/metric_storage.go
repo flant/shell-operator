@@ -3,10 +3,14 @@ package metrics_storage
 import (
 	"context"
 	"fmt"
+	"sync"
 
-	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/flant/shell-operator/pkg/metrics_storage/operation"
+	"github.com/flant/shell-operator/pkg/metrics_storage/vault"
+	. "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 const (
@@ -26,6 +30,12 @@ type MetricStorage struct {
 	Gauges           map[string]*prometheus.GaugeVec
 	Histograms       map[string]*prometheus.HistogramVec
 	HistogramBuckets map[string][]float64
+
+	countersLock   sync.Mutex
+	gaugesLock     sync.Mutex
+	histogramsLock sync.Mutex
+
+	GroupedVault *vault.GroupedVault
 }
 
 func NewMetricStorage() *MetricStorage {
@@ -34,6 +44,7 @@ func NewMetricStorage() *MetricStorage {
 		Counters:         make(map[string]*prometheus.CounterVec),
 		Histograms:       make(map[string]*prometheus.HistogramVec),
 		HistogramBuckets: make(map[string][]float64),
+		GroupedVault:     vault.NewGroupedVault(),
 	}
 }
 
@@ -86,6 +97,11 @@ func (m *MetricStorage) GetOrDefineGauge(metric string, labels map[string]string
 		}
 	}()
 
+	log.WithField("operator.component", "metricsStorage").
+		Debugf("Get metric gauge %s", metric)
+	m.gaugesLock.Lock()
+	defer m.gaugesLock.Unlock()
+
 	vec, ok := m.Gauges[metric]
 
 	// create and register CounterVec
@@ -135,6 +151,10 @@ func (m *MetricStorage) GetOrDefineCounter(metric string, labels map[string]stri
 		}
 	}()
 
+	log.WithField("operator.component", "metricsStorage").
+		Debugf("Get metric counter %s", metric)
+	m.countersLock.Lock()
+	defer m.countersLock.Unlock()
 	vec, ok := m.Counters[metric]
 
 	// create and register CounterVec
@@ -194,6 +214,11 @@ func (m *MetricStorage) GetOrDefineHistogram(metric string, labels map[string]st
 		}
 	}()
 
+	log.WithField("operator.component", "metricsStorage").
+		Debugf("Get metric histogram %s", metric)
+
+	m.histogramsLock.Lock()
+	defer m.histogramsLock.Unlock()
 	vec, ok := m.Histograms[metric]
 	if !ok {
 		buckets, has := m.HistogramBuckets[metric]
@@ -214,13 +239,13 @@ func (m *MetricStorage) GetOrDefineHistogram(metric string, labels map[string]st
 	return vec
 }
 
-func (m *MetricStorage) SendBatch(ops []MetricOperation, labels map[string]string) error {
+func (m *MetricStorage) SendBatchV0(ops []operation.MetricOperation, labels map[string]string) error {
 	if m == nil {
 		return nil
 	}
 	// Apply metric operations
 	for _, metricOp := range ops {
-		labels := utils.MergeLabels(metricOp.Labels, labels)
+		labels := MergeLabels(metricOp.Labels, labels)
 
 		if metricOp.Add != nil {
 			m.SendCounterNoPrefix(metricOp.Name, *metricOp.Add, labels)
@@ -235,10 +260,75 @@ func (m *MetricStorage) SendBatch(ops []MetricOperation, labels map[string]strin
 	return nil
 }
 
-func LabelNames(labels map[string]string) []string {
-	names := make([]string, 0)
-	for labelName := range labels {
-		names = append(names, labelName)
+func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[string]string) error {
+	if m == nil {
+		return nil
 	}
-	return names
+
+	// Group ops by 'Group'.
+	var groupedOps = make(map[string][]operation.MetricOperation)
+	var nonGroupedOps = make([]operation.MetricOperation, 0)
+
+	for _, op := range ops {
+		if op.Group == "" {
+			nonGroupedOps = append(nonGroupedOps, op)
+			continue
+		}
+		if _, ok := groupedOps[op.Group]; !ok {
+			groupedOps[op.Group] = make([]operation.MetricOperation, 0)
+		}
+		groupedOps[op.Group] = append(groupedOps[op.Group], op)
+	}
+
+	// Apply metric operations for each group
+	for group, ops := range groupedOps {
+		// clean group
+		m.ApplyGroupOperations(group, ops, labels)
+	}
+
+	// backward compatibility — send metrics without cleaning
+	err := m.SendBatchV0(nonGroupedOps, labels)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabels map[string]string) {
+	labels := MergeLabels(op.Labels, commonLabels)
+
+	if op.Add != nil {
+		m.SendCounterNoPrefix(op.Name, *op.Add, labels)
+		return
+	}
+	if op.Set != nil {
+		m.SendGaugeNoPrefix(op.Name, *op.Set, labels)
+		return
+	}
+}
+
+func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.MetricOperation, commonLabels map[string]string) {
+	// Gather labels to clear absent metrics by label values
+	var metricLabels = make(map[string][]map[string]string)
+	for _, op := range ops {
+		if _, ok := metricLabels[op.Name]; !ok {
+			metricLabels[op.Name] = make([]map[string]string, 0)
+		}
+		metricLabels[op.Name] = append(metricLabels[op.Name], MergeLabels(op.Labels, commonLabels))
+	}
+	m.GroupedVault.ClearMissingMetrics(group, metricLabels)
+
+	// Apply metric operations
+	for _, op := range ops {
+		labels := MergeLabels(op.Labels, commonLabels)
+		if op.Add != nil {
+			m.GroupedVault.CounterAdd(group, op.Name, *op.Add, labels)
+			continue
+		}
+		if op.Set != nil {
+			m.GroupedVault.GaugeSet(group, op.Name, *op.Set, labels)
+			continue
+		}
+	}
 }

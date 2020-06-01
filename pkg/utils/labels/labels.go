@@ -2,6 +2,7 @@ package utils
 
 import (
 	log "github.com/sirupsen/logrus"
+	"sort"
 )
 
 // MergeLabels merges several maps into one. Last map keys overrides keys from first maps.
@@ -25,4 +26,22 @@ func LabelsToLogFields(labelsMaps ...map[string]string) log.Fields {
 		}
 	}
 	return fields
+}
+
+// LabelNames returns sorted label keys
+func LabelNames(labels map[string]string) []string {
+	names := make([]string, 0)
+	for labelName := range labels {
+		names = append(names, labelName)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func LabelValues(labels map[string]string, labelNames []string) []string {
+	var values = make([]string, 0)
+	for _, name := range labelNames {
+		values = append(values, labels[name])
+	}
+	return values
 }

@@ -17,7 +17,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
-	"github.com/flant/shell-operator/pkg/metrics_storage"
+	"github.com/flant/shell-operator/pkg/metrics_storage/operation"
 )
 
 type CommonHook interface {
@@ -67,7 +67,7 @@ func (h *Hook) GetHookController() controller.HookController {
 	return h.HookController
 }
 
-func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) ([]metrics_storage.MetricOperation, error) {
+func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) ([]operation.MetricOperation, error) {
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
@@ -105,7 +105,7 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 		return nil, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
 
-	metrics, err := metrics_storage.MetricOperationsFromFile(metricsPath)
+	metrics, err := operation.MetricOperationsFromFile(metricsPath)
 	if err != nil {
 		return nil, fmt.Errorf("got bad metrics: %s", err)
 	}

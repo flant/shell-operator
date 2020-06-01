@@ -1,4 +1,4 @@
-package metrics_storage
+package operation
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ type MetricOperation struct {
 	Add    *float64          `json:"add,omitempty"`
 	Set    *float64          `json:"set,omitempty"`
 	Labels map[string]string `json:"labels"`
+	Group  string            `json:"group,omitempty"`
 }
 
 func MetricOperationsFromReader(r io.Reader) ([]MetricOperation, error) {
