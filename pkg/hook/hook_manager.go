@@ -140,9 +140,13 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 		return nil, fmt.Errorf("creating hook '%s': %s", hookName, err.Error())
 	}
 
-	// Add hook info as log labels
+	// Add hook info as log labels, update MetricLabels
 	for _, kubeCfg := range hook.GetConfig().OnKubernetesEvents {
 		kubeCfg.Monitor.Metadata.LogLabels["hook"] = hook.Name
+		kubeCfg.Monitor.Metadata.MetricLabels = map[string]string{
+			"hook":    hook.Name,
+			"binding": kubeCfg.BindingName,
+		}
 	}
 
 	hookCtrl := controller.NewHookController()

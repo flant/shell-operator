@@ -5,20 +5,24 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flant/shell-operator/pkg/kube"
-	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metrics_storage"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type Monitor interface {
+	WithContext(ctx context.Context)
 	WithKubeClient(client kube.KubernetesClient)
+	WithMetricStorage(mstor *metrics_storage.MetricStorage)
 	WithConfig(config *MonitorConfig)
 	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateInformers() error
 	Start(context.Context)
 	Stop()
+	PauseHandleEvents()
 	GetExistedObjects() []ObjectAndFilterResult
 	GetConfig() *MonitorConfig
 }
@@ -42,8 +46,9 @@ type monitor struct {
 
 	cancelForNs map[string]context.CancelFunc
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx           context.Context
+	cancel        context.CancelFunc
+	metricStorage *metrics_storage.MetricStorage
 }
 
 var NewMonitor = func() Monitor {
@@ -55,8 +60,16 @@ var NewMonitor = func() Monitor {
 	}
 }
 
+func (m *monitor) WithContext(ctx context.Context) {
+	m.ctx, m.cancel = context.WithCancel(ctx)
+}
+
 func (m *monitor) WithKubeClient(client kube.KubernetesClient) {
 	m.KubeClient = client
+}
+
+func (m *monitor) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+	m.metricStorage = mstor
 }
 
 func (m *monitor) WithConfig(config *MonitorConfig) {
@@ -103,6 +116,7 @@ func (m *monitor) CreateInformers() error {
 	if m.Config.NamespaceSelector != nil && m.Config.NamespaceSelector.LabelSelector != nil {
 		logEntry.Debugf("Create NamespaceInformer for namespace.labelSelector")
 		m.NamespaceInformer = NewNamespaceInformer(m.Config)
+		m.NamespaceInformer.WithContext(m.ctx)
 		m.NamespaceInformer.WithKubeClient(m.KubeClient)
 		err := m.NamespaceInformer.CreateSharedInformer(
 			func(nsName string) {
@@ -129,7 +143,8 @@ func (m *monitor) CreateInformers() error {
 				ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
 
 				for _, informer := range m.VaryingInformers[nsName] {
-					go informer.Run(ctx.Done())
+					informer.WithContext(ctx)
+					go informer.Start()
 				}
 			},
 			func(nsName string) {
@@ -212,7 +227,9 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []Res
 
 	for _, objName := range objNames {
 		informer := NewResourceInformer(m.Config)
+		informer.WithContext(m.ctx)
 		informer.WithKubeClient(m.KubeClient)
+		informer.WithMetricStorage(m.metricStorage)
 		informer.WithNamespace(namespace)
 		informer.WithName(objName)
 		informer.WithKubeEventCb(m.eventCb)
@@ -232,23 +249,44 @@ func (m *monitor) Start(parentCtx context.Context) {
 	m.ctx, m.cancel = context.WithCancel(parentCtx)
 
 	for _, informer := range m.ResourceInformers {
-		go informer.Run(m.ctx.Done())
+		go informer.Start()
 	}
 
 	for nsName := range m.VaryingInformers {
 		var ctx context.Context
 		ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
 		for _, informer := range m.VaryingInformers[nsName] {
-			go informer.Run(ctx.Done())
+			informer.WithContext(ctx)
+			go informer.Start()
 		}
 	}
 
 	if m.NamespaceInformer != nil {
-		go m.NamespaceInformer.Run(m.ctx.Done())
+		go m.NamespaceInformer.Start()
 	}
 }
 
 // Stop stops all informers
 func (m *monitor) Stop() {
 	m.cancel()
+}
+
+// PauseHandleEvents set flags for all informers to ignore incoming events.
+// Useful for shutdown without panicking.
+// Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
+func (m *monitor) PauseHandleEvents() {
+	for _, informer := range m.ResourceInformers {
+		informer.PauseHandleEvents()
+	}
+
+	for _, informers := range m.VaryingInformers {
+		for _, informer := range informers {
+			informer.PauseHandleEvents()
+		}
+	}
+
+	if m.NamespaceInformer != nil {
+		m.NamespaceInformer.PauseHandleEvents()
+	}
+
 }

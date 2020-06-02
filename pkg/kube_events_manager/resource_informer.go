@@ -1,7 +1,9 @@
 package kube_events_manager
 
 import (
+	"context"
 	"fmt"
+	"runtime/trace"
 	"sync"
 	"time"
 
@@ -12,21 +14,25 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-
 	"github.com/flant/shell-operator/pkg/kube"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metrics_storage"
+	. "github.com/flant/shell-operator/pkg/utils/measure"
 )
 
 // ResourceInformer is a kube informer for particular onKubernetesEvent
 type ResourceInformer interface {
+	WithContext(ctx context.Context)
 	WithKubeClient(client kube.KubernetesClient)
+	WithMetricStorage(mstor *metrics_storage.MetricStorage)
 	WithNamespace(string)
 	WithName(string)
 	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateSharedInformer() error
 	GetExistedObjects() []ObjectAndFilterResult
-	Run(stopCh <-chan struct{})
+	Start()
 	Stop()
+	PauseHandleEvents()
 }
 
 type resourceInformer struct {
@@ -47,7 +53,13 @@ type resourceInformer struct {
 	eventCb func(KubeEvent)
 
 	// TODO resourceInformer should be stoppable (think of deleted namespaces and disabled modules in addon-operator)
-	//ctx context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	metricStorage *metrics_storage.MetricStorage
+
+	// a flag to stop handle events after Stop()
+	stopped bool
 }
 
 // resourceInformer should implement ResourceInformer
@@ -62,8 +74,16 @@ var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 	return informer
 }
 
+func (ei *resourceInformer) WithContext(ctx context.Context) {
+	ei.ctx, ei.cancel = context.WithCancel(ctx)
+}
+
 func (ei *resourceInformer) WithKubeClient(client kube.KubernetesClient) {
 	ei.KubeClient = client
+}
+
+func (ei *resourceInformer) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+	ei.metricStorage = mstor
 }
 
 func (ei *resourceInformer) WithNamespace(ns string) {
@@ -151,6 +171,7 @@ func (ei *resourceInformer) GetExistedObjects() []ObjectAndFilterResult {
 // ListExistedObjects get a list of existed objects in namespace that match selectors and
 // fills Checksum map with checksums of existing objects.
 func (ei *resourceInformer) ListExistedObjects() error {
+	defer trace.StartRegion(context.Background(), "ListExistedObjects").End()
 	objList, err := ei.KubeClient.Dynamic().
 		Resource(ei.GroupVersionResource).
 		Namespace(ei.Namespace).
@@ -174,7 +195,17 @@ func (ei *resourceInformer) ListExistedObjects() error {
 	for _, item := range objList.Items {
 		// copy loop var to avoid duplication of pointer
 		obj := item
-		objFilterRes, err := ApplyJqFilter(ei.Monitor.JqFilter, &obj)
+		//objFilterRes, err := ApplyJqFilter(ei.Monitor.JqFilter, &obj)
+
+		var objFilterRes *ObjectAndFilterResult
+		var err error
+		func() {
+			defer MeasureTime(func(nanos Nanos) {
+				ei.metricStorage.ObserveHistogram("kube_jq_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
+			})()
+			objFilterRes, err = ApplyJqFilter(ei.Monitor.JqFilter, &obj)
+		}()
+
 		if err != nil {
 			return err
 		}
@@ -214,6 +245,16 @@ func (ei *resourceInformer) OnDelete(obj interface{}) {
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 //func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType WatchEventType) {
+	// check if stop
+	if ei.stopped {
+		return
+	}
+
+	defer MeasureTime(func(nanos Nanos) {
+		ei.metricStorage.ObserveHistogram("kube_event_duration_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
+	})()
+	defer trace.StartRegion(context.Background(), "HandleWatchEvent").End()
+
 	if staleObj, stale := object.(cache.DeletedFinalStateUnknown); stale {
 		object = staleObj.Obj
 	}
@@ -223,7 +264,14 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 
 	// Always calculate checksum and update cache, because we need actual state in CachedObjects
 
-	objFilterRes, err := ApplyJqFilter(ei.Monitor.JqFilter, obj)
+	var objFilterRes *ObjectAndFilterResult
+	var err error
+	func() {
+		defer MeasureTime(func(nanos Nanos) {
+			ei.metricStorage.ObserveHistogram("kube_jq_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
+		})()
+		objFilterRes, err = ApplyJqFilter(ei.Monitor.JqFilter, obj)
+	}()
 	if err != nil {
 		log.Errorf("%s: WATCH %s: %s",
 			ei.Monitor.Metadata.DebugName,
@@ -320,11 +368,27 @@ func (ei *resourceInformer) ShouldFireEvent(checkEvent WatchEventType) bool {
 	return false
 }
 
-func (ei *resourceInformer) Run(stopCh <-chan struct{}) {
+func (ei *resourceInformer) Start() {
 	log.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
+	stopCh := make(chan struct{}, 1)
+	go func() {
+		<-ei.ctx.Done()
+		ei.stopped = true
+		close(stopCh)
+	}()
+
 	ei.SharedInformer.Run(stopCh)
 }
 
 func (ei *resourceInformer) Stop() {
 	log.Debugf("%s: STOP resource informer", ei.Monitor.Metadata.DebugName)
+	if ei.cancel != nil {
+		ei.cancel()
+	}
+	ei.stopped = true
+}
+
+func (ei *resourceInformer) PauseHandleEvents() {
+	log.Debugf("%s: PAUSE resource informer", ei.Monitor.Metadata.DebugName)
+	ei.stopped = true
 }

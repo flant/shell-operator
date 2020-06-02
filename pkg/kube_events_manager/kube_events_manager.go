@@ -2,15 +2,18 @@ package kube_events_manager
 
 import (
 	"context"
+	"runtime/trace"
 
-	"github.com/flant/shell-operator/pkg/kube"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metrics_storage"
 )
 
 type KubeEventsManager interface {
 	WithContext(ctx context.Context)
+	WithMetricStorage(mstor *metrics_storage.MetricStorage)
 	WithKubeClient(client kube.KubernetesClient)
 	AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error)
 	HasMonitor(monitorId string) bool
@@ -20,6 +23,7 @@ type KubeEventsManager interface {
 
 	StopMonitor(configId string) error
 	Ch() chan KubeEvent
+	PauseHandleEvents()
 }
 
 // kubeEventsManager is a main implementation of KubeEventsManager.
@@ -31,8 +35,9 @@ type kubeEventsManager struct {
 
 	KubeClient kube.KubernetesClient
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx           context.Context
+	cancel        context.CancelFunc
+	metricStorage *metrics_storage.MetricStorage
 }
 
 // kubeEventsManager should implement KubeEventsManager.
@@ -51,6 +56,10 @@ func (mgr *kubeEventsManager) WithContext(ctx context.Context) {
 	mgr.ctx, mgr.cancel = context.WithCancel(ctx)
 }
 
+func (mgr *kubeEventsManager) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+	mgr.metricStorage = mstor
+}
+
 func (mgr *kubeEventsManager) WithKubeClient(client kube.KubernetesClient) {
 	mgr.KubeClient = client
 }
@@ -61,9 +70,12 @@ func (mgr *kubeEventsManager) WithKubeClient(client kube.KubernetesClient) {
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error) {
 	log.Debugf("Add MONITOR %+v", monitorConfig)
 	monitor := NewMonitor()
+	monitor.WithContext(mgr.ctx)
 	monitor.WithKubeClient(mgr.KubeClient)
+	monitor.WithMetricStorage(mgr.metricStorage)
 	monitor.WithConfig(monitorConfig)
 	monitor.WithKubeEventCb(func(ev KubeEvent) {
+		defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
 		outEvent := mgr.MakeKubeEvent(monitor, ev)
 		if outEvent != nil {
 			mgr.KubeEventCh <- *outEvent
@@ -140,18 +152,11 @@ func (mgr *kubeEventsManager) Ch() chan KubeEvent {
 	return mgr.KubeEventCh
 }
 
-func (mgr *kubeEventsManager) StopAll() {
-	mgr.cancel()
-	// wait?
-	//
-	//informers, ok := mgr.InformersStore[configId]
-	//if ok {
-	//	for _, informer := range informers {
-	//		informer.Stop()
-	//	}
-	//	delete(mgr.InformersStore, configId)
-	//} else {
-	//	log.Errorf("configId '%s' has no informers to stop", configId)
-	//}
-	//return nil
+// PauseHandleEvents set flags for all informers to ignore incoming events.
+// Useful for shutdown without panicking.
+// Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
+func (mgr *kubeEventsManager) PauseHandleEvents() {
+	for _, monitor := range mgr.Monitors {
+		monitor.PauseHandleEvents()
+	}
 }

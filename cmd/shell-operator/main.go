@@ -40,7 +40,8 @@ func main() {
 
 			// Block action by waiting signals from OS.
 			utils_signal.WaitForProcessInterruption(func() {
-				defaultOperator.Stop()
+				defaultOperator.Shutdown()
+				os.Exit(1)
 			})
 
 			return nil

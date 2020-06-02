@@ -202,6 +202,7 @@ func (c *HookConfig) ConvertAndCheckV0() (err error) {
 		monitor.Metadata.DebugName = c.MonitorDebugName(kubeCfg.Name, i)
 		monitor.Metadata.MonitorId = c.MonitorConfigId()
 		monitor.Metadata.LogLabels = map[string]string{}
+		monitor.Metadata.MetricLabels = map[string]string{}
 		monitor.WithMode(ModeV0)
 
 		// convert event names from legacy config.
@@ -270,6 +271,7 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		monitor.Metadata.DebugName = c.MonitorDebugName(kubeCfg.Name, i)
 		monitor.Metadata.MonitorId = c.MonitorConfigId()
 		monitor.Metadata.LogLabels = map[string]string{}
+		monitor.Metadata.MetricLabels = map[string]string{}
 		monitor.WithMode(kubeCfg.Mode)
 		monitor.ApiVersion = kubeCfg.ApiVersion
 		monitor.Kind = kubeCfg.Kind
