@@ -22,7 +22,7 @@ func Test_CounterAdd(t *testing.T) {
 
 	v.CounterAdd("group1", "metric_total", 1.0, map[string]string{"lbl": "val"})
 
-	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occured in log: %s", buf.String())
+	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occurred in log: %s", buf.String())
 
 	expect := `
 # HELP metric_total metric_total
@@ -38,7 +38,7 @@ metric_total{lbl="val"} 1
 		},
 	})
 
-	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occured in log: %s", buf.String())
+	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occurred in log: %s", buf.String())
 
 	// Expect no metric with lbl="val"
 	expect = ``
@@ -47,7 +47,7 @@ metric_total{lbl="val"} 1
 
 	v.CounterAdd("group1", "metric_total", 1.0, map[string]string{"lbl": "val2"})
 
-	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occured in log: %s", buf.String())
+	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occurred in log: %s", buf.String())
 
 	// Expect metric_total with new label value
 	expect = `
@@ -61,7 +61,7 @@ metric_total{lbl="val2"} 1
 	v.CounterAdd("group1", "metric_total", 1.0, map[string]string{"lbl": "val2"})
 	v.CounterAdd("group1", "metric_total", 1.0, map[string]string{"lbl": "val222"})
 
-	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occured in log: %s", buf.String())
+	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occurred in log: %s", buf.String())
 
 	// Expect metric_total with 2 label values
 	expect = `
@@ -84,7 +84,7 @@ metric_total{lbl="val222"} 1
 	v.CounterAdd("group1", "metric_total", 1.0, map[string]string{"lbl": "val"})
 	v.CounterAdd("group2", "metric2_total", 1.0, map[string]string{"lbl": "val222"})
 
-	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occured in log: %s", buf.String())
+	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occurred in log: %s", buf.String())
 	// Expect metric_total is updated and metric2_total
 	expect = `
 # HELP metric_total metric_total
@@ -103,7 +103,7 @@ metric2_total{lbl="val222"} 1
 		},
 	})
 	v.CounterAdd("group2", "metric2_total", 1.0, map[string]string{"lbl": "val222"})
-	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occured in log: %s", buf.String())
+	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occurred in log: %s", buf.String())
 	// Expect metric_total is updated and metric2_total is updated and metric_total left as is
 	expect = `
 # HELP metric_total metric_total

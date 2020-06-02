@@ -11,7 +11,7 @@ func MeasureTimeMs(resultCallback func(ms float64)) func() {
 	})
 }
 
-// MeasureTime returns a function that can be defered to measure an execution time of a method call
+// MeasureTime returns a function that can be deferred to measure an execution time of a method call
 func MeasureTime(resultCallback func(nanos Nanos)) func() {
 	start := time.Now()
 	return func() {

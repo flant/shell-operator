@@ -218,8 +218,8 @@ const labelsSeparator = byte(255)
 func HashLabelValues(labelValues []string) uint64 {
 	hasher := fnv.New64a()
 	for _, labelValue := range labelValues {
-		hasher.Write([]byte(labelValue))
-		hasher.Write([]byte{labelsSeparator})
+		_, _ = hasher.Write([]byte(labelValue))
+		_, _ = hasher.Write([]byte{labelsSeparator})
 	}
 	return hasher.Sum64()
 }
