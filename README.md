@@ -158,23 +158,20 @@ Every hook should respond with JSON or YAML configuration of bindings when execu
 
 This binding defines a subset of Kubernetes objects that Shell-operator will monitor and a [jq](https://github.com/stedolan/jq/) expression to filter their properties. Read more about `onKubernetesEvent` bindings [here](HOOKS.md#kubernetes).
 
-Example of JSON output from `hook --config`:
+Example of YAML output from `hook --config`:
 
-```json
-{
-  "configVersion": "v1",
-  "kubernetes": [
-    {
-      "name":"Execute on changes of namespace labels",
-      "kind": "namespace",
-      "executeHookOnEvent":["Modified"],
-      "jqFilter":".metadata.labels"
-    }
-  ]
-}
+```yaml
+configVersion: v1
+kubernetes:
+- name: execute_on_changes_of_namespace_labels
+  kind: Namespace
+  executeHookOnEvent: ["Modified"]
+  jqFilter: ".metadata.labels"
 ```
 
 > Note: it is possible to watch Custom Defined Resources, just use proper values for `apiVersion` and `kind` fields.
+
+> Note: return configuration as JSON is also possible as JSON is a subset of YAML.
 
 ### onStartup
 

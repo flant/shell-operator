@@ -38,6 +38,7 @@ func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (*ObjectAndF
 	if err != nil {
 		return nil, err
 	}
+	res.ObjectBytes = int64(len(data))
 
 	if jqFilter == "" {
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))

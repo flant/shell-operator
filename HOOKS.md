@@ -37,7 +37,20 @@ Next, the main cycle is started:
 
 ## Hook configuration
 
-Shell-operator runs the hook with the `--config` flag. In response, the hook should print its event binding configuration to stdout. The response can be in JSON format:
+Shell-operator runs the hook with the `--config` flag. In response, the hook should print its event binding configuration to stdout. The response can be in YAML format:
+
+```yaml
+configVersion: v1
+onStartup: ORDER,
+schedule:
+- {SCHEDULE_PARAMETERS}
+- {SCHEDULE_PARAMETERS}
+kubernetes:
+- {KUBERNETES_PARAMETERS}
+- {KUBERNETES_PARAMETERS}
+```
+
+or in JSON format:
 
 ```json
 {
@@ -52,19 +65,6 @@ Shell-operator runs the hook with the `--config` flag. In response, the hook sho
        {KUBERNETES_PARAMETERS}
   ]
 }
-```
-
-or in YAML format:
-
-```yaml
-configVersion: v1
-onStartup: ORDER,
-schedule:
-- {SCHEDULE_PARAMETERS}
-- {SCHEDULE_PARAMETERS}
-kubernetes:
-- {KUBERNETES_PARAMETERS}
-- {KUBERNETES_PARAMETERS}
 ```
 
 `configVersion` field specifies a version of configuration schema. The latest schema version is **v1** and it is described below.
@@ -137,74 +137,58 @@ Run a hook on a Kubernetes object changes.
 
 Syntax:
 
-```json
-{
-  "configVersion": "v1",
-  "kubernetes": [
-    {
-      "name": "Monitor pods in cache tier",
-      "apiVersion": "v1",
-      "kind": "Pod",
-      "executeHookOnEvent": [ "Added", "Modified", "Deleted" ],
-      "executeHookOnSynchronization": true|false,
-      "nameSelector": {
-        "matchNames": ["pod-0", "pod-1"]
-      },
-      "labelSelector": {
-        "matchLabels": {
-          "myLabel": "myLabelValue",
-          "someKey": "someValue",
-          ...
-        },
-        "matchExpressions": [
-          {
-            "key": "tier",
-            "operator": "In",
-            "values": ["cache"]
-          },
-          ...
-        ],
-      },
-      "fieldSelector": {
-        "matchExpressions": [
-          {
-            "field": "status.phase",
-            "operator": "Equals",
-            "value": "Pending"
-          },
-          ...
-        ],
-      },
-      "namespace": {
-        "nameSelector": {
-          "matchNames": ["somenamespace", "proj-production", "proj-stage"]
-        },
-        "labelSelector": {
-          "matchLabels": {
-            "myLabel": "myLabelValue",
-            "someKey": "someValue",
-            ...
-          },
-          "matchExpressions": [
-            {
-              "key": "env",
-              "operator": "In",
-              "values": ["production"]
-            },
-            ...
-          ],
-      },
-      "jqFilter": ".metadata.labels",
-      "includeSnapshotsFrom": ["Monitor pods in cache tier", "another-binding-name", ...],
-      "allowFailure": true|false,
-      "queue": "cache-pods",
-      "group": "pods",
-    },
-    {"name":"monitor Pods", "kind": "pod", ...},
-    ...
-    {...}
-  ]
-}
+```yaml
+configVersion: v1
+kubernetes:
+- name: "Monitor pods in cache tier"
+  apiVersion: v1
+  kind: Pod  # required
+  executeHookOnEvent: [ "Added", "Modified", "Deleted" ]
+  executeHookOnSynchronization: true|false # default is true
+  fullObjectInSnapshot: true|false # default is true
+  nameSelector:
+    matchNames:
+    - pod-0
+    - pod-1
+  labelSelector:
+    matchLabels:
+      myLabel: myLabelValue
+      someKey: someValue
+    matchExpressions:
+    - key: "tier"
+      operator: "In"
+      values: ["cache"]
+    # - ...
+  fieldSelector":
+    matchExpressions:
+    - field: "status.phase"
+      operator: "Equals"
+      value: "Pending"
+    # - ...
+  namespace:
+    nameSelector:
+      matchNames: ["somenamespace", "proj-production", "proj-stage"]
+    labelSelector:
+      matchLabels:
+        myLabel: "myLabelValue"
+        someKey: "someValue"
+      matchExpressions:
+      - key: "env"
+        operator: "In"
+        values: ["production"]
+      # - ...
+  jqFilter: ".metadata.labels"
+  includeSnapshotsFrom:
+  - "Monitor pods in cache tier"
+  - "monitor Pods"
+  - ...
+  allowFailure: true|false  # default is false
+  queue: "cache-pods"
+  group: "pods"
+
+- name: "monitor Pods"
+  kind: "pod"
+  # ...
 ```
 
 Parameters:
@@ -248,9 +232,11 @@ Parameters:
 
 - `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from that bindings will be added to the binding context in a `snapshots` field. Self-include is also possible.
 
+- `fullObjectInSnapshot` — if not set or `true`, dumps of Kubernetes resources are cached for this binding and the snapshot includes them as `object` fields. Set to `false` if the hook not relies on full objects to reduce the memory footprint.
+
 - `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group). `group` is mutually exclusive with `includeSnapshotsFrom`.
 
-YAML example:
+Example:
 
 ```yaml
 configVersion: v1
@@ -275,12 +261,11 @@ This hook configuration will execute hook on each change in labels of pods label
 
 ##### default Namespace
 
-Unlike `kubectl` you should explicitly define namespace.nameSelector to monitor events from `default` namespace.
+Unlike `kubectl` you should explicitly define `namespace.nameSelector` to monitor events from `default` namespace.
 
-```json
-      "namespace": {
-        "nameSelector": ["default"]
-      },
+```yaml
+  namespace:
+    nameSelector: ["default"]
 ```
 
 ##### RBAC is required
@@ -289,7 +274,7 @@ Shell-operator requires a ServiceAccount with the appropriate [RBAC](https://kub
 
 ##### jqFilter
 
-This filter is used to ignore superfluous "Modified" events, and to *exclude* object from event subscription. For example, if the hook is interested in changes of object's labels, `"jqFilter": ".metadata.labels"` can be used to ignore changes in `.status` or `.metadata.annotations`.
+This filter is used to *ignore* superfluous "Modified" events, *and* to *exclude* object from event subscription. For example, if the hook should track changes of object's labels, `jqFilter: ".metadata.labels"` can be used to ignore changes in other properties (`.status`,`.metadata.annotations`, etc.).
 
 The result of applying the filter to the event's object is passed to the hook in a `filterResult` field of a [binding context](#binding-context).
 
@@ -317,17 +302,13 @@ However fieldSelector can be useful for some resources with extended set of supp
 
 Example of selecting Pods by 'Running' phase:
 
-```json
-"kind": "Pod",
-"fieldSelector":{
-  "matchExpressions":[
-    {
-      "field":"status.phase",
-      "operator":"Equals",
-      "value":"Running"
-    }
-  ]
-}
+```yaml
+kind: Pod
+fieldSelector:
+  matchExpressions:
+  - field: "status.phase"
+    operator: Equals
+    value: Running
 ```
 
 ##### fieldSelector and labelSelector expressions are ANDed
@@ -340,26 +321,35 @@ When an event associated with a hook is triggered, Shell-operator executes the h
 
 Temporary files have unique names to prevent collisions between queues and are deleted after the hook run.
 
- Binging context is a JSON-array of structures with the following fields:
+Binging context is a JSON-array of structures with the following fields:
 
-- `binding` — a string from the `name` or `group` parameter. If these parameters has not been set in the binding configuration, then strings `schedule` or `kubernetes` are used. For a hook executed at startup, this value is always `onStartup`.
-- `snapshots` — a map with object lists if `includeSnapshotsFrom` or `group` are defined. This map contains a list of objects for each binding name from `includeSnapshotsFrom` or for each `kubernetes` binding in a group. If `includeSnapshotsFrom` list is empty, the named field is omitted.
-- `type` — "Schedule" for `schedule` bindings. "Group" or "Synchronization" if `group` is defined.
+- `binding` — a string from the `name` or `group` parameters. If these parameters has not been set in the binding configuration, then strings "schedule" or "kubernetes" are used. For a hook executed at startup, this value is always "onStartup".
+- `type` — "Schedule" for `schedule` bindings. "Synchronization" or "Event" for `kubernetes` bindings. "Synchronization" or "Group" if `group` is defined.
 
-There are more fields for `kubernetes`-type events:
+The hook receives "Event"-type binding context on Kubernetes event and it contains more fields:
+- `watchEvent` — the possible value is one of the values you can use with `executeHookOnEvent` parameter: "Added", "Modified" or "Deleted".
+- `object` — a JSON dump of the full object related to the event. It contains an exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta) response, so it's the object state **at the moment of the event** (not at the moment of the hook execution).
+- `filterResult` — the result of `jq` execution with specified `jqFilter` on the above mentioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
 
-- `type` - "Synchronization" or "Event". "Synchronization" binding context contains all objects that match selectors in a hook's configuration. "Event" binding context contains a watch event type, an event related object and a jq filter result.
-- `watchEvent` — the possible value is one of the values you can pass in `executeHookOnEvent` binding parameter: “Added”, “Modified” or “Deleted”. This value is set if the `type` field is set to "Event".
-- `object` — the whole object related to the event. It contains an exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta) response, so it's the object state **at the moment of the event** (not at the moment of the hook execution).
-- `filterResult` — the result of `jq` execution with specified `jqFilter` on the abovementioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
-- `objects` — a list of existing objects that match selectors. Each item of this list contains `object` and `filterResult` fields. If the list is empty, the value of `objects` is an empty array.
+The hook receives existed objects on startup for each binding with "Synchronization"-type binding context:
+- `objects` — a list of existing objects that match selectors in binding configuration. Each item of this list contains `object` and `filterResult` fields. If the list is empty, the value of `objects` is an empty array.
 
-Also, `schedule` events has 
+If `group` or `includeSnapshotsFrom` are defined, the hook receives binding context with additional field:
+- `snapshots` — a map that contains a list of objects for each binding name from `includeSnapshotsFrom` or for each `kubernetes` binding in a group. If `includeSnapshotsFrom` list is empty, the field is omitted.
 
 ### `onStartup` binding context example
 
+Hook with this configuration:
+
+```yaml
+configVersion: v1
+onStartup: 1
+```
+
+will be executed with this binding context at startup:
+
 ```json
-[{ "binding": "onStartup"}]
+[{"binding": "onStartup"}]
 ```
 
 ### `schedule` binding context example
@@ -377,10 +367,10 @@ schedule:
 then at 12:02, it will be executed with the following binding context:
 
 ```json
-[{ "binding": "incremental"}]
+[{ "binding": "incremental", "type":"Schedule"}]
 ```
 
-### kubernetes binding context example
+### `kubernetes` binding context example
 
 A hook can monitor Pods in all namespaces with this simple configuration:
 
@@ -390,7 +380,9 @@ kubernetes:
 - kind: Pod
 ```
 
-During startup, the hook will be executed with "Synchronization" binding context:
+#### "Synchronization" binding context
+
+During startup, the hook receives all existing objects with "Synchronization"-type binding context:
 
 ```json
 [
@@ -424,7 +416,9 @@ During startup, the hook will be executed with "Synchronization" binding context
 ]
 ```
 
-If pod `pod-321d12` is then added into namespace 'default', then the hook will be executed with the "Event" binding context:
+#### "Event" binding context
+
+If pod `pod-321d12` is then added into namespace 'default', then the hook will be executed with the "Event"-type binding context:
 
 ```json
 [
@@ -449,9 +443,50 @@ If pod `pod-321d12` is then added into namespace 'default', then the hook will b
 ]
 ```
 
-### An example of a binding context with `includeSnapshotsFrom` and `jqFilter` result
+### Snapshots
 
-Consider the hook that monitors changes of labels of all Pods and do something interesting on schedule:
+Shell-operator caches a list of resources for each `kubernetes` binding. Another bindings can access this list via `includeSnapshotsFrom` parameter. Also, there is a `group` parameter to automatically get all snapshots from multiple bindings and deduplicate executions.
+
+Snapshot is a list of cached kubernetes objects and corresponding jqFilter results. To access the snapshot from particular binding, there is a map `snapshots` in the binding context where the key is a binding name and the value is the snapshot.
+
+`snapshots` format:
+
+```json
+    "snapshots": {
+      "binding-name-1": [ 
+        {
+          "object": {
+            "kind": "Pod",
+            "metadata":{
+              "name":"etcd-...",
+              "namespace":"kube-system",
+              ...
+            },
+          },
+          "filterResult": { ... },
+        },
+        ...
+      ]
+    }
+```
+
+- `object` — it is a JSON dump of Kubernetes object.
+- `filterResult` — a JSON result of applying `jqFilter` to the Kubernetes object.
+
+Keeping dumps for `object` fields can take a lot of memory. There is a parameter `keepFullObjectsInMemory: false` to disable full dumps.
+ 
+Note that disabling full objects make sense only if `jqFilter` is defined, as it disables full objects in `snapshots` field, `objects` field of "Synchronization" binding context and `object` field of "Event" binding context.
+
+For example, this binding configuration will execute hook with empty items in `objects` field of "Synchronization" binding context:
+ 
+```
+kubernetes:
+- name: pods
+  kinds: Pod   
+  keepFullObjectsInMemory: false
+```
+
+To illustrate `includeSnapshotsFrom` parameter, consider the hook that monitors changes of labels of all Pods and do something interesting on schedule:
 
 ```yaml
 configVersion: v1
@@ -465,6 +500,8 @@ kubernetes:
   jqFilter: '.metadata.labels'
   includeSnapshotsFrom: ["monitor-pods"]
 ```
+
+#### "Synchronization" binding context with snapshots
 
 During startup, the hook will be executed with the "Synchronization" binding context with `snapshots` JSON object:
 
@@ -525,6 +562,8 @@ During startup, the hook will be executed with the "Synchronization" binding con
 ]
 ```
 
+#### "Event" binding context with snapshots
+
 If pod `pod-321d12` is then added into the "default" namespace, then the hook will be executed with the "Event" binding context with `object` and `filterResult` fields:
 
 ```json
@@ -567,7 +606,9 @@ If pod `pod-321d12` is then added into the "default" namespace, then the hook wi
 ]
 ```
 
-at 12:02, it will be executed with the following binding context:
+#### "Schedule" binding context with snapshots
+
+at 12:02, the hook will be executed with the following binding context:
 
 ```json
 [
@@ -594,9 +635,18 @@ at 12:02, it will be executed with the following binding context:
 ]
 ```
 
-### An example of a binding context with `group`
+### Binding context of grouped bindings
 
-Consider the hook that monitors changes of labels of all Pods, changes in ConfigMap and do something interesting on schedule:
+`group` field defines a named group of bindings. Group is used when the source of event is not important and data in snapshots is enough for the hook. When binding with `group` is triggered with the event, the hook receives snapshots from all bindings with equal `group` name. Also, adjacent tasks with equal `group` in the same queue are "compacted" and hook is executed only once. So it is wise to use the same queue for all hooks in a group.
+
+`executeHookOnSynchronization`, `executeHookOnEvent` and `keepFullObjectsInMemory` can be used with `group`.
+
+Binding context for group contains:
+- `binding` field with group name.
+- `type` field with "Synchronization" or "Group" string.
+- `snapshots` field if there is at least one `kubernetes` binding in the group.
+
+Consider the hook that is executed on changes of labels of all Pods, changes in ConfigMap and also on schedule:
 
 ```yaml
 configVersion: v1
@@ -617,6 +667,7 @@ kubernetes:
   group: "pods" 
 ```
 
+#### "Synchronization" binding context for group
 
 During startup, the hook will be executed with the "Synchronization" binding context with `snapshots` JSON object:
 
@@ -658,6 +709,8 @@ During startup, the hook will be executed with the "Synchronization" binding con
   }
 ]
 ```
+
+#### "Group" binding context
 
 If pod `pod-dfbd12` is then added into the "default" namespace, then the hook will be executed with the "Group" binding context:
 

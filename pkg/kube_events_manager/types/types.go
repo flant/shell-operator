@@ -36,22 +36,26 @@ const (
 
 type ObjectAndFilterResult struct {
 	Metadata struct {
-		JqFilter   string
-		Checksum   string
-		ResourceId string
+		JqFilter     string
+		Checksum     string
+		ResourceId   string
+		RemoveObject bool
 	}
 	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
 	FilterResult string
+	ObjectBytes  int64 // length of Object
 }
 
 func (o ObjectAndFilterResult) Map() map[string]interface{} {
-	m := map[string]interface{}{
-		"object": o.Object,
+	m := map[string]interface{}{}
+
+	if !o.Metadata.RemoveObject {
+		m["object"] = o.Object
 	}
+
 	if o.Metadata.JqFilter == "" {
 		return m
 	}
-
 	// Add filterResult field only if it was requested
 	inJson := o.FilterResult
 	if inJson == "" {
@@ -72,6 +76,22 @@ func (o ObjectAndFilterResult) Map() map[string]interface{} {
 
 func (o ObjectAndFilterResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.Map())
+}
+
+func (o *ObjectAndFilterResult) RemoveFullObject() {
+	o.Object = nil
+	o.ObjectBytes = 0
+	o.Metadata.RemoveObject = true
+}
+
+type ObjectAndFilterResults map[string]*ObjectAndFilterResult
+
+func (a ObjectAndFilterResults) Bytes() (size int64) {
+	for _, o := range a {
+		size += int64(len(o.FilterResult))
+		size += o.ObjectBytes
+	}
+	return
 }
 
 // ByNamespaceAndName implements sort.Interface for []ObjectAndFilterResult

@@ -30,6 +30,7 @@ type ResourceInformer interface {
 	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateSharedInformer() error
 	GetExistedObjects() []ObjectAndFilterResult
+	CachedObjectsBytes() int64
 	Start()
 	Stop()
 	PauseHandleEvents()
@@ -148,9 +149,9 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	informer.Informer().AddEventHandler(ei)
 	ei.SharedInformer = informer.Informer()
 
-	err = ei.ListExistedObjects()
+	err = ei.LoadExistedObjects()
 	if err != nil {
-		log.Errorf("list existing objects: %v", err)
+		log.Errorf("load existing objects: %v", err)
 		return err
 	}
 
@@ -168,10 +169,16 @@ func (ei *resourceInformer) GetExistedObjects() []ObjectAndFilterResult {
 	return res
 }
 
-// ListExistedObjects get a list of existed objects in namespace that match selectors and
+func (ei *resourceInformer) CachedObjectsBytes() int64 {
+	ei.cacheLock.RLock()
+	defer ei.cacheLock.RUnlock()
+	return ObjectAndFilterResults(ei.CachedObjects).Bytes()
+}
+
+// LoadExistedObjects get a list of existed objects in namespace that match selectors and
 // fills Checksum map with checksums of existing objects.
-func (ei *resourceInformer) ListExistedObjects() error {
-	defer trace.StartRegion(context.Background(), "ListExistedObjects").End()
+func (ei *resourceInformer) LoadExistedObjects() error {
+	defer trace.StartRegion(context.Background(), "LoadExistedObjects").End()
 	objList, err := ei.KubeClient.Dynamic().
 		Resource(ei.GroupVersionResource).
 		Namespace(ei.Namespace).
@@ -204,6 +211,9 @@ func (ei *resourceInformer) ListExistedObjects() error {
 				ei.metricStorage.ObserveHistogram("kube_jq_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
 			})()
 			objFilterRes, err = ApplyJqFilter(ei.Monitor.JqFilter, &obj)
+			if !ei.Monitor.KeepFullObjectsInMemory {
+				objFilterRes.RemoveFullObject()
+			}
 		}()
 
 		if err != nil {
@@ -224,6 +234,9 @@ func (ei *resourceInformer) ListExistedObjects() error {
 	for k, v := range filteredObjects {
 		ei.CachedObjects[k] = v
 	}
+
+	ei.metricStorage.SendGauge("kube_snapshot_length", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
+	ei.metricStorage.SendGauge("kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 
 	return nil
 }
@@ -271,6 +284,9 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			ei.metricStorage.ObserveHistogram("kube_jq_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
 		})()
 		objFilterRes, err = ApplyJqFilter(ei.Monitor.JqFilter, obj)
+		if !ei.Monitor.KeepFullObjectsInMemory {
+			objFilterRes.RemoveFullObject()
+		}
 	}()
 	if err != nil {
 		log.Errorf("%s: WATCH %s: %s",
@@ -300,6 +316,8 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			skipEvent = true
 		}
 		ei.CachedObjects[resourceId] = objFilterRes
+		ei.metricStorage.SendGauge("kube_snapshot_length", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.SendGauge("kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 		if skipEvent {
 			return
@@ -308,6 +326,8 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 	case WatchEventDeleted:
 		ei.cacheLock.Lock()
 		delete(ei.CachedObjects, resourceId)
+		ei.metricStorage.SendGauge("kube_snapshot_length", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.SendGauge("kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 	}
 
