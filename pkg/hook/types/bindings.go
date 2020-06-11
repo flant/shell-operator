@@ -46,4 +46,5 @@ type OnKubernetesEventConfig struct {
 	Group                        string
 	ExecuteHookOnSynchronization bool
 	WaitForSynchronization       bool
+	KeepFullObjectsInMemory      bool
 }

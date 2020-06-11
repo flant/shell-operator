@@ -140,6 +140,8 @@ properties:
         jqFilter:
           type: string
           example: ".metadata.labels"
+        keepFullObjectsInMemory:
+          type: boolean
         allowFailure:
           type: boolean
         executeHookOnSynchronization:

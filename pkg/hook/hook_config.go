@@ -87,6 +87,7 @@ type OnKubernetesEventConfigV1 struct {
 	ExecuteHookOnEvents          []WatchEventType         `json:"executeHookOnEvent,omitempty"`
 	ExecuteHookOnSynchronization string                   `json:"executeHookOnSynchronization,omitempty"`
 	WaitForSynchronization       string                   `json:"waitForSynchronization,omitempty"`
+	KeepFullObjectsInMemory      string                   `json:"keepFullObjectsInMemory,omitempty"`
 	Mode                         KubeEventMode            `json:"mode,omitempty"`
 	ApiVersion                   string                   `json:"apiVersion,omitempty"`
 	Kind                         string                   `json:"kind,omitempty"`
@@ -307,18 +308,24 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		}
 		kubeConfig.Group = kubeCfg.Group
 
+		// ExecuteHookOnSynchronization is enabled by default.
+		kubeConfig.ExecuteHookOnSynchronization = true
 		if kubeCfg.ExecuteHookOnSynchronization == "false" {
 			kubeConfig.ExecuteHookOnSynchronization = false
-		} else {
-			kubeConfig.ExecuteHookOnSynchronization = true
 		}
 
-		// Disable WaitForSynchronization makes sense only for named queues.
+		// WaitForSynchronization is enabled by default. It can be disabled only for named queues.
+		kubeConfig.WaitForSynchronization = true
 		if kubeCfg.WaitForSynchronization == "false" && kubeCfg.Queue != "" {
 			kubeConfig.WaitForSynchronization = false
-		} else {
-			kubeConfig.WaitForSynchronization = true
 		}
+
+		// KeepFullObjectsInMemory is enabled by default.
+		kubeConfig.KeepFullObjectsInMemory = true
+		if kubeCfg.KeepFullObjectsInMemory == "false" {
+			kubeConfig.KeepFullObjectsInMemory = false
+		}
+		kubeConfig.Monitor.KeepFullObjectsInMemory = kubeConfig.KeepFullObjectsInMemory
 
 		c.OnKubernetesEvents = append(c.OnKubernetesEvents, kubeConfig)
 	}

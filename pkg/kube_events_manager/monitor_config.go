@@ -17,16 +17,17 @@ type MonitorConfig struct {
 		LogLabels    map[string]string
 		MetricLabels map[string]string
 	}
-	EventTypes        []WatchEventType
-	ApiVersion        string
-	Kind              string
-	NameSelector      *NameSelector
-	NamespaceSelector *NamespaceSelector
-	LabelSelector     *metav1.LabelSelector
-	FieldSelector     *FieldSelector
-	JqFilter          string
-	LogEntry          *log.Entry
-	Mode              KubeEventMode
+	EventTypes              []WatchEventType
+	ApiVersion              string
+	Kind                    string
+	NameSelector            *NameSelector
+	NamespaceSelector       *NamespaceSelector
+	LabelSelector           *metav1.LabelSelector
+	FieldSelector           *FieldSelector
+	JqFilter                string
+	LogEntry                *log.Entry
+	Mode                    KubeEventMode
+	KeepFullObjectsInMemory bool
 }
 
 func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
