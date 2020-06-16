@@ -459,12 +459,13 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 			return
 		}
 		hm := tsk.GetMetadata()
+		// Stop on task without metadata
 		if hm == nil {
 			stopIterate = true
 			return
 		}
 		nextHookName := hm.(HookNameAccessor).GetHookName()
-		// Only tasks for the same hook and of the same type can be combined.
+		// Only tasks for the same hook and of the same type can be combined (HookRun cannot be combined with OnStartup).
 		// Using stopCombineFn function more stricter combine rules can be defined.
 		if nextHookName == hookName && t.GetType() == tsk.GetType() {
 			if stopCombineFn != nil {

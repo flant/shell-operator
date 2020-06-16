@@ -38,7 +38,7 @@ type ObjectAndFilterResult struct {
 	Metadata struct {
 		JqFilter     string
 		Checksum     string
-		ResourceId   string
+		ResourceId   string // Used for sorting
 		RemoveObject bool
 	}
 	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
@@ -96,6 +96,7 @@ func (a ObjectAndFilterResults) Bytes() (size int64) {
 
 // ByNamespaceAndName implements sort.Interface for []ObjectAndFilterResult
 // based on Namespace and Name of Object field.
+// TODO use special fields instead of ResourceId. ResourceId can be changed in the future.
 type ByNamespaceAndName []ObjectAndFilterResult
 
 func (a ByNamespaceAndName) Len() int      { return len(a) }
@@ -103,7 +104,7 @@ func (a ByNamespaceAndName) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a ByNamespaceAndName) Less(i, j int) bool {
 	p, q := &a[i], &a[j]
 	if p.Object == nil || q.Object == nil {
-		return false
+		return p.Metadata.ResourceId < q.Metadata.ResourceId
 	}
 	switch {
 	case p.Object.GetNamespace() < q.Object.GetNamespace():
