@@ -776,3 +776,40 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
 		})
 	}
 }
+
+func Test_MergeArrays(t *testing.T) {
+	g := NewWithT(t)
+
+	tests := []struct {
+		name   string
+		a1     []string
+		a2     []string
+		expect []string
+	}{
+		{
+			"simple",
+			[]string{"snap3", "snap2", "snap1"},
+			[]string{"snap1", "snap4", "snap3"},
+			[]string{"snap3", "snap2", "snap1", "snap4"},
+		},
+		{
+			"empty",
+			[]string{},
+			[]string{},
+			[]string{},
+		},
+		{
+			"no_intersect",
+			[]string{"snap3", "snap2", "snap1"},
+			[]string{"snap11", "snap41", "snap31"},
+			[]string{"snap3", "snap2", "snap1", "snap11", "snap41", "snap31"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res := MergeArrays(test.a1, test.a2)
+			g.Expect(res).To(Equal(test.expect))
+		})
+	}
+}

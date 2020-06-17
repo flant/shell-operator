@@ -129,7 +129,7 @@ Parameters:
 
 - `includeSnapshotsFrom` — a list of names of `kubernetes` bindings. When specified, all monitored objects will be added to the binding context in a `snapshots` field.
 
-- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group). `group` is mutually exclusive with `includeSnapshotsFrom`.
+- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group).
 
 ### kubernetes
 
@@ -159,7 +159,7 @@ kubernetes:
       operator: "In"
       values: ["cache"]
     # - ...
-  fieldSelector":
+  fieldSelector:
     matchExpressions:
     - field: "status.phase"
       operator: "Equals"
@@ -234,7 +234,7 @@ Parameters:
 
 - `fullObjectInSnapshot` — if not set or `true`, dumps of Kubernetes resources are cached for this binding and the snapshot includes them as `object` fields. Set to `false` if the hook not relies on full objects to reduce the memory footprint.
 
-- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group). `group` is mutually exclusive with `includeSnapshotsFrom`.
+- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group).
 
 Example:
 
@@ -637,14 +637,16 @@ at 12:02, the hook will be executed with the following binding context:
 
 ### Binding context of grouped bindings
 
-`group` field defines a named group of bindings. Group is used when the source of event is not important and data in snapshots is enough for the hook. When binding with `group` is triggered with the event, the hook receives snapshots from all bindings with equal `group` name. Also, adjacent tasks with equal `group` in the same queue are "compacted" and hook is executed only once. So it is wise to use the same queue for all hooks in a group.
+`group` parameter defines a named group of bindings. Group is used when the source of event is not important and data in snapshots is enough for the hook. When binding with `group` is triggered with the event, the hook receives snapshots from all bindings with equal `group` name. Also, adjacent tasks with equal `group` in the same queue are "compacted" and hook is executed only once. So it is wise to use the same queue for all hooks in a group.
 
 `executeHookOnSynchronization`, `executeHookOnEvent` and `keepFullObjectsInMemory` can be used with `group`.
+
+`group` parameter is compatible with `includeSnapshotsFrom` parameter. `includeSnapshotsFrom` can be used to include additional snapshots into binding context.
 
 Binding context for group contains:
 - `binding` field with group name.
 - `type` field with "Synchronization" or "Group" string.
-- `snapshots` field if there is at least one `kubernetes` binding in the group.
+- `snapshots` field if there is at least one `kubernetes` binding in the group and in `includeSnapshotsFrom`.
 
 Consider the hook that is executed on changes of labels of all Pods, changes in ConfigMap and also on schedule:
 

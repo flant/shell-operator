@@ -92,6 +92,9 @@ func execJq(jqFilter string, jsonData []byte) (stdout string, stderr string, err
 	return
 }
 
+// ResourceId describes object with namespace, kind and name
+//
+// Change with caution, as this string is used for sorting objects and snapshots.
 func ResourceId(obj *unstructured.Unstructured) string {
 	return fmt.Sprintf("%s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 }

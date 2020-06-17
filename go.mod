@@ -3,9 +3,8 @@ module github.com/flant/shell-operator
 go 1.12
 
 require (
-	github.com/flant/libjq-go v1.6.1 // branch: master
+	github.com/flant/libjq-go v1.6.2-0.20200616114952-907039e8a02a // branch: master
 	github.com/go-chi/chi v4.0.3+incompatible
-	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.3
 	github.com/go-openapi/strfmt v0.19.3
 	github.com/go-openapi/swag v0.19.5
@@ -18,7 +17,6 @@ require (
 	github.com/prometheus/client_golang v1.0.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/sys v0.0.0-20200113162924-86b910548bc1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/satori/go.uuid.v1 v1.2.0

@@ -9,8 +9,8 @@ import (
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
 
-// ByNamespaceAndName implements sort.Interface for []ObjectAndFilterResult
-// based on Namespace and Name of Object field.
+// AsQueueNames implements sort.Interface for array of queue names.
+// 'main' queue has the top priority. Other names are sorted as usual.
 type AsQueueNames []string
 
 func (a AsQueueNames) Len() int      { return len(a) }

@@ -26,22 +26,18 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 		}
 	})
 
-	var tasks = make([]task.Task, 0)
-	currTask := task.NewTask(HookRun).
-		WithQueueName("test_multiple_hooks").
-		WithMetadata(HookMetadata{
-			HookName: "hook1.sh",
-			BindingContext: []hook.BindingContext{
-				{
-					Binding: "kubernetes",
-					Type:    TypeEvent,
+	var tasks = []task.Task{
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook1.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Binding: "kubernetes",
+						Type:    TypeEvent,
+					},
 				},
-			},
-		})
-
-	tasks = append(tasks, currTask)
-
-	tasks = append(tasks, []task.Task{
+			}),
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
@@ -88,7 +84,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
-				HookName: "hook2.sh",
+				HookName: "hook1.sh",
 				BindingContext: []hook.BindingContext{
 					{
 						Binding: "kubernetes",
@@ -96,8 +92,36 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 					},
 				},
 			}),
+	}
+
+	for _, tsk := range tasks {
+		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
+	}
+	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
+
+	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+
+	// Should combine binding contexts from 4 tasks.
+	g.Expect(bcs).Should(HaveLen(4))
+	// Should delete 3 tasks
+	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks) - 3))
+}
+
+func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
+	g := NewWithT(t)
+
+	op := NewShellOperator()
+	op.TaskQueues = queue.NewTaskQueueSet()
+	op.TaskQueues.WithContext(context.Background())
+	op.TaskQueues.NewNamedQueue("test_no_combine", func(tsk task.Task) queue.TaskResult {
+		return queue.TaskResult{
+			Status: "Success",
+		}
+	})
+
+	var tasks = []task.Task{
 		task.NewTask(HookRun).
-			WithQueueName("test_multiple_hooks").
+			WithQueueName("test_no_combine").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []hook.BindingContext{
@@ -107,46 +131,8 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 					},
 				},
 			}),
-	}...)
-
-	for _, tsk := range tasks {
-		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
-	}
-
-	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask, nil)
-	g.Expect(bcs).Should(HaveLen(4))
-}
-
-func Test_CombineBindingContext_OneHook(t *testing.T) {
-	g := NewWithT(t)
-
-	op := NewShellOperator()
-	op.TaskQueues = queue.NewTaskQueueSet()
-	op.TaskQueues.WithContext(context.Background())
-	op.TaskQueues.NewNamedQueue("test_one_hook", func(tsk task.Task) queue.TaskResult {
-		return queue.TaskResult{
-			Status: "Success",
-		}
-	})
-
-	var tasks = make([]task.Task, 0)
-	currTask := task.NewTask(HookRun).
-		WithQueueName("test_one_hook").
-		WithMetadata(HookMetadata{
-			HookName: "hook1.sh",
-			BindingContext: []hook.BindingContext{
-				{
-					Binding: "kubernetes",
-					Type:    TypeEvent,
-				},
-			},
-		})
-
-	tasks = append(tasks, currTask)
-
-	tasks = append(tasks, []task.Task{
 		task.NewTask(HookRun).
-			WithQueueName("test_one_hook").
+			WithQueueName("test_no_combine").
 			WithMetadata(HookMetadata{
 				HookName: "hook2.sh",
 				BindingContext: []hook.BindingContext{
@@ -157,7 +143,7 @@ func Test_CombineBindingContext_OneHook(t *testing.T) {
 				},
 			}),
 		task.NewTask(HookRun).
-			WithQueueName("test_one_hook").
+			WithQueueName("test_no_combine").
 			WithMetadata(HookMetadata{
 				HookName: "hook3.sh",
 				BindingContext: []hook.BindingContext{
@@ -166,17 +152,21 @@ func Test_CombineBindingContext_OneHook(t *testing.T) {
 					},
 				},
 			}),
-	}...)
-
-	for _, tsk := range tasks {
-		op.TaskQueues.GetByName("test_one_hook").AddLast(tsk)
 	}
 
-	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_one_hook"), currTask, nil)
+	for _, tsk := range tasks {
+		op.TaskQueues.GetByName("test_no_combine").AddLast(tsk)
+	}
+	g.Expect(op.TaskQueues.GetByName("test_no_combine").Length()).Should(Equal(len(tasks)))
+
+	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_no_combine"), tasks[0], nil)
+	// Should return nil if no combine
 	g.Expect(bcs).Should(BeNil())
+	// Should not delete tasks
+	g.Expect(op.TaskQueues.GetByName("test_no_combine").Length()).Should(Equal(len(tasks)))
 }
 
-func Test_CombineBindingContext_Group(t *testing.T) {
+func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 	g := NewWithT(t)
 
 	op := NewShellOperator()
@@ -188,27 +178,23 @@ func Test_CombineBindingContext_Group(t *testing.T) {
 		}
 	})
 
-	var tasks = make([]task.Task, 0)
-
 	bcMeta := hook.BindingContext{}.Metadata
 	bcMeta.Group = "pods"
 
-	currTask := task.NewTask(HookRun).
-		WithQueueName("test_multiple_hooks").
-		WithMetadata(HookMetadata{
-			HookName: "hook1.sh",
-			BindingContext: []hook.BindingContext{
-				{
-					Metadata: bcMeta,
-					Binding:  "kubernetes",
-					Type:     TypeEvent,
+	var tasks = []task.Task{
+		// 3 tasks with Group should be compacted
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook1.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Metadata: bcMeta,
+						Binding:  "kubernetes",
+						Type:     TypeEvent,
+					},
 				},
-			},
-		})
-
-	tasks = append(tasks, currTask)
-
-	tasks = append(tasks, []task.Task{
+			}),
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
@@ -243,17 +229,7 @@ func Test_CombineBindingContext_Group(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
-			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
-				HookName: "hook2.sh",
-				BindingContext: []hook.BindingContext{
-					{
-						Binding: "kubernetes",
-						Type:    TypeEvent,
-					},
-				},
-			}),
+		// Should not combine with next tasks (different hook name)
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
@@ -276,16 +252,19 @@ func Test_CombineBindingContext_Group(t *testing.T) {
 					},
 				},
 			}),
-	}...)
-
-	//hm.BindingContext[0].Metadata.Group = "pods"
+	}
 
 	for _, tsk := range tasks {
 		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
 	}
+	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
 
-	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask, nil)
+	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+	// Should compact 4 tasks into 4 binding context and combine 3 binding contexts into one.
 	g.Expect(bcList).Should(HaveLen(2))
+
+	// Should delete 3 tasks
+	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks) - 3))
 }
 
 func Test_CombineBindingContext_Group_Type(t *testing.T) {
@@ -300,8 +279,6 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 		}
 	})
 
-	var tasks = make([]task.Task, 0)
-
 	bcMeta := hook.BindingContext{}.Metadata
 	bcMeta.Group = "pods"
 	bcMeta.BindingType = types.OnKubernetesEvent
@@ -310,22 +287,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	schMeta.Group = "pods"
 	schMeta.BindingType = types.Schedule
 
-	currTask := task.NewTask(HookRun).
-		WithQueueName("test_multiple_hooks").
-		WithMetadata(HookMetadata{
-			HookName: "hook1.sh",
-			BindingContext: []hook.BindingContext{
-				{
-					Metadata: bcMeta,
-					Binding:  "kubernetes",
-					Type:     TypeEvent,
-				},
-			},
-		})
-
-	tasks = append(tasks, currTask)
-
-	tasks = append(tasks, []task.Task{
+	var tasks = []task.Task{
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
@@ -345,11 +307,23 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 				BindingContext: []hook.BindingContext{
 					{
 						Metadata: bcMeta,
+						Binding:  "kubernetes2",
+						Type:     TypeSynchronization,
+					},
+				},
+			}),
+		task.NewTask(HookRun).
+			WithQueueName("test_multiple_hooks").
+			WithMetadata(HookMetadata{
+				HookName: "hook1.sh",
+				BindingContext: []hook.BindingContext{
+					{
+						Metadata: bcMeta,
 						Binding:  "schedule",
 					},
 				},
 			}),
-		// stop grouping
+		// stop compaction for group
 
 		// bcList[1] type == TypeEvent
 		task.NewTask(HookRun).
@@ -404,21 +378,11 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		// Should not combine with task that has different type
+		task.NewTask(EnableScheduleBindings).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
-				HookName: "hook2.sh",
-				BindingContext: []hook.BindingContext{
-					{
-						Binding: "kubernetes",
-						Type:    TypeEvent,
-					},
-				},
-			}),
-		task.NewTask(HookRun).
-			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
-				HookName: "hook2.sh",
+				HookName: "hook1.sh",
 				BindingContext: []hook.BindingContext{
 					{
 						Binding: "kubernetes",
@@ -437,14 +401,18 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 					},
 				},
 			}),
-	}...)
+	}
 
 	for _, tsk := range tasks {
 		op.TaskQueues.GetByName("test_multiple_hooks").AddLast(tsk)
 	}
+	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
 
-	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), currTask, nil)
+	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+	// Should leave 3 tasks in queue.
+	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(3))
 
+	// Should combine binding contexts from 7 tasks. Should compact 3 binding contexts into 1.
 	g.Expect(bcList).Should(HaveLen(5))
 
 	g.Expect(string(bcList[0].Type)).Should(Equal(""), "bc: %+v", bcList[0])

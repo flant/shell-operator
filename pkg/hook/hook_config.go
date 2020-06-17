@@ -354,7 +354,8 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		c.Schedules = append(c.Schedules, schedule)
 	}
 
-	// Update IncludeSnapshotsFrom for groups
+	// Update IncludeSnapshotsFrom for every binding with a group.
+	// Merge binding's IncludeSnapshotsFrom with snapshots list calculated for group.
 	var groupSnapshots = make(map[string][]string)
 	for _, kubeCfg := range c.OnKubernetesEvents {
 		if kubeCfg.Group == "" {
@@ -368,7 +369,7 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 	newKubeEvents := make([]OnKubernetesEventConfig, 0)
 	for _, cfg := range c.OnKubernetesEvents {
 		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
-			cfg.IncludeSnapshotsFrom = snapshots
+			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
 		}
 		newKubeEvents = append(newKubeEvents, cfg)
 	}
@@ -376,13 +377,33 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 	newSchedules := make([]ScheduleConfig, 0)
 	for _, cfg := range c.Schedules {
 		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
-			cfg.IncludeSnapshotsFrom = snapshots
+			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
 		}
 		newSchedules = append(newSchedules, cfg)
 	}
 	c.Schedules = newSchedules
 
 	return nil
+}
+
+// MergeArrays returns merged array with unique elements. Preserve elements order.
+func MergeArrays(a1 []string, a2 []string) []string {
+	union := make(map[string]bool)
+	for _, a := range a2 {
+		union[a] = true
+	}
+	res := make([]string, 0)
+	for _, a := range a1 {
+		res = append(res, a)
+		union[a] = false
+	}
+	for _, a := range a2 {
+		if union[a] {
+			res = append(res, a)
+			union[a] = false
+		}
+	}
+	return res
 }
 
 func (c *HookConfig) Bindings() []BindingType {
@@ -526,10 +547,6 @@ func (c *HookConfig) CheckOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1,
 				}
 			}
 		}
-	}
-
-	if kubeCfg.Group != "" && len(kubeCfg.IncludeSnapshotsFrom) > 0 {
-		allErr = multierror.Append(allErr, fmt.Errorf("group and includeSnapshotsFrom are mutually exclusive"))
 	}
 
 	return allErr
