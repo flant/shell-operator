@@ -3,15 +3,16 @@ package queue
 import (
 	"context"
 	"fmt"
+	"github.com/flant/shell-operator/pkg/utils/measure"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/flant/shell-operator/pkg/metrics_storage"
+	"github.com/flant/shell-operator/pkg/metric_storage"
 	"github.com/flant/shell-operator/pkg/task"
-	. "github.com/flant/shell-operator/pkg/utils/measure"
 )
 
 /*
@@ -44,7 +45,7 @@ type TaskResult struct {
 
 type TaskQueue struct {
 	m             sync.Mutex
-	metricStorage *metrics_storage.MetricStorage
+	metricStorage *metric_storage.MetricStorage
 	ctx           context.Context
 	cancel        context.CancelFunc
 
@@ -55,13 +56,20 @@ type TaskQueue struct {
 	Handler  func(task.Task) TaskResult
 	HeadLock sync.Mutex
 	Status   string
+
+	measureActionFn     func()
+	measureActionFnOnce sync.Once
+	addHandler          func(task.Task)
+	removeHandler       func(task.Task)
 }
 
 func NewTasksQueue() *TaskQueue {
 	return &TaskQueue{
-		m:        sync.Mutex{},
-		items:    make([]task.Task, 0),
-		HeadLock: sync.Mutex{},
+		m:             sync.Mutex{},
+		items:         make([]task.Task, 0),
+		HeadLock:      sync.Mutex{},
+		addHandler:    func(_ task.Task) {},
+		removeHandler: func(_ task.Task) {},
 	}
 }
 
@@ -69,7 +77,7 @@ func (q *TaskQueue) WithContext(ctx context.Context) {
 	q.ctx, q.cancel = context.WithCancel(ctx)
 }
 
-func (q *TaskQueue) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+func (q *TaskQueue) WithMetricStorage(mstor *metric_storage.MetricStorage) {
 	q.metricStorage = mstor
 }
 
@@ -83,14 +91,28 @@ func (tq *TaskQueue) WithHandler(fn func(task.Task) TaskResult) *TaskQueue {
 	return tq
 }
 
+func (tq *TaskQueue) WithAddHandler(fn func(task.Task)) *TaskQueue {
+	tq.addHandler = fn
+	return tq
+}
+
+func (tq *TaskQueue) WithRemoveHandler(fn func(task.Task)) *TaskQueue {
+	tq.removeHandler = fn
+	return tq
+}
+
 // MeasureActionTime is a helper to measure execution time of queue's actions
 func (q *TaskQueue) MeasureActionTime(action string) func() {
-	if q.metricStorage == nil {
-		return func() {}
-	}
-	return MeasureTime(func(nanos Nanos) {
-		q.metricStorage.ObserveHistogram("queue_hist", nanos.Micro(), map[string]string{"queue_name": q.Name, "queue_action": action})
+	q.measureActionFnOnce.Do(func() {
+		if os.Getenv("QUEUE_ACTIONS_METRICS") == "no" {
+			q.measureActionFn = func() {}
+		} else {
+			q.measureActionFn = measure.Duration(func(d time.Duration) {
+				q.metricStorage.HistogramObserve("{PREFIX}tasks_queue_action_duration_seconds", d.Seconds(), map[string]string{"queue_name": q.Name, "queue_action": action})
+			})
+		}
 	})
+	return q.measureActionFn
 }
 
 func (q *TaskQueue) IsEmpty() bool {
@@ -114,6 +136,7 @@ func (q *TaskQueue) Length() int {
 // AddFirst adds new head element.
 func (q *TaskQueue) AddFirst(t task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
+	q.addHandler(t)
 	q.m.Lock()
 	q.items = append([]task.Task{t}, q.items...)
 	q.m.Unlock()
@@ -122,7 +145,6 @@ func (q *TaskQueue) AddFirst(t task.Task) {
 // RemoveFirst deletes a head element, so head is moved.
 func (q *TaskQueue) RemoveFirst() (t task.Task) {
 	defer q.MeasureActionTime("RemoveFirst")()
-
 	q.m.Lock()
 	if q.isEmpty() {
 		q.m.Unlock()
@@ -131,6 +153,7 @@ func (q *TaskQueue) RemoveFirst() (t task.Task) {
 	t = q.items[0]
 	q.items = q.items[1:]
 	q.m.Unlock()
+	q.removeHandler(t)
 	return t
 }
 
@@ -146,10 +169,11 @@ func (q *TaskQueue) GetFirst() task.Task {
 }
 
 // AddFirst adds new tail element.
-func (q *TaskQueue) AddLast(task task.Task) {
+func (q *TaskQueue) AddLast(t task.Task) {
 	defer q.MeasureActionTime("AddLast")()
+	q.addHandler(t)
 	q.m.Lock()
-	q.items = append(q.items, task)
+	q.items = append(q.items, t)
 	q.m.Unlock()
 }
 
@@ -168,6 +192,7 @@ func (q *TaskQueue) RemoveLast() (t task.Task) {
 		q.items = q.items[:len(q.items)-1]
 	}
 	q.m.Unlock()
+	q.removeHandler(t)
 	return t
 }
 
@@ -198,6 +223,7 @@ func (q *TaskQueue) Get(id string) task.Task {
 // AddAfter inserts a task after the task with specified id.
 func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
+	q.addHandler(newTask)
 
 	newItems := make([]task.Task, len(q.items)+1)
 
@@ -223,6 +249,7 @@ func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 // AddBefore inserts a task before the task with specified id.
 func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddBefore")()
+	q.addHandler(newTask)
 
 	newItems := make([]task.Task, len(q.items)+1)
 
@@ -266,6 +293,7 @@ func (q *TaskQueue) Remove(id string) (t task.Task) {
 	}
 	t = q.items[delId]
 	q.items = append(q.items[:delId], q.items[delId+1:]...)
+	q.removeHandler(t)
 	return t
 }
 
