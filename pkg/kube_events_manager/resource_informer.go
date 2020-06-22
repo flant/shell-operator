@@ -16,15 +16,15 @@ import (
 
 	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metrics_storage"
-	. "github.com/flant/shell-operator/pkg/utils/measure"
+	"github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
 // ResourceInformer is a kube informer for particular onKubernetesEvent
 type ResourceInformer interface {
 	WithContext(ctx context.Context)
 	WithKubeClient(client kube.KubernetesClient)
-	WithMetricStorage(mstor *metrics_storage.MetricStorage)
+	WithMetricStorage(mstor *metric_storage.MetricStorage)
 	WithNamespace(string)
 	WithName(string)
 	WithKubeEventCb(eventCb func(KubeEvent))
@@ -57,7 +57,7 @@ type resourceInformer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	metricStorage *metrics_storage.MetricStorage
+	metricStorage *metric_storage.MetricStorage
 
 	// a flag to stop handle events after Stop()
 	stopped bool
@@ -83,7 +83,7 @@ func (ei *resourceInformer) WithKubeClient(client kube.KubernetesClient) {
 	ei.KubeClient = client
 }
 
-func (ei *resourceInformer) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+func (ei *resourceInformer) WithMetricStorage(mstor *metric_storage.MetricStorage) {
 	ei.metricStorage = mstor
 }
 
@@ -207,8 +207,8 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 		var objFilterRes *ObjectAndFilterResult
 		var err error
 		func() {
-			defer MeasureTime(func(nanos Nanos) {
-				ei.metricStorage.ObserveHistogram("kube_jq_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
+			defer measure.Duration(func(d time.Duration) {
+				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels)
 			})()
 			objFilterRes, err = ApplyJqFilter(ei.Monitor.JqFilter, &obj)
 			if !ei.Monitor.KeepFullObjectsInMemory {
@@ -235,8 +235,8 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 		ei.CachedObjects[k] = v
 	}
 
-	ei.metricStorage.SendGauge("kube_snapshot_length", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
-	ei.metricStorage.SendGauge("kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
+	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
+	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 
 	return nil
 }
@@ -263,8 +263,8 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 		return
 	}
 
-	defer MeasureTime(func(nanos Nanos) {
-		ei.metricStorage.ObserveHistogram("kube_event_duration_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
+	defer measure.Duration(func(d time.Duration) {
+		ei.metricStorage.HistogramObserve("{PREFIX}kube_event_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels)
 	})()
 	defer trace.StartRegion(context.Background(), "HandleWatchEvent").End()
 
@@ -280,8 +280,8 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 	var objFilterRes *ObjectAndFilterResult
 	var err error
 	func() {
-		defer MeasureTime(func(nanos Nanos) {
-			ei.metricStorage.ObserveHistogram("kube_jq_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
+		defer measure.Duration(func(d time.Duration) {
+			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels)
 		})()
 		objFilterRes, err = ApplyJqFilter(ei.Monitor.JqFilter, obj)
 		if !ei.Monitor.KeepFullObjectsInMemory {
@@ -316,8 +316,8 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			skipEvent = true
 		}
 		ei.CachedObjects[resourceId] = objFilterRes
-		ei.metricStorage.SendGauge("kube_snapshot_length", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
-		ei.metricStorage.SendGauge("kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 		if skipEvent {
 			return
@@ -326,8 +326,8 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 	case WatchEventDeleted:
 		ei.cacheLock.Lock()
 		delete(ei.CachedObjects, resourceId)
-		ei.metricStorage.SendGauge("kube_snapshot_length", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
-		ei.metricStorage.SendGauge("kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.CachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.CachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 	}
 

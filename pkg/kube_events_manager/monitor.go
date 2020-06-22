@@ -9,14 +9,14 @@ import (
 
 	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metrics_storage"
+	"github.com/flant/shell-operator/pkg/metric_storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type Monitor interface {
 	WithContext(ctx context.Context)
 	WithKubeClient(client kube.KubernetesClient)
-	WithMetricStorage(mstor *metrics_storage.MetricStorage)
+	WithMetricStorage(mstor *metric_storage.MetricStorage)
 	WithConfig(config *MonitorConfig)
 	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateInformers() error
@@ -48,7 +48,7 @@ type monitor struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage *metrics_storage.MetricStorage
+	metricStorage *metric_storage.MetricStorage
 }
 
 var NewMonitor = func() Monitor {
@@ -68,7 +68,7 @@ func (m *monitor) WithKubeClient(client kube.KubernetesClient) {
 	m.KubeClient = client
 }
 
-func (m *monitor) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+func (m *monitor) WithMetricStorage(mstor *metric_storage.MetricStorage) {
 	m.metricStorage = mstor
 }
 

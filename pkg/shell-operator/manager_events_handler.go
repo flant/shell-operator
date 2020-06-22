@@ -2,6 +2,7 @@ package shell_operator
 
 import (
 	"context"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -88,6 +89,7 @@ func (m *ManagerEventsHandler) Start() {
 					if q == nil {
 						log.Errorf("Possible bug!!! Got task for queue '%s' but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
 					} else {
+						resTask.WithQueuedAt(time.Now())
 						q.AddLast(resTask)
 						logEntry.WithFields(utils.LabelsToLogFields(resTask.GetLogLabels())).
 							WithField("queue", q.Name).

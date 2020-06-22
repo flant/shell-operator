@@ -5,6 +5,7 @@ package kube
 import (
 	"fmt"
 	"io/ioutil"
+	"k8s.io/client-go/tools/metrics"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -22,9 +23,10 @@ import (
 	// load the gcp plugin (only required to authenticate against GKE clusters)
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
-	// log klog messages from client-go with logrus
+	// route klog messages from client-go to logrus
 	_ "github.com/flant/shell-operator/pkg/utils/klogtologrus"
 
+	"github.com/flant/shell-operator/pkg/metric_storage"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 )
 
@@ -40,6 +42,7 @@ type KubernetesClient interface {
 	WithConfigPath(configPath string)
 	WithServer(server string)
 	WithRateLimiterSettings(qps float32, burst int)
+	WithMetricStorage(metricStorage *metric_storage.MetricStorage)
 
 	Init() error
 
@@ -77,6 +80,7 @@ type kubernetesClient struct {
 	qps              float32
 	burst            int
 	server           string
+	metricStorage    *metric_storage.MetricStorage
 }
 
 func (c *kubernetesClient) WithServer(server string) {
@@ -94,6 +98,10 @@ func (c *kubernetesClient) WithConfigPath(path string) {
 func (c *kubernetesClient) WithRateLimiterSettings(qps float32, burst int) {
 	c.qps = qps
 	c.burst = burst
+}
+
+func (c *kubernetesClient) WithMetricStorage(metricStorage *metric_storage.MetricStorage) {
+	c.metricStorage = metricStorage
 }
 
 func (c *kubernetesClient) DefaultNamespace() string {
@@ -170,6 +178,20 @@ func (c *kubernetesClient) Init() error {
 	c.dynamicClient, err = dynamic.NewForConfig(config)
 	if err != nil {
 		return err
+	}
+
+	if c.metricStorage != nil {
+		RegisterKubernetesClientMetrics(c.metricStorage)
+		metrics.Register(
+			NewRequestLatencyMetric(c.metricStorage),
+			NewRequestResultMetric(c.metricStorage),
+		)
+		// client-go supports more metrics in v0.18.* versions
+		//metrics.Register(metrics.RegisterOpts{
+		//	RequestLatency:        NewLatencyMetric(c.metricStorage),
+		//	RateLimiterLatency:    NewRateLimiterMetric(c.metricStorage),
+		//	RequestResult:         NewResultMetric(c.metricStorage),
+		//})
 	}
 
 	logEntry.Infof("Kubernetes client is configured successfully with '%s' config", configType)

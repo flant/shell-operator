@@ -2,6 +2,7 @@ package task
 
 import (
 	"fmt"
+	"time"
 
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	uuid "gopkg.in/satori/go.uuid.v1"
@@ -21,6 +22,8 @@ type Task interface {
 	GetFailureCount() int
 	GetLogLabels() map[string]string
 	GetQueueName() string
+	GetQueuedAt() time.Time
+	WithQueuedAt(time.Time) Task
 	GetMetadata() interface{}
 	UpdateMetadata(interface{})
 	GetDescription() string
@@ -33,6 +36,7 @@ type BaseTask struct {
 	FailureCount   int // Failed executions count
 	FailureMessage string
 	QueueName      string
+	QueuedAt       time.Time
 
 	Metadata interface{}
 }
@@ -76,6 +80,15 @@ func (t *BaseTask) GetLogLabels() map[string]string {
 
 func (t *BaseTask) GetQueueName() string {
 	return t.QueueName
+}
+
+func (t *BaseTask) GetQueuedAt() time.Time {
+	return t.QueuedAt
+}
+
+func (t *BaseTask) WithQueuedAt(queuedAt time.Time) Task {
+	t.QueuedAt = queuedAt
+	return t
 }
 
 func (t *BaseTask) GetMetadata() interface{} {
