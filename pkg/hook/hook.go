@@ -17,7 +17,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
-	"github.com/flant/shell-operator/pkg/metrics_storage/operation"
+	"github.com/flant/shell-operator/pkg/metric_storage/operation"
 )
 
 type CommonHook interface {

@@ -8,12 +8,12 @@ import (
 
 	"github.com/flant/shell-operator/pkg/kube"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metrics_storage"
+	"github.com/flant/shell-operator/pkg/metric_storage"
 )
 
 type KubeEventsManager interface {
 	WithContext(ctx context.Context)
-	WithMetricStorage(mstor *metrics_storage.MetricStorage)
+	WithMetricStorage(mstor *metric_storage.MetricStorage)
 	WithKubeClient(client kube.KubernetesClient)
 	AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error)
 	HasMonitor(monitorId string) bool
@@ -37,7 +37,7 @@ type kubeEventsManager struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage *metrics_storage.MetricStorage
+	metricStorage *metric_storage.MetricStorage
 }
 
 // kubeEventsManager should implement KubeEventsManager.
@@ -56,7 +56,7 @@ func (mgr *kubeEventsManager) WithContext(ctx context.Context) {
 	mgr.ctx, mgr.cancel = context.WithCancel(ctx)
 }
 
-func (mgr *kubeEventsManager) WithMetricStorage(mstor *metrics_storage.MetricStorage) {
+func (mgr *kubeEventsManager) WithMetricStorage(mstor *metric_storage.MetricStorage) {
 	mgr.metricStorage = mstor
 }
 

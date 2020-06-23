@@ -1,2 +1,9 @@
 Dockerfile
 Dockerfile-alpine3.9
+Dockerfile-alpine3.10
+Dockerfile-alpine3.11
+docs
+examples
+scripts
+test
+*.md
