@@ -211,15 +211,15 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 				ei.metricStorage.ObserveHistogram("kube_jq_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
 			})()
 			objFilterRes, err = ApplyJqFilter(ei.Monitor.JqFilter, &obj)
-			if !ei.Monitor.KeepFullObjectsInMemory {
-				objFilterRes.RemoveFullObject()
-			}
 		}()
 
 		if err != nil {
 			return err
 		}
-		// save object to the cache
+
+		if !ei.Monitor.KeepFullObjectsInMemory {
+			objFilterRes.RemoveFullObject()
+		}
 
 		filteredObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
@@ -229,6 +229,7 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 			objFilterRes.Metadata.Checksum)
 	}
 
+	// Save objects to the cache.
 	ei.cacheLock.Lock()
 	defer ei.cacheLock.Unlock()
 	for k, v := range filteredObjects {
@@ -284,9 +285,6 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			ei.metricStorage.ObserveHistogram("kube_jq_hist", nanos.Ms(), ei.Monitor.Metadata.MetricLabels)
 		})()
 		objFilterRes, err = ApplyJqFilter(ei.Monitor.JqFilter, obj)
-		if !ei.Monitor.KeepFullObjectsInMemory {
-			objFilterRes.RemoveFullObject()
-		}
 	}()
 	if err != nil {
 		log.Errorf("%s: WATCH %s: %s",
@@ -294,6 +292,10 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			eventType,
 			err)
 		return
+	}
+
+	if !ei.Monitor.KeepFullObjectsInMemory {
+		objFilterRes.RemoveFullObject()
 	}
 
 	// Ignore Added or Modified if object is in cache and its checksum is equal to the newChecksum.
