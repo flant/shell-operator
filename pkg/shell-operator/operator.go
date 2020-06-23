@@ -433,6 +433,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 		} else {
 			errors = 1.0
 			t.UpdateFailureMessage(err.Error())
+			t.WithQueuedAt(time.Now()) // Reset queueAt for correct results in 'task_wait_in_queue' metric.
 			taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
 			res.Status = "Fail"
 		}
