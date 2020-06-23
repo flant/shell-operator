@@ -34,15 +34,15 @@ Shell-operator exports Prometheus metrics to the `/metrics` path. The default po
 
 ## Custom metrics
 
-Hooks can export metrics by writing a set of operation on JSON format into $METRICS_PATH file.
+Hooks can export metrics by writing a set of operations in JSON format into $METRICS_PATH file.
 
-Operation to increase a counter:
+Operation to register a counter and increase its value:
 
 ```json
 {"name":"metric_name","add":1,"labels":{"label1":"value1"}}
 ```
 
-Operation to set a value for a gauge:
+Operation to register a gauge and set its value:
 
 ```json
 {"name":"metric_name","set":33,"labels":{"label1":"value1"}}
@@ -55,4 +55,78 @@ Several metrics can be expored at once. For example, this script will create 2 m
 ```
 echo '{"name":"hook_metric_count","add":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
 echo '{"name":"hook_metrics_items","add":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
+```
+
+The metric name is used as-is, so several hooks can export same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.
+
+There is no operation to delete metrics and no ttl mechanism yet. If hook set value for metric, this value is exported until the process ends.
+
+To expire metrics, you can use a "group" field. When Shell-operator receives operations with "group", it expires previous metrics with the same group and apply new values. This grouping works across hooks and label values.
+
+For example:
+
+`hook1.sh` returns these metrics:
+
+```
+echo '{"group":"hook1", "name":"hook_metric","add":1,"labels":{"kind":"pod"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"hook_metric","add":1,"labels":{"kind":"replicaset"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"hook_metric","add":1,"labels":{"kind":"deployment"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"hook1_special_metric","set":12,"labels":{"label1":"value1"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"common_metric","set":300,"labels":{"source":"source3"}}' >> $METRICS_PATH
+echo '{"name":"common_metric","set":100,"labels":{"source":"source1"}}' >> $METRICS_PATH
+```
+
+`hook2.sh` returns these metrics:
+
+```
+echo '{"group":"hook2", "name":"hook_metric","add":1,"labels":{"kind":"configmap"}}' >> $METRICS_PATH
+echo '{"group":"hook2", "name":"hook_metric","add":1,"labels":{"kind":"secret"}}' >> $METRICS_PATH
+echo '{"group":"hook2", "name":"hook2_special_metric","set":42}' >> $METRICS_PATH
+echo '{"name":"common_metric","set":200,"labels":{"source":"source2"}}' >> $METRICS_PATH
+```
+
+Prometheus scrapes these metrics:
+
+```
+# HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook="hook1.sh", kind="pod"} 1
+hook_metric{hook="hook1.sh", kind="replicaset"} 1
+hook_metric{hook="hook1.sh", kind="deployment"} 1
+hook_metric{hook="hook2.sh", kind="configmap"} 1
+hook_metric{hook="hook2.sh", kind="secret"} 1
+# HELP hook2_special_metric hook2_special_metric
+# TYPE hook1_special_metric gauge
+hook1_special_metric{hook="hook1.sh", label1="value1"} 12
+# HELP hook2_special_metric hook2_special_metric
+# TYPE hook2_special_metric gauge
+hook2_special_metric{hook="hook2.sh"} 42
+# HELP common_metric common_metric
+# TYPE common_metric gauge
+common_metric{hook="hook1.sh", source="source1"} 100
+common_metric{hook="hook1.sh", source="source3"} 300
+common_metric{hook="hook2.sh", source="source2"} 200
+```
+
+On next execution of `hook1.sh` values for `hook_metric{kind="replicaset"}`, `hook_metric{kind="deployment"}`, `common_metric{source="source3"}` and `hook1_special_metric` are expired and hook returns only one metric:
+
+```
+echo '{"group":"hook1", "name":"hook_metric","add":1,"labels":{"kind":"pod"}}' >> $METRICS_PATH
+```
+
+Shell-operator expires previous values for group "hook1" and updates value for `hook_metric{hook="hook1.sh", kind="pod"}`. Values for group `hook2` and `common_metric` without group are left intact. Now Prometheus scrapes these metrics:
+
+```
+# HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook="hook1.sh", kind="pod"} 2
+hook_metric{hook="hook2.sh", kind="configmap"} 1
+hook_metric{hook="hook2.sh", kind="secret"} 1
+# HELP hook2_special_metric hook2_special_metric
+# TYPE hook2_special_metric gauge
+hook2_special_metric{hook="hook2.sh"} 42
+# HELP common_metric common_metric
+# TYPE common_metric gauge
+common_metric{hook="hook1.sh", source="source1"} 100
+common_metric{hook="hook2.sh", source="source2"} 200
 ```
