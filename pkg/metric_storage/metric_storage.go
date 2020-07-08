@@ -3,10 +3,12 @@ package metric_storage
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
@@ -38,16 +40,24 @@ type MetricStorage struct {
 	histogramsLock sync.RWMutex
 
 	GroupedVault *vault.GroupedVault
+
+	Registry   *prometheus.Registry
+	Gatherer   prometheus.Gatherer
+	Registerer prometheus.Registerer
 }
 
 func NewMetricStorage() *MetricStorage {
-	return &MetricStorage{
+	m := &MetricStorage{
 		Gauges:           make(map[string]*prometheus.GaugeVec),
 		Counters:         make(map[string]*prometheus.CounterVec),
 		Histograms:       make(map[string]*prometheus.HistogramVec),
 		HistogramBuckets: make(map[string][]float64),
 		GroupedVault:     vault.NewGroupedVault(),
+		Gatherer:         prometheus.DefaultGatherer,
+		Registerer:       prometheus.DefaultRegisterer,
 	}
+	m.GroupedVault.Registerer = m.Registerer
+	return m
 }
 
 func (m *MetricStorage) WithContext(ctx context.Context) {
@@ -56,6 +66,13 @@ func (m *MetricStorage) WithContext(ctx context.Context) {
 
 func (m *MetricStorage) WithPrefix(prefix string) {
 	m.Prefix = prefix
+}
+
+func (m *MetricStorage) WithNewRegistry() {
+	m.Registry = prometheus.NewRegistry()
+	m.Gatherer = m.Registry
+	m.Registerer = m.Registry
+	m.GroupedVault.Registerer = m.Registry
 }
 
 func (m *MetricStorage) Stop() {
@@ -148,7 +165,7 @@ func (m *MetricStorage) RegisterGauge(metric string, labels map[string]string) *
 		},
 		LabelNames(labels),
 	)
-	prometheus.MustRegister(vec)
+	m.Registerer.MustRegister(vec)
 	m.Gauges[metric] = vec
 	return vec
 }
@@ -209,7 +226,7 @@ func (m *MetricStorage) RegisterCounter(metric string, labels map[string]string)
 		},
 		LabelNames(labels),
 	)
-	prometheus.MustRegister(vec)
+	m.Registerer.MustRegister(vec)
 	m.Counters[metric] = vec
 	return vec
 }
@@ -277,7 +294,7 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 		Buckets: buckets,
 	}, LabelNames(labels))
 
-	prometheus.MustRegister(vec)
+	m.Registerer.MustRegister(vec)
 	m.Histograms[metric] = vec
 	return vec
 }
@@ -380,5 +397,15 @@ func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.Metri
 			m.GroupedVault.GaugeSet(group, op.Name, *op.Set, labels)
 			continue
 		}
+	}
+}
+
+func (m *MetricStorage) Handler() http.Handler {
+	if m.Registry == nil {
+		return promhttp.Handler()
+	} else {
+		return promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
+			Registry: m.Registry,
+		})
 	}
 }

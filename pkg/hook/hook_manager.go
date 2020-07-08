@@ -146,6 +146,7 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 		kubeCfg.Monitor.Metadata.MetricLabels = map[string]string{
 			"hook":    hook.Name,
 			"binding": kubeCfg.BindingName,
+			"queue":   kubeCfg.Queue,
 		}
 	}
 

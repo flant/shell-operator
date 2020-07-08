@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	uuid "gopkg.in/satori/go.uuid.v1"
 
@@ -45,7 +44,9 @@ type ShellOperator struct {
 	TempDir  string
 
 	MetricStorage *metric_storage.MetricStorage
-	KubeClient    kube.KubernetesClient
+	// separate metric storage for hook metrics if separate listen port is configured
+	HookMetricStorage *metric_storage.MetricStorage
+	KubeClient        kube.KubernetesClient
 
 	ScheduleManager   schedule_manager.ScheduleManager
 	KubeEventsManager kube_events_manager.KubeEventsManager
@@ -90,17 +91,31 @@ func (op *ShellOperator) WithMetricStorage(metricStorage *metric_storage.MetricS
 	op.MetricStorage = metricStorage
 }
 
+// InitMetricStorage creates default MetricStorage object if not set earlier.
 func (op *ShellOperator) InitMetricStorage() {
 	if op.MetricStorage != nil {
 		return
 	}
-	// Metric storage.
 	metricStorage := metric_storage.NewMetricStorage()
 	metricStorage.WithContext(op.ctx)
 	metricStorage.WithPrefix(app.PrometheusMetricsPrefix)
 	metricStorage.Start()
 	RegisterShellOperatorMetrics(metricStorage)
 	op.MetricStorage = metricStorage
+}
+
+// InitHookMetricStorage creates MetricStorage object
+// with new registry to scrape hook metrics on separate port.
+func (op *ShellOperator) InitHookMetricStorage() {
+	if op.HookMetricStorage != nil {
+		return
+	}
+	metricStorage := metric_storage.NewMetricStorage()
+	metricStorage.WithContext(op.ctx)
+	metricStorage.WithPrefix(app.PrometheusMetricsPrefix)
+	metricStorage.WithNewRegistry()
+	metricStorage.Start()
+	op.HookMetricStorage = metricStorage
 }
 
 // Init does some basic checks and instantiate dependencies
@@ -416,7 +431,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 	metrics, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
 
 	if err == nil {
-		err = op.MetricStorage.SendBatch(metrics, map[string]string{
+		err = op.HookMetricStorage.SendBatch(metrics, map[string]string{
 			"hook": hookMeta.HookName,
 		})
 	}
@@ -674,10 +689,10 @@ func (op *ShellOperator) SetupHttpServerHandles() {
     </html>`, app.ListenPort)
 	})
 
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/metrics", op.MetricStorage.Handler())
 }
 
-func (op *ShellOperator) StartHttpServer(ip string, port string) error {
+func (op *ShellOperator) StartHttpServer(ip string, port string, mux *http.ServeMux) error {
 	address := fmt.Sprintf("%s:%s", ip, port)
 
 	// Check if port is available
@@ -690,12 +705,34 @@ func (op *ShellOperator) StartHttpServer(ip string, port string) error {
 	log.Infof("Listen on %s", address)
 
 	go func() {
-		if err := http.Serve(listener, nil); err != nil {
+		if err := http.Serve(listener, mux); err != nil {
 			log.Errorf("Error starting HTTP server: %s", err)
 			os.Exit(1)
 		}
 	}()
 
+	return nil
+}
+
+func (op *ShellOperator) SetupHookMetricStorageAndServer() error {
+	if op.HookMetricStorage != nil {
+		return nil
+	}
+	if app.HookMetricsListenPort == "" || app.HookMetricsListenPort == app.ListenPort {
+		// register default prom handler in DefaultServeMux
+		op.HookMetricStorage = op.MetricStorage
+	} else {
+		// create new metric storage for hooks
+		op.InitHookMetricStorage()
+		// Create new ServeMux, serve on custom port
+		mux := http.NewServeMux()
+		err := op.StartHttpServer(app.ListenAddress, app.HookMetricsListenPort, mux)
+		if err != nil {
+			return err
+		}
+		// register scrape handler
+		mux.Handle("/metrics", op.HookMetricStorage.Handler())
+	}
 	return nil
 }
 
@@ -706,15 +743,19 @@ func DefaultOperator() *ShellOperator {
 }
 
 func InitAndStart(operator *ShellOperator) error {
-	operator.SetupHttpServerHandles()
-
-	err := operator.StartHttpServer(app.ListenAddress, app.ListenPort)
+	err := operator.StartHttpServer(app.ListenAddress, app.ListenPort, http.DefaultServeMux)
 	if err != nil {
 		log.Errorf("HTTP SERVER start failed: %v", err)
 		return err
 	}
-
 	operator.InitMetricStorage()
+	operator.SetupHttpServerHandles()
+
+	err = operator.SetupHookMetricStorageAndServer()
+	if err != nil {
+		log.Errorf("HTTP SERVER for hook metrics start failed: %v", err)
+		return err
+	}
 
 	err = operator.Init()
 	if err != nil {
