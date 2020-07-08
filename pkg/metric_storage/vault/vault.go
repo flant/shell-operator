@@ -13,6 +13,7 @@ import (
 type GroupedVault struct {
 	collectors map[string]ConstMetricCollector
 	mtx        sync.Mutex
+	Registerer prometheus.Registerer
 }
 
 func NewGroupedVault() *GroupedVault {
@@ -38,7 +39,7 @@ func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []str
 	collector, ok := v.collectors[name]
 	if !ok {
 		collector = NewConstCounterCollector(name, labelNames)
-		if err := prometheus.Register(collector); err != nil {
+		if err := v.Registerer.Register(collector); err != nil {
 			return nil, fmt.Errorf("counter '%s' %v registration: %v", name, labelNames, err)
 		}
 		v.collectors[name] = collector
@@ -55,7 +56,7 @@ func (v *GroupedVault) GetOrCreateGaugeCollector(name string, labelNames []strin
 	collector, ok := v.collectors[name]
 	if !ok {
 		collector = NewConstGaugeCollector(name, labelNames)
-		if err := prometheus.Register(collector); err != nil {
+		if err := v.Registerer.Register(collector); err != nil {
 			return nil, fmt.Errorf("gauge '%s' %v registration: %v", name, labelNames, err)
 		}
 		v.collectors[name] = collector

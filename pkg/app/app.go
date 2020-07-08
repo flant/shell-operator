@@ -16,6 +16,7 @@ var TempDir = "/tmp/shell-operator"
 
 var ListenAddress = "0.0.0.0"
 var ListenPort = "9115"
+var HookMetricsListenPort = ""
 
 var PrometheusMetricsPrefix = "shell_operator_"
 
@@ -44,6 +45,11 @@ func DefineStartCommandFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause)
 		Envar("SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX").
 		Default(PrometheusMetricsPrefix).
 		StringVar(&PrometheusMetricsPrefix)
+
+	cmd.Flag("hook-metrics-listen-port", "Port to use to serve hooks’ custom metrics to Prometheus. Can be set with $SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT. Equal to listen-port if empty.").
+		Envar("SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT").
+		Default(HookMetricsListenPort).
+		StringVar(&HookMetricsListenPort)
 
 	DefineKubeClientFlags(cmd)
 	DefineJqFlags(cmd)
