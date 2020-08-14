@@ -37,6 +37,7 @@ RUN apk --no-cache add ca-certificates jq bash sed tini && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 ADD frameworks /
+ADD shell_lib.sh /
 COPY --from=shell-operator /src/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_HOOKS_DIR /hooks
