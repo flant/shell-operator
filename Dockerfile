@@ -45,6 +45,7 @@ RUN apt-get update && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 ADD frameworks /
+ADD shell_lib.sh /
 COPY --from=tini /usr/local/bin/tini /sbin/tini
 COPY --from=shell-operator /src/shell-operator /
 WORKDIR /
