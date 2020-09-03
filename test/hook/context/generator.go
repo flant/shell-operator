@@ -16,8 +16,13 @@ import (
 // FakeCluster is global for now. It can be encapsulated in BindingContextController lately.
 var FakeCluster *fake.FakeCluster
 
+type GeneratedBindingContexts struct {
+	Rendered        string
+	BindingContexts []BindingContext
+}
+
 // convertBindingContexts render json with array of binding contexts
-func convertBindingContexts(bindingContexts []BindingContext) (string, error) {
+func convertBindingContexts(bindingContexts []BindingContext) (GeneratedBindingContexts, error) {
 	// Compact groups
 	lastGroup := ""
 	lastGroupIndex := 0
@@ -40,16 +45,21 @@ func convertBindingContexts(bindingContexts []BindingContext) (string, error) {
 		compactedBindingContexts[lastGroupIndex] = bindingContext
 	}
 
-	// Only v1 binding contexts supported by now
+	res := GeneratedBindingContexts{}
+
+	// Support only v1 binding contexts.
 	bcList := ConvertBindingContextList("v1", compactedBindingContexts)
 	data, err := bcList.Json()
 	if err != nil {
-		return "", fmt.Errorf("marshaling binding context error: %v", err)
+		return res, fmt.Errorf("marshaling binding context error: %v", err)
 	}
-	return string(data), nil
+	res.BindingContexts = bindingContexts
+	res.Rendered = string(data)
+	return res, nil
 }
 
 type BindingContextController struct {
+	Hook              *hook.Hook
 	HookCtrl          controller.HookController
 	HookMap           map[string]string
 	HookConfig        string
@@ -78,13 +88,18 @@ func NewBindingContextController(config, initialState string) (*BindingContextCo
 	}, nil
 }
 
+func (b *BindingContextController) WithHook(h *hook.Hook) {
+	b.Hook = h
+	b.HookConfig = ""
+}
+
 // RegisterCRD registers custom resources for the cluster
 func (b *BindingContextController) RegisterCRD(group, version, kind string, namespaced bool) {
 	FakeCluster.RegisterCRD(group, version, kind, namespaced)
 }
 
 // BindingContextsGenerator generates binding contexts for hook tests
-func (b *BindingContextController) Run() (string, error) {
+func (b *BindingContextController) Run() (GeneratedBindingContexts, error) {
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
 	b.KubeEventsManager.WithContext(b.Context)
 	b.KubeEventsManager.WithKubeClient(FakeCluster.KubeClient)
@@ -95,35 +110,38 @@ func (b *BindingContextController) Run() (string, error) {
 	// Use StateController to apply changes
 	err := b.Controller.SetInitialState(b.InitialState)
 	if err != nil {
-		return "", err
+		return GeneratedBindingContexts{}, err
 	}
 
-	testHook := hook.NewHook("test", "test")
-	testHook, err = testHook.WithConfig([]byte(b.HookConfig))
-	if err != nil {
-		return "", fmt.Errorf("couldn't load or validate hook configuration: %v", err)
+	if b.Hook == nil {
+		testHook := hook.NewHook("test", "test")
+		testHook, err = testHook.WithConfig([]byte(b.HookConfig))
+		if err != nil {
+			return GeneratedBindingContexts{}, fmt.Errorf("couldn't load or validate hook configuration: %v", err)
+		}
+		b.Hook = testHook
 	}
 
 	b.HookCtrl = controller.NewHookController()
-	b.HookCtrl.InitKubernetesBindings(testHook.GetConfig().OnKubernetesEvents, b.KubeEventsManager)
-	b.HookCtrl.InitScheduleBindings(testHook.GetConfig().Schedules, b.ScheduleManager)
+	b.HookCtrl.InitKubernetesBindings(b.Hook.GetConfig().OnKubernetesEvents, b.KubeEventsManager)
+	b.HookCtrl.InitScheduleBindings(b.Hook.GetConfig().Schedules, b.ScheduleManager)
 	b.HookCtrl.EnableScheduleBindings()
 
-	testHook.WithHookController(b.HookCtrl)
+	b.Hook.WithHookController(b.HookCtrl)
 
 	bindingContexts := make([]BindingContext, 0)
 	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
 		bindingContexts = append(bindingContexts, b.HookCtrl.UpdateSnapshots(info.BindingContext)...)
 	})
 	if err != nil {
-		return "", fmt.Errorf("couldn't enable kubernetes bindings: %v", err)
+		return GeneratedBindingContexts{}, fmt.Errorf("couldn't enable kubernetes bindings: %v", err)
 	}
 	b.HookCtrl.StartMonitors()
 
 	return convertBindingContexts(bindingContexts)
 }
 
-func (b *BindingContextController) ChangeState(newState ...string) (string, error) {
+func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBindingContexts, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), b.Timeout)
 	defer cancel()
 
@@ -132,7 +150,7 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 	for _, state := range newState {
 		generatedEvents, err := b.Controller.ChangeState(state)
 		if err != nil {
-			return "", fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
+			return GeneratedBindingContexts{}, fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
 		}
 
 		for receivedEvents := 0; receivedEvents < generatedEvents; receivedEvents++ {
@@ -150,7 +168,7 @@ func (b *BindingContextController) ChangeState(newState ...string) (string, erro
 	return convertBindingContexts(bindingContexts)
 }
 
-func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQuantity int, newState string) (string, error) {
+func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQuantity int, newState string) (GeneratedBindingContexts, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -158,7 +176,7 @@ func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQ
 
 	_, err := b.Controller.ChangeState(newState)
 	if err != nil {
-		return "", fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
+		return GeneratedBindingContexts{}, fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
 	}
 
 	for len(bindingContexts) != desiredQuantity {
@@ -169,14 +187,14 @@ func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQ
 			})
 			continue
 		case <-ctx.Done():
-			return "", fmt.Errorf("timeout occurred while waiting for binding contexts")
+			return GeneratedBindingContexts{}, fmt.Errorf("timeout occurred while waiting for binding contexts")
 		}
 	}
 
 	return convertBindingContexts(bindingContexts)
 }
 
-func (b *BindingContextController) RunSchedule(crontab string) (string, error) {
+func (b *BindingContextController) RunSchedule(crontab string) (GeneratedBindingContexts, error) {
 	bindingContexts := make([]BindingContext, 0)
 
 	b.HookCtrl.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {

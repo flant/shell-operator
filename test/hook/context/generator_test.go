@@ -49,7 +49,7 @@ metadata:
 	contexts, err := c.Run()
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	parsedBindingContexts := parseContexts(contexts)
+	parsedBindingContexts := parseContexts(contexts.Rendered)
 
 	g.Expect(string(parsedBindingContexts[0].Type)).To(Equal("Synchronization"))
 	g.Expect(parsedBindingContexts[0].Objects).To(HaveLen(2))
@@ -76,7 +76,7 @@ spec:
   containers: []
 `)
 	g.Expect(err).ShouldNot(HaveOccurred())
-	parsedBindingContexts = parseContexts(contexts)
+	parsedBindingContexts = parseContexts(contexts.Rendered)
 
 	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Added"))
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
@@ -103,7 +103,7 @@ spec:
   - name: test
 `)
 	g.Expect(err).ShouldNot(HaveOccurred())
-	parsedBindingContexts = parseContexts(contexts)
+	parsedBindingContexts = parseContexts(contexts.Rendered)
 
 	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Modified"))
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
@@ -122,7 +122,7 @@ metadata:
   name: pod2
 `)
 	g.Expect(err).ShouldNot(HaveOccurred())
-	parsedBindingContexts = parseContexts(contexts)
+	parsedBindingContexts = parseContexts(contexts.Rendered)
 
 	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Deleted"))
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
@@ -130,7 +130,7 @@ metadata:
 	// Run schedule
 	contexts, err = c.RunSchedule("* * * * *")
 	g.Expect(err).ShouldNot(HaveOccurred())
-	parsedBindingContexts = parseContexts(contexts)
+	parsedBindingContexts = parseContexts(contexts.Rendered)
 
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 }
@@ -202,10 +202,10 @@ metadata:
 `)
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	rawData, err := c.Run()
+	contexts, err := c.Run()
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	bindingContexts := parseContexts(rawData)
+	bindingContexts := parseContexts(contexts.Rendered)
 
 	g.Expect(bindingContexts[0].Snapshots["deployment"]).To(HaveLen(1))
 	g.Expect(string(bindingContexts[0].Type)).To(Equal("Synchronization"))
@@ -238,10 +238,10 @@ metadata:
 `)
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	rawData, err := c.Run()
+	contexts, err := c.Run()
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	bindingContexts := parseContexts(rawData)
+	bindingContexts := parseContexts(contexts.Rendered)
 
 	g.Expect(bindingContexts).To(HaveLen(1))
 	g.Expect(string(bindingContexts[0].Type)).To(Equal("Group"))

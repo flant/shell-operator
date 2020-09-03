@@ -25,7 +25,7 @@ import (
 // ApplyJqFilter filter object json representation with jq expression, calculate checksum
 // over result and return ObjectAndFilterResult. If jqFilter is empty, no filter
 // is required and checksum is calculated over full json representation of the object.
-func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (*ObjectAndFilterResult, error) {
+func ApplyJqFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) (result string, err error), obj *unstructured.Unstructured) (*ObjectAndFilterResult, error) {
 	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
 
 	res := &ObjectAndFilterResult{
@@ -39,6 +39,19 @@ func ApplyJqFilter(jqFilter string, obj *unstructured.Unstructured) (*ObjectAndF
 		return nil, err
 	}
 	res.ObjectBytes = int64(len(data))
+
+	// If filterFn is passed, run it and return result.
+	if filterFn != nil {
+		var err error
+		var filtered string
+		filtered, err = filterFn(obj)
+		if err != nil {
+			return nil, fmt.Errorf("filterFn: %v", err)
+		}
+		res.FilterResult = filtered
+		res.Metadata.Checksum = utils_checksum.CalculateChecksum(filtered)
+		return res, nil
+	}
 
 	if jqFilter == "" {
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))

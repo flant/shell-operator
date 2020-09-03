@@ -4,6 +4,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
@@ -28,6 +29,7 @@ type MonitorConfig struct {
 	LogEntry                *log.Entry
 	Mode                    KubeEventMode
 	KeepFullObjectsInMemory bool
+	FilterFunc              func(obj *unstructured.Unstructured) (result string, err error)
 }
 
 func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
