@@ -1,0 +1,46 @@
+# build libjq
+FROM alpine:3.12 AS libjq
+RUN apk --no-cache add git ca-certificates && \
+    git clone https://github.com/flant/libjq-go /libjq-go && \
+    cd /libjq-go && \
+    git submodule update --init --recursive && \
+    /libjq-go/scripts/install-libjq-dependencies-alpine.sh && \
+    /libjq-go/scripts/build-libjq-static.sh /libjq-go /libjq
+
+
+# build shell-operator binary
+FROM golang:1.15-alpine3.12 AS shell-operator
+ARG appVersion=latest
+RUN apk --no-cache add git ca-certificates gcc libc-dev
+
+# Cache-friendly download of go dependencies.
+ADD go.mod go.sum /src/shell-operator/
+WORKDIR /src/shell-operator
+RUN go mod download
+
+COPY --from=libjq /libjq /libjq
+ADD . /src/shell-operator
+
+RUN CGO_ENABLED=1 \
+    CGO_CFLAGS="-I/libjq/include" \
+    CGO_LDFLAGS="-L/libjq/lib" \
+    GOOS=linux \
+    go build -ldflags="-s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" \
+             -o shell-operator \
+             ./cmd/shell-operator
+
+
+# build final image
+FROM alpine:3.12
+RUN apk --no-cache add ca-certificates jq bash sed tini && \
+    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.0/bin/linux/amd64/kubectl -O /bin/kubectl && \
+    chmod +x /bin/kubectl && \
+    mkdir /hooks
+ADD frameworks /
+ADD shell_lib.sh /
+COPY --from=shell-operator /src/shell-operator /
+WORKDIR /
+ENV SHELL_OPERATOR_HOOKS_DIR /hooks
+ENV LOG_TYPE json
+ENTRYPOINT ["/sbin/tini", "--", "/shell-operator"]
+CMD ["start"]
