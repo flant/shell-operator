@@ -62,7 +62,7 @@ jobs:
 
           case $FLAVOUR in
             alpine)
-              dockerFile="Dockerfile-alpine3.11"
+              dockerFile="Dockerfile-alpine3.12"
               ;;
           esac
 

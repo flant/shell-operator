@@ -38,10 +38,10 @@ jobs:
     if: github.event_name == 'push' && github.event.ref != 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.12
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.12
+          go-version: 1.15
         id: go
 
       - name: Check out shell-operator code
@@ -124,10 +124,10 @@ jobs:
     if: (github.event_name == 'push' && github.event.ref == 'refs/heads/master') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.12
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.12
+          go-version: 1.15
         id: go
 
       - name: Check out shell-operator code
@@ -203,10 +203,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v1
 
-      - name: Set up Go 1.12
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.12
+          go-version: 1.15
         id: go
 
       - name: Download go modules artifact
@@ -272,10 +272,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v1
 
-      - name: Set up Go 1.12
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.12
+          go-version: 1.15
         id: go
 
       - name: Download go modules artifact
