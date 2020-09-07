@@ -19,6 +19,7 @@ jobs:
           - ubuntu
           - alpine3.9
           - alpine3.11
+          - alpine3.12
     runs-on: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v1
@@ -55,6 +56,10 @@ jobs:
           alpine3.11)
             dockerFile="Dockerfile-alpine3.11"
             imageTag=${imageTag}-alpine3.11
+            ;;
+          alpine3.12)
+            dockerFile="Dockerfile-alpine3.12"
+            imageTag=${imageTag}-alpine3.12
             ;;
           esac
 
