@@ -133,7 +133,7 @@ func (k KubeEvent) String() string {
 			kind := k.Objects[0].Object.GetKind()
 			msgs = append(msgs, fmt.Sprintf("Synchronization with %d objects of kind '%s'", len(k.Objects), kind))
 		} else {
-			msgs = append(msgs, fmt.Sprintf("Synchronization with 0 objects"))
+			msgs = append(msgs, "Synchronization with 0 objects")
 		}
 	case TypeEvent:
 		if len(k.Objects) == 1 {
@@ -148,14 +148,14 @@ func (k KubeEvent) String() string {
 				if obj != nil {
 					msgs = append(msgs, fmt.Sprintf("Event with no kubernetes event type for %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName()))
 				} else {
-					msgs = append(msgs, fmt.Sprintf("Event with no kubernetes event type"))
+					msgs = append(msgs, "Event with no kubernetes event type")
 				}
 			}
 		} else {
 			if len(k.WatchEvents) > 0 {
 				msgs = append(msgs, fmt.Sprintf("Event '%s' without objects", k.WatchEvents[0]))
 			} else {
-				msgs = append(msgs, fmt.Sprintf("Event without objects and kubernetes event type"))
+				msgs = append(msgs, "Event without objects and kubernetes event type")
 			}
 		}
 	default:
