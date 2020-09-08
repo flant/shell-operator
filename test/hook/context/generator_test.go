@@ -160,7 +160,7 @@ kubernetes:
 	bindingContexts, err := c.Run()
 
 	g.Expect(err).ShouldNot(HaveOccurred())
-	g.Expect(bindingContexts).To(ContainSubstring("Synchronization"))
+	g.Expect(bindingContexts.Rendered).To(ContainSubstring("Synchronization"))
 
 	// Event phase
 	bindingContexts, err = c.ChangeState(`
@@ -179,7 +179,7 @@ spec:
   data: baz
 `)
 	g.Expect(err).ShouldNot(HaveOccurred())
-	g.Expect(bindingContexts).To(ContainSubstring("MyResource"))
+	g.Expect(bindingContexts.Rendered).To(ContainSubstring("MyResource"))
 
 }
 

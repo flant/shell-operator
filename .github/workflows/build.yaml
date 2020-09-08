@@ -8,14 +8,14 @@ jobs:
     name: Build shell-operator binary
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.12
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.12
+          go-version: 1.15
         id: go
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       # Restore go_modules.tar.gz from cache or download and pack them, upload archive as artifact for other jobs.
       # NOTE: cache action is limited to 400Mb artifacts and has a 2Gb space.
@@ -50,7 +50,7 @@ jobs:
 
       - name: Cache libjq libraries
         id: libjq-cache
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         with:
           path: libjq
           key: ${{ runner.os }}-libjq-${{ hashFiles('libjq-go.lock') }}

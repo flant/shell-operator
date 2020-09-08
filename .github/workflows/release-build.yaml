@@ -17,12 +17,11 @@ jobs:
       matrix:
         flavour:
           - ubuntu
-          - alpine3.9
           - alpine3.11
           - alpine3.12
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
 
       - name: Build '${{ matrix.flavour }}' image
         env:
@@ -45,14 +44,6 @@ jobs:
           fi
 
           case $FLAVOUR in
-          alpine3.9)
-            dockerFile="Dockerfile-alpine3.9"
-            imageTag=${imageTag}-alpine3.9
-            ;;
-          alpine3.10)
-            dockerFile="Dockerfile-alpine3.10"
-            imageTag=${imageTag}-alpine3.10
-            ;;
           alpine3.11)
             dockerFile="Dockerfile-alpine3.11"
             imageTag=${imageTag}-alpine3.11

@@ -200,7 +200,7 @@ func (c *kubernetesClient) Init() error {
 }
 
 func makeOutOfClusterClientConfigError(kubeConfig, kubeContext string, err error) error {
-	baseErrMsg := fmt.Sprintf("out-of-cluster configuration problem")
+	baseErrMsg := "out-of-cluster configuration problem"
 
 	if kubeConfig != "" {
 		baseErrMsg += fmt.Sprintf(", custom kube config path is '%s'", kubeConfig)

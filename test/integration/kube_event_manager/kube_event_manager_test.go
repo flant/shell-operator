@@ -41,8 +41,9 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 
 		BeforeEach(func() {
 			monitorConfig = &kube_events_manager.MonitorConfig{
-				Kind:       "Pod",
-				ApiVersion: "v1",
+				Kind:                    "Pod",
+				ApiVersion:              "v1",
+				KeepFullObjectsInMemory: true,
 				EventTypes: []WatchEventType{
 					WatchEventAdded,
 				},
