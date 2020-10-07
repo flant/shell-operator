@@ -21,6 +21,22 @@ Shell-operator provides:
 - __Object selector and properties filter__: shell-operator can monitor a particular set of objects and detect changes in their properties.
 - __Simple configuration__: hook binding definition is a JSON or YAML document on script's stdout.
 
+**Contents**:
+* [Quickstart](#quickstart)
+  * [Build an image with your hooks](#build-an-image-with-your-hooks)
+  * [Create RBAC objects](#create-rbac-objects)
+  * [Install shell-operator in a cluster](#install-shell-operator-in-a-cluster)
+  * [It all comes together](#it-all-comes-together)
+* [Hook binding types](#hook-binding-types)
+  * [`kubernetes`](#kubernetes)
+  * [`onStartup`](#onstartup)
+  * [`schedule`](#schedule)
+* [Prometheus target](#prometheus-target)
+* [Examples](#examples)
+* [Articles & talks](#articles--talks)
+* [Community](#community)
+* [License](#license)
+
 # Quickstart
 
 > You need to have a Kubernetes cluster, and the `kubectl` must be configured to communicate with your cluster.
@@ -223,7 +239,7 @@ Some other publications on shell-operator:
 
 # Community
 
-Please feel free to reach us via [Flant Open Source forums](https://community.flant.com/) (based on Discourse). They have a [special category](https://community.flant.com/c/shell-operator/7) dedicated to shell-operator (and his "older brother" — [addon-operator](https://github.com/flant/addon-operator)).
+Please feel free to reach us via [Flant Open Source forums](https://community.flant.com/) (based on Discourse). They have a [special category](https://community.flant.com/c/shell-operator/7) dedicated to shell-operator (and its "older brother" — [addon-operator](https://github.com/flant/addon-operator)).
 
 You're also welcome to follow [@flant_com](https://twitter.com/flant_com) to stay informed about all our Open Source initiatives.
 
