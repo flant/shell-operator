@@ -31,7 +31,11 @@ schedule:
   crontab: "* * * * *"
   includeSnapshotsFrom:
   - selected_pods
-`, `
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	// Synchronization contexts
+	contexts, err := c.Run(`
 ---
 apiVersion: v1
 kind: Pod
@@ -43,10 +47,6 @@ kind: Pod
 metadata:
   name: pod2
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
-	// Synchronization contexts
-	contexts, err := c.Run()
 	g.Expect(err).ShouldNot(HaveOccurred())
 
 	parsedBindingContexts := parseContexts(contexts.Rendered)
@@ -145,7 +145,7 @@ kubernetes:
   - selected_crds
   kind: MyResource
   name: selected_crds
-`, "")
+`)
 	g.Expect(err).ShouldNot(HaveOccurred())
 
 	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
@@ -157,7 +157,7 @@ kubernetes:
 	g.Expect(gvr.GroupVersion().String()).To(Equal("my.crd.io/v1alpha1"))
 
 	// Synchronization phase
-	bindingContexts, err := c.Run()
+	bindingContexts, err := c.Run("")
 
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(bindingContexts.Rendered).To(ContainSubstring("Synchronization"))
@@ -193,16 +193,16 @@ kubernetes:
   - deployment
   kind: Deployment
   name: deployment
-`, `
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: my-res-obj-2
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
-	contexts, err := c.Run()
 	g.Expect(err).ShouldNot(HaveOccurred())
 
 	bindingContexts := parseContexts(contexts.Rendered)
@@ -224,7 +224,10 @@ kubernetes:
   group: main
   kind: Secret
   name: secret
-`, `
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -236,9 +239,6 @@ kind: Secret
 metadata:
   name: my-secret-obj-2
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
-	contexts, err := c.Run()
 	g.Expect(err).ShouldNot(HaveOccurred())
 
 	bindingContexts := parseContexts(contexts.Rendered)
