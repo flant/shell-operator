@@ -53,38 +53,34 @@ func convertBindingContexts(bindingContexts []BindingContext) (GeneratedBindingC
 	if err != nil {
 		return res, fmt.Errorf("marshaling binding context error: %v", err)
 	}
+
 	res.BindingContexts = bindingContexts
 	res.Rendered = string(data)
 	return res, nil
 }
 
 type BindingContextController struct {
-	Hook              *hook.Hook
-	HookCtrl          controller.HookController
-	HookMap           map[string]string
-	HookConfig        string
-	InitialState      string
+	Hook       *hook.Hook
+	HookCtrl   controller.HookController
+	HookMap    map[string]string
+	HookConfig string
+
 	Controller        *StateController
 	KubeEventsManager kubeeventsmanager.KubeEventsManager
 	ScheduleManager   schedulemanager.ScheduleManager
-	Context           context.Context
-	Cancel            context.CancelFunc
-	Timeout           time.Duration
+
+	UpdateTimeout time.Duration
 }
 
-func NewBindingContextController(config, initialState string) (*BindingContextController, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-
+func NewBindingContextController(config string) (*BindingContextController, error) {
 	FakeCluster = fake.NewFakeCluster()
 
 	return &BindingContextController{
-		HookMap:      make(map[string]string),
-		HookConfig:   config,
-		InitialState: initialState,
-		Controller:   NewStateController(),
-		Context:      ctx,
-		Cancel:       cancel,
-		Timeout:      1500 * time.Millisecond,
+		HookMap:    make(map[string]string),
+		HookConfig: config,
+
+		Controller:    NewStateController(),
+		UpdateTimeout: 1500 * time.Millisecond,
 	}, nil
 }
 
@@ -99,16 +95,18 @@ func (b *BindingContextController) RegisterCRD(group, version, kind string, name
 }
 
 // BindingContextsGenerator generates binding contexts for hook tests
-func (b *BindingContextController) Run() (GeneratedBindingContexts, error) {
+func (b *BindingContextController) Run(initialState string) (GeneratedBindingContexts, error) {
+	ctx := context.Background()
+
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
-	b.KubeEventsManager.WithContext(b.Context)
+	b.KubeEventsManager.WithContext(ctx)
 	b.KubeEventsManager.WithKubeClient(FakeCluster.KubeClient)
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager()
-	b.ScheduleManager.WithContext(b.Context)
+	b.ScheduleManager.WithContext(ctx)
 
 	// Use StateController to apply changes
-	err := b.Controller.SetInitialState(b.InitialState)
+	err := b.Controller.SetInitialState(initialState)
 	if err != nil {
 		return GeneratedBindingContexts{}, err
 	}
@@ -136,13 +134,15 @@ func (b *BindingContextController) Run() (GeneratedBindingContexts, error) {
 	if err != nil {
 		return GeneratedBindingContexts{}, fmt.Errorf("couldn't enable kubernetes bindings: %v", err)
 	}
+
 	b.HookCtrl.StartMonitors()
 
+	<-time.After(time.Millisecond) // tick to trigger informers
 	return convertBindingContexts(bindingContexts)
 }
 
 func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBindingContexts, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), b.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), b.UpdateTimeout)
 	defer cancel()
 
 	bindingContexts := make([]BindingContext, 0)
@@ -161,7 +161,7 @@ func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBin
 				})
 				continue
 			case <-ctx.Done():
-				return convertBindingContexts(bindingContexts)
+				break
 			}
 		}
 	}
@@ -201,4 +201,10 @@ func (b *BindingContextController) RunSchedule(crontab string) (GeneratedBinding
 		bindingContexts = append(bindingContexts, b.HookCtrl.UpdateSnapshots(info.BindingContext)...)
 	})
 	return convertBindingContexts(bindingContexts)
+}
+
+func (b *BindingContextController) Stop() {
+	if b.HookCtrl != nil {
+		b.HookCtrl.StopMonitors()
+	}
 }
