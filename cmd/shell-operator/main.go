@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/flant/shell-operator/pkg/debug"
 	log "github.com/sirupsen/logrus"
@@ -29,8 +31,11 @@ func main() {
 	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
 		Action(func(c *kingpin.ParseContext) error {
+			// Init logging subsystem.
 			app.SetupLogging()
 			log.Infof("%s %s", app.AppName, app.Version)
+			// Init rand generator.
+			rand.Seed(time.Now().UnixNano())
 
 			defaultOperator := shell_operator.DefaultOperator()
 			err := shell_operator.InitAndStart(defaultOperator)
