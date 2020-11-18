@@ -15,16 +15,16 @@ RUN apt-get update && \
 
 
 # build shell-operator binary
-FROM golang:1.12 AS shell-operator
+FROM golang:1.15 AS shell-operator
 ARG appVersion=latest
 
 # Cache-friendly download of go dependencies.
-ADD go.mod go.sum /src/shell-operator/
-WORKDIR /src/shell-operator
+ADD go.mod go.sum /app/
+WORKDIR /app
 RUN go mod download
 
 COPY --from=libjq /libjq /libjq
-ADD . /src/shell-operator
+ADD . /app
 
 RUN CGO_ENABLED=1 \
     CGO_CFLAGS="-I/libjq/include" \
@@ -41,13 +41,14 @@ FROM ubuntu:18.04
 RUN apt-get update && \
     apt-get install -y ca-certificates wget jq && \
     rm -rf /var/lib/apt/lists && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.17.4/bin/linux/amd64/kubectl -O /bin/kubectl && \
+    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.4/bin/linux/amd64/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
+    rm -rf /var/lib/apt/lists/* && \
     mkdir /hooks
 ADD frameworks /
 ADD shell_lib.sh /
 COPY --from=tini /usr/local/bin/tini /sbin/tini
-COPY --from=shell-operator /src/shell-operator /
+COPY --from=shell-operator /app/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_HOOKS_DIR /hooks
 ENV LOG_TYPE json
