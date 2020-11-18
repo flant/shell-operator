@@ -14,12 +14,12 @@ ARG appVersion=latest
 RUN apk --no-cache add git ca-certificates gcc libc-dev
 
 # Cache-friendly download of go dependencies.
-ADD go.mod go.sum /src/shell-operator/
-WORKDIR /src/shell-operator
+ADD go.mod go.sum /app/
+WORKDIR /app
 RUN go mod download
 
 COPY --from=libjq /libjq /libjq
-ADD . /src/shell-operator
+ADD . /app
 
 RUN CGO_ENABLED=1 \
     CGO_CFLAGS="-I/libjq/include" \
@@ -33,12 +33,12 @@ RUN CGO_ENABLED=1 \
 # build final image
 FROM alpine:3.12
 RUN apk --no-cache add ca-certificates jq bash sed tini && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.0/bin/linux/amd64/kubectl -O /bin/kubectl && \
+    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.4/bin/linux/amd64/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 ADD frameworks /
 ADD shell_lib.sh /
-COPY --from=shell-operator /src/shell-operator /
+COPY --from=shell-operator /app/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_HOOKS_DIR /hooks
 ENV LOG_TYPE json

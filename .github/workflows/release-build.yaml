@@ -17,7 +17,6 @@ jobs:
       matrix:
         flavour:
           - ubuntu
-          - alpine3.11
           - alpine3.12
     runs-on: [ubuntu-latest]
     env:
@@ -46,10 +45,6 @@ jobs:
           fi
 
           case $FLAVOUR in
-          alpine3.11)
-            dockerFile="Dockerfile-alpine3.11"
-            imageTag=${imageTag}-alpine3.11
-            ;;
           alpine3.12)
             dockerFile="Dockerfile-alpine3.12"
             imageTag=${imageTag}-alpine3.12
