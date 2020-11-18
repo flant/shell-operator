@@ -8,7 +8,7 @@ import (
 
 const MaxExponentialBackoffDelay = time.Duration(32 * time.Second)
 const ExponentialDelayFactor float64 = 2.0 // Each delay is twice longer.
-const ExponentialDelayRandomMs = 1000      // Each delay has random additonal milliseconds.
+const ExponentialDelayRandomMs = 1000      // Each delay has random additional milliseconds.
 
 // CalculateDelay returns delay distributed from initialDelay to default maxDelay (32s)
 //

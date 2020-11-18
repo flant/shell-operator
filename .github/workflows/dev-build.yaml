@@ -54,6 +54,8 @@ jobs:
           - ubuntu
           - alpine
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev images' label
     steps:
       - uses: actions/checkout@v2

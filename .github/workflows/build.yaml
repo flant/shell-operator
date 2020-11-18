@@ -7,6 +7,8 @@ jobs:
   build_binary:
     name: Build shell-operator binary
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
       - name: Set up Go 1.15
         uses: actions/setup-go@v2
