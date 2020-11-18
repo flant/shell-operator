@@ -3,7 +3,6 @@ package queue
 import (
 	"context"
 	"fmt"
-	"github.com/flant/shell-operator/pkg/utils/measure"
 	"os"
 	"strings"
 	"sync"
@@ -13,6 +12,8 @@ import (
 
 	"github.com/flant/shell-operator/pkg/metric_storage"
 	"github.com/flant/shell-operator/pkg/task"
+	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
+	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
 /*
@@ -351,9 +352,9 @@ func (q *TaskQueue) Start() {
 
 			switch taskRes.Status {
 			case "Fail":
+				// Exponential backoff delay before retry.
+				nextSleepDelay = exponential_backoff.CalculateDelay(DelayOnFailedTask, t.GetFailureCount())
 				t.IncrementFailureCount()
-				// delay before retry
-				nextSleepDelay = DelayOnFailedTask
 				q.Status = fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String())
 			case "Success":
 				// add tasks after current task in reverse order

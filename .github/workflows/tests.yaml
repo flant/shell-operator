@@ -46,6 +46,8 @@ jobs:
     name: Build and unit tests
     if: github.event_name == 'push' && github.event.ref != 'refs/heads/master'
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
       - name: Set up Go 1.15
         uses: actions/setup-go@v2
@@ -132,6 +134,8 @@ jobs:
     name: Download modules and build libjq
     if: (github.event_name == 'push' && github.event.ref == 'refs/heads/master') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
       - name: Set up Go 1.15
         uses: actions/setup-go@v2
@@ -208,6 +212,8 @@ jobs:
     if: (github.event_name == 'push' && github.event.ref == 'refs/heads/master') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
     needs: prepare_build_dependencies
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -277,6 +283,8 @@ jobs:
         os: [ubuntu-latest]
         k8s_version: [1.16, 1.17]
     runs-on: ${{ matrix.os }}
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
