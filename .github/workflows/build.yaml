@@ -4,7 +4,7 @@ on:
   push:
     branches:
 jobs:
-  build_binary:
+  build_linux_binary:
     name: Build shell-operator binary
     runs-on: ubuntu-latest
     env:
@@ -87,3 +87,45 @@ jobs:
       - name: Build binary
         run: |
           go build ./cmd/shell-operator
+
+
+# MacOS build works fine because jq package already has static libraries.
+# Windows build requires jq compilation, this should be done in libjq-go.
+# TODO Does cross-compile can help here?
+#
+#  build_darwin_binary:
+#    name: Darwin binary
+#    runs-on: macos-10.15
+#    steps:
+#      - uses: actions/checkout@v2
+#
+#      - name: install jq
+#        run: |
+#          brew install jq
+#
+#      - name: build shell-operator binary
+#        run: |
+#          GO111MODULE=on \
+#          CGO_ENABLED=1 \
+#          go build ./cmd/shell-operator
+#
+#          file ./shell-operator
+#
+#          ./shell-operator version
+#
+#  build_windows_binary:
+#    name: Windows binary
+#    runs-on: windows-2019
+#    steps:
+#      - uses: actions/checkout@v2
+#
+#      - name: build shell-operator binary
+#        run: |
+#          GO111MODULE=on \
+#          CGO_ENABLED=1 \
+#          go build ./cmd/shell-operator
+#
+#          ls -la .
+#
+#          ./shell-operator.exe version
+#        shell: bash

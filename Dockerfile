@@ -1,22 +1,11 @@
-# build libjq
-FROM ubuntu:18.04 AS libjq
-ENV DEBIAN_FRONTEND=noninteractive \
-    DEBCONF_NONINTERACTIVE_SEEN=true \
-    LC_ALL=C.UTF-8 \
-    LANG=C.UTF-8
+# Pre-build libjq.
+FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl as libjq
 
-RUN apt-get update && \
-    apt-get install -y git ca-certificates && \
-    git clone https://github.com/flant/libjq-go /libjq-go && \
-    cd /libjq-go && \
-    git submodule update --init --recursive && \
-    /libjq-go/scripts/install-libjq-dependencies-ubuntu.sh && \
-    /libjq-go/scripts/build-libjq-static.sh /libjq-go /libjq
+# Go builder.
+FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.15-alpine3.12 AS builder
 
-
-# build shell-operator binary
-FROM golang:1.15 AS shell-operator
 ARG appVersion=latest
+RUN apk --no-cache add git ca-certificates gcc musl-dev libc-dev
 
 # Cache-friendly download of go dependencies.
 ADD go.mod go.sum /app/
@@ -30,25 +19,20 @@ RUN CGO_ENABLED=1 \
     CGO_CFLAGS="-I/libjq/include" \
     CGO_LDFLAGS="-L/libjq/lib" \
     GOOS=linux \
-    go build -ldflags="-s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" \
+    go build -ldflags="-linkmode external -extldflags '-static' -s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" \
              -o shell-operator \
              ./cmd/shell-operator
 
-FROM krallin/ubuntu-tini:bionic AS tini
-
-# build final image
-FROM ubuntu:18.04
-RUN apt-get update && \
-    apt-get install -y ca-certificates wget jq && \
-    rm -rf /var/lib/apt/lists && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.4/bin/linux/amd64/kubectl -O /bin/kubectl && \
+# Final image
+FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.12
+RUN apk --no-cache add ca-certificates bash sed tini && \
+    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.4/bin/${TARGETPLATFORM:-linux/amd64}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
-    rm -rf /var/lib/apt/lists/* && \
     mkdir /hooks
 ADD frameworks /
 ADD shell_lib.sh /
-COPY --from=tini /usr/local/bin/tini /sbin/tini
-COPY --from=shell-operator /app/shell-operator /
+COPY --from=libjq /bin/jq /usr/bin
+COPY --from=builder /app/shell-operator /
 WORKDIR /
 ENV SHELL_OPERATOR_HOOKS_DIR /hooks
 ENV LOG_TYPE json

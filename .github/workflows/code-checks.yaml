@@ -38,5 +38,5 @@ jobs:
 
       - name: codespell
         run: |
-          pip install codespell
+          pip install codespell==v1.17.1
           codespell --skip=".git,go.mod,go.sum,*.log,*.gif,*.png" -L witht,eventtypes,uint,uptodate

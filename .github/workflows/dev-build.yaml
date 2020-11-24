@@ -1,9 +1,14 @@
-name: Publish dev images
+name: Publish dev image
 on:
   pull_request:
     types: [labeled]
 env:
   GO111MODULE: on
+  # build only 2 platforms to speed up dev image build
+  # TODO create pre-release build label!
+  QEMU_PLATFORMS: arm64
+  BUILDX_PLATFORMS: "linux/amd64,linux/arm64"
+  IMAGE_REPO: flant/shell-operator-dev
 
 jobs:
   stub:
@@ -47,46 +52,64 @@ jobs:
 
   build_dev_image:
     name: Dev image
-    strategy:
-      fail-fast: false
-      matrix:
-        flavour:
-          - ubuntu
-          - alpine
     runs-on: ubuntu-latest
-    env:
-      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev images' label
     steps:
       - uses: actions/checkout@v2
 
       - name: Prepare environment
         env:
-          FLAVOUR: ${{ matrix.flavour }}
-          IMAGE_NAME: flant/shell-operator-dev
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          imageTag=${IMAGE_NAME}:${FLAVOUR}
           # master-371e2d3b9467fb9b72b515fb5e30d39964519601-2020.02.06_18:37:42
-          appVersion=dev-$FLAVOUR-$GITHUB_HEAD_REF-${HEAD_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
-          dockerFile=Dockerfile
+          APP_VERSION=dev-$GITHUB_HEAD_REF-${HEAD_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
 
-          case $FLAVOUR in
-            alpine)
-              dockerFile="Dockerfile-alpine3.12"
-              ;;
-          esac
+          # This step is close to release-build.yaml to emulate release build.
+          GITHUB_REF="refs/tags/latest"
 
-          echo ::set-env name=imageTag::${imageTag}
-          echo ::set-env name=dockerFile::${dockerFile}
-          echo ::set-env name=appVersion::${appVersion}
+          : Setup imageTag, appVersion and dockerFile envs and build image
+          imageTag=${GITHUB_REF#refs/tags/}
+          APP_VERSION=${imageTag}
+          FINAL_IMAGE_NAME="${IMAGE_REPO}:${imageTag}"
 
-      - name: Build '${{ matrix.flavour }}' image
+          echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "APP_VERSION=${APP_VERSION}" >> ${GITHUB_ENV}
+
+          echo "========================================="
+          echo "APP_VERSION        = $APP_VERSION"
+          echo "FINAL_IMAGE_NAME   = $FINAL_IMAGE_NAME"
+          echo "========================================="
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: "${{ process.env.QEMU_PLATFORMS }}"
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+        with:
+          version: latest
+
+      - name: BuildX info
+        if: matrix.ref == 'refs/heads/master'
         run: |
-          echo Build $imageTag with version $appVersion using ./$dockerFile
-          docker build --build-arg appVersion=$appVersion -t $imageTag -f $dockerFile .
+          echo Builder instance name
+          echo ${{ steps.buildx.outputs.name }}
+          echo Available platforms
+          echo ${{ steps.buildx.outputs.platforms }}
 
-      - name: Push '${{ matrix.flavour }}' image
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASS }}
+
+      - name: Build and push multi-arch image
         run: |
-          docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASS }}
-          docker push $imageTag
+          echo "Build $FINAL_IMAGE_NAME with version '$APP_VERSION'"
+          docker buildx build --push \
+              --platform $BUILDX_PLATFORMS \
+              --build-arg appVersion=$APP_VERSION \
+              --tag $FINAL_IMAGE_NAME .
+

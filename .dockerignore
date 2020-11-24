@@ -1,9 +1,12 @@
-Dockerfile
-Dockerfile-alpine3.9
-Dockerfile-alpine3.10
-Dockerfile-alpine3.11
+.github
 docs
 examples
 scripts
 test
+
+.git
+.gitignore
+Dockerfile
+LICENSE
 *.md
+*.png
