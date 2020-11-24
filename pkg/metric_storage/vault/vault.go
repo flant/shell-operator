@@ -33,6 +33,15 @@ func (v *GroupedVault) ClearMissingMetrics(group string, metricLabels map[string
 	}
 }
 
+// ClearAllMetrics takes each collector in collectors and clear all metrics by group.
+func (v *GroupedVault) ClearAllMetrics(group string) {
+	v.mtx.Lock()
+	defer v.mtx.Unlock()
+	for _, collector := range v.collectors {
+		collector.ClearAllMetrics(group)
+	}
+}
+
 func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []string) (*ConstCounterCollector, error) {
 	v.mtx.Lock()
 	defer v.mtx.Unlock()

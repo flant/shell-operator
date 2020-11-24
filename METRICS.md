@@ -48,7 +48,7 @@ Operation to register a gauge and set its value:
 {"name":"metric_name","set":33,"labels":{"label1":"value1"}}
 ```
 
-Labels are not required, but Shell-operator adds a `hook` label.
+Labels are not required, but Shell-operator adds a `hook` label with hook name (a path to a hook script relative to hooks directory).
 
 Several metrics can be expored at once. For example, this script will create 2 metrics:
 
@@ -59,9 +59,19 @@ echo '{"name":"hook_metrics_items","add":1,"labels":{"label1":"value1"}}' >> $ME
 
 The metric name is used as-is, so several hooks can export same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.
 
-There is no operation to delete metrics and no ttl mechanism yet. If hook set value for metric, this value is exported until the process ends.
+Note that there is no mechanism to expire this kind of metrics except the process restart. It is a default behaviour of prometheus-client.
 
-To expire metrics, you can use a "group" field. When Shell-operator receives operations with "group", it expires previous metrics with the same group and apply new values. This grouping works across hooks and label values.
+### grouped metrics
+
+The common cause to expire a metric is a removed object. It means that object is no longer in "snapshot" and the hook can't recreate labels to identify metric that should be expired.
+
+To solve this, use "group" field in metric operations. When Shell-operator receives operations with "group" field, it expires previous metrics with the same group and apply new metric values. This grouping works across hooks and label values.
+
+To expire all metrics in group, there is a field "action" with value "expired":
+
+```
+ {"group":"group_name_1", "action":"expired"}
+```
 
 For example:
 
@@ -90,22 +100,22 @@ Prometheus scrapes these metrics:
 ```
 # HELP hook_metric hook_metric
 # TYPE hook_metric counter
-hook_metric{hook="hook1.sh", kind="pod"} 1
-hook_metric{hook="hook1.sh", kind="replicaset"} 1
-hook_metric{hook="hook1.sh", kind="deployment"} 1
-hook_metric{hook="hook2.sh", kind="configmap"} 1
-hook_metric{hook="hook2.sh", kind="secret"} 1
-# HELP hook2_special_metric hook2_special_metric
-# TYPE hook1_special_metric gauge
-hook1_special_metric{hook="hook1.sh", label1="value1"} 12
-# HELP hook2_special_metric hook2_special_metric
-# TYPE hook2_special_metric gauge
-hook2_special_metric{hook="hook2.sh"} 42
-# HELP common_metric common_metric
-# TYPE common_metric gauge
-common_metric{hook="hook1.sh", source="source1"} 100
-common_metric{hook="hook1.sh", source="source3"} 300
-common_metric{hook="hook2.sh", source="source2"} 200
+hook_metric{hook="hook1.sh", kind="pod"} 1 -------------------+---------- group:hook1
+hook_metric{hook="hook1.sh", kind="replicaset"} 1 ------------+
+hook_metric{hook="hook1.sh", kind="deployment"} 1 ------------+
+hook_metric{hook="hook2.sh", kind="configmap"} 1  ------------|-------+-- group:hook2
+hook_metric{hook="hook2.sh", kind="secret"} 1 ----------------|-------+
+# HELP hook1_special_metric hook1_special_metric              |       |
+# TYPE hook1_special_metric gauge                             |       |
+hook1_special_metric{hook="hook1.sh", label1="value1"} 12 ----+       |
+# HELP hook2_special_metric hook2_special_metric              |       |
+# TYPE hook2_special_metric gauge                             |       |
+hook2_special_metric{hook="hook2.sh"} 42 ---------------------|-------'
+# HELP common_metric common_metric                            |
+# TYPE common_metric gauge                                    |
+common_metric{hook="hook1.sh", source="source3"} 300 ---------'
+common_metric{hook="hook1.sh", source="source1"} 100 ---------------+---- no group
+common_metric{hook="hook2.sh", source="source2"} 200 ---------------'
 ```
 
 On next execution of `hook1.sh` values for `hook_metric{kind="replicaset"}`, `hook_metric{kind="deployment"}`, `common_metric{source="source3"}` and `hook1_special_metric` are expired and hook returns only one metric:
@@ -119,14 +129,33 @@ Shell-operator expires previous values for group "hook1" and updates value for `
 ```
 # HELP hook_metric hook_metric
 # TYPE hook_metric counter
-hook_metric{hook="hook1.sh", kind="pod"} 2
-hook_metric{hook="hook2.sh", kind="configmap"} 1
-hook_metric{hook="hook2.sh", kind="secret"} 1
-# HELP hook2_special_metric hook2_special_metric
-# TYPE hook2_special_metric gauge
-hook2_special_metric{hook="hook2.sh"} 42
+hook_metric{hook="hook1.sh", kind="pod"} 2 --------------- group:hook1
+hook_metric{hook="hook2.sh", kind="configmap"} 1 ----+---- group:hook2
+hook_metric{hook="hook2.sh", kind="secret"} 1 -------+
+# HELP hook2_special_metric hook2_special_metric     |
+# TYPE hook2_special_metric gauge                    |
+hook2_special_metric{hook="hook2.sh"} 42 ------------'
 # HELP common_metric common_metric
 # TYPE common_metric gauge
-common_metric{hook="hook1.sh", source="source1"} 100
-common_metric{hook="hook2.sh", source="source2"} 200
+common_metric{hook="hook1.sh", source="source1"} 100 --+-- no group
+common_metric{hook="hook2.sh", source="source2"} 200 --'
 ```
+
+Next execution of `hook2.sh` expires all metrics in group 'hook2':
+
+```
+echo '{"group":"hook2", "action":"expire"}' >> $METRICS_PATH
+```
+
+Shell-operator expires previous values for group "hook2" but leaves `common_metrics` for "hook2.sh" as is. Now Prometheus scrapes these metrics:
+
+```
+# HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook="hook1.sh", kind="pod"} 2 --------------- group:hook1
+# HELP common_metric common_metric
+# TYPE common_metric gauge
+common_metric{hook="hook1.sh", source="source1"} 100 --+-- no group
+common_metric{hook="hook2.sh", source="source2"} 200 --'
+```
+

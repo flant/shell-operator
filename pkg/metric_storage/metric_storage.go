@@ -353,7 +353,7 @@ func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[st
 		m.ApplyGroupOperations(group, ops, labels)
 	}
 
-	// backward compatibility — send metrics without cleaning
+	// backward compatibility — send metrics without expire
 	err := m.SendBatchV0(nonGroupedOps, labels)
 	if err != nil {
 		return err
@@ -375,19 +375,17 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 	}
 }
 
+// ApplyGroupOperations set metrics for group to a new state defined by ops.
 func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.MetricOperation, commonLabels map[string]string) {
-	// Gather labels to clear absent metrics by label values
-	var metricLabels = make(map[string][]map[string]string)
-	for _, op := range ops {
-		if _, ok := metricLabels[op.Name]; !ok {
-			metricLabels[op.Name] = make([]map[string]string, 0)
-		}
-		metricLabels[op.Name] = append(metricLabels[op.Name], MergeLabels(op.Labels, commonLabels))
-	}
-	m.GroupedVault.ClearMissingMetrics(group, metricLabels)
+	// Implicitly expire all metrics for group.
+	m.GroupedVault.ClearAllMetrics(group)
 
 	// Apply metric operations
 	for _, op := range ops {
+		// Ignore operations with action
+		if op.Action != "" {
+			continue
+		}
 		labels := MergeLabels(op.Labels, commonLabels)
 		if op.Add != nil {
 			m.GroupedVault.CounterAdd(group, op.Name, *op.Add, labels)

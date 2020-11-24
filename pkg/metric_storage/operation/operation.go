@@ -14,6 +14,7 @@ type MetricOperation struct {
 	Set    *float64          `json:"set,omitempty"`
 	Labels map[string]string `json:"labels"`
 	Group  string            `json:"group,omitempty"`
+	Action string            `json:"action,omitempty"`
 }
 
 func MetricOperationsFromReader(r io.Reader) ([]MetricOperation, error) {

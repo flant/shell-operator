@@ -1,4 +1,4 @@
-# Pre-build libjq.
+# Prebuilt libjq.
 FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl as libjq
 
 # Go builder.

@@ -17,6 +17,7 @@ type ConstMetricCollector interface {
 	LabelNames() []string
 	Name() string
 	ClearMissingMetrics(group string, labelSet []map[string]string)
+	ClearAllMetrics(group string)
 }
 
 var (
@@ -123,6 +124,18 @@ func (c *ConstCounterCollector) ClearMissingMetrics(group string, labelSet []map
 	}
 }
 
+// ClearAllMetrics deletes all metrics from collection with matched group.
+func (c *ConstCounterCollector) ClearAllMetrics(group string) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	for hash, m := range c.collection {
+		if m.Group == group {
+			delete(c.collection, hash)
+		}
+	}
+}
+
 type ConstGaugeCollector struct {
 	mtx sync.RWMutex
 
@@ -208,6 +221,18 @@ func (c *ConstGaugeCollector) ClearMissingMetrics(group string, labelSet []map[s
 			continue
 		}
 		if _, ok := hashedOps[hash]; !ok {
+			delete(c.collection, hash)
+		}
+	}
+}
+
+// ClearAllMetrics deletes all metrics from collection with matched group.
+func (c *ConstGaugeCollector) ClearAllMetrics(group string) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	for hash, m := range c.collection {
+		if m.Group == group {
 			delete(c.collection, hash)
 		}
 	}
