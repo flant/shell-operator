@@ -73,7 +73,7 @@ To expire all metrics in group, there is a field "action" with value "expired":
  {"group":"group_name_1", "action":"expired"}
 ```
 
-For example:
+### Example
 
 `hook1.sh` returns these metrics:
 
