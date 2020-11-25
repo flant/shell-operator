@@ -16,7 +16,7 @@ type ConstMetricCollector interface {
 	Type() string
 	LabelNames() []string
 	Name() string
-	ClearMissingMetrics(group string, labelSet []map[string]string)
+	ExpireGroupMetrics(group string)
 }
 
 var (
@@ -103,21 +103,13 @@ func (c *ConstCounterCollector) Name() string {
 	return c.name
 }
 
-// ClearMissingMetrics deletes metrics from collection with unmatched hashes of labelValues.
-func (c *ConstCounterCollector) ClearMissingMetrics(group string, labelSet []map[string]string) {
+// ExpireGroupMetrics deletes all metrics from collection with matched group.
+func (c *ConstCounterCollector) ExpireGroupMetrics(group string) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	hashedOps := make(map[uint64]struct{})
-	for _, labels := range labelSet {
-		hashedOps[HashLabelValues(LabelValues(labels, c.labelNames))] = struct{}{}
-	}
-
 	for hash, m := range c.collection {
-		if m.Group != group {
-			continue
-		}
-		if _, ok := hashedOps[hash]; !ok {
+		if m.Group == group {
 			delete(c.collection, hash)
 		}
 	}
@@ -187,27 +179,13 @@ func (c *ConstGaugeCollector) Name() string {
 	return c.name
 }
 
-// ClearGroup removes all metrics for a group
-// TODO ClearGroup
-
-// Clear removes all metrics from this collector
-//TODO
-
-// ClearMissingMetrics deletes metrics from collection with unmatched hashes of labelValues.
-func (c *ConstGaugeCollector) ClearMissingMetrics(group string, labelSet []map[string]string) {
+// ExpireGroupMetrics deletes all metrics from collection with matched group.
+func (c *ConstGaugeCollector) ExpireGroupMetrics(group string) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	hashedOps := make(map[uint64]struct{})
-	for _, labels := range labelSet {
-		hashedOps[HashLabelValues(LabelValues(labels, c.labelNames))] = struct{}{}
-	}
-
 	for hash, m := range c.collection {
-		if m.Group != group {
-			continue
-		}
-		if _, ok := hashedOps[hash]; !ok {
+		if m.Group == group {
 			delete(c.collection, hash)
 		}
 	}

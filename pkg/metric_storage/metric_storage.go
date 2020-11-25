@@ -332,7 +332,12 @@ func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[st
 		return nil
 	}
 
-	// Group ops by 'Group'.
+	err := operation.ValidateOperations(ops)
+	if err != nil {
+		return err
+	}
+
+	// Group operations by 'Group' value.
 	var groupedOps = make(map[string][]operation.MetricOperation)
 	var nonGroupedOps = make([]operation.MetricOperation, 0)
 
@@ -347,14 +352,13 @@ func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[st
 		groupedOps[op.Group] = append(groupedOps[op.Group], op)
 	}
 
-	// Apply metric operations for each group
+	// Expire each group and apply new metric operations.
 	for group, ops := range groupedOps {
-		// clean group
 		m.ApplyGroupOperations(group, ops, labels)
 	}
 
-	// backward compatibility — send metrics without cleaning
-	err := m.SendBatchV0(nonGroupedOps, labels)
+	// Send non-grouped metrics.
+	err = m.SendBatchV0(nonGroupedOps, labels)
 	if err != nil {
 		return err
 	}
@@ -375,27 +379,23 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 	}
 }
 
+// ApplyGroupOperations set metrics for group to a new state defined by ops.
 func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.MetricOperation, commonLabels map[string]string) {
-	// Gather labels to clear absent metrics by label values
-	var metricLabels = make(map[string][]map[string]string)
-	for _, op := range ops {
-		if _, ok := metricLabels[op.Name]; !ok {
-			metricLabels[op.Name] = make([]map[string]string, 0)
-		}
-		metricLabels[op.Name] = append(metricLabels[op.Name], MergeLabels(op.Labels, commonLabels))
-	}
-	m.GroupedVault.ClearMissingMetrics(group, metricLabels)
+	// Implicitly expire all metrics for group.
+	m.GroupedVault.ExpireGroupMetrics(group)
 
-	// Apply metric operations
+	// Apply metric operations one-by-one.
 	for _, op := range ops {
-		labels := MergeLabels(op.Labels, commonLabels)
-		if op.Add != nil {
-			m.GroupedVault.CounterAdd(group, op.Name, *op.Add, labels)
+		if op.Action == "expire" {
+			m.GroupedVault.ExpireGroupMetrics(group)
 			continue
 		}
-		if op.Set != nil {
-			m.GroupedVault.GaugeSet(group, op.Name, *op.Set, labels)
-			continue
+		labels := MergeLabels(op.Labels, commonLabels)
+		if op.Action == "add" && op.Value != nil {
+			m.GroupedVault.CounterAdd(group, op.Name, *op.Value, labels)
+		}
+		if op.Action == "set" && op.Value != nil {
+			m.GroupedVault.GaugeSet(group, op.Name, *op.Value, labels)
 		}
 	}
 }

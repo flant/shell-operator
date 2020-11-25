@@ -22,14 +22,12 @@ func NewGroupedVault() *GroupedVault {
 	}
 }
 
-// ClearMissingMetrics takes each collector in collector by its name and clear missing metrics by group.
-func (v *GroupedVault) ClearMissingMetrics(group string, metricLabels map[string][]map[string]string) {
+// ClearAllMetrics takes each collector in collectors and clear all metrics by group.
+func (v *GroupedVault) ExpireGroupMetrics(group string) {
 	v.mtx.Lock()
 	defer v.mtx.Unlock()
-	for name, collector := range v.collectors {
-		if labelSet, ok := metricLabels[name]; ok {
-			collector.ClearMissingMetrics(group, labelSet)
-		}
+	for _, collector := range v.collectors {
+		collector.ExpireGroupMetrics(group)
 	}
 }
 
