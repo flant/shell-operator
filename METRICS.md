@@ -48,7 +48,7 @@ Operation to register a gauge and set its value:
 {"name":"metric_name","set":33,"labels":{"label1":"value1"}}
 ```
 
-Labels are not required, but Shell-operator adds a `hook` label with hook name (a path to a hook script relative to hooks directory).
+Labels are not required, but Shell-operator adds a `hook` label with a path to a hook script relative to hooks directory.
 
 Several metrics can be expored at once. For example, this script will create 2 metrics:
 
@@ -59,15 +59,15 @@ echo '{"name":"hook_metrics_items","add":1,"labels":{"label1":"value1"}}' >> $ME
 
 The metric name is used as-is, so several hooks can export same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.
 
-Note that there is no mechanism to expire this kind of metrics except the process restart. It is a default behaviour of prometheus-client.
+Note that there is no mechanism to expire this kind of metrics except the shell-operator restart. It is the default behavior of prometheus-client.
 
-### grouped metrics
+### Grouped metrics
 
-The common cause to expire a metric is a removed object. It means that object is no longer in "snapshot" and the hook can't recreate labels to identify metric that should be expired.
+The common cause to expire a metric is a removed object. It means that the object is no longer in the snapshot, and the hook can't identify the metric that should be expired.
 
-To solve this, use "group" field in metric operations. When Shell-operator receives operations with "group" field, it expires previous metrics with the same group and apply new metric values. This grouping works across hooks and label values.
+To solve this, use the "group" field in metric operations. When Shell-operator receives operations with the "group" field, it expires previous metrics with the same group and applies new metric values. This grouping works across hooks and label values.
 
-To expire all metrics in group, there is a field "action" with value "expired":
+To expire all metrics in a group, there is a field "action" with value "expired":
 
 ```
  {"group":"group_name_1", "action":"expired"}
@@ -158,4 +158,3 @@ hook_metric{hook="hook1.sh", kind="pod"} 2 --------------- group:hook1
 common_metric{hook="hook1.sh", source="source1"} 100 --+-- no group
 common_metric{hook="hook2.sh", source="source2"} 200 --'
 ```
-
