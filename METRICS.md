@@ -39,25 +39,31 @@ Hooks can export metrics by writing a set of operations in JSON format into $MET
 Operation to register a counter and increase its value:
 
 ```json
-{"name":"metric_name","add":1,"labels":{"label1":"value1"}}
+{"name":"metric_name","action":"add","value":1,"labels":{"label1":"value1"}}
 ```
 
 Operation to register a gauge and set its value:
 
 ```json
-{"name":"metric_name","set":33,"labels":{"label1":"value1"}}
+{"name":"metric_name","action":"set","value":33,"labels":{"label1":"value1"}}
 ```
 
 Labels are not required, but Shell-operator adds a `hook` label with a path to a hook script relative to hooks directory.
 
-Several metrics can be expored at once. For example, this script will create 2 metrics:
+Several metrics can be exported at once. For example, this script will create 2 metrics:
 
 ```
-echo '{"name":"hook_metric_count","add":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
-echo '{"name":"hook_metrics_items","add":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
+echo '{"name":"hook_metric_count","action":"add","value":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
+echo '{"name":"hook_metrics_items","action":"add","value":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
 ```
 
 The metric name is used as-is, so several hooks can export same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.
+
+There are fields "add" and "set" that can be used as shortcuts for action and value. This feature may be deprecated in future releases.
+
+```
+{"name":"metric_name","add":1,"labels":{"label1":"value1"}}
+```
 
 Note that there is no mechanism to expire this kind of metrics except the shell-operator restart. It is the default behavior of prometheus-client.
 
@@ -67,10 +73,15 @@ The common cause to expire a metric is a removed object. It means that the objec
 
 To solve this, use the "group" field in metric operations. When Shell-operator receives operations with the "group" field, it expires previous metrics with the same group and applies new metric values. This grouping works across hooks and label values.
 
-To expire all metrics in a group, there is a field "action" with value "expired":
+```
+echo '{"group":"group1", "name":"hook_metric_count",  "action":"add", "value":1, "labels":{"label1":"value1"}}' >> $METRICS_PATH
+echo '{"group":"group1", "name":"hook_metrics_items", "action":"add", "value":1, "labels":{"label1":"value1"}}' >> $METRICS_PATH
+```
+
+To expire all metrics in a group, use action "expire":
 
 ```
- {"group":"group_name_1", "action":"expired"}
+{"group":"group_name_1", "action":"expire"}
 ```
 
 ### Example
@@ -78,21 +89,21 @@ To expire all metrics in a group, there is a field "action" with value "expired"
 `hook1.sh` returns these metrics:
 
 ```
-echo '{"group":"hook1", "name":"hook_metric","add":1,"labels":{"kind":"pod"}}' >> $METRICS_PATH
-echo '{"group":"hook1", "name":"hook_metric","add":1,"labels":{"kind":"replicaset"}}' >> $METRICS_PATH
-echo '{"group":"hook1", "name":"hook_metric","add":1,"labels":{"kind":"deployment"}}' >> $METRICS_PATH
-echo '{"group":"hook1", "name":"hook1_special_metric","set":12,"labels":{"label1":"value1"}}' >> $METRICS_PATH
-echo '{"group":"hook1", "name":"common_metric","set":300,"labels":{"source":"source3"}}' >> $METRICS_PATH
-echo '{"name":"common_metric","set":100,"labels":{"source":"source1"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"hook_metric", "action":"add", "value":1, "labels":{"kind":"pod"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"hook_metric", "action":"add", "value":1, "labels":{"kind":"replicaset"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"hook_metric", "action":"add", "value":1, "labels":{"kind":"deployment"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"hook1_special_metric", "action":"set", "value":12, "labels":{"label1":"value1"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"common_metric", "action":"set", "value":300, "labels":{"source":"source3"}}' >> $METRICS_PATH
+echo '{"name":"common_metric", "action":"set", "value":100, "labels":{"source":"source1"}}' >> $METRICS_PATH
 ```
 
 `hook2.sh` returns these metrics:
 
 ```
-echo '{"group":"hook2", "name":"hook_metric","add":1,"labels":{"kind":"configmap"}}' >> $METRICS_PATH
-echo '{"group":"hook2", "name":"hook_metric","add":1,"labels":{"kind":"secret"}}' >> $METRICS_PATH
-echo '{"group":"hook2", "name":"hook2_special_metric","set":42}' >> $METRICS_PATH
-echo '{"name":"common_metric","set":200,"labels":{"source":"source2"}}' >> $METRICS_PATH
+echo '{"group":"hook2", "name":"hook_metric","action":"add", "value":1, "labels":{"kind":"configmap"}}' >> $METRICS_PATH
+echo '{"group":"hook2", "name":"hook_metric","action":"add", "value":1, "labels":{"kind":"secret"}}' >> $METRICS_PATH
+echo '{"group":"hook2", "name":"hook2_special_metric", "action":"set", "value":42}' >> $METRICS_PATH
+echo '{"name":"common_metric", "action":"set", "value":200, "labels":{"source":"source2"}}' >> $METRICS_PATH
 ```
 
 Prometheus scrapes these metrics:
@@ -121,7 +132,7 @@ common_metric{hook="hook2.sh", source="source2"} 200 ---------------'
 On next execution of `hook1.sh` values for `hook_metric{kind="replicaset"}`, `hook_metric{kind="deployment"}`, `common_metric{source="source3"}` and `hook1_special_metric` are expired and hook returns only one metric:
 
 ```
-echo '{"group":"hook1", "name":"hook_metric","add":1,"labels":{"kind":"pod"}}' >> $METRICS_PATH
+echo '{"group":"hook1", "name":"hook_metric", "action":"add", "value":1, "labels":{"kind":"pod"}}' >> $METRICS_PATH
 ```
 
 Shell-operator expires previous values for group "hook1" and updates value for `hook_metric{hook="hook1.sh", kind="pod"}`. Values for group `hook2` and `common_metric` without group are left intact. Now Prometheus scrapes these metrics:
