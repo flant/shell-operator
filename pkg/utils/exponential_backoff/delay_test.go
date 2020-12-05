@@ -17,15 +17,15 @@ func Test_Delay(t *testing.T) {
 		switch {
 		case i == 0:
 			if seconds != initialSeconds {
-				t.Fatalf("delay for retry %d shoud be %d seconds, actual delay is %s", i, initialSeconds, delay)
+				t.Fatalf("delay for retry %d should be %d seconds, actual delay is %s", i, initialSeconds, delay)
 			}
 		case i <= ExponentialCalculationsCount:
 			if seconds > int64(MaxExponentialBackoffDelay.Seconds()) || seconds < 0 {
-				t.Fatalf("delay for retry %d shoud be greater than 0 and less than MaxExponentialBackoffDelay=%d seconds, actual delay is %s", i, int64(MaxExponentialBackoffDelay.Seconds()), delay)
+				t.Fatalf("delay for retry %d should be greater than 0 and less than MaxExponentialBackoffDelay=%d seconds, actual delay is %s", i, int64(MaxExponentialBackoffDelay.Seconds()), delay)
 			}
 		case i > ExponentialCalculationsCount:
 			if seconds != int64(MaxExponentialBackoffDelay.Seconds()) {
-				t.Fatalf("delay for retry %d shoud be MaxExponentialBackoffDelay=%d seconds, actual delay is %s", i, int64(MaxExponentialBackoffDelay.Seconds()), delay)
+				t.Fatalf("delay for retry %d should be MaxExponentialBackoffDelay=%d seconds, actual delay is %s", i, int64(MaxExponentialBackoffDelay.Seconds()), delay)
 			}
 		}
 
