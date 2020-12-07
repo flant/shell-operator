@@ -57,7 +57,7 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 		}
 
 		if !IsFileExecutable(f) {
-			log.Infof("file '%s' in a hooks dir skipped because it has no executable permissions", path)
+			log.Warnf("File '%s' is skipped: no executable permissions, chmod +x is required to run this hook", path)
 			return nil
 		}
 
