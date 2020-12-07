@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // FileExists returns true if path exists
@@ -54,10 +56,12 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 			return nil
 		}
 
-		if IsFileExecutable(f) {
-			paths = append(paths, path)
+		if !IsFileExecutable(f) {
+			log.Warnf("File '%s' is skipped: no executable permissions, chmod +x is required to run this hook", path)
+			return nil
 		}
 
+		paths = append(paths, path)
 		return nil
 	})
 
