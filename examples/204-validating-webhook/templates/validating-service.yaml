@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.shellOperator.validatingWebhookServiceName }}
+spec:
+#  type: LoadBalancer
+#  externalTrafficPolicy: Local
+  ports:
+    - name: validating-webhook
+      port: 443
+      targetPort: 9680
+      protocol: TCP
+  selector:
+    app: shell-operator

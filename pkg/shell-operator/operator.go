@@ -32,6 +32,8 @@ import (
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/flant/shell-operator/pkg/utils/measure"
+	"github.com/flant/shell-operator/pkg/utils/structured-logger"
+	"github.com/flant/shell-operator/pkg/validating-webhook"
 )
 
 var WaitQueuesTimeout = time.Second * 10
@@ -56,6 +58,8 @@ type ShellOperator struct {
 	ManagerEventsHandler *ManagerEventsHandler
 
 	HookManager hook.HookManager
+
+	WebhookManager *validating_webhook.WebhookManager
 
 	DebugServer *debug.Server
 }
@@ -680,7 +684,7 @@ func (op *ShellOperator) SetupDebugServerHandles() {
 
 	op.DebugServer.Router.Get("/queue/list.{format:(json|yaml|text)}", func(writer http.ResponseWriter, request *http.Request) {
 		format := chi.URLParam(request, "format")
-		debug.GetLogEntry(request).Debugf("queue list using format %s", format)
+		structured_logger.GetLogEntry(request).Debugf("queue list using format %s", format)
 		_, _ = writer.Write([]byte(dump.TaskQueueSetToText(op.TaskQueues)))
 	})
 }
@@ -776,6 +780,20 @@ func InitAndStart(operator *ShellOperator) error {
 	if err != nil {
 		log.Errorf("INIT HookManager failed: %s", err)
 		return err
+	}
+
+	// FIXME add configuration and detect if there are hooks with 'kubernetesValidating' binding.
+	valh := operator.HookManager.GetHook("validating.sh")
+	if valh != nil {
+		operator.WebhookManager = &validating_webhook.WebhookManager{
+			KubeClient: operator.KubeClient,
+		}
+		err := operator.WebhookManager.Start()
+		if err != nil {
+			// Log only while in dev phase.
+			// FIXME Return err when feature is complete.
+			log.Errorf("Webhook start: %v", err)
+		}
 	}
 
 	operator.Start()

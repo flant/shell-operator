@@ -1,0 +1,41 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shell-operator
+  labels:
+    app: shell-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shell-operator
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: shell-operator
+      annotations:
+        checksum/hook: {{ .Files.Get "hooks/validating.sh" | sha256sum }}
+    spec:
+      containers:
+      - name: shell-operator
+        image: {{ .Values.shellOperator.image | quote }}
+        imagePullPolicy: Always
+        env:
+        - name: SHELL_OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: VALIDATING_WEBHOOK_SERVICE_NAME
+          value: {{ .Values.shellOperator.validatingWebhookServiceName | quote }}
+        volumeMounts:
+        - name: validating-certs
+          mountPath: /validating-certs/
+          readOnly: true
+      serviceAccountName: shell-operator-validating-acc
+      volumes:
+      - name: validating-certs
+        secret:
+          secretName: shell-operator-validating-certs

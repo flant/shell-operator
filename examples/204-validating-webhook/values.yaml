@@ -1,0 +1,3 @@
+shellOperator:
+  image: flant/shell-operator:latest
+  validatingWebhookServiceName: shell-operator-validating-service

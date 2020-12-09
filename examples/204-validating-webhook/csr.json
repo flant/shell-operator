@@ -1,0 +1,12 @@
+{
+  "hosts": [
+    "shell-operator-validating-service.shell-test.svc",
+    "shell-operator-valdiating-service.shell-test.svc.cluster.local"
+  ],
+  "CN": "shell-operator-validating-service.shell-test.svc",
+  "key": {
+    "algo": "ecdsa",
+    "size": 256
+  }
+}
+
