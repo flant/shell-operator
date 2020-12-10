@@ -46,7 +46,7 @@ Mirrors all REST DELETE [options](https://kubernetes.io/docs/concepts/workloads/
    * *Optimistic* operationTypes work well for ensuring object's consistency. An object 
         will be considered as a whole. If there is a conflict, hook's logic will re-run to ensure
         that object will transform to the desired state
-   * *Fire and forget*. `JQPatch` and `FilterPatch` will work great with ensuring consistency of the whole object, but may miss
+   * *Fire and forget*. `FilterPatch` will work great with ensuring consistency of the whole object, but may miss
         some updates to an object if there were `resourceVersion` conflicts.
 
 #### Implementations
@@ -57,7 +57,6 @@ These operationTypes will utilize REST's PUT verb. If an operation fails due to 
 shell-operator shall execute a hook again, but not count it as a failure. It should increment an appropriate metric counter
 (`{PREFIX}hook_run_conflicts_total`) which will signal the User about a potential bottleneck.
 
-* `JQPatchOptimistic` — receives a JQFilter that describes object transformations. Only used for shell hooks.
 * `FilterPatchOptimistic` — receives an anonymous function that describes object transformations. Only used for Go hooks.
 
 ##### Fire and forget
@@ -67,7 +66,6 @@ conflict, shell-operator shall not call the hook again. Instead, it will apply j
 until resource update is successful. With [an exponential backoff](https://pkg.go.dev/k8s.io/client-go@v0.19.4/util/retry#RetryOnConflict)
 and upper limit, of course.
 
-* `JQPatch`
 * `FilterPatch`
 
 Also, shell-operator should accept raw versions of Kubernetes' API's patch operations:
@@ -76,7 +74,7 @@ Also, shell-operator should accept raw versions of Kubernetes' API's patch opera
 * `MergePatch`
 
 These might be used for hooks that are called often and which manipulate objects with constantly incrementing resourceVersions.
-They provide weaker consistency than `JQPatch` and `FilterPatch`. Their use should be discouraged in the documentation.
+They provide weaker consistency than `FilterPatch`. Their use should be discouraged in the documentation.
 
 ##### Not implementing
 
@@ -96,7 +94,7 @@ Server-side Apply
 
 ## Go hooks
 
-Still work in progress. They will have access direct to all functions, except JQPatch will be replaced with FilterPatch.
+Still work in progress. They will have access direct to all functions, except FilterPatch will be replaced with JQPatch operationType.
 
 ## Shell hooks
 
