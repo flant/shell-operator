@@ -5,14 +5,15 @@ package kube_events_manager
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/flant/shell-operator/pkg/kube"
 	log "github.com/sirupsen/logrus"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/flant/shell-operator/pkg/kube"
 )
 
 type NamespaceInformer interface {
@@ -61,7 +62,7 @@ func (ni *namespaceInformer) WithKubeClient(client kube.KubernetesClient) {
 
 func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(string)) error {
 	// define resyncPeriod for informer
-	resyncPeriod := time.Duration(2) * time.Hour
+	resyncPeriod := RandomizedResyncPeriod()
 
 	// define indexers for informer
 	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}

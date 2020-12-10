@@ -116,7 +116,7 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	log.Debugf("%s: GVR for kind '%s' is '%s'", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.GroupVersionResource.String())
 
 	// define resyncPeriod for informer
-	resyncPeriod := time.Duration(2) * time.Hour
+	resyncPeriod := RandomizedResyncPeriod()
 
 	// define indexers for informer
 	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}

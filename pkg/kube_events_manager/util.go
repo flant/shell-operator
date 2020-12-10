@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"runtime/trace"
 	"strings"
+	"time"
 
 	. "github.com/flant/libjq-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -140,4 +142,19 @@ func FormatFieldSelector(selector *FieldSelector) (string, error) {
 	}
 
 	return fields.AndSelectors(requirements...).String(), nil
+}
+
+const ResyncPeriodMedian = time.Duration(3) * time.Hour
+const ResyncPeriodSpread = time.Duration(2) * time.Hour
+const ResyncPeriodGranularity = time.Duration(5) * time.Minute
+const ResyncPeriodJitterGranularity = time.Duration(15) * time.Second
+
+// RandomizedResyncPeriod returns a time.Duration between 2 hours and 4 hours with jitter and granularity
+func RandomizedResyncPeriod() time.Duration {
+	spreadCount := ResyncPeriodSpread.Milliseconds() / ResyncPeriodGranularity.Milliseconds()
+	rndSpreadDelta := time.Duration(rand.Int63n(spreadCount)) * ResyncPeriodGranularity
+	jitterCount := ResyncPeriodGranularity.Milliseconds() / ResyncPeriodJitterGranularity.Milliseconds()
+	rndJitterDelta := time.Duration(rand.Int63n(jitterCount)) * ResyncPeriodJitterGranularity
+
+	return ResyncPeriodMedian - (ResyncPeriodSpread / 2) + rndSpreadDelta + rndJitterDelta
 }
