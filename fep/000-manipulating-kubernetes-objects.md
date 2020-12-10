@@ -17,14 +17,14 @@ These will implement all common object manipulation patterns.
 
 ### Creating
 
-* `CreateorUpdate` — accept a Kubernetes object.
-  It retrieves an object, and if it already exists computes a JSON Merge Patch and applies it (will not update .status field).
+* `CreateOrUpdate` — accept a Kubernetes object.
+  It retrieves an object, and if it already exists, computes a JSON Merge Patch and applies it (will not update .status field).
   If it does not exist, we create the object.
 
 Optionally, we might support the following Manipulations:
 
 * `Create` — will fail if an object already exists
-* `CreateIfNotExists` — create and object if such an object does not already 
+* `CreateIfNotExists` — create an object if such an object does not already 
   exist by namespace/name.
 
 These manipulations are potentially dangerous and useless, since they do not reconcile an object in any way.
