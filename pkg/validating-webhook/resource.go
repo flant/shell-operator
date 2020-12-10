@@ -9,6 +9,8 @@ import (
 
 type WebhookResource struct {
 	KubeClient kube.KubernetesClient
+
+	Hooks map[string][]v1.ValidatingWebhook
 }
 
 func (w *WebhookResource) CreateWebhook() error {

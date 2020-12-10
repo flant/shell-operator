@@ -12,13 +12,13 @@ import (
 
 	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
 
-	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
+	"github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type WebhookHandler struct {
-	Router chi.Router
+	Manager *WebhookManager
+	Router  chi.Router
 }
 
 func NewWebhookHandler() *WebhookHandler {
@@ -28,15 +28,13 @@ func NewWebhookHandler() *WebhookHandler {
 	}
 	rtr.Use(structured_logger.NewStructuredLogger(log.StandardLogger()))
 	rtr.Use(middleware.Recoverer)
-	rtr.Post("/", h.handleRequest)
+	rtr.Use(middleware.AllowContentType("application/json"))
+	rtr.Post("/*", h.ServeHTTP)
 
 	return h
 }
 
-func (h *WebhookHandler) handleRequest(w http.ResponseWriter, r *http.Request) {
-	cntType := r.Header.Get("Content-type")
-	log.Infof("Got request: URL:'%s' Content-type:%s", r.URL.String(), cntType)
-
+func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -48,9 +46,7 @@ func (h *WebhookHandler) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var review v1.AdmissionReview
-
 	err = json.Unmarshal(bodyBytes, &review)
-
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error parsing AdmissionReview"))
@@ -58,25 +54,29 @@ func (h *WebhookHandler) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	yamlBytes, _ := yaml.Marshal(review)
-	fmt.Printf("## Get review: \n%s\n", string(yamlBytes))
+	dumpBytes, _ := json.MarshalIndent(review, "  ", "  ")
+	fmt.Printf("## Get review: \n%s\n", string(dumpBytes))
 
-	yamlBytes, _ = yaml.Marshal(r.Header)
-	fmt.Printf("## Request headers:\n%s\n", string(yamlBytes))
+	dumpBytes, _ = json.MarshalIndent(r.Header, "  ", "  ")
+	fmt.Printf("## Request headers:\n%s\n", string(dumpBytes))
 
-	response := v1.AdmissionReview{
+	response := h.HandleReview(&review)
+	admissionResponse := v1.AdmissionReview{
 		TypeMeta: review.TypeMeta,
 		Response: &v1.AdmissionResponse{
 			UID:     review.Request.UID,
-			Allowed: false,
-			Result: &metav1.Status{
-				Message: "You cannot do this because it is Tuesday and your name starts with A",
-				Code:    403,
-			},
+			Allowed: response.Allow,
 		},
 	}
 
-	respBytes, err := json.Marshal(response)
+	if !response.Allow && response.Result != nil {
+		admissionResponse.Response.Result = &metav1.Status{
+			Code:    int32(response.Result.Code),
+			Message: response.Result.Message,
+		}
+	}
+
+	respBytes, err := json.Marshal(admissionResponse)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -88,4 +88,28 @@ func (h *WebhookHandler) handleRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(respBytes)
+}
+
+func (h *WebhookHandler) HandleReview(review *v1.AdmissionReview) *ReviewResponse {
+	if h.Manager.ReviewHandlerFn != nil {
+		resp, err := h.Manager.ReviewHandlerFn(review)
+		if err != nil {
+			return &ReviewResponse{
+				Allow: false,
+				Result: &ReviewResponseResult{
+					Code:    403,
+					Message: err.Error(),
+				},
+			}
+		}
+		return resp
+	}
+
+	return &ReviewResponse{
+		Allow: false,
+		Result: &ReviewResponseResult{
+			Code:    403,
+			Message: "AdmissionReview handler is not defined",
+		},
+	}
 }

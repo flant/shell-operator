@@ -42,3 +42,10 @@ type OnKubernetesEventConfig struct {
 	WaitForSynchronization       bool
 	KeepFullObjectsInMemory      bool
 }
+
+type KubernetesValidatingConfig struct {
+	CommonBindingConfig
+
+	IncludeSnapshotsFrom []string
+	Group                string
+}

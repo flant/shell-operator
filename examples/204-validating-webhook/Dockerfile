@@ -7,4 +7,4 @@ ADD frameworks/shell/ /frameworks/shell/
 ADD hooks /hooks
 
 # Compiled version of shell-operator binary
-#ADD shell-operator /
+ADD shell-operator /

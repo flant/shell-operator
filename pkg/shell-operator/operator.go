@@ -785,6 +785,7 @@ func InitAndStart(operator *ShellOperator) error {
 	// FIXME add configuration and detect if there are hooks with 'kubernetesValidating' binding.
 	valh := operator.HookManager.GetHook("validating.sh")
 	if valh != nil {
+		log.Infof("Init Webhook components")
 		operator.WebhookManager = &validating_webhook.WebhookManager{
 			KubeClient: operator.KubeClient,
 		}

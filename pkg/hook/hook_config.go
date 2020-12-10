@@ -28,9 +28,10 @@ type HookConfig struct {
 	V1 *HookConfigV1
 
 	// effective config values
-	OnStartup          *OnStartupConfig
-	Schedules          []ScheduleConfig
-	OnKubernetesEvents []OnKubernetesEventConfig
+	OnStartup            *OnStartupConfig
+	Schedules            []ScheduleConfig
+	OnKubernetesEvents   []OnKubernetesEventConfig
+	KubernetesValidating []KubernetesValidatingConfig
 }
 
 type HookConfigV0 struct {
@@ -40,10 +41,11 @@ type HookConfigV0 struct {
 }
 
 type HookConfigV1 struct {
-	ConfigVersion     string                      `json:"configVersion"`
-	OnStartup         interface{}                 `json:"onStartup"`
-	Schedule          []ScheduleConfigV1          `json:"schedule"`
-	OnKubernetesEvent []OnKubernetesEventConfigV1 `json:"kubernetes"`
+	ConfigVersion        string                         `json:"configVersion"`
+	OnStartup            interface{}                    `json:"onStartup"`
+	Schedule             []ScheduleConfigV1             `json:"schedule"`
+	OnKubernetesEvent    []OnKubernetesEventConfigV1    `json:"kubernetes"`
+	KubernetesValidating []KubernetesValidatingConfigV1 `json:"kubernetesValidating"`
 }
 
 // Schedule configuration
@@ -108,6 +110,26 @@ type KubeNameSelectorV1 NameSelector
 type KubeFieldSelectorV1 FieldSelector
 
 type KubeNamespaceSelectorV1 NamespaceSelector
+
+// version 1 of kubernetes event configuration
+type KubernetesValidatingConfigV1 struct {
+	Name                 string   `json:"name,omitempty"`
+	IncludeSnapshotsFrom []string `json:"includeSnapshotsFrom,omitempty"`
+	Group                string   `json:"group,omitempty"`
+	//WatchEventTypes              []WatchEventType         `json:"watchEvent,omitempty"`
+	//ExecuteHookOnEvents          []WatchEventType         `json:"executeHookOnEvent,omitempty"`
+	//ExecuteHookOnSynchronization string                   `json:"executeHookOnSynchronization,omitempty"`
+	//WaitForSynchronization       string                   `json:"waitForSynchronization,omitempty"`
+	//KeepFullObjectsInMemory      string                   `json:"keepFullObjectsInMemory,omitempty"`
+	//Mode                         KubeEventMode            `json:"mode,omitempty"`
+	//ApiVersion                   string                   `json:"apiVersion,omitempty"`
+	//Kind                         string                   `json:"kind,omitempty"`
+	//NameSelector                 *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
+	//LabelSelector                *metav1.LabelSelector    `json:"labelSelector,omitempty"`
+	//FieldSelector                *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
+	//Namespace                    *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
+	//JqFilter                     string                   `json:"jqFilter,omitempty"`
+}
 
 // LoadAndValidate loads config from bytes and validate it. Returns multierror.
 func (c *HookConfig) LoadAndValidate(data []byte) error {
