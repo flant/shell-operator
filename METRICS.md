@@ -32,6 +32,10 @@ Shell-operator exports Prometheus metrics to the `/metrics` path. The default po
 
 * `shell_operator_tasks_queue_action_duration_seconds{queue_name="", queue_action=""}` — a histogram with measurements of low level queue operations. Use QUEUE_ACTIONS_METRICS="no" to disable this metric.
 
+* `shell_operator_hook_run_usage_sys_ms_total{hook="", binding="", queue=""}` — a counter with system cpu milliseconds.
+* `shell_operator_hook_run_usage_user_ms_total{hook="", binding="", queue=""}` — a counter with user cpu milliseconds.
+* `shell_operator_hook_run_usage_maxrss_kb_total{hook="", binding="", queue=""}` — a counter with maximum resident set size used in kilobytes.
+
 ## Custom metrics
 
 Hooks can export metrics by writing a set of operations in JSON format into $METRICS_PATH file.
