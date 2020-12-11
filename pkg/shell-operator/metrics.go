@@ -123,7 +123,7 @@ func RegisterHookMetrics(metricStorage *metric_storage.MetricStorage) {
 			10, // 10 seconds
 		},
 	)
-	// Max RSS in kilobytes.
+	// Max RSS in bytes.
 	metricStorage.RegisterGauge("{PREFIX}hook_run_max_rss_bytes", labels)
 
 	metricStorage.RegisterCounter("{PREFIX}hook_run_errors_total", labels)
