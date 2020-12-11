@@ -67,7 +67,7 @@ func (h *Hook) GetHookController() controller.HookController {
 	return h.HookController
 }
 
-func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) ([]operation.MetricOperation, error) {
+func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) (*executor.CmdUsage, []operation.MetricOperation, error) {
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
@@ -75,12 +75,12 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 
 	contextPath, err := h.prepareBindingContextJsonFile(versionedContextList)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	metricsPath, err := h.prepareMetricsFile()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// remove tmp file on hook exit
@@ -100,17 +100,17 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
-	err = executor.RunAndLogLines(hookCmd, logLabels)
+	usage, err := executor.RunAndLogLines(hookCmd, logLabels)
 	if err != nil {
-		return nil, fmt.Errorf("%s FAILED: %s", h.Name, err)
+		return usage, nil, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
 
 	metrics, err := operation.MetricOperationsFromFile(metricsPath)
 	if err != nil {
-		return nil, fmt.Errorf("got bad metrics: %s", err)
+		return usage, nil, fmt.Errorf("got bad metrics: %s", err)
 	}
 
-	return metrics, nil
+	return usage, metrics, nil
 }
 
 func (h *Hook) SafeName() string {

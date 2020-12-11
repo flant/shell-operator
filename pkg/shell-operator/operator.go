@@ -428,7 +428,14 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 		}
 	}
 
-	metrics, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+	usage, metrics, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+
+	if usage != nil {
+		log.Infof("Usage: %+v", usage)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", usage.Sys.Seconds(), metricLabels)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", usage.User.Seconds(), metricLabels)
+		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(usage.MaxRss)*1024, metricLabels)
+	}
 
 	if err == nil {
 		err = op.HookMetricStorage.SendBatch(metrics, map[string]string{

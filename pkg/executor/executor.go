@@ -5,11 +5,19 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
+
+type CmdUsage struct {
+	Sys    time.Duration
+	User   time.Duration
+	MaxRss int64
+}
 
 func Run(cmd *exec.Cmd) error {
 	// TODO context: hook name, hook phase, hook binding
@@ -19,7 +27,7 @@ func Run(cmd *exec.Cmd) error {
 	return cmd.Run()
 }
 
-func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
+func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, error) {
 	// TODO observability
 	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 	stdoutLogEntry := logEntry.WithField("output", "stdout")
@@ -31,17 +39,17 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	//	cmd.Process.Pid
@@ -67,11 +75,20 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) error {
 
 	err = cmd.Wait()
 
-	if err != nil {
-		return err
+	var usage *CmdUsage = nil
+	if cmd.ProcessState != nil {
+		usage = &CmdUsage{
+			Sys:  cmd.ProcessState.SystemTime(),
+			User: cmd.ProcessState.UserTime(),
+		}
+		// FIXME Maxrss is Unix specific.
+		sysUsage := cmd.ProcessState.SysUsage()
+		if v, ok := sysUsage.(*syscall.Rusage); ok {
+			usage.MaxRss = v.Maxrss
+		}
 	}
 
-	return nil
+	return usage, err
 }
 
 func Output(cmd *exec.Cmd) (output []byte, err error) {
