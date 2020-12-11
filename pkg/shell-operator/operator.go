@@ -432,9 +432,9 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 
 	if usage != nil {
 		log.Infof("Usage: %+v", usage)
-		op.MetricStorage.CounterAdd("{PREFIX}hook_run_usage_sys_ms_total", float64(usage.Sys.Milliseconds()), metricLabels)
-		op.MetricStorage.CounterAdd("{PREFIX}hook_run_usage_user_ms_total", float64(usage.User.Milliseconds()), metricLabels)
-		op.MetricStorage.CounterAdd("{PREFIX}hook_run_usage_maxrss_kb_total", float64(usage.MaxRss), metricLabels)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", usage.Sys.Seconds(), metricLabels)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", usage.User.Seconds(), metricLabels)
+		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(usage.MaxRss)*1024, metricLabels)
 	}
 
 	if err == nil {

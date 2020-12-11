@@ -297,8 +297,8 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 		objFilterRes.RemoveFullObject()
 	}
 
-	// Ignore Added or Modified if object is in cache and its checksum is equal to the newChecksum.
-	// Delete is never ignored.
+	// Do not fire Added or Modified if object is in cache and its checksum is equal to the newChecksum.
+	// Delete is always fired.
 	switch eventType {
 	case WatchEventAdded:
 		fallthrough

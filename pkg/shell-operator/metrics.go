@@ -97,6 +97,35 @@ func RegisterHookMetrics(metricStorage *metric_storage.MetricStorage) {
 		},
 	)
 
+	// System CPU usage.
+	metricStorage.RegisterHistogramWithBuckets(
+		"{PREFIX}hook_run_user_cpu_seconds",
+		labels,
+		[]float64{
+			0.0,
+			0.001, 0.002, 0.005, // 1,2,5 milliseconds
+			0.01, 0.02, 0.05, // 10,20,50 milliseconds
+			0.1, 0.2, 0.5, // 100,200,500 milliseconds
+			1, 2, 5, // 1,2,5 seconds
+			10, // 10 seconds
+		},
+	)
+	// User CPU usage.
+	metricStorage.RegisterHistogramWithBuckets(
+		"{PREFIX}hook_run_sys_cpu_seconds",
+		labels,
+		[]float64{
+			0.0,
+			0.001, 0.002, 0.005, // 1,2,5 milliseconds
+			0.01, 0.02, 0.05, // 10,20,50 milliseconds
+			0.1, 0.2, 0.5, // 100,200,500 milliseconds
+			1, 2, 5, // 1,2,5 seconds
+			10, // 10 seconds
+		},
+	)
+	// Max RSS in kilobytes.
+	metricStorage.RegisterGauge("{PREFIX}hook_run_max_rss_bytes", labels)
+
 	metricStorage.RegisterCounter("{PREFIX}hook_run_errors_total", labels)
 	metricStorage.RegisterCounter("{PREFIX}hook_run_allowed_errors_total", labels)
 	metricStorage.RegisterCounter("{PREFIX}hook_run_success_total", labels)
