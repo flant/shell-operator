@@ -30,6 +30,8 @@ spec:
               fieldPath: metadata.namespace
         - name: VALIDATING_WEBHOOK_SERVICE_NAME
           value: {{ .Values.shellOperator.validatingWebhookServiceName | quote }}
+        - name: VALIDATING_WEBHOOK_CLIENT_CA
+          value: /validating-certs/client-ca.pem
         volumeMounts:
         - name: validating-certs
           mountPath: /validating-certs/

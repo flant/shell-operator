@@ -187,6 +187,93 @@ properties:
               "$ref": "#/definitions/nameSelector"
             labelSelector:
               "$ref": "#/definitions/labelSelector"
+  kubernetesValidating:
+    title: ValidatingWebhookConfiguration handlers
+    type: array
+    additionalItems: false
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        group:
+          type: string
+        includeSnapshotsFrom:
+          type: array
+          additionalItems: false
+          minItems: 1
+          items:
+            type: string
+        failurePolicy:
+          type: string
+          enum:
+          - Ignore
+          - Fail
+        sideEffects:
+          type: string
+          enum:
+          - None
+          - NoneOrDryRun
+        timeoutSeconds:
+          type: integer
+          example: 10
+        labelSelector:
+          "$ref": "#/definitions/labelSelector"
+        namespace:
+          type: object
+          additionalProperties: false
+          required:
+          - nameSelector
+          properties:
+            nameSelector:
+              "$ref": "#/definitions/nameSelector"
+        rules:
+          type: array
+          additionalItems: false
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - apiVersions
+              - apiGroups
+              - resources
+              - operations
+            properties:
+              apiVersions:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+              apiGroups:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+              resources:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+              operations:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+                  enum:
+                  - "CREATE"
+                  - "UPDATE"
+                  - "*"
+              scope:
+                type: string
+                enum:
+                - "Cluster"
+                - "Namespaced"
+                - "*"
 `,
 	"v0": `
 type: object

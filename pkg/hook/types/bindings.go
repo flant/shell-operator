@@ -8,9 +8,10 @@ import (
 type BindingType string
 
 const (
-	Schedule          BindingType = "schedule"
-	OnStartup         BindingType = "onStartup"
-	OnKubernetesEvent BindingType = "kubernetes"
+	Schedule             BindingType = "schedule"
+	OnStartup            BindingType = "onStartup"
+	OnKubernetesEvent    BindingType = "kubernetes"
+	KubernetesValidating BindingType = "kubernetesValidating"
 )
 
 // Types for effective binding configs
