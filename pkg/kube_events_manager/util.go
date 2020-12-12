@@ -151,9 +151,9 @@ const ResyncPeriodJitterGranularity = time.Duration(15) * time.Second
 
 // RandomizedResyncPeriod returns a time.Duration between 2 hours and 4 hours with jitter and granularity
 func RandomizedResyncPeriod() time.Duration {
-	spreadCount := ResyncPeriodSpread.Milliseconds() / ResyncPeriodGranularity.Milliseconds()
+	spreadCount := ResyncPeriodSpread.Nanoseconds() / ResyncPeriodGranularity.Nanoseconds()
 	rndSpreadDelta := time.Duration(rand.Int63n(spreadCount)) * ResyncPeriodGranularity
-	jitterCount := ResyncPeriodGranularity.Milliseconds() / ResyncPeriodJitterGranularity.Milliseconds()
+	jitterCount := ResyncPeriodGranularity.Nanoseconds() / ResyncPeriodJitterGranularity.Nanoseconds()
 	rndJitterDelta := time.Duration(rand.Int63n(jitterCount)) * ResyncPeriodJitterGranularity
 
 	return ResyncPeriodMedian - (ResyncPeriodSpread / 2) + rndSpreadDelta + rndJitterDelta
