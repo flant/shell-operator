@@ -222,7 +222,7 @@ func (op *ShellOperator) InitHookManager() (err error) {
 	op.ManagerEventsHandler.WithKubeEventHandler(func(kubeEvent KubeEvent) []task.Task {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
-			"binding":  ContextBindingType[Schedule],
+			"binding":  string(OnKubernetesEvent),
 		}
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 		logEntry.Debugf("Create tasks for 'kubernetes' event '%s'", kubeEvent.String())
@@ -248,7 +248,7 @@ func (op *ShellOperator) InitHookManager() (err error) {
 	op.ManagerEventsHandler.WithScheduleEventHandler(func(crontab string) []task.Task {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
-			"binding":  ContextBindingType[Schedule],
+			"binding":  string(Schedule),
 		}
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 		logEntry.Debugf("Create tasks for 'schedule' event '%s'", crontab)
