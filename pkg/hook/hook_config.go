@@ -409,7 +409,7 @@ func MergeArrays(a1 []string, a2 []string) []string {
 func (c *HookConfig) Bindings() []BindingType {
 	res := []BindingType{}
 
-	for binding := range ContextBindingType {
+	for _, binding := range []BindingType{OnStartup, Schedule, OnKubernetesEvent} {
 		if c.HasBinding(binding) {
 			res = append(res, binding)
 		}

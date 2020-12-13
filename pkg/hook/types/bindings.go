@@ -13,12 +13,6 @@ const (
 	OnKubernetesEvent BindingType = "kubernetes"
 )
 
-var ContextBindingType = map[BindingType]string{
-	Schedule:          "schedule",
-	OnStartup:         "onStartup",
-	OnKubernetesEvent: "kubernetes",
-}
-
 // Types for effective binding configs
 type CommonBindingConfig struct {
 	BindingName  string
