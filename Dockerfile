@@ -29,7 +29,7 @@ RUN apk --no-cache add ca-certificates bash sed tini && \
     wget https://storage.googleapis.com/kubernetes-release/release/v1.19.4/bin/${TARGETPLATFORM:-linux/amd64}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
-ADD frameworks /
+ADD frameworks/shell /frameworks/shell
 ADD shell_lib.sh /
 COPY --from=libjq /bin/jq /usr/bin
 COPY --from=builder /app/shell-operator /

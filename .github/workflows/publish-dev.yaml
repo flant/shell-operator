@@ -61,7 +61,7 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # master-371e2d3b9467fb9b72b515fb5e30d39964519601-2020.02.06_18:37:42
+          # dev-feat_branch-371e2d3b-2020.02.06_18:37:42
           APP_VERSION=dev-$GITHUB_HEAD_REF-${HEAD_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
 
           # This step is close to release-build.yaml to emulate release build.
