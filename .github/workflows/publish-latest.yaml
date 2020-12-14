@@ -23,7 +23,7 @@ jobs:
       - name: Prepare environment
         run: |
           : Setup imageTag, appVersion and dockerFile envs and build image
-          APP_VERSION=$GITHUB_HEAD_REF-${GITHUB_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
+          APP_VERSION=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
           FINAL_IMAGE_NAME="${IMAGE_REPO}:latest"
 
           echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
