@@ -1,4 +1,4 @@
-name: Publish release image
+name: Publish latest image
 on: workflow_dispatch
 env:
   GO111MODULE: on
