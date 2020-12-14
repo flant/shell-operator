@@ -45,7 +45,7 @@ type TaskResult struct {
 }
 
 type TaskQueue struct {
-	m             sync.Mutex
+	m             sync.RWMutex
 	metricStorage *metric_storage.MetricStorage
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -66,7 +66,7 @@ type TaskQueue struct {
 
 func NewTasksQueue() *TaskQueue {
 	return &TaskQueue{
-		m:             sync.Mutex{},
+		m:             sync.RWMutex{},
 		items:         make([]task.Task, 0),
 		HeadLock:      sync.Mutex{},
 		addHandler:    func(_ task.Task) {},
@@ -118,8 +118,8 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 
 func (q *TaskQueue) IsEmpty() bool {
 	defer q.MeasureActionTime("IsEmpty")()
-	q.m.Lock()
-	defer q.m.Unlock()
+	q.m.RLock()
+	defer q.m.RUnlock()
 	return q.isEmpty()
 }
 
@@ -129,8 +129,8 @@ func (q *TaskQueue) isEmpty() bool {
 
 func (q *TaskQueue) Length() int {
 	defer q.MeasureActionTime("Length")()
-	q.m.Lock()
-	defer q.m.Unlock()
+	q.m.RLock()
+	defer q.m.RUnlock()
 	return len(q.items)
 }
 
@@ -161,8 +161,8 @@ func (q *TaskQueue) RemoveFirst() (t task.Task) {
 // GetFirst returns a head element.
 func (q *TaskQueue) GetFirst() task.Task {
 	defer q.MeasureActionTime("GetFirst")()
-	q.m.Lock()
-	defer q.m.Unlock()
+	q.m.RLock()
+	defer q.m.RUnlock()
 	if q.isEmpty() {
 		return nil
 	}
@@ -200,8 +200,8 @@ func (q *TaskQueue) RemoveLast() (t task.Task) {
 // GetLast returns a tail element.
 func (q *TaskQueue) GetLast() task.Task {
 	defer q.MeasureActionTime("GetLast")()
-	q.m.Lock()
-	defer q.m.Unlock()
+	q.m.RLock()
+	defer q.m.RUnlock()
 	if q.isEmpty() {
 		return nil
 	}
@@ -211,8 +211,8 @@ func (q *TaskQueue) GetLast() task.Task {
 // Get returns a task by id.
 func (q *TaskQueue) Get(id string) task.Task {
 	defer q.MeasureActionTime("Get")()
-	q.m.Lock()
-	defer q.m.Unlock()
+	q.m.RLock()
+	defer q.m.RUnlock()
 	for _, t := range q.items {
 		if t.GetId() == id {
 			return t
@@ -460,8 +460,8 @@ func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 
 	defer q.MeasureActionTime("Iterate")()
 
-	q.m.Lock()
-	defer q.m.Unlock()
+	q.m.RLock()
+	defer q.m.RUnlock()
 	for _, t := range q.items {
 		doFn(t)
 	}
