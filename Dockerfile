@@ -26,7 +26,8 @@ RUN CGO_ENABLED=1 \
 # Final image
 FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.12
 RUN apk --no-cache add ca-certificates bash sed tini && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.4/bin/${TARGETPLATFORM:-linux/amd64}/kubectl -O /bin/kubectl && \
+    kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
+    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.4/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 ADD frameworks/shell /frameworks/shell
