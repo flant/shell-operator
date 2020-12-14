@@ -84,7 +84,8 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 		// FIXME Maxrss is Unix specific.
 		sysUsage := cmd.ProcessState.SysUsage()
 		if v, ok := sysUsage.(*syscall.Rusage); ok {
-			usage.MaxRss = v.Maxrss
+			// v.Maxrss is int32 on arm/v7
+			usage.MaxRss = int64(v.Maxrss)
 		}
 	}
 
