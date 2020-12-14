@@ -112,4 +112,3 @@ jobs:
               --platform $BUILDX_PLATFORMS \
               --build-arg appVersion=$APP_VERSION \
               --tag $FINAL_IMAGE_NAME .
-

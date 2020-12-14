@@ -54,7 +54,6 @@ jobs:
         run: |
           echo "Build $FINAL_IMAGE_NAME with version '$APP_VERSION'"
           docker buildx build --push \
-              --platform $PLATFORMS \
+              --platform $BUILDX_PLATFORMS \
               --build-arg appVersion=$APP_VERSION \
               --tag $FINAL_IMAGE_NAME .
-
