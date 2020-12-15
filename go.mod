@@ -25,7 +25,7 @@ require (
 	k8s.io/client-go v0.17.0
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/kind v0.7.0
-	sigs.k8s.io/yaml v1.1.1-0.20191128155103-745ef44e09d6 // branch master, with fixes in yaml.v2.2.7
+	sigs.k8s.io/yaml v1.2.0
 )
 
 // replace github.com/go-openapi/validate => ../go-openapi-validate
