@@ -64,7 +64,7 @@ func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(respBytes)
+	_, _ = w.Write(respBytes)
 }
 
 func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.AdmissionReview, error) {
