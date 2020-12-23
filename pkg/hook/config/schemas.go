@@ -217,7 +217,7 @@ properties:
           type: string
           enum:
           - None
-          - NoneOrDryRun
+          - NoneOnDryRun
         timeoutSeconds:
           type: integer
           example: 10
@@ -227,10 +227,10 @@ properties:
           type: object
           additionalProperties: false
           required:
-          - nameSelector
+          - labelSelector
           properties:
-            nameSelector:
-              "$ref": "#/definitions/nameSelector"
+            labelSelector:
+              "$ref": "#/definitions/labelSelector"
         rules:
           type: array
           additionalItems: false

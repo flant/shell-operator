@@ -6,9 +6,11 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"gopkg.in/robfig/cron.v2"
 	uuid "gopkg.in/satori/go.uuid.v1"
+	"sigs.k8s.io/yaml"
+
+	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/yaml"
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -16,6 +18,8 @@ import (
 
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/validating_webhook"
+	"github.com/flant/shell-operator/pkg/validating_webhook/validation"
 )
 
 // HookConfig is a structure with versioned hook configuration
@@ -31,7 +35,7 @@ type HookConfig struct {
 	OnStartup            *OnStartupConfig
 	Schedules            []ScheduleConfig
 	OnKubernetesEvents   []OnKubernetesEventConfig
-	KubernetesValidating []KubernetesValidatingConfig
+	KubernetesValidating []ValidatingConfig
 }
 
 type HookConfigV0 struct {
@@ -113,22 +117,15 @@ type KubeNamespaceSelectorV1 NamespaceSelector
 
 // version 1 of kubernetes event configuration
 type KubernetesValidatingConfigV1 struct {
-	Name                 string   `json:"name,omitempty"`
-	IncludeSnapshotsFrom []string `json:"includeSnapshotsFrom,omitempty"`
-	Group                string   `json:"group,omitempty"`
-	//WatchEventTypes              []WatchEventType         `json:"watchEvent,omitempty"`
-	//ExecuteHookOnEvents          []WatchEventType         `json:"executeHookOnEvent,omitempty"`
-	//ExecuteHookOnSynchronization string                   `json:"executeHookOnSynchronization,omitempty"`
-	//WaitForSynchronization       string                   `json:"waitForSynchronization,omitempty"`
-	//KeepFullObjectsInMemory      string                   `json:"keepFullObjectsInMemory,omitempty"`
-	//Mode                         KubeEventMode            `json:"mode,omitempty"`
-	//ApiVersion                   string                   `json:"apiVersion,omitempty"`
-	//Kind                         string                   `json:"kind,omitempty"`
-	//NameSelector                 *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
-	//LabelSelector                *metav1.LabelSelector    `json:"labelSelector,omitempty"`
-	//FieldSelector                *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
-	//Namespace                    *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
-	//JqFilter                     string                   `json:"jqFilter,omitempty"`
+	Name                 string                   `json:"name,omitempty"`
+	IncludeSnapshotsFrom []string                 `json:"includeSnapshotsFrom,omitempty"`
+	Group                string                   `json:"group,omitempty"`
+	Rules                []v1.RuleWithOperations  `json:"rules,omitempty"`
+	FailurePolicy        *v1.FailurePolicyType    `json:"failurePolicy"`
+	LabelSelector        *metav1.LabelSelector    `json:"labelSelector,omitempty"`
+	Namespace            *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
+	SideEffects          *v1.SideEffectClass      `json:"sideEffects"`
+	TimeoutSeconds       *int32                   `json:"timeoutSeconds,omitempty"`
 }
 
 // LoadAndValidate loads config from bytes and validate it. Returns multierror.
@@ -376,6 +373,30 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		c.Schedules = append(c.Schedules, schedule)
 	}
 
+	c.KubernetesValidating = []ValidatingConfig{}
+	for i, rawValidating := range c.V1.KubernetesValidating {
+		err := c.CheckValidatingV1(rawValidating)
+		if err != nil {
+			return fmt.Errorf("invalid kubernetesValidating config [%d]: %v", i, err)
+		}
+		validating, err := c.ConvertValidatingV1(rawValidating)
+		if err != nil {
+			return err
+		}
+		c.KubernetesValidating = append(c.KubernetesValidating, validating)
+	}
+	// Validate webhooks
+	webhooks := []v1.ValidatingWebhook{}
+	for _, cfg := range c.KubernetesValidating {
+		webhooks = append(webhooks, *cfg.Webhook.ValidatingWebhook)
+	}
+	err = validation.ValidateValidatingWebhooks(&v1.ValidatingWebhookConfiguration{
+		Webhooks: webhooks,
+	})
+	if err != nil {
+		return err
+	}
+
 	// Update IncludeSnapshotsFrom for every binding with a group.
 	// Merge binding's IncludeSnapshotsFrom with snapshots list calculated for group.
 	var groupSnapshots = make(map[string][]string)
@@ -404,6 +425,14 @@ func (c *HookConfig) ConvertAndCheckV1() (err error) {
 		newSchedules = append(newSchedules, cfg)
 	}
 	c.Schedules = newSchedules
+	newValidating := make([]ValidatingConfig, 0)
+	for _, cfg := range c.KubernetesValidating {
+		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
+			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
+		}
+		newValidating = append(newValidating, cfg)
+	}
+	c.KubernetesValidating = newValidating
 
 	return nil
 }
@@ -431,7 +460,7 @@ func MergeArrays(a1 []string, a2 []string) []string {
 func (c *HookConfig) Bindings() []BindingType {
 	res := []BindingType{}
 
-	for _, binding := range []BindingType{OnStartup, Schedule, OnKubernetesEvent} {
+	for _, binding := range []BindingType{OnStartup, Schedule, OnKubernetesEvent, KubernetesValidating} {
 		if c.HasBinding(binding) {
 			res = append(res, binding)
 		}
@@ -448,6 +477,8 @@ func (c *HookConfig) HasBinding(binding BindingType) bool {
 		return len(c.Schedules) > 0
 	case OnKubernetesEvent:
 		return len(c.OnKubernetesEvents) > 0
+	case KubernetesValidating:
+		return len(c.KubernetesValidating) > 0
 	}
 	return false
 }
@@ -572,6 +603,79 @@ func (c *HookConfig) CheckOnKubernetesEventV1(kubeCfg OnKubernetesEventConfigV1,
 	}
 
 	return allErr
+}
+
+func (c *HookConfig) CheckValidatingV1(cfgV1 KubernetesValidatingConfigV1) (allErr error) {
+	var err error
+
+	if len(cfgV1.IncludeSnapshotsFrom) > 0 {
+		err = c.CheckIncludeSnapshots(cfgV1.IncludeSnapshotsFrom...)
+		if err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("includeSnapshotsFrom is invalid: %v", err))
+		}
+	}
+
+	if cfgV1.LabelSelector != nil {
+		_, err := kube_events_manager.FormatLabelSelector(cfgV1.LabelSelector)
+		if err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %v", err))
+		}
+	}
+
+	if cfgV1.Namespace != nil && cfgV1.Namespace.LabelSelector != nil {
+		_, err := kube_events_manager.FormatLabelSelector(cfgV1.Namespace.LabelSelector)
+		if err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("namespace.labelSelector is invalid: %v", err))
+		}
+	}
+
+	return allErr
+}
+
+func (c *HookConfig) ConvertValidatingV1(cfgV1 KubernetesValidatingConfigV1) (ValidatingConfig, error) {
+	cfg := ValidatingConfig{}
+
+	cfg.Group = cfgV1.Group
+	cfg.IncludeSnapshotsFrom = cfgV1.IncludeSnapshotsFrom
+	cfg.BindingName = cfgV1.Name
+
+	DefaultFailurePolicy := v1.Fail
+	DefaultSideEffects := v1.SideEffectClassNone
+	DefaultTimeoutSeconds := int32(10)
+
+	webhook := &v1.ValidatingWebhook{
+		Name:  cfgV1.Name,
+		Rules: cfgV1.Rules,
+	}
+	if cfgV1.Namespace != nil {
+		webhook.NamespaceSelector = cfgV1.Namespace.LabelSelector
+	}
+	if cfgV1.LabelSelector != nil {
+		webhook.ObjectSelector = cfgV1.LabelSelector
+	}
+	if cfgV1.FailurePolicy != nil {
+		webhook.FailurePolicy = cfgV1.FailurePolicy
+	} else {
+		webhook.FailurePolicy = &DefaultFailurePolicy
+	}
+	if cfgV1.SideEffects != nil {
+		webhook.SideEffects = cfgV1.SideEffects
+	} else {
+		webhook.SideEffects = &DefaultSideEffects
+	}
+	if cfgV1.TimeoutSeconds != nil {
+		webhook.TimeoutSeconds = cfgV1.TimeoutSeconds
+	} else {
+		webhook.TimeoutSeconds = &DefaultTimeoutSeconds
+	}
+
+	cfg.Webhook = &validating_webhook.ValidatingWebhookConfig{
+		ValidatingWebhook: webhook,
+	}
+	cfg.Webhook.Metadata.LogLabels = map[string]string{}
+	cfg.Webhook.Metadata.MetricLabels = map[string]string{}
+
+	return cfg, nil
 }
 
 // CheckIncludeSnapshots check if all includes has corresponding kubernetes

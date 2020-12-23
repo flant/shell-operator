@@ -1,8 +1,10 @@
 package types
 
 import (
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+
+	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/validating_webhook"
 )
 
 type BindingType string
@@ -44,8 +46,10 @@ type OnKubernetesEventConfig struct {
 	KeepFullObjectsInMemory      bool
 }
 
-type KubernetesValidatingConfig struct {
+type ValidatingConfig struct {
 	CommonBindingConfig
+
+	Webhook *validating_webhook.ValidatingWebhookConfig
 
 	IncludeSnapshotsFrom []string
 	Group                string

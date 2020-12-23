@@ -13,18 +13,22 @@ import (
 // logger backed on logrus. It is adapted from https://github.com/go-chi/chi
 // 'logging' example.
 
-func NewStructuredLogger(logger *logrus.Logger) func(next http.Handler) http.Handler {
-	return middleware.RequestLogger(&StructuredLogger{logger})
+func NewStructuredLogger(logger *logrus.Logger, componentLabel string) func(next http.Handler) http.Handler {
+	return middleware.RequestLogger(&StructuredLogger{
+		logger,
+		componentLabel,
+	})
 }
 
 type StructuredLogger struct {
-	Logger *logrus.Logger
+	Logger         *logrus.Logger
+	ComponentLabel string
 }
 
 func (l *StructuredLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 	entry := &StructuredLoggerEntry{Logger: logrus.NewEntry(l.Logger)}
 	logFields := logrus.Fields{}
-	logFields["operator.component"] = "debugEndpoint"
+	logFields["operator.component"] = l.ComponentLabel
 	logFields["http_method"] = r.Method
 	logFields["uri"] = r.RequestURI
 

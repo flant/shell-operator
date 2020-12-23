@@ -1,0 +1,59 @@
+package types
+
+import "testing"
+
+func Test_ValidatingResponseFromFile_Allowed(t *testing.T) {
+	r, err := ValidatingResponseFromFile("testdata/response/good_allow.json")
+
+	if err != nil {
+		t.Fatalf("ValidatingResponse should be loaded from file: %v", err)
+	}
+
+	if r == nil {
+		t.Fatalf("ValidatingResponse should not be nil")
+	}
+
+	if !r.Allowed {
+		t.Fatalf("ValidatingResponse should have allowed=true: %#v", r)
+	}
+}
+
+func Test_ValidatingResponseFromFile_NotAllowed_WithMessage(t *testing.T) {
+	r, err := ValidatingResponseFromFile("testdata/response/good_deny.json")
+
+	if err != nil {
+		t.Fatalf("ValidatingResponse should be loaded from file: %v", err)
+	}
+
+	if r == nil {
+		t.Fatalf("ValidatingResponse should not be nil")
+	}
+
+	if r.Allowed {
+		t.Fatalf("ValidatingResponse should have allowed=false: %#v", r)
+	}
+
+	if r.Message == "" {
+		t.Fatalf("ValidatingResponse should have message: %#v", r)
+	}
+}
+
+func Test_ValidatingResponseFromFile_NotAllowed_WithoutMessage(t *testing.T) {
+	r, err := ValidatingResponseFromFile("testdata/response/good_deny_quiet.json")
+
+	if err != nil {
+		t.Fatalf("ValidatingResponse should be loaded from file: %v", err)
+	}
+
+	if r == nil {
+		t.Fatalf("ValidatingResponse should not be nil")
+	}
+
+	if r.Allowed {
+		t.Fatalf("ValidatingResponse should have allowed=false: %#v", r)
+	}
+
+	if r.Message != "" {
+		t.Fatalf("ValidatingResponse should have no message: %#v", r)
+	}
+}

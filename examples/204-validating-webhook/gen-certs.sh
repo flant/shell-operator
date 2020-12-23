@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+NAMESPACE=example-204
+SERVICE_NAME=example-204-validating-service
+
+CERT_NAME=${SERVICE_NAME}.${NAMESPACE}
+
 set -eo pipefail
 
 echo =================================================================
@@ -11,7 +16,7 @@ mkdir -p validating-certs
 
 cd validating-certs
 
-if [[ -e .generated  ]] ; then
+if [[ -e server-key.pem  ]] ; then
   read -p "Regenerate certificates? (yes/no) [no]: "
   if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]
   then
@@ -19,15 +24,27 @@ if [[ -e .generated  ]] ; then
   fi
 fi
 
+echo ">>> Remove server.crt server.csr server-key.pem cluster-ca.pem"
 rm -f server.crt server.csr server-key.pem cluster-ca.pem
-
 
 # generate server-key.pem server.csr
 echo ">>> Generate server-key.pem"
-cat ../csr.json| cfssl genkey - | cfssljson -bare server
+cat <<EOF | cfssl genkey - | cfssljson -bare server
+{
+  "hosts": [
+    "${CERT_NAME}.svc",
+    "${CERT_NAME}.svc.cluster.local"
+  ],
+  "CN": "${CERT_NAME}.svc",
+  "key": {
+    "algo": "ecdsa",
+    "size": 256
+  }
+}
+EOF
 
-echo ">>> Delete CertificateSigningRequest"
-(kubectl delete certificatesigningrequest/shell-operator-validating-service.shell-test || true )
+echo ">>> Delete previous CertificateSigningRequest"
+(kubectl delete certificatesigningrequest/${CERT_NAME} || true )
 
 
 echo ">>> Create CertificateSigningRequest"
@@ -38,7 +55,9 @@ cat <<EOF | kubectl apply -f -
 apiVersion: certificates.k8s.io/v1beta1
 kind: CertificateSigningRequest
 metadata:
-  name: shell-operator-validating-service.shell-test
+  name: ${CERT_NAME}
+  labels:
+    heritage: example-204
 spec:
   request: $(cat server.csr | base64 | tr -d '\n')
   usages:
@@ -47,16 +66,13 @@ spec:
   - server auth
 EOF
 
-# certificatesigningrequest.certificates.k8s.io/shell-operator-validating-service.shell-test created
+kubectl certificate approve $CERT_NAME
 
-kubectl certificate approve shell-operator-validating-service.shell-test
+echo ">>> Retrieve server.crt"
+kubectl get certificatesigningrequest $CERT_NAME -o jsonpath='{.status.certificate}' | base64 -d > server.crt
 
-kubectl get certificatesigningrequest
+echo ">>> Delete CertificateSigningRequest"
+(kubectl delete certificatesigningrequest/${CERT_NAME} || true )
 
-echo ">>> Retrieve server.crt from cluster"
-kubectl get certificatesigningrequest shell-operator-validating-service.shell-test -o jsonpath='{.status.certificate}' | base64 -d > server.crt
-
-echo ">>> Retrieve cluster-ca.pem from cluster"
-kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' > cluster-ca.pem
-
-touch .generated
+echo ">>> Retrieve cluster-ca.pem"
+kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d > cluster-ca.pem

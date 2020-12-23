@@ -4,9 +4,11 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	. "github.com/flant/shell-operator/pkg/validating_webhook/types"
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
+	"github.com/flant/shell-operator/pkg/validating_webhook"
 )
 
 type BindingExecutionInfo struct {
@@ -34,24 +36,26 @@ type BindingExecutionInfo struct {
 type HookController interface {
 	InitKubernetesBindings([]OnKubernetesEventConfig, kube_events_manager.KubeEventsManager)
 	InitScheduleBindings([]ScheduleConfig, schedule_manager.ScheduleManager)
+	InitValidatingBindings([]ValidatingConfig, *validating_webhook.WebhookManager)
 
 	CanHandleKubeEvent(kubeEvent KubeEvent) bool
 	CanHandleScheduleEvent(crontab string) bool
+	CanHandleValidatingEvent(event ValidatingEvent) bool
 
 	// These method should call underlying BindingController to get binding context
 	// and then add Snapshots to binding context
 	HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error
 	HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo))
-
-	//WithKubernetesBindingsControllers([]*KubernetesBindingsController)
-	//WithScheduleBindingsControllers([]*ScheduleBindingsController)
+	HandleValidatingEvent(event ValidatingEvent, createTasksFn func(BindingExecutionInfo))
 
 	StartMonitors()
 	StopMonitors()
 
 	EnableScheduleBindings()
 	DisableScheduleBindings()
+
+	EnableValidatingBindings()
 
 	KubernetesSnapshots() map[string][]ObjectAndFilterResult
 	UpdateSnapshots([]BindingContext) []BindingContext
@@ -66,8 +70,10 @@ func NewHookController() HookController {
 type hookController struct {
 	KubernetesController KubernetesBindingsController
 	ScheduleController   ScheduleBindingsController
+	ValidatingController ValidatingBindingsController
 	kubernetesBindings   []OnKubernetesEventConfig
 	scheduleBindings     []ScheduleConfig
+	validatingBindings   []ValidatingConfig
 }
 
 func (hc *hookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager) {
@@ -94,6 +100,18 @@ func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, schedu
 	hc.scheduleBindings = bindings
 }
 
+func (hc *hookController) InitValidatingBindings(bindings []ValidatingConfig, webhookMgr *validating_webhook.WebhookManager) {
+	if len(bindings) == 0 {
+		return
+	}
+
+	bindingCtrl := NewValidatingBindingsController()
+	bindingCtrl.WithWebhookManager(webhookMgr)
+	bindingCtrl.WithValidatingBindings(bindings)
+	hc.ValidatingController = bindingCtrl
+	hc.validatingBindings = bindings
+}
+
 func (hc *hookController) CanHandleKubeEvent(kubeEvent KubeEvent) bool {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.CanHandleEvent(kubeEvent)
@@ -104,6 +122,13 @@ func (hc *hookController) CanHandleKubeEvent(kubeEvent KubeEvent) bool {
 func (hc *hookController) CanHandleScheduleEvent(crontab string) bool {
 	if hc.ScheduleController != nil {
 		return hc.ScheduleController.CanHandleEvent(crontab)
+	}
+	return false
+}
+
+func (hc *hookController) CanHandleValidatingEvent(event ValidatingEvent) bool {
+	if hc.ValidatingController != nil {
+		return hc.ValidatingController.CanHandleEvent(event)
 	}
 	return false
 }
@@ -129,12 +154,18 @@ func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 	if hc.KubernetesController != nil {
 		execInfo := hc.KubernetesController.HandleEvent(event)
 		if createTasksFn != nil {
-			// Inject IncludeSnapshots to BindingContext
-			if len(execInfo.BindingContext) > 0 && len(execInfo.IncludeSnapshots) > 0 {
-				execInfo.BindingContext[0].Snapshots = hc.KubernetesController.SnapshotsFrom(execInfo.IncludeSnapshots...)
-			}
 			createTasksFn(execInfo)
 		}
+	}
+}
+
+func (hc *hookController) HandleValidatingEvent(event ValidatingEvent, createTasksFn func(BindingExecutionInfo)) {
+	if hc.ValidatingController == nil {
+		return
+	}
+	execInfo := hc.ValidatingController.HandleEvent(event)
+	if createTasksFn != nil {
+		createTasksFn(execInfo)
 	}
 }
 
@@ -147,12 +178,6 @@ func (hc *hookController) HandleScheduleEvent(crontab string, createTasksFn func
 		return
 	}
 	for _, info := range infos {
-		// Inject IncludeSnapshots to BindingContext
-		if hc.KubernetesController != nil && len(info.BindingContext) > 0 && len(info.IncludeSnapshots) > 0 {
-			newBc := info.BindingContext[0]
-			newBc.Snapshots = hc.KubernetesController.SnapshotsFrom(info.IncludeSnapshots...)
-			info.BindingContext[0] = newBc
-		}
 		createTasksFn(info)
 	}
 }
@@ -181,6 +206,12 @@ func (hc *hookController) DisableScheduleBindings() {
 	}
 }
 
+func (hc *hookController) EnableValidatingBindings() {
+	if hc.ValidatingController != nil {
+		hc.ValidatingController.EnableValidatingBindings()
+	}
+}
+
 // KubernetesSnapshots returns all exited objects for all registered kubernetes bindings.
 func (hc *hookController) KubernetesSnapshots() map[string][]ObjectAndFilterResult {
 	if hc.KubernetesController != nil {
@@ -203,6 +234,13 @@ func (hc *hookController) KubernetesSnapshotsFor(bindingType BindingType, bindin
 		}
 	case Schedule:
 		for _, binding := range hc.scheduleBindings {
+			if bindingName == binding.BindingName {
+				includeSnapshots = binding.IncludeSnapshotsFrom
+				break
+			}
+		}
+	case KubernetesValidating:
+		for _, binding := range hc.validatingBindings {
 			if bindingName == binding.BindingName {
 				includeSnapshots = binding.IncludeSnapshotsFrom
 				break

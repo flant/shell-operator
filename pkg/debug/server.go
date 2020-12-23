@@ -67,7 +67,7 @@ func (s *Server) Init() (err error) {
 	log.Infof("Debug endpoint listen on %s", address)
 
 	s.Router = chi.NewRouter()
-	s.Router.Use(structured_logger.NewStructuredLogger(log.StandardLogger()))
+	s.Router.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "debugEndpoint"))
 	s.Router.Use(middleware.Recoverer)
 
 	go func() {

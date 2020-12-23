@@ -1,0 +1,66 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-204-acc
+  labels:
+    heritage: example-204
+---
+# Create and update ValidatingWebhookConfiguration
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: example-204
+  labels:
+    heritage: example-204
+rules:
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["validatingwebhookconfigurations"]
+  verbs: ["create", "list", "update"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: example-204
+  labels:
+    heritage: example-204
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: example-204
+subjects:
+  - kind: ServiceAccount
+    name: example-204-acc
+    namespace: {{ .Release.Namespace }}
+
+#
+#
+#---
+## List and Watch CronTab
+#apiVersion: rbac.authorization.k8s.io/v1beta1
+#kind: Role
+#metadata:
+#  name: shell-operator-validating
+#  namespace: {{ .Release.Namespace }}
+#rules:
+#- apiGroups: ["stable.example.com"]
+#  resources: ["crontabs"]
+#  verbs: ["watch", "list"]
+##- apiGroups: ["*"]
+##  resources: ["*"]
+##  verbs: ["*"]
+#
+#---
+#apiVersion: rbac.authorization.k8s.io/v1beta1
+#kind: RoleBinding
+#metadata:
+#  name: shell-operator-validating
+#  namespace: {{ .Release.Namespace }}
+#roleRef:
+#  apiGroup: rbac.authorization.k8s.io
+#  kind: Role
+#  name: shell-operator-validating
+#subjects:
+#  - kind: ServiceAccount
+#    name: shell-operator-validating-acc

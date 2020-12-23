@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/go-multierror"
 	. "github.com/onsi/gomega"
+
+	"github.com/hashicorp/go-multierror"
+	v1 "k8s.io/api/admissionregistration/v1"
 )
 
 func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
@@ -494,6 +496,142 @@ schedule:
 			func() {
 				g.Expect(err).Should(HaveOccurred())
 				g.Expect(err.Error()).Should(ContainSubstring("executeHookOnSynchronization"))
+			},
+		},
+		{
+			"v1 kubernetesValidating",
+			`
+configVersion: v1
+kubernetes:
+- name: pods
+  kind: pods
+  group: main
+kubernetesValidating:
+- name: default.example.com
+  rules:
+  - apiVersions:
+    - v1
+    apiGroups:
+    - crd-domain.io
+    resources:
+    - MyCustomResource
+    operations:
+    - "*"
+- name: snapshots.example.com
+  group: main
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["apps"]
+    apiVersions: ["v1", "v1beta1"]
+    resources: ["deployments", "replicasets"]
+    scope: "Namespaced"  
+- name: full.example.com
+  includeSnapshotsFrom: ["pods"]
+  rules:
+  - apiVersions:
+    - v1
+    apiGroups:
+    - crd-domain.io
+    resources:
+    - MyCustomResource
+    operations:
+    - "*"
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["apps"]
+    apiVersions: ["v1", "v1beta1"]
+    resources: ["deployments", "replicasets"]
+    scope: "Namespaced"
+  failurePolicy: Ignore
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: 30
+  namespace:
+    labelSelector:
+      matchLabels:
+        foo: bar
+  labelSelector:
+    matchLabels:
+      baz: bar
+`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				// Version
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+
+				// Sections
+				g.Expect(hookConfig.OnStartup).To(BeNil())
+				g.Expect(hookConfig.OnKubernetesEvents).Should(HaveLen(1))
+				g.Expect(hookConfig.KubernetesValidating).Should(HaveLen(3))
+
+				// Section with default values
+				cfg := hookConfig.KubernetesValidating[0]
+				g.Expect(cfg.BindingName).To(Equal("default.example.com"))
+				g.Expect(cfg.Webhook).ShouldNot(BeNil())
+				wh := cfg.Webhook
+				g.Expect(wh.NamespaceSelector).Should(BeNil())
+				g.Expect(wh.ObjectSelector).Should(BeNil())
+				g.Expect(wh.FailurePolicy).ShouldNot(BeNil())
+				g.Expect(*wh.FailurePolicy).To(Equal(v1.Fail))
+				g.Expect(wh.SideEffects).ShouldNot(BeNil())
+				g.Expect(*wh.SideEffects).To(Equal(v1.SideEffectClassNone))
+				g.Expect(wh.TimeoutSeconds).ShouldNot(BeNil())
+				g.Expect(*wh.TimeoutSeconds).To(BeEquivalentTo(10))
+
+				// Section with group should have updated IncludeSnapshotsFrom!
+				cfg = hookConfig.KubernetesValidating[1]
+				g.Expect(cfg.BindingName).To(Equal("snapshots.example.com"))
+				g.Expect(cfg.Group).To(Equal("main"))
+				g.Expect(cfg.IncludeSnapshotsFrom).To(BeEquivalentTo([]string{"pods"}))
+
+				// Section with custom values
+				cfg = hookConfig.KubernetesValidating[2]
+				g.Expect(cfg.BindingName).To(Equal("full.example.com"))
+				g.Expect(cfg.Webhook).ShouldNot(BeNil())
+				wh = cfg.Webhook
+				g.Expect(wh.NamespaceSelector).ShouldNot(BeNil())
+				g.Expect(wh.ObjectSelector).ShouldNot(BeNil())
+				g.Expect(wh.FailurePolicy).ShouldNot(BeNil())
+				g.Expect(*wh.FailurePolicy).To(Equal(v1.Ignore))
+				g.Expect(wh.SideEffects).ShouldNot(BeNil())
+				g.Expect(*wh.SideEffects).To(Equal(v1.SideEffectClassNoneOnDryRun))
+				g.Expect(wh.TimeoutSeconds).ShouldNot(BeNil())
+				g.Expect(*wh.TimeoutSeconds).To(BeEquivalentTo(30))
+
+			},
+		},
+		{
+			"v1 kubernetesValidating name error",
+			`
+configVersion: v1
+kubernetesValidating:
+- name: snapshots
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["apps"]
+    apiVersions: ["v1", "v1beta1"]
+    resources: ["deployments", "replicasets"]
+`,
+			func() {
+				g.Expect(err).Should(HaveOccurred())
+			},
+		},
+		{
+			"v1 kubernetesValidating timeoutSeconds out of range",
+			`
+configVersion: v1
+kubernetesValidating:
+- name: snapshots.example.com
+  rules:
+  - operations: ["*"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+  timeoutSeconds: 32
+`,
+			func() {
+				g.Expect(err).Should(HaveOccurred())
 			},
 		},
 	}

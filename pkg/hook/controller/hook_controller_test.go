@@ -2,6 +2,6 @@ package controller
 
 import "testing"
 
-func Test_UpdateSnapshots(t *testing.T) {
+func Test_KubernetesValidating(t *testing.T) {
 
 }

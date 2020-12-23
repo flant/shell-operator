@@ -1,4 +1,4 @@
 apiVersion: v1
-name: 203-validating-webhook
+name: 204-validating-webhook
 version: 1.0.0
-description: Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster
+description: Shell-operator validating hook example
