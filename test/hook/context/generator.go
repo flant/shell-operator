@@ -129,7 +129,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 
 	bindingContexts := make([]BindingContext, 0)
 	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
-		bindingContexts = append(bindingContexts, b.HookCtrl.UpdateSnapshots(info.BindingContext)...)
+		bindingContexts = append(bindingContexts, info.BindingContext...)
 	})
 	if err != nil {
 		return GeneratedBindingContexts{}, fmt.Errorf("couldn't enable kubernetes bindings: %v", err)
@@ -138,6 +138,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	b.HookCtrl.StartMonitors()
 
 	<-time.After(time.Millisecond) // tick to trigger informers
+	bindingContexts = b.HookCtrl.UpdateSnapshots(bindingContexts)
 	return convertBindingContexts(bindingContexts)
 }
 
@@ -165,6 +166,7 @@ func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBin
 			}
 		}
 	}
+	bindingContexts = b.HookCtrl.UpdateSnapshots(bindingContexts)
 	return convertBindingContexts(bindingContexts)
 }
 

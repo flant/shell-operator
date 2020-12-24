@@ -64,7 +64,8 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		}
 	}
 
-	if bc.Metadata.Group != "" {
+	// KubernetesValidating uses 'group' only for snapshots.
+	if bc.Metadata.Group != "" && bc.Metadata.BindingType != KubernetesValidating {
 		res["binding"] = bc.Metadata.Group
 		res["type"] = "Group"
 		return res
