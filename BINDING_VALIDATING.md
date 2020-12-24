@@ -1,6 +1,6 @@
 # kubernetesValidating
 
-This binding transforms a hook into a handler for ValidatingWebhookConfiguration. The Shell-operator creates ValidatingWebhookConfiguration, starts HTTPS server and use hooks to handle [AdmissionReview requests](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#request).
+This binding transforms a hook into a handler for ValidatingWebhookConfiguration. The Shell-operator creates ValidatingWebhookConfiguration, starts HTTPS server, and runs hooks to handle [AdmissionReview requests](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#request).
 
 ## Syntax
 
@@ -49,7 +49,7 @@ kubernetesValidating:
 
 - `name` is a required parameter. It should be a domain with at least three segments separated by dots.
 
-- `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from that bindings will be added to the binding context in a `snapshots` field.
+- `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the `snapshots` field.
 
 - `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)). See [objectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector).
 
