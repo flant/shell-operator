@@ -11,9 +11,11 @@ kubernetes:
 - name: myCrdObjects
   ...
 kubernetesValidating:
-- name: myCrdValidator
+- name: my-crd-validator.example.com
+  # include snapshots by binding names
   includeSnapshotsFrom: ["myCrdObjects"]
-  failurePolicy: Ignore | Fail (default)
+  # or use group name to include all snapshots in a group
+  group: "group name"
   labelSelector:   # equivalent of objectSelector
     matchLabels:
       label1: value1
@@ -41,21 +43,24 @@ kubernetesValidating:
     apiVersions: ["v1", "v1beta1"]
     resources: ["deployments", "replicasets"]
     scope: "Namespaced"
+  failurePolicy: Ignore | Fail (default)
   sideEffects: None (default) | NoneOnDryRun
   timeoutSeconds: 2 (default is 10)
 ```
 
 ## Parameters
 
-- `name` is a required parameter. It should be a domain with at least three segments separated by dots.
+- `name` — a required parameter. It should be a domain with at least three segments separated by dots.
 
 - `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the `snapshots` field.
+
+- `group` — a key to include snapshots from a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group).
 
 - `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)). See [objectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector).
 
 - `namespace.labelSelector` — this filter works like `labelSelector` but for namespaces. See [namespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector).
 
-- `rules` — a list of rules used to determine if a request to the Kubernetes API server should be sent to the hook. See [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules).
+- `rules` — a required list of rules used to determine if a request to the Kubernetes API server should be sent to the hook. See [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules).
 
 - `failurePolicy` — defines how errors from the hook are handled. See [Failure policy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy). Default is `Fail`.
 
@@ -90,16 +95,21 @@ See example [204-validating-webhook](./examples/204-validating-webhook).
 
 ## Hook input and output
 
+> Note that the `group` parameter is only for including snapshots. `kubernetesValidating` hook is never executed on `schedule` or `kubernetes` events with binding context with `"type":"Group"`.
+
 The hook receives a binding context and should return response in `$VALIDATING_RESPONSE_PATH`.
 
 $BINDING_CONTEXT_PATH file example:
 
 ```yaml
 [{
-"binding":"myCrdValidator",
-"type":"Validating",
+# Name as defined in binding configuration.
+"binding": "my-crd-validator.example.com",
+# Validating to distinguish from other events.
+"type": "Validating",
+# Snapshots as defined by includeSnapshotsFrom or group.
 "snapshots": { ... }
-# AdmissionReview object
+# AdmissionReview object.
 "review": {
   "apiVersion": "admission.k8s.io/v1",
   "kind": "AdmissionReview",
@@ -171,7 +181,7 @@ $BINDING_CONTEXT_PATH file example:
 
 Response example:
 ```
-cat <<EOF >> $VALIDATING_RESPONSE_PATH
+cat <<EOF > $VALIDATING_RESPONSE_PATH
 {"allowed": true}
 EOF
 ```
