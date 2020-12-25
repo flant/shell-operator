@@ -1,0 +1,15 @@
+---
+operation: JQPatch
+apiversion: core/v1
+kind: ConfigMap
+name: "test"
+---
+operation: MergePatch
+apiversion: core/v1
+kind: ConfigMap
+name: "test"
+---
+operation: jsonPatch
+apiversion: core/v1
+kind: ConfigMap
+name: "test"

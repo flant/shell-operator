@@ -46,7 +46,7 @@ func KindCreateCluster(clusterName string) error {
 	); err != nil {
 		if errs := errors.Errors(err); errs != nil {
 			for _, problem := range errs {
-				fmt.Fprintf(os.Stderr, "KIND: %v", problem)
+				_, _ = fmt.Fprintf(os.Stderr, "KIND: %v", problem)
 			}
 			return errors.New("aborting due to invalid configuration")
 		}
@@ -93,7 +93,7 @@ func KindGetKubeContext(clusterName string) string {
 func KindClusterVersion() string {
 	k8sVer := os.Getenv("KIND_CLUSTER_VERSION")
 	if k8sVer == "" {
-		k8sVer = "1.15"
+		k8sVer = "1.20"
 	}
 
 	return k8sVer
@@ -108,12 +108,13 @@ func KindNodeImage() string {
 		return image
 	}
 	images := map[string]string{
-		"1.11": "kindest/node:v1.11.10",
-		"1.12": "kindest/node:v1.12.10",
-		"1.13": "kindest/node:v1.13.12",
 		"1.14": "kindest/node:v1.14.10",
-		"1.15": "kindest/node:v1.15.7",
-		"1.16": "kindest/node:v1.16.4",
+		"1.15": "kindest/node:v1.15.12",
+		"1.16": "kindest/node:v1.16.15",
+		"1.17": "kindest/node:v1.17.17",
+		"1.18": "kindest/node:v1.18.15",
+		"1.19": "kindest/node:v1.19.7",
+		"1.20": "kindest/node:v1.20.2",
 	}
 
 	return images[KindClusterVersion()]

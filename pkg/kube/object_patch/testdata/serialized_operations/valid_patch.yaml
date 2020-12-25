@@ -1,0 +1,24 @@
+---
+operation: JQPatch
+apiVersion: core/v1
+kind: ConfigMap
+name: "test"
+jqFilter: '.data = {"test": test}'
+---
+operation: MergePatch
+apiVersion: core/v1
+kind: ConfigMap
+name: "test"
+mergePatch:
+  data:
+    test: test
+---
+operation: jsonPatch
+apiVersion: core/v1
+kind: ConfigMap
+name: "test"
+jsonPatch:
+- op: replace
+  path: /data
+  value:
+    test: test

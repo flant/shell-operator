@@ -9,14 +9,18 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/flant/shell-operator/pkg/kube/object_patch"
 	. "github.com/flant/shell-operator/test/utils"
 
 	"github.com/flant/shell-operator/pkg/kube"
 )
 
-var ClusterName string
-var ContextName string
-var KubeClient kube.KubernetesClient
+var (
+	ClusterName   string
+	ContextName   string
+	KubeClient    kube.KubernetesClient
+	ObjectPatcher *object_patch.ObjectPatcher
+)
 
 func RunIntegrationSuite(t *testing.T, description string, clusterPrefix string) {
 	ClusterName = KindClusterName(clusterPrefix)
@@ -26,7 +30,7 @@ func RunIntegrationSuite(t *testing.T, description string, clusterPrefix string)
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
-	Ω(KindCreateCluster(ClusterName)).Should(Succeed())
+	Expect(KindCreateCluster(ClusterName)).Should(Succeed())
 	fmt.Println(KindUseClusterMessage(ClusterName))
 	return []byte{}
 }, func([]byte) {
@@ -35,9 +39,11 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	KubeClient = kube.NewKubernetesClient()
 	KubeClient.WithContextName(ContextName)
 	err := KubeClient.Init()
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ShouldNot(HaveOccurred())
+
+	ObjectPatcher = object_patch.NewObjectPatcher(KubeClient)
 })
 
 var _ = SynchronizedAfterSuite(func() {}, func() {
-	Ω(KindDeleteCluster(ClusterName)).Should(Succeed())
+	Expect(KindDeleteCluster(ClusterName)).Should(Succeed())
 })

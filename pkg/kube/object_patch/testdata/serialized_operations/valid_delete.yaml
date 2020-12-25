@@ -1,0 +1,15 @@
+---
+operation: Delete
+apiVersion: core/v1
+kind: ConfigMap
+name: "test"
+---
+operation: DeleteInBackground
+apiVersion: core/v1
+kind: ConfigMap
+name: "test"
+---
+operation: DeleteNonCascading
+apiVersion: core/v1
+kind: ConfigMap
+name: "test"
