@@ -2,6 +2,8 @@
 
 This binding transforms a hook into a handler for ValidatingWebhookConfiguration. The Shell-operator creates ValidatingWebhookConfiguration, starts HTTPS server, and runs hooks to handle [AdmissionReview requests](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#request).
 
+> Note: shell-operator use `admissionregistration.k8s.io/v1`, so Kubernetes 1.16+ is needed.
+
 ## Syntax
 
 ```yaml
