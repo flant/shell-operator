@@ -61,7 +61,7 @@ func (m *WebhookManager) Init() error {
 		m.DefaultConfigurationId = DefaultConfigurationId
 	}
 	// settings
-	caBundleBytes, err := ioutil.ReadFile(app.ValidatingWebhookSettings.ClusterCAPath)
+	caBundleBytes, err := ioutil.ReadFile(app.ValidatingWebhookSettings.CAPath)
 	if err != nil {
 		return err
 	}

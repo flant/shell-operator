@@ -16,7 +16,7 @@ func Test_Manager_AddWebhook(t *testing.T) {
 	vs.ServiceName = "webhook-service"
 	vs.ServerKeyPath = "testdata/demo-certs/server-key.pem"
 	vs.ServerCertPath = "testdata/demo-certs/server.crt"
-	vs.ClusterCAPath = "testdata/demo-certs/cluster-ca.pem"
+	vs.CAPath = "testdata/demo-certs/cluster-ca.pem"
 
 	err := m.Init()
 

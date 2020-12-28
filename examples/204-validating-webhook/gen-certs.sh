@@ -24,8 +24,8 @@ if [[ -e server-key.pem  ]] ; then
   fi
 fi
 
-echo ">>> Remove server.crt server.csr server-key.pem cluster-ca.pem"
-rm -f server.crt server.csr server-key.pem cluster-ca.pem
+echo ">>> Remove server.crt server.csr server-key.pem ca.pem"
+rm -f server.crt server.csr server-key.pem ca.pem
 
 # generate server-key.pem server.csr
 echo ">>> Generate server-key.pem"
@@ -74,5 +74,5 @@ kubectl get certificatesigningrequest $CERT_NAME -o jsonpath='{.status.certifica
 echo ">>> Delete CertificateSigningRequest"
 (kubectl delete certificatesigningrequest/${CERT_NAME} || true )
 
-echo ">>> Retrieve cluster-ca.pem"
-kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d > cluster-ca.pem
+echo ">>> Retrieve ca.pem"
+kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d > ca.pem

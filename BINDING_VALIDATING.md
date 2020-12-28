@@ -214,8 +214,8 @@ Command line options:
                              A path to a server certificate for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_SERVER_CERT.
 --validating-webhook-server-key="/validating-certs/server-key.pem"
                              A path to a server private key for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_SERVER_KEY.
---validating-webhook-cluster-ca="/validating-certs/cluster-ca.pem"
-                             A path to a cluster ca bundle for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_CLUSTER_CA.
+--validating-webhook-ca="/validating-certs/ca.pem"
+                             A path to a ca bundle for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_CA.
 --validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
                              A path to a server certificate for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_CLIENT_CA.
 --validating-webhook-service-name=VALIDATING-WEBHOOK-SERVICE-NAME ...

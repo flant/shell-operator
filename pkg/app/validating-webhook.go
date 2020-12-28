@@ -7,8 +7,8 @@ import (
 type validatingWebhookSettings struct {
 	ServerCertPath    string
 	ServerKeyPath     string
-	ClusterCAPath     string
-	ClusterCABundle   []byte
+	CAPath            string
+	CABundle          []byte
 	ClientCAPaths     []string
 	ServiceName       string
 	ConfigurationName string
@@ -19,7 +19,7 @@ type validatingWebhookSettings struct {
 var ValidatingWebhookSettings = &validatingWebhookSettings{
 	ServerCertPath:    "/validating-certs/server.crt",
 	ServerKeyPath:     "/validating-certs/server-key.pem",
-	ClusterCAPath:     "/validating-certs/cluster-ca.pem",
+	CAPath:            "/validating-certs/ca.pem",
 	ClientCAPaths:     nil,
 	ServiceName:       "shell-operator-validating-svc",
 	ConfigurationName: "shell-operator-hooks",
@@ -45,10 +45,10 @@ func DefineValidatingWebhookFlags(cmd *kingpin.CmdClause) {
 		Envar("VALIDATING_WEBHOOK_SERVER_KEY").
 		Default(ValidatingWebhookSettings.ServerKeyPath).
 		StringVar(&ValidatingWebhookSettings.ServerKeyPath)
-	cmd.Flag("validating-webhook-cluster-ca", "A path to a cluster ca bundle for ValidatingWebhookConfiguration. Can be set with $VALIDATING_WEBHOOK_CLUSTER_CA.").
-		Envar("VALIDATING_WEBHOOK_CLUSTER_CA").
-		Default(ValidatingWebhookSettings.ClusterCAPath).
-		StringVar(&ValidatingWebhookSettings.ClusterCAPath)
+	cmd.Flag("validating-webhook-ca", "A path to a ca certificate for ValidatingWebhookConfiguration. Can be set with $VALIDATING_WEBHOOK_CA.").
+		Envar("VALIDATING_WEBHOOK_CA").
+		Default(ValidatingWebhookSettings.CAPath).
+		StringVar(&ValidatingWebhookSettings.CAPath)
 	cmd.Flag("validating-webhook-client-ca", "A path to a server certificate for ValidatingWebhookConfiguration. Can be set with $VALIDATING_WEBHOOK_CLIENT_CA.").
 		Envar("VALIDATING_WEBHOOK_CLIENT_CA").
 		StringsVar(&ValidatingWebhookSettings.ClientCAPaths)
