@@ -145,7 +145,7 @@ kubernetes:
   kind: Pod  # required
   executeHookOnEvent: [ "Added", "Modified", "Deleted" ]
   executeHookOnSynchronization: true|false # default is true
-  fullObjectInSnapshot: true|false # default is true
+  keepFullObjectsInMemory: true|false # default is true
   nameSelector:
     matchNames:
     - pod-0
@@ -232,7 +232,7 @@ Parameters:
 
 - `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from that bindings will be added to the binding context in a `snapshots` field. Self-include is also possible.
 
-- `fullObjectInSnapshot` — if not set or `true`, dumps of Kubernetes resources are cached for this binding and the snapshot includes them as `object` fields. Set to `false` if the hook not relies on full objects to reduce the memory footprint.
+- `keepFullObjectsInMemory` — if not set or `true`, dumps of Kubernetes resources are cached for this binding, and the snapshot includes them as `object` fields. Set to `false` if the hook does not rely on full objects to reduce the memory footprint.
 
 - `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group).
 
