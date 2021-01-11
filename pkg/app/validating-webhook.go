@@ -17,9 +17,9 @@ type validatingWebhookSettings struct {
 }
 
 var ValidatingWebhookSettings = &validatingWebhookSettings{
-	ServerCertPath:    "/validating-certs/server.crt",
-	ServerKeyPath:     "/validating-certs/server-key.pem",
-	CAPath:            "/validating-certs/ca.pem",
+	ServerCertPath:    "/validating-certs/cert.crt",
+	ServerKeyPath:     "/validating-certs/cert.key",
+	CAPath:            "/validating-certs/ca.crt",
 	ClientCAPaths:     nil,
 	ServiceName:       "shell-operator-validating-svc",
 	ConfigurationName: "shell-operator-hooks",

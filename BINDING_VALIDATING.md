@@ -212,11 +212,11 @@ There should be a Service for shell-operator (see [Availability](https://kuberne
 Command line options:
 
 ```
---validating-webhook-server-cert="/validating-certs/server.crt"
+--validating-webhook-server-cert="/validating-certs/cert.crt"
                              A path to a server certificate for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_SERVER_CERT.
---validating-webhook-server-key="/validating-certs/server-key.pem"
+--validating-webhook-server-key="/validating-certs/cert.key"
                              A path to a server private key for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_SERVER_KEY.
---validating-webhook-ca="/validating-certs/ca.pem"
+--validating-webhook-ca="/validating-certs/ca.crt"
                              A path to a ca bundle for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_CA.
 --validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
                              A path to a server certificate for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_CLIENT_CA.
