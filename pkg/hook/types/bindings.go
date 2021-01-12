@@ -1,16 +1,19 @@
 package types
 
 import (
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+
+	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/validating_webhook"
 )
 
 type BindingType string
 
 const (
-	Schedule          BindingType = "schedule"
-	OnStartup         BindingType = "onStartup"
-	OnKubernetesEvent BindingType = "kubernetes"
+	Schedule             BindingType = "schedule"
+	OnStartup            BindingType = "onStartup"
+	OnKubernetesEvent    BindingType = "kubernetes"
+	KubernetesValidating BindingType = "kubernetesValidating"
 )
 
 // Types for effective binding configs
@@ -41,4 +44,13 @@ type OnKubernetesEventConfig struct {
 	ExecuteHookOnSynchronization bool
 	WaitForSynchronization       bool
 	KeepFullObjectsInMemory      bool
+}
+
+type ValidatingConfig struct {
+	CommonBindingConfig
+
+	Webhook *validating_webhook.ValidatingWebhookConfig
+
+	IncludeSnapshotsFrom []string
+	Group                string
 }

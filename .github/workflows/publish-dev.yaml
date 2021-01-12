@@ -3,9 +3,6 @@ on:
   pull_request:
     types: [labeled]
 env:
-  GO111MODULE: on
-  # build only 2 platforms to speed up dev image build
-  # TODO create pre-release build label!
   QEMU_PLATFORMS: arm64,arm
   BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/arm/v7"
   IMAGE_REPO: flant/shell-operator-dev
@@ -14,19 +11,15 @@ jobs:
   stub:
     name: Empty job to prevent workflow fail
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.label.id != 1838515600 # not ':robot: build dev images' label
+    if: github.event_name == 'pull_request' && github.event.label.id != 1838515600 # not ':robot: build dev image: multiarch' label
     steps:
       - name: stub action
         run: ": This job is used to prevent the workflow to fail when all other jobs are skipped."
-#      - name: dump label event
-#        run: cat $GITHUB_EVENT_PATH
-#      - name: dump envs
-#        run: export
 
   unlabel:
     name: Unlabel
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev images' label
+    if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev image: multiarch' label
     steps:
       - uses: actions/github-script@v3
         with:

@@ -154,3 +154,52 @@ func Test_Validate_V1_With_Error(t *testing.T) {
 		})
 	}
 }
+
+func Test_Validate_V1_KubernetesValidating(t *testing.T) {
+	g := NewWithT(t)
+
+	var vu *VersionedUntyped
+	var err error
+
+	var tests = []struct {
+		name       string
+		configText string
+		fn         func()
+	}{
+		{
+			"kubernetesValidating",
+			`
+configVersion: v1
+kubernetesValidating:
+- name: "myCrdValidator"
+  group: main
+  includeSnapshotsFrom:
+  - myCrdBinding
+  failurePolicy: Ignore
+  labelSelector:
+    matchExpressions:
+      - key: azaza
+        operator: Exists
+  rules:
+  - apiVersions: ["v1"]
+    apiGroups: [""]
+    resources: ["pods"]
+    operations: ["*"]
+  timeoutSeconds: 123
+`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vu = prepareConfigObj(g, tt.configText)
+			t.Logf("version: %s", vu.Version)
+			s := GetSchema(vu.Version)
+			err = ValidateConfig(vu.Obj, s, "root")
+			//t.Logf("expected multierror was: %v", err)
+			tt.fn()
+		})
+	}
+}

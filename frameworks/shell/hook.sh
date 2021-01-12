@@ -51,6 +51,9 @@ function hook::_determine_kubernetes_and_scheduler_handlers() {
     "Schedule")
       echo __on_schedule::${BINDING_CONTEXT_CURRENT_BINDING}
     ;;
+    "Validating")
+      echo __on_validating::${BINDING_CONTEXT_CURRENT_BINDING}
+    ;;
     esac
   fi
 }

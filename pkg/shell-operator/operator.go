@@ -17,6 +17,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	. "github.com/flant/shell-operator/pkg/validating_webhook/types"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
@@ -32,6 +33,8 @@ import (
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/flant/shell-operator/pkg/utils/measure"
+	"github.com/flant/shell-operator/pkg/utils/structured-logger"
+	"github.com/flant/shell-operator/pkg/validating_webhook"
 )
 
 var WaitQueuesTimeout = time.Second * 10
@@ -56,6 +59,8 @@ type ShellOperator struct {
 	ManagerEventsHandler *ManagerEventsHandler
 
 	HookManager hook.HookManager
+
+	WebhookManager *validating_webhook.WebhookManager
 
 	DebugServer *debug.Server
 }
@@ -212,6 +217,8 @@ func (op *ShellOperator) InitHookManager() (err error) {
 	op.HookManager.WithDirectories(op.HooksDir, op.TempDir)
 	op.HookManager.WithKubeEventManager(op.KubeEventsManager)
 	op.HookManager.WithScheduleManager(op.ScheduleManager)
+	op.HookManager.WithWebhookManager(op.WebhookManager)
+	// Search hooks and load their configurations
 	err = op.HookManager.Init()
 	if err != nil {
 		log.Errorf("MAIN Fatal: initialize hook manager: %s\n", err)
@@ -271,7 +278,92 @@ func (op *ShellOperator) InitHookManager() (err error) {
 
 		return tasks
 	})
+
 	return nil
+}
+
+// InitWebhookManager adds kubernetesValidating hooks
+// to a WebhookManager and set a validating event handler.
+func (op *ShellOperator) InitWebhookManager() (err error) {
+	// Initialize validating webhooks manager
+	op.WebhookManager.WithKubeClient(op.KubeClient)
+	op.WebhookManager.Namespace = app.Namespace
+	op.WebhookManager.ConfigurationName = app.ValidatingWebhookSettings.ConfigurationName
+	op.WebhookManager.ServiceName = app.ValidatingWebhookSettings.ServiceName
+
+	err = op.WebhookManager.Init()
+	if err != nil {
+		log.Errorf("WebhookManager init: %v", err)
+	}
+
+	// error is only for OnStartup hooks.
+	hookNames, _ := op.HookManager.GetHooksInOrder(KubernetesValidating)
+	if len(hookNames) == 0 {
+		return
+	}
+
+	for _, hookName := range hookNames {
+		h := op.HookManager.GetHook(hookName)
+		h.HookController.EnableValidatingBindings()
+	}
+
+	// Define handler for ValidatingEvent
+	op.WebhookManager.WithValidatingEventHandler(func(event ValidatingEvent) (*ValidatingResponse, error) {
+		logLabels := map[string]string{
+			"event.id": uuid.NewV4().String(),
+			"binding":  string(KubernetesValidating),
+		}
+		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
+		logEntry.Debugf("Handle '%s' event '%s' '%s'", string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
+
+		var tasks []task.Task
+		op.HookManager.HandleValidatingEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+			newTask := task.NewTask(HookRun).
+				WithMetadata(HookMetadata{
+					HookName:       hook.Name,
+					BindingType:    KubernetesValidating,
+					BindingContext: info.BindingContext,
+					AllowFailure:   info.AllowFailure,
+					Binding:        info.Binding,
+					Group:          info.Group,
+				}).
+				WithLogLabels(logLabels)
+			tasks = append(tasks, newTask)
+		})
+
+		// Assert exactly one task is created.
+		if len(tasks) == 0 {
+			logEntry.Errorf("Possible bug!!! No hook found for '%s' event '%s' '%s'", string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
+			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
+		}
+
+		if len(tasks) > 1 {
+			logEntry.Errorf("Possible bug!!! %d hooks found for '%s' event '%s' '%s'", len(tasks), string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
+		}
+
+		res := op.TaskHandler(tasks[0])
+
+		if res.Status == "Fail" {
+			return &ValidatingResponse{
+				Allowed: false,
+				Message: "Hook failed",
+			}, nil
+		}
+
+		validatingProp := tasks[0].GetProp("validatingResponse")
+		validatingResponse, ok := validatingProp.(*ValidatingResponse)
+		if !ok {
+			logEntry.Errorf("'validatingResponse' task prop is not of type *ValidatingResponse: %T", validatingProp)
+			return nil, fmt.Errorf("hook task prop error")
+		}
+		return validatingResponse, nil
+	})
+
+	err = op.WebhookManager.Start()
+	if err != nil {
+		log.Errorf("Webhook start: %v", err)
+	}
+	return err
 }
 
 func (op *ShellOperator) Start() {
@@ -428,17 +520,22 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 		}
 	}
 
-	usage, metrics, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+	result, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
 
-	if usage != nil {
-		log.Infof("Usage: %+v", usage)
-		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", usage.Sys.Seconds(), metricLabels)
-		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", usage.User.Seconds(), metricLabels)
-		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(usage.MaxRss)*1024, metricLabels)
+	if result != nil && result.Usage != nil {
+		taskLogEntry.Infof("Usage: %+v", result.Usage)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", result.Usage.Sys.Seconds(), metricLabels)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", result.Usage.User.Seconds(), metricLabels)
+		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(result.Usage.MaxRss)*1024, metricLabels)
 	}
 
 	if err == nil {
-		err = op.HookMetricStorage.SendBatch(metrics, map[string]string{
+		// Save validatingResponse in task props for future use.
+		if result.ValidatingResponse != nil {
+			t.SetProp("validatingResponse", result.ValidatingResponse)
+			taskLogEntry.Infof("ValidatingResponse from hook: %s", result.ValidatingResponse.Dump())
+		}
+		err = op.HookMetricStorage.SendBatch(result.Metrics, map[string]string{
 			"hook": hookMeta.HookName,
 		})
 	}
@@ -680,7 +777,7 @@ func (op *ShellOperator) SetupDebugServerHandles() {
 
 	op.DebugServer.Router.Get("/queue/list.{format:(json|yaml|text)}", func(writer http.ResponseWriter, request *http.Request) {
 		format := chi.URLParam(request, "format")
-		debug.GetLogEntry(request).Debugf("queue list using format %s", format)
+		structured_logger.GetLogEntry(request).Debugf("queue list using format %s", format)
 		_, _ = writer.Write([]byte(dump.TaskQueueSetToText(op.TaskQueues)))
 	})
 }
@@ -772,10 +869,17 @@ func InitAndStart(operator *ShellOperator) error {
 
 	operator.SetupDebugServerHandles()
 
+	operator.WebhookManager = validating_webhook.NewWebhookManager()
+
 	err = operator.InitHookManager()
 	if err != nil {
 		log.Errorf("INIT HookManager failed: %s", err)
 		return err
+	}
+
+	err = operator.InitWebhookManager()
+	if err != nil {
+		log.Errorf("INIT WebhookManager failed: %s", err)
 	}
 
 	operator.Start()

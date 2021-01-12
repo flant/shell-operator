@@ -131,7 +131,6 @@ metadata:
 	contexts, err = c.RunSchedule("* * * * *")
 	g.Expect(err).ShouldNot(HaveOccurred())
 	parsedBindingContexts = parseContexts(contexts.Rendered)
-
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 }
 

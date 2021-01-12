@@ -13,6 +13,7 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
+	. "github.com/flant/shell-operator/pkg/validating_webhook/types"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
@@ -22,6 +23,12 @@ import (
 
 type CommonHook interface {
 	Name() string
+}
+
+type HookResult struct {
+	Usage              *executor.CmdUsage
+	Metrics            []operation.MetricOperation
+	ValidatingResponse *ValidatingResponse
 }
 
 type Hook struct {
@@ -67,7 +74,7 @@ func (h *Hook) GetHookController() controller.HookController {
 	return h.HookController
 }
 
-func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) (*executor.CmdUsage, []operation.MetricOperation, error) {
+func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) (*HookResult, error) {
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
@@ -75,12 +82,17 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 
 	contextPath, err := h.prepareBindingContextJsonFile(versionedContextList)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	metricsPath, err := h.prepareMetricsFile()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+
+	validatingPath, err := h.prepareValidatingResponseFile()
+	if err != nil {
+		return nil, err
 	}
 
 	// remove tmp file on hook exit
@@ -88,6 +100,7 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 		if app.DebugKeepTmpFiles != "yes" {
 			os.Remove(contextPath)
 			os.Remove(metricsPath)
+			os.Remove(validatingPath)
 		}
 	}()
 
@@ -96,21 +109,29 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 	if contextPath != "" {
 		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
 		envs = append(envs, fmt.Sprintf("METRICS_PATH=%s", metricsPath))
+		envs = append(envs, fmt.Sprintf("VALIDATING_RESPONSE_PATH=%s", validatingPath))
 	}
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
-	usage, err := executor.RunAndLogLines(hookCmd, logLabels)
+	result := &HookResult{}
+
+	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels)
 	if err != nil {
-		return usage, nil, fmt.Errorf("%s FAILED: %s", h.Name, err)
+		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
 
-	metrics, err := operation.MetricOperationsFromFile(metricsPath)
+	result.Metrics, err = operation.MetricOperationsFromFile(metricsPath)
 	if err != nil {
-		return usage, nil, fmt.Errorf("got bad metrics: %s", err)
+		return result, fmt.Errorf("got bad metrics: %s", err)
 	}
 
-	return usage, metrics, nil
+	result.ValidatingResponse, err = ValidatingResponseFromFile(validatingPath)
+	if err != nil {
+		return result, fmt.Errorf("got bad validating response: %s", err)
+	}
+
+	return result, nil
 }
 
 func (h *Hook) SafeName() string {
@@ -144,6 +165,24 @@ func (h *Hook) GetConfigDescription() string {
 		}
 		msgs = append(msgs, fmt.Sprintf("Watch k8s kinds: '%s'", strings.Join(kindList, "', '")))
 	}
+	if len(h.Config.KubernetesValidating) > 0 {
+		kinds := map[string]bool{}
+		for _, validating := range h.Config.KubernetesValidating {
+			if validating.Webhook == nil {
+				continue
+			}
+			for _, rule := range validating.Webhook.Rules {
+				for _, resource := range rule.Resources {
+					kinds[strings.ToLower(resource)] = true
+				}
+			}
+		}
+		kindList := []string{}
+		for kind := range kinds {
+			kindList = append(kindList, kind)
+		}
+		msgs = append(msgs, fmt.Sprintf("Validate k8s kinds: '%s'", strings.Join(kindList, "', '")))
+	}
 	return strings.Join(msgs, ", ")
 }
 
@@ -173,4 +212,15 @@ func (h *Hook) prepareMetricsFile() (string, error) {
 	}
 
 	return metricsPath, nil
+}
+
+func (h *Hook) prepareValidatingResponseFile() (string, error) {
+	validatingPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-validating-response-%s.json", h.SafeName(), uuid.NewV4().String()))
+
+	err := ioutil.WriteFile(validatingPath, []byte{}, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	return validatingPath, nil
 }

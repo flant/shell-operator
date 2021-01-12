@@ -1,0 +1,4 @@
+apiVersion: v1
+name: 204-validating-webhook
+version: 1.0.0
+description: Shell-operator validating hook example

@@ -11,12 +11,14 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	. "github.com/flant/shell-operator/pkg/validating_webhook/types"
 
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
+	"github.com/flant/shell-operator/pkg/validating_webhook"
 )
 
 type HookManager interface {
@@ -25,6 +27,7 @@ type HookManager interface {
 	WithDirectories(workingDir string, tempDir string)
 	WithKubeEventManager(kube_events_manager.KubeEventsManager)
 	WithScheduleManager(schedule_manager.ScheduleManager)
+	WithWebhookManager(*validating_webhook.WebhookManager)
 	WorkingDir() string
 	TempDir() string
 	GetHook(name string) *Hook
@@ -32,6 +35,7 @@ type HookManager interface {
 	GetHooksInOrder(bindingType BindingType) ([]string, error)
 	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	HandleValidatingEvent(event ValidatingEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 }
 
 type hookManager struct {
@@ -40,6 +44,7 @@ type hookManager struct {
 	tempDir           string
 	kubeEventsManager kube_events_manager.KubeEventsManager
 	scheduleManager   schedule_manager.ScheduleManager
+	webhookManager    *validating_webhook.WebhookManager
 
 	// sorted hook names
 	hookNamesInOrder []string
@@ -74,6 +79,10 @@ func (hm *hookManager) WithScheduleManager(mgr schedule_manager.ScheduleManager)
 	hm.scheduleManager = mgr
 }
 
+func (hm *hookManager) WithWebhookManager(mgr *validating_webhook.WebhookManager) {
+	hm.webhookManager = mgr
+}
+
 func (hm *hookManager) WorkingDir() string {
 	return hm.workingDir
 }
@@ -104,7 +113,7 @@ func (hm *hookManager) Init() error {
 			return err
 		}
 
-		// register hook in indexes
+		// register hook in indices
 		for _, binding := range hook.Config.Bindings() {
 			hm.hooksInOrder[binding] = append(hm.hooksInOrder[binding], hook)
 		}
@@ -149,10 +158,19 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 			"queue":   kubeCfg.Queue,
 		}
 	}
+	for _, validatingCfg := range hook.GetConfig().KubernetesValidating {
+		validatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
+		validatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
+			"hook":    hook.Name,
+			"binding": validatingCfg.BindingName,
+		}
+		validatingCfg.Webhook.UpdateIds("", validatingCfg.BindingName)
+	}
 
 	hookCtrl := controller.NewHookController()
 	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
 	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
+	hookCtrl.InitValidatingBindings(hook.GetConfig().KubernetesValidating, hm.webhookManager)
 
 	hook.WithHookController(hookCtrl)
 	hook.WithTmpDir(hm.TempDir())
@@ -208,6 +226,7 @@ func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error
 	}
 
 	// OnStartup hooks are sorted by onStartup config value
+	// FIXME: onStartup value is now a config validating error, no need to check it here again.
 	if bindingType == OnStartup {
 		for _, hook := range hooks {
 			if !hook.Config.HasBinding(OnStartup) {
@@ -250,6 +269,20 @@ func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Ho
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleScheduleEvent(crontab) {
 			h.HookController.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
+				if createTaskFn != nil {
+					createTaskFn(h, info)
+				}
+			})
+		}
+	}
+}
+
+func (hm *hookManager) HandleValidatingEvent(event ValidatingEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
+	for _, hookName := range vHooks {
+		h := hm.GetHook(hookName)
+		if h.HookController.CanHandleValidatingEvent(event) {
+			h.HookController.HandleValidatingEvent(event, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
 				}

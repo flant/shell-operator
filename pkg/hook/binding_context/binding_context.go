@@ -5,6 +5,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	v1 "k8s.io/api/admission/v1"
+
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
@@ -27,6 +29,7 @@ type BindingContext struct {
 	WatchEvent WatchEventType
 	Objects    []ObjectAndFilterResult
 	Snapshots  map[string][]ObjectAndFilterResult
+	Review     *v1.AdmissionReview
 }
 
 func (bc BindingContext) MarshalJSON() ([]byte, error) {
@@ -61,7 +64,8 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		}
 	}
 
-	if bc.Metadata.Group != "" {
+	// KubernetesValidating uses 'group' only for snapshots.
+	if bc.Metadata.Group != "" && bc.Metadata.BindingType != KubernetesValidating {
 		res["binding"] = bc.Metadata.Group
 		res["type"] = "Group"
 		return res
@@ -69,6 +73,12 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 
 	if bc.Metadata.BindingType == Schedule {
 		res["type"] = "Schedule"
+		return res
+	}
+
+	if bc.Metadata.BindingType == KubernetesValidating {
+		res["type"] = "Validating"
+		res["review"] = bc.Review
 		return res
 	}
 

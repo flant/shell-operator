@@ -2,8 +2,6 @@ package config
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_GetSchema(t *testing.T) {
@@ -11,15 +9,20 @@ func Test_GetSchema(t *testing.T) {
 
 	for _, schema := range schemas {
 		s := GetSchema(schema)
-		assert.NotNil(t, s)
+		if s == nil {
+			t.Fatalf("schema '%s' should not be nil", schema)
+		}
 	}
 }
 
 func Test_LoadSchema_From_Schemas(t *testing.T) {
-	for _, schema := range Schemas {
-		s, err := LoadSchema(schema)
-		if assert.NoError(t, err) {
-			assert.NotNil(t, s)
+	for schemaVer := range Schemas {
+		s, err := LoadSchema(schemaVer)
+		if err != nil {
+			t.Fatalf("schema '%s' should load: %v", schemaVer, err)
+		}
+		if s == nil {
+			t.Fatalf("schema '%s' should not be nil: %v", schemaVer, err)
 		}
 	}
 }

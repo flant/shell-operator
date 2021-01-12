@@ -48,11 +48,14 @@ schedule:
 kubernetes:
 - {KUBERNETES_PARAMETERS}
 - {KUBERNETES_PARAMETERS}
+kubernetesValidating:
+- {VALIDATING_PARAMETERS}
+- {VALIDATING_PARAMETERS}
 ```
 
 or in JSON format:
 
-```json
+```yaml
 {
   "configVersion": "v1",
   "onStartup": STARTUP_ORDER,
@@ -61,19 +64,23 @@ or in JSON format:
     {SCHEDULE_PARAMETERS}
   ],
   "kubernetes": [
-       {KUBERNETES_PARAMETERS},
-       {KUBERNETES_PARAMETERS}
+    {KUBERNETES_PARAMETERS},
+    {KUBERNETES_PARAMETERS}
+  ],
+  "kubernetesValidating": [
+    {VALIDATING_PARAMETERS},
+    {VALIDATING_PARAMETERS}
   ]
 }
 ```
 
 `configVersion` field specifies a version of configuration schema. The latest schema version is **v1** and it is described below.
 
-Event binding is an event type ("onStartup", "schedule" or "kubernetes") plus parameters required for a subscription.
+Event binding is an event type (one of "onStartup", "schedule", "kubernetes" or "kubernetesValidating") plus parameters required for a subscription.
 
 ### onStartup
 
-Use this binding type to execute a hook at the Shell-operator’ startup.
+Use this binding type to execute a hook at the Shell-operator’s startup.
 
 Syntax:
 
@@ -84,13 +91,13 @@ onStartup: ORDER
 
 Parameters:
 
-`ORDER` — an integer value that specifies an execution order. When added to the "main" queue, the hooks will be sorted by this value and then alphabetically by file name.
+`ORDER` — an integer value that specifies an execution order. "OnStartup" hooks will be sorted by this value and then alphabetically by file name.
 
 ### schedule
 
 Scheduled execution. You can bind a hook to any number of schedules.
 
-Syntax:
+#### Syntax
 
 ```yaml
 configVersion: v1
@@ -117,7 +124,7 @@ schedule:
   ...
 ```
 
-Parameters:
+#### Parameters
 
 - `name` — is an optional identifier. It is used to distinguish between multiple schedules during runtime. For more information see [binding context](#binding-context).
 
@@ -135,7 +142,7 @@ Parameters:
 
 Run a hook on a Kubernetes object changes.
 
-Syntax:
+#### Syntax
 
 ```yaml
 configVersion: v1
@@ -191,7 +198,7 @@ kubernetes:
   # ...
 ```
 
-Parameters:
+#### Parameters
 
 - `name` is an optional identifier. It is used to distinguish different bindings during runtime. See also [binding context](#binding-context).
 
@@ -236,7 +243,7 @@ Parameters:
 
 - `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group).
 
-Example:
+#### Example
 
 ```yaml
 configVersion: v1
@@ -257,7 +264,7 @@ kubernetes:
 
 This hook configuration will execute hook on each change in labels of pods labeled with `myLabel=myLabelValue` in "default" namespace. The binding context will contain all pods with `myLabel=myLabelValue` from "default" namespace.
 
-#### Extra notes
+#### Notes
 
 ##### default Namespace
 
@@ -278,7 +285,7 @@ This filter is used to *ignore* superfluous "Modified" events, *and* to *exclude
 
 The result of applying the filter to the event's object is passed to the hook in a `filterResult` field of a [binding context](#binding-context).
 
-You can use `JQ_LIBRARY_PATH` environment variable to set a path with `jq` modules. Also, Shell-operator uses `jq` release 1.6 so you can check your filters with a binary of that version.
+You can use `JQ_LIBRARY_PATH` environment variable to set a path with `jq` modules.
 
 ##### Added != Object created
 
@@ -314,6 +321,12 @@ fieldSelector:
 ##### fieldSelector and labelSelector expressions are ANDed
 
 Objects should match all expressions defined in `fieldSelector` and `labelSelector`, so, for example, multiple `fieldSelector` expressions with `metadata.name` field and different values will not match any object.
+
+### kubernetesValidating
+
+Use a hook as handler for [ValidationWebhookConfiguration](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers).
+
+See syntax and parameters in [BINDING_VALIDATING.md](BINDING_VALIDATING.md)
 
 ## Binding context
 

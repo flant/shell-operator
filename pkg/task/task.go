@@ -27,6 +27,8 @@ type Task interface {
 	GetMetadata() interface{}
 	UpdateMetadata(interface{})
 	GetDescription() string
+	GetProp(key string) interface{}
+	SetProp(key string, value interface{})
 }
 
 type BaseTask struct {
@@ -39,6 +41,7 @@ type BaseTask struct {
 	QueuedAt       time.Time
 
 	Metadata interface{}
+	Props    map[string]interface{}
 }
 
 func NewTask(taskType TaskType) *BaseTask {
@@ -48,6 +51,7 @@ func NewTask(taskType TaskType) *BaseTask {
 		FailureCount: 0,
 		Type:         taskType,
 		LogLabels:    map[string]string{"task.id": taskId},
+		Props:        make(map[string]interface{}),
 	}
 }
 
@@ -97,6 +101,14 @@ func (t *BaseTask) GetMetadata() interface{} {
 
 func (t *BaseTask) UpdateMetadata(meta interface{}) {
 	t.Metadata = meta
+}
+
+func (t *BaseTask) GetProp(key string) interface{} {
+	return t.Props[key]
+}
+
+func (t *BaseTask) SetProp(key string, value interface{}) {
+	t.Props[key] = value
 }
 
 func (t *BaseTask) GetFailureCount() int {

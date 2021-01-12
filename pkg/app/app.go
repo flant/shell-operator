@@ -14,44 +14,127 @@ var Version = "dev"
 var HooksDir = ""
 var TempDir = "/tmp/shell-operator"
 
+var Namespace = ""
 var ListenAddress = "0.0.0.0"
 var ListenPort = "9115"
 var HookMetricsListenPort = ""
 
 var PrometheusMetricsPrefix = "shell_operator_"
 
+type FlagInfo struct {
+	Name   string
+	Help   string
+	Envar  string
+	Define bool
+}
+
+var CommonFlagsInfo = map[string]FlagInfo{
+	"hooks-dir": {
+		"hooks-dir",
+		"A path to a hooks file structure. Can be set with $SHELL_OPERATOR_HOOKS_DIR.",
+		"SHELL_OPERATOR_HOOKS_DIR",
+		true,
+	},
+	"tmp-dir": {
+		"tmp-dir",
+		"A path to store temporary files with data for hooks. Can be set with $SHELL_OPERATOR_TMP_DIR.",
+		"SHELL_OPERATOR_TMP_DIR",
+		true,
+	},
+	"listen-address": {
+		"listen-address",
+		"Address to use to serve metrics to Prometheus. Can be set with $SHELL_OPERATOR_LISTEN_ADDRESS.",
+		"SHELL_OPERATOR_LISTEN_ADDRESS",
+		true,
+	},
+	"listen-port": {
+		"listen-port",
+		"Port to use to serve metrics to Prometheus. Can be set with $SHELL_OPERATOR_LISTEN_PORT.",
+		"SHELL_OPERATOR_LISTEN_PORT",
+		true,
+	},
+	"prometheus-metrics-prefix": {
+		"prometheus-metrics-prefix",
+		"Prefix for Prometheus metrics. Can be set with $SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX.",
+		"SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX",
+		true,
+	},
+	"hook-metrics-listen-port": {
+		"hook-metrics-listen-port",
+		"Port to use to serve hooks’ custom metrics to Prometheus. Can be set with $SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT. Equal to listen-port if empty.",
+		"SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT",
+		true,
+	},
+	"namespace": {
+		"namespace",
+		"A namespace of a shell-operator. Used to setup validating webhooks. Can be set with $SHELL_OPERATOR_NAMESPACE.",
+		"SHELL_OPERATOR_NAMESPACE",
+		true,
+	},
+}
+
 // DefineStartCommandFlags set shell-operator flags for cmd
 func DefineStartCommandFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
-	cmd.Flag("hooks-dir", "A path to a hooks file structure. Can be set with $SHELL_OPERATOR_HOOKS_DIR.").
-		Envar("SHELL_OPERATOR_HOOKS_DIR").
-		Default(HooksDir).
-		StringVar(&HooksDir)
+	var flag FlagInfo
 
-	cmd.Flag("tmp-dir", "A path to store temporary files with data for hooks. Can be set with $SHELL_OPERATOR_TMP_DIR.").
-		Envar("SHELL_OPERATOR_TMP_DIR").
-		Default(TempDir).
-		StringVar(&TempDir)
+	flag = CommonFlagsInfo["hooks-dir"]
+	if flag.Define {
+		cmd.Flag(flag.Name, flag.Help).
+			Envar(flag.Envar).
+			Default(HooksDir).
+			StringVar(&HooksDir)
+	}
 
-	cmd.Flag("listen-address", "Address to use to serve metrics to Prometheus. Can be set with $SHELL_OPERATOR_LISTEN_ADDRESS.").
-		Envar("SHELL_OPERATOR_LISTEN_ADDRESS").
-		Default(ListenAddress).
-		StringVar(&ListenAddress)
-	cmd.Flag("listen-port", "Port to use to serve metrics to Prometheus. Can be set with $SHELL_OPERATOR_LISTEN_PORT.").
-		Envar("SHELL_OPERATOR_LISTEN_PORT").
-		Default(ListenPort).
-		StringVar(&ListenPort)
+	flag = CommonFlagsInfo["tmp-dir"]
+	if flag.Define {
+		cmd.Flag(flag.Name, flag.Help).
+			Envar(flag.Envar).
+			Default(TempDir).
+			StringVar(&TempDir)
+	}
 
-	cmd.Flag("prometheus-metrics-prefix", "Prefix for Prometheus metrics. Can be set with $SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX.").
-		Envar("SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX").
-		Default(PrometheusMetricsPrefix).
-		StringVar(&PrometheusMetricsPrefix)
+	flag = CommonFlagsInfo["listen-address"]
+	if flag.Define {
+		cmd.Flag(flag.Name, flag.Help).
+			Envar(flag.Envar).
+			Default(ListenAddress).
+			StringVar(&ListenAddress)
+	}
 
-	cmd.Flag("hook-metrics-listen-port", "Port to use to serve hooks’ custom metrics to Prometheus. Can be set with $SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT. Equal to listen-port if empty.").
-		Envar("SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT").
-		Default(HookMetricsListenPort).
-		StringVar(&HookMetricsListenPort)
+	flag = CommonFlagsInfo["listen-port"]
+	if flag.Define {
+		cmd.Flag(flag.Name, flag.Help).
+			Envar(flag.Envar).
+			Default(ListenPort).
+			StringVar(&ListenPort)
+	}
+
+	flag = CommonFlagsInfo["prometheus-metrics-prefix"]
+	if flag.Define {
+		cmd.Flag(flag.Name, flag.Help).
+			Envar(flag.Envar).
+			Default(PrometheusMetricsPrefix).
+			StringVar(&PrometheusMetricsPrefix)
+	}
+
+	flag = CommonFlagsInfo["hook-metrics-listen-port"]
+	if flag.Define {
+		cmd.Flag(flag.Name, flag.Help).
+			Envar(flag.Envar).
+			Default(HookMetricsListenPort).
+			StringVar(&HookMetricsListenPort)
+	}
+
+	flag = CommonFlagsInfo["namespace"]
+	if flag.Define {
+		cmd.Flag(flag.Name, flag.Help).
+			Envar(flag.Envar).
+			Default(Namespace).
+			StringVar(&Namespace)
+	}
 
 	DefineKubeClientFlags(cmd)
+	DefineValidatingWebhookFlags(cmd)
 	DefineJqFlags(cmd)
 	DefineLoggingFlags(cmd)
 	DefineDebugFlags(kpApp, cmd)

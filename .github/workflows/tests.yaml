@@ -127,7 +127,6 @@ jobs:
         run: |
           go test \
             -tags test \
-            -v \
             ./cmd/... ./pkg/... ./test/utils
 
   prepare_build_dependencies:
