@@ -4,7 +4,7 @@
 
 <p align="center">
 <a href="https://hub.docker.com/r/flant/shell-operator"><img src="https://img.shields.io/docker/pulls/flant/shell-operator.svg?logo=docker" alt="docker pull flant/shell-operator"/></a>
-<a href="https://community.flant.com/c/shell-operator/7"><img src="https://img.shields.io/discourse/status?server=https%3A%2F%2Fcommunity.flant.com" alt="Discourse forum for discussions"/></a>
+ <a href="https://github.com/flant/shell-operator/discussions"><img src="https://img.shields.io/badge/GitHub-discussions-brightgreen" alt="GH Discussions"/></a>
 <a href="https://t.me/kubeoperator"><img src="https://img.shields.io/badge/telegram-RU%20chat-179cde.svg?logo=telegram" alt="Telegram chat RU"/></a>
 </p>
 
@@ -239,7 +239,7 @@ Some other publications on shell-operator:
 
 # Community
 
-Please feel free to reach us via [Flant Open Source forums](https://community.flant.com/) (based on Discourse). They have a [special category](https://community.flant.com/c/shell-operator/7) dedicated to shell-operator (and its "older brother" — [addon-operator](https://github.com/flant/addon-operator)).
+Please feel free to reach developers/maintainers and users via [GitHub Discussions](https://github.com/flant/shell-operator/discussions) for any questions regarding shell-operator.
 
 You're also welcome to follow [@flant_com](https://twitter.com/flant_com) to stay informed about all our Open Source initiatives.
 
