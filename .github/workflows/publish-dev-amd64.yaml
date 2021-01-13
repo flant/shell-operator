@@ -62,6 +62,7 @@ jobs:
           imageTag=${GITHUB_REF#refs/tags/}
           APP_VERSION=${imageTag}
           FINAL_IMAGE_NAME="${IMAGE_REPO}:${imageTag}"
+          LATEST_IMAGE_NAME="${IMAGE_REPO}:latest"
 
           : Override image name and version for dev image
           # dev-feat_branch-371e2d3b-2020.02.06_18:37:42
@@ -69,12 +70,14 @@ jobs:
           FINAL_IMAGE_NAME="${IMAGE_REPO}:pr${{ github.event.pull_request.number }}"
           : end override
 
-          echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
           echo "APP_VERSION=${APP_VERSION}" >> ${GITHUB_ENV}
+          echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "LATEST_IMAGE_NAME=${LATEST_IMAGE_NAME}" >> ${GITHUB_ENV}
 
           echo "========================================="
           echo "APP_VERSION        = $APP_VERSION"
           echo "FINAL_IMAGE_NAME   = $FINAL_IMAGE_NAME"
+          echo "LATEST_IMAGE_NAME  = $LATEST_IMAGE_NAME"
           echo "========================================="
 
       - name: Set up Docker Buildx
@@ -95,4 +98,5 @@ jobs:
           docker buildx build --push \
               --platform $BUILDX_PLATFORMS \
               --build-arg appVersion=$APP_VERSION \
-              --tag $FINAL_IMAGE_NAME .
+              --tag $FINAL_IMAGE_NAME \
+              --tag $LATEST_IMAGE_NAME .

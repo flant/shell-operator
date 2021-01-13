@@ -24,13 +24,16 @@ jobs:
           imageTag=${GITHUB_REF#refs/tags/}
           APP_VERSION=${imageTag}
           FINAL_IMAGE_NAME="${IMAGE_REPO}:${imageTag}"
+          LATEST_IMAGE_NAME="${IMAGE_REPO}:latest"
 
-          echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
           echo "APP_VERSION=${APP_VERSION}" >> ${GITHUB_ENV}
+          echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "LATEST_IMAGE_NAME=${LATEST_IMAGE_NAME}" >> ${GITHUB_ENV}
 
           echo "========================================="
           echo "APP_VERSION        = $APP_VERSION"
           echo "FINAL_IMAGE_NAME   = $FINAL_IMAGE_NAME"
+          echo "LATEST_IMAGE_NAME  = $LATEST_IMAGE_NAME"
           echo "========================================="
 
       - name: Set up QEMU
@@ -56,4 +59,5 @@ jobs:
           docker buildx build --push \
               --platform $BUILDX_PLATFORMS \
               --build-arg appVersion=$APP_VERSION \
-              --tag $FINAL_IMAGE_NAME .
+              --tag $FINAL_IMAGE_NAME \
+              --tag $LATEST_IMAGE_NAME .
