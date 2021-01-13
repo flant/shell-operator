@@ -77,7 +77,7 @@ jobs:
           echo "========================================="
           echo "APP_VERSION        = $APP_VERSION"
           echo "FINAL_IMAGE_NAME   = $FINAL_IMAGE_NAME"
-          echo "LATEST_IMAGE_NAME  = LATEST_IMAGE_NAME"
+          echo "LATEST_IMAGE_NAME  = $LATEST_IMAGE_NAME"
           echo "========================================="
 
       - name: Set up Docker Buildx
@@ -98,5 +98,5 @@ jobs:
           docker buildx build --push \
               --platform $BUILDX_PLATFORMS \
               --build-arg appVersion=$APP_VERSION \
-              --tag $FINAL_IMAGE_NAME\
+              --tag $FINAL_IMAGE_NAME \
               --tag $LATEST_IMAGE_NAME .

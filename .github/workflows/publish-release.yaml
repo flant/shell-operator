@@ -33,7 +33,7 @@ jobs:
           echo "========================================="
           echo "APP_VERSION        = $APP_VERSION"
           echo "FINAL_IMAGE_NAME   = $FINAL_IMAGE_NAME"
-          echo "LATEST_IMAGE_NAME  = LATEST_IMAGE_NAME"
+          echo "LATEST_IMAGE_NAME  = $LATEST_IMAGE_NAME"
           echo "========================================="
 
       - name: Set up QEMU
