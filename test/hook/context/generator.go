@@ -193,6 +193,7 @@ func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQ
 		}
 	}
 
+	bindingContexts = b.HookCtrl.UpdateSnapshots(bindingContexts)
 	return convertBindingContexts(bindingContexts)
 }
 
