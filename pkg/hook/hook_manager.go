@@ -3,6 +3,7 @@ package hook
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -141,6 +142,9 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
 		hookEntry.Errorf("Hook config output:\n%s", string(configOutput))
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+			hookEntry.Errorf("Hook config stderr:\n%s", string(ee.Stderr))
+		}
 		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
 	}
 
@@ -184,6 +188,7 @@ func (hm *hookManager) execCommandOutput(hookName string, dir string, entrypoint
 	envs = append(os.Environ(), envs...)
 	cmd := executor.MakeCommand(dir, entrypoint, args, envs)
 	cmd.Stdout = nil
+	cmd.Stderr = nil
 
 	debugEntry := log.WithField("hook", hookName).
 		WithField("cmd", strings.Join(cmd.Args, " "))
