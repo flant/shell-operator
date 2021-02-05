@@ -54,6 +54,10 @@ function hook::_determine_kubernetes_and_scheduler_handlers() {
     "Validating")
       echo __on_validating::${BINDING_CONTEXT_CURRENT_BINDING}
     ;;
+    "Conversion")
+      echo __on_conversion::${BINDING_CONTEXT_CURRENT_BINDING}::$(context::jq -er '[.fromVersion,.toVersion]| map(sub("/";".")) | join("::")')
+      echo __on_conversion::${BINDING_CONTEXT_CURRENT_BINDING}
+    ;;
     esac
   fi
 }

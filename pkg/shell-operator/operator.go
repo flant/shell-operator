@@ -17,7 +17,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/validating_webhook/types"
+	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
@@ -34,7 +34,8 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 	"github.com/flant/shell-operator/pkg/utils/structured-logger"
-	"github.com/flant/shell-operator/pkg/validating_webhook"
+	"github.com/flant/shell-operator/pkg/webhook/conversion"
+	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 var WaitQueuesTimeout = time.Second * 10
@@ -60,7 +61,8 @@ type ShellOperator struct {
 
 	HookManager hook.HookManager
 
-	WebhookManager *validating_webhook.WebhookManager
+	ValidatingWebhookManager *validating.WebhookManager
+	ConversionWebhookManager *conversion.WebhookManager
 
 	DebugServer *debug.Server
 }
@@ -217,7 +219,8 @@ func (op *ShellOperator) InitHookManager() (err error) {
 	op.HookManager.WithDirectories(op.HooksDir, op.TempDir)
 	op.HookManager.WithKubeEventManager(op.KubeEventsManager)
 	op.HookManager.WithScheduleManager(op.ScheduleManager)
-	op.HookManager.WithWebhookManager(op.WebhookManager)
+	op.HookManager.WithValidatingWebhookManager(op.ValidatingWebhookManager)
+	op.HookManager.WithConversionWebhookManager(op.ConversionWebhookManager)
 	// Search hooks and load their configurations
 	err = op.HookManager.Init()
 	if err != nil {
@@ -282,24 +285,24 @@ func (op *ShellOperator) InitHookManager() (err error) {
 	return nil
 }
 
-// InitWebhookManager adds kubernetesValidating hooks
+// InitWebhookManagers adds kubernetesValidating hooks
 // to a WebhookManager and set a validating event handler.
-func (op *ShellOperator) InitWebhookManager() (err error) {
-	// Initialize validating webhooks manager
-	op.WebhookManager.WithKubeClient(op.KubeClient)
-	op.WebhookManager.Namespace = app.Namespace
-	op.WebhookManager.ConfigurationName = app.ValidatingWebhookSettings.ConfigurationName
-	op.WebhookManager.ServiceName = app.ValidatingWebhookSettings.ServiceName
-
-	err = op.WebhookManager.Init()
-	if err != nil {
-		log.Errorf("WebhookManager init: %v", err)
-	}
-
-	// error is only for OnStartup hooks.
+func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
+	// Do not init ValidatingWebhook if there are no KubernetesValidating hooks.
 	hookNames, _ := op.HookManager.GetHooksInOrder(KubernetesValidating)
 	if len(hookNames) == 0 {
 		return
+	}
+
+	// Initialize validating webhooks manager
+	op.ValidatingWebhookManager.WithKubeClient(op.KubeClient)
+	op.ValidatingWebhookManager.Settings = app.ValidatingWebhookSettings
+	op.ValidatingWebhookManager.Namespace = app.Namespace
+
+	err = op.ValidatingWebhookManager.Init()
+	if err != nil {
+		log.Errorf("ValidatingWebhookManager init: %v", err)
+		return err
 	}
 
 	for _, hookName := range hookNames {
@@ -308,7 +311,7 @@ func (op *ShellOperator) InitWebhookManager() (err error) {
 	}
 
 	// Define handler for ValidatingEvent
-	op.WebhookManager.WithValidatingEventHandler(func(event ValidatingEvent) (*ValidatingResponse, error) {
+	op.ValidatingWebhookManager.WithValidatingEventHandler(func(event ValidatingEvent) (*ValidatingResponse, error) {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
 			"binding":  string(KubernetesValidating),
@@ -359,13 +362,141 @@ func (op *ShellOperator) InitWebhookManager() (err error) {
 		return validatingResponse, nil
 	})
 
-	err = op.WebhookManager.Start()
+	err = op.ValidatingWebhookManager.Start()
 	if err != nil {
-		log.Errorf("Webhook start: %v", err)
+		log.Errorf("ValidatingWebhookManager start: %v", err)
 	}
 	return err
 }
 
+// InitConversionWebhookManager sets a conversions webhook manager.
+func (op *ShellOperator) InitConversionWebhookManager() (err error) {
+	// Do not init ConversionWebhook if there are no KubernetesConversion hooks.
+	hookNames, _ := op.HookManager.GetHooksInOrder(KubernetesConversion)
+	if len(hookNames) == 0 {
+		return
+	}
+
+	// Initialize validating webhooks manager
+	op.ConversionWebhookManager.KubeClient = op.KubeClient
+	op.ConversionWebhookManager.Settings = app.ConversionWebhookSettings
+	op.ConversionWebhookManager.Namespace = app.Namespace
+	// This handler is called when Kubernetes requests a conversion.
+	op.ConversionWebhookManager.EventHandlerFn = op.ConversionEventHandler
+
+	err = op.ConversionWebhookManager.Init()
+	if err != nil {
+		log.Errorf("ConversionWebhookManager init: %v", err)
+		return err
+	}
+
+	for _, hookName := range hookNames {
+		h := op.HookManager.GetHook(hookName)
+		h.HookController.EnableConversionBindings()
+	}
+
+	err = op.ConversionWebhookManager.Start()
+	if err != nil {
+		log.Errorf("ConversionWebhookManager Start: %v", err)
+	}
+	return err
+}
+
+// ConversionEventHandler is called when Kubernetes requests a conversion.
+func (op *ShellOperator) ConversionEventHandler(event conversion.Event) (*conversion.Response, error) {
+	logLabels := map[string]string{
+		"event.id": uuid.NewV4().String(),
+		"binding":  string(KubernetesConversion),
+	}
+	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
+
+	sourceVersions := conversion.ExtractAPIVersions(event.Objects)
+	logEntry.Infof("Handle '%s' event for crd/%s: %d objects with versions %v", string(KubernetesConversion), event.CrdName, len(event.Objects), sourceVersions)
+
+	done := false
+	for _, srcVer := range sourceVersions {
+		rule := conversion.Rule{
+			FromVersion: srcVer,
+			ToVersion:   event.Review.Request.DesiredAPIVersion,
+		}
+		convPath := op.HookManager.FindConversionChain(event.CrdName, rule)
+		if len(convPath) == 0 {
+			continue
+		}
+		logEntry.Infof("Find conversion path for %s: %v", rule.String(), convPath)
+
+		for _, rule := range convPath {
+			var tasks []task.Task
+			op.HookManager.HandleConversionEvent(event, rule, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+				newTask := task.NewTask(HookRun).
+					WithMetadata(HookMetadata{
+						HookName:       hook.Name,
+						BindingType:    KubernetesConversion,
+						BindingContext: info.BindingContext,
+						AllowFailure:   info.AllowFailure,
+						Binding:        info.Binding,
+						Group:          info.Group,
+					}).
+					WithLogLabels(logLabels)
+				tasks = append(tasks, newTask)
+			})
+
+			// Assert exactly one task is created.
+			if len(tasks) == 0 {
+				logEntry.Errorf("Possible bug!!! No hook found for '%s' event for crd/%s", string(KubernetesConversion), event.CrdName)
+				return nil, fmt.Errorf("no hook found for '%s' event for crd/%s", string(KubernetesConversion), event.CrdName)
+			}
+			if len(tasks) > 1 {
+				logEntry.Errorf("Possible bug!!! %d hooks found for '%s' event for crd/%s", len(tasks), string(KubernetesValidating), event.CrdName)
+			}
+
+			res := op.TaskHandler(tasks[0])
+
+			if res.Status == "Fail" {
+				return &conversion.Response{
+					FailedMessage:    fmt.Sprintf("Hook failed to convert to %s", event.Review.Request.DesiredAPIVersion),
+					ConvertedObjects: nil,
+				}, nil
+			}
+
+			prop := tasks[0].GetProp("conversionResponse")
+			response, ok := prop.(*conversion.Response)
+			if !ok {
+				logEntry.Errorf("'conversionResponse' task prop is not of type *conversion.Response: %T", prop)
+				return nil, fmt.Errorf("hook task prop error")
+			}
+
+			// Set response objects as new objects for a next round.
+			event.Objects = response.ConvertedObjects
+
+			// Stop iterating if hook has converted all objects to a desiredAPIVersions.
+			newSourceVersions := conversion.ExtractAPIVersions(event.Objects)
+			//logEntry.Infof("Hook return conversion response: failMsg=%s, %d convertedObjects, versions:%v, desired: %s", response.FailedMessage, len(response.ConvertedObjects), newSourceVersions, event.Review.Request.DesiredAPIVersion)
+
+			if len(newSourceVersions) == 1 && newSourceVersions[0] == event.Review.Request.DesiredAPIVersion {
+				// success
+				done = true
+				break
+			}
+		}
+
+		if done {
+			break
+		}
+	}
+
+	if done {
+		return &conversion.Response{
+			ConvertedObjects: event.Objects,
+		}, nil
+	}
+
+	return &conversion.Response{
+		FailedMessage: fmt.Sprintf("Conversion to %s was not successuful", event.Review.Request.DesiredAPIVersion),
+	}, nil
+}
+
+// Start
 func (op *ShellOperator) Start() {
 	log.Info("start shell-operator")
 
@@ -534,6 +665,11 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 		if result.ValidatingResponse != nil {
 			t.SetProp("validatingResponse", result.ValidatingResponse)
 			taskLogEntry.Infof("ValidatingResponse from hook: %s", result.ValidatingResponse.Dump())
+		}
+		// Save conversionResponse in task props for future use.
+		if result.ConversionResponse != nil {
+			t.SetProp("conversionResponse", result.ConversionResponse)
+			taskLogEntry.Infof("ConversionResponse from hook: %s", result.ConversionResponse.Dump())
 		}
 		err = op.HookMetricStorage.SendBatch(result.Metrics, map[string]string{
 			"hook": hookMeta.HookName,
@@ -869,7 +1005,9 @@ func InitAndStart(operator *ShellOperator) error {
 
 	operator.SetupDebugServerHandles()
 
-	operator.WebhookManager = validating_webhook.NewWebhookManager()
+	// Create webhookManagers before hook loading to set them on HookControllers.
+	operator.ValidatingWebhookManager = validating.NewWebhookManager()
+	operator.ConversionWebhookManager = conversion.NewWebhookManager()
 
 	err = operator.InitHookManager()
 	if err != nil {
@@ -877,9 +1015,18 @@ func InitAndStart(operator *ShellOperator) error {
 		return err
 	}
 
-	err = operator.InitWebhookManager()
+	// Setup validating configs from hooks.
+	err = operator.InitValidatingWebhookManager()
 	if err != nil {
-		log.Errorf("INIT WebhookManager failed: %s", err)
+		log.Errorf("INIT ValidatingWebhookManager failed: %s", err)
+		return err
+	}
+
+	// Setup conversion configs from hooks.
+	err = operator.InitConversionWebhookManager()
+	if err != nil {
+		log.Errorf("INIT ConversionWebhookManager failed: %s", err)
+		return err
 	}
 
 	operator.Start()

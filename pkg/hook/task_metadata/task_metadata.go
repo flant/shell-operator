@@ -31,7 +31,7 @@ type HookMetadata struct {
 	Group          string
 	BindingType    BindingType
 	BindingContext []BindingContext
-	AllowFailure   bool //Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
+	AllowFailure   bool // Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
 }
 
 var _ HookNameAccessor = HookMetadata{}

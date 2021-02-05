@@ -12,7 +12,7 @@ kubernetes:
     matchLabels:
       foo: bar
 kubernetesValidating:
-- name: ololo-policy.example.com
+- name: test-policy.example.com
   labelSelector:
     matchLabels:
       foo: bar

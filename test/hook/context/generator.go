@@ -113,7 +113,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 
 	if b.Hook == nil {
 		testHook := hook.NewHook("test", "test")
-		testHook, err = testHook.WithConfig([]byte(b.HookConfig))
+		testHook, err = testHook.LoadConfig([]byte(b.HookConfig))
 		if err != nil {
 			return GeneratedBindingContexts{}, fmt.Errorf("couldn't load or validate hook configuration: %v", err)
 		}

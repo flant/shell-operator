@@ -49,7 +49,17 @@ You can configure the operator with the following environment variables and cli 
 | --log-no-time | LOG_NO_TIME | `false` | Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps. |
 | --debug-keep-tmp-files | DEBUG_KEEP_TMP_FILES | `"no"` | Set to `yes` to keep files in $SHELL_OPERATOR_TMP_DIR for debugging purposes. Note that it can generate many files. |
 | --debug-unix-socket | DEBUG_UNIX_SOCKET | `"/var/run/shell-operator/debug.socket"` | Path to the unix socket file for debugging purposes. |
-
+|  --validating-webhook-configuration-name | VALIDATING_WEBHOOK_CONFIGURATION_NAME | `"shell-operator-hooks"` | A name of a ValidatingWebhookConfiguration resource. |
+|  --validating-webhook-service-name | VALIDATING_WEBHOOK_SERVICE_NAME | `"shell-operator-validating-svc"` | A name of a service used in ValidatingWebhookConfiguration. |
+|  --validating-webhook-server-cert | VALIDATING_WEBHOOK_SERVER_CERT | `"/validating-certs/tls.crt"` | A path to a server certificate for service used in ValidatingWebhookConfiguration. |
+|  --validating-webhook-server-key | VALIDATING_WEBHOOK_SERVER_KEY | `"/validating-certs/tls.key"` | A path to a server private key for service used in ValidatingWebhookConfiguration. |
+|  --validating-webhook-ca | VALIDATING_WEBHOOK_CA | `"/validating-certs/ca.crt"` | A path to a ca certificate for ValidatingWebhookConfiguration. |
+|  --validating-webhook-client-ca | VALIDATING_WEBHOOK_CLIENT_CA | [] | A path to a server certificate for ValidatingWebhookConfiguration. |
+|  --conversion-webhook-service-name | CONVERSION_WEBHOOK_SERVICE_NAME | `"shell-operator-conversion-svc"` | A name of a service for clientConfig in CRD. |
+|  --conversion-webhook-server-cert | CONVERSION_WEBHOOK_SERVER_CERT | `"/conversion-certs/tls.crt"` | A path to a server certificate for clientConfig in CRD. |
+|  --conversion-webhook-server-key | CONVERSION_WEBHOOK_SERVER_KEY | `"/conversion-certs/tls.key"` | A path to a server private key for clientConfig in CRD. |
+|  --conversion-webhook-ca | CONVERSION_WEBHOOK_CA | `"/conversion-certs/ca.crt"` | A path to a ca certificate for clientConfig in CRD. |
+|  --conversion-webhook-client-ca | CONVERSION_WEBHOOK_CLIENT_CA | [] | A path to a server certificate for CRD.spec.conversion.webhook. |
 
 ## Debug
 

@@ -5,10 +5,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	v1 "k8s.io/api/admission/v1"
-
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	v1 "k8s.io/api/admission/v1"
 )
 
 // Information about event for hook
@@ -25,11 +24,14 @@ type BindingContext struct {
 	// name of a binding or a group or kubeEventType if binding has no 'name' field
 	Binding string
 	// additional fields for 'kubernetes' binding
-	Type       KubeEventType
-	WatchEvent WatchEventType
-	Objects    []ObjectAndFilterResult
-	Snapshots  map[string][]ObjectAndFilterResult
-	Review     *v1.AdmissionReview
+	Type             KubeEventType
+	WatchEvent       WatchEventType
+	Objects          []ObjectAndFilterResult
+	Snapshots        map[string][]ObjectAndFilterResult
+	AdmissionReview  *v1.AdmissionReview
+	ConversionReview map[string]interface{}
+	FromVersion      string
+	ToVersion        string
 }
 
 func (bc BindingContext) MarshalJSON() ([]byte, error) {
@@ -64,6 +66,20 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		}
 	}
 
+	if bc.Metadata.BindingType == KubernetesValidating {
+		res["type"] = "Validating"
+		res["review"] = bc.AdmissionReview
+		return res
+	}
+
+	if bc.Metadata.BindingType == KubernetesConversion {
+		res["type"] = "Conversion"
+		res["fromVersion"] = bc.FromVersion
+		res["toVersion"] = bc.ToVersion
+		res["review"] = bc.ConversionReview
+		return res
+	}
+
 	// KubernetesValidating uses 'group' only for snapshots.
 	if bc.Metadata.Group != "" && bc.Metadata.BindingType != KubernetesValidating {
 		res["binding"] = bc.Metadata.Group
@@ -76,12 +92,7 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		return res
 	}
 
-	if bc.Metadata.BindingType == KubernetesValidating {
-		res["type"] = "Validating"
-		res["review"] = bc.Review
-		return res
-	}
-
+	// A short way for addon-operator's hooks.
 	if bc.Metadata.BindingType != OnKubernetesEvent || bc.Type == "" {
 		return res
 	}

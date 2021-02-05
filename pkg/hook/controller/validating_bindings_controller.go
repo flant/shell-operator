@@ -5,9 +5,9 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/validating_webhook/types"
+	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
-	"github.com/flant/shell-operator/pkg/validating_webhook"
+	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 // A link between a hook and a kube monitor
@@ -23,7 +23,7 @@ type ValidatingBindingToWebhookLink struct {
 // ScheduleBindingsController handles schedule bindings for one hook.
 type ValidatingBindingsController interface {
 	WithValidatingBindings([]ValidatingConfig)
-	WithWebhookManager(*validating_webhook.WebhookManager)
+	WithWebhookManager(*validating.WebhookManager)
 	EnableValidatingBindings()
 	DisableValidatingBindings()
 	CanHandleEvent(event ValidatingEvent) bool
@@ -38,7 +38,7 @@ type validatingBindingsController struct {
 
 	ValidatingBindings []ValidatingConfig
 
-	webhookManager *validating_webhook.WebhookManager
+	webhookManager *validating.WebhookManager
 }
 
 var _ ValidatingBindingsController = &validatingBindingsController{}
@@ -54,7 +54,7 @@ func (c *validatingBindingsController) WithValidatingBindings(bindings []Validat
 	c.ValidatingBindings = bindings
 }
 
-func (c *validatingBindingsController) WithWebhookManager(mgr *validating_webhook.WebhookManager) {
+func (c *validatingBindingsController) WithWebhookManager(mgr *validating.WebhookManager) {
 	c.webhookManager = mgr
 }
 
@@ -117,8 +117,8 @@ func (c *validatingBindingsController) HandleEvent(event ValidatingEvent) Bindin
 	}
 
 	bc := BindingContext{
-		Binding: link.BindingName,
-		Review:  event.Review,
+		Binding:         link.BindingName,
+		AdmissionReview: event.Review,
 	}
 	bc.Metadata.BindingType = KubernetesValidating
 	bc.Metadata.IncludeSnapshots = link.IncludeSnapshots

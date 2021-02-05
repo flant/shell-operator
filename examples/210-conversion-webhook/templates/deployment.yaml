@@ -1,0 +1,43 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shell-operator
+  labels:
+    heritage: example-210
+    app: shell-operator-example-210
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shell-operator-example-210
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        heritage: example-210
+        app: shell-operator-example-210
+      annotations:
+        checksum/hook: {{ .Files.Get "hooks/conversion-alpha.sh" | sha256sum }}
+    spec:
+      containers:
+      - name: shell-operator
+        image: {{ .Values.shellOperator.image | quote }}
+        imagePullPolicy: Always
+        env:
+        - name: SHELL_OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONVERSION_WEBHOOK_SERVICE_NAME
+          value: {{ .Values.shellOperator.conversionWebhookServiceName | quote }}
+        volumeMounts:
+        - name: conversion-certs
+          mountPath: /conversion-certs/
+          readOnly: true
+      serviceAccountName: example-210-acc
+      volumes:
+      - name: conversion-certs
+        secret:
+          secretName: example-210-conversion-certs
