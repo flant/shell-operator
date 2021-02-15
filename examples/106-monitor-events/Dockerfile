@@ -1,2 +1,2 @@
-FROM flant/shell-operator:latest-alpine3.11
+FROM flant/shell-operator:latest
 ADD hooks /hooks
