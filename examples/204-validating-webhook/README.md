@@ -14,7 +14,7 @@ An HTTP server behind the ValidatingWebhookConfiguration requires a certificate 
 ./gen-certs.sh
 ```
 
-> Note: `gen-certs.sh` requires [cfssl utility](https://github.com/cloudflare/cfssl/releases/latest) and an [Approval Permission](https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster) in cluster.
+> Note: `gen-certs.sh` requires [cfssl utility](https://github.com/cloudflare/cfssl/releases/latest).
 
 ### Build and install example
 

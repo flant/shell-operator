@@ -274,6 +274,46 @@ properties:
                 - "Cluster"
                 - "Namespaced"
                 - "*"
+  kubernetesCustomResourceConversion:
+    title: Conversion handlers for CustomResourceDefinition versions
+    type: array
+    additionalItems: false
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - crdName
+      - conversions
+      properties:
+        name:
+          type: string
+        group:
+          type: string
+        includeSnapshotsFrom:
+          type: array
+          additionalItems: false
+          minItems: 1
+          items:
+            type: string
+        crdName:
+          type: string
+        conversions:
+          type: array
+          additionalItems: false
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - fromVersion
+            - toVersion
+            properties:
+              fromVersion:
+                type: string
+              toVersion:
+                type: string
 `,
 	"v0": `
 type: object

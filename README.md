@@ -20,6 +20,8 @@ Shell-operator provides:
 - __Kubernetes object events__: hook can be triggered by `add`, `update` or `delete` events. **[Learn more](HOOKS.md) about hooks.**
 - __Object selector and properties filter__: shell-operator can monitor a particular set of objects and detect changes in their properties.
 - __Simple configuration__: hook binding definition is a JSON or YAML document on script's stdout.
+- __Validating webhook machinery__: hook can handle validating for Kubernetes resources.
+- __Conversion webhook machinery__: hook can handle version conversion for Kubernetes resources.
 
 **Contents**:
 * [Quickstart](#quickstart)

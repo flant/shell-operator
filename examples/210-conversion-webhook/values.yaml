@@ -1,0 +1,4 @@
+shellOperator:
+  image: localhost:5000/shell-operator:example-210
+  # Important: this name should be the same as in gen-certs.sh and csr.json.
+  conversionWebhookServiceName: example-210-conversion-service

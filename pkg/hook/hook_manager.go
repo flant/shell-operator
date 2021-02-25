@@ -12,14 +12,15 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/validating_webhook/types"
+	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
-	"github.com/flant/shell-operator/pkg/validating_webhook"
+	"github.com/flant/shell-operator/pkg/webhook/conversion"
+	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 type HookManager interface {
@@ -28,7 +29,8 @@ type HookManager interface {
 	WithDirectories(workingDir string, tempDir string)
 	WithKubeEventManager(kube_events_manager.KubeEventsManager)
 	WithScheduleManager(schedule_manager.ScheduleManager)
-	WithWebhookManager(*validating_webhook.WebhookManager)
+	WithConversionWebhookManager(*conversion.WebhookManager)
+	WithValidatingWebhookManager(*validating.WebhookManager)
 	WorkingDir() string
 	TempDir() string
 	GetHook(name string) *Hook
@@ -37,15 +39,18 @@ type HookManager interface {
 	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleValidatingEvent(event ValidatingEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule
 }
 
 type hookManager struct {
 	// dependencies
-	workingDir        string
-	tempDir           string
-	kubeEventsManager kube_events_manager.KubeEventsManager
-	scheduleManager   schedule_manager.ScheduleManager
-	webhookManager    *validating_webhook.WebhookManager
+	workingDir               string
+	tempDir                  string
+	kubeEventsManager        kube_events_manager.KubeEventsManager
+	scheduleManager          schedule_manager.ScheduleManager
+	conversionWebhookManager *conversion.WebhookManager
+	validatingWebhookManager *validating.WebhookManager
 
 	// sorted hook names
 	hookNamesInOrder []string
@@ -54,6 +59,9 @@ type hookManager struct {
 	hooksByName map[string]*Hook
 	// index to search hooks by binding type
 	hooksInOrder map[BindingType][]*Hook
+
+	// Index crdName -> fromVersion -> conversionLink
+	conversionChains *conversion.ChainStorage
 }
 
 // hookManager should implement HookManager
@@ -64,6 +72,7 @@ func NewHookManager() *hookManager {
 		hooksByName:      make(map[string]*Hook),
 		hookNamesInOrder: make([]string, 0),
 		hooksInOrder:     make(map[BindingType][]*Hook),
+		conversionChains: conversion.NewChainStorage(),
 	}
 }
 
@@ -80,8 +89,12 @@ func (hm *hookManager) WithScheduleManager(mgr schedule_manager.ScheduleManager)
 	hm.scheduleManager = mgr
 }
 
-func (hm *hookManager) WithWebhookManager(mgr *validating_webhook.WebhookManager) {
-	hm.webhookManager = mgr
+func (hm *hookManager) WithValidatingWebhookManager(mgr *validating.WebhookManager) {
+	hm.validatingWebhookManager = mgr
+}
+
+func (hm *hookManager) WithConversionWebhookManager(mgr *conversion.WebhookManager) {
+	hm.conversionWebhookManager = mgr
 }
 
 func (hm *hookManager) WorkingDir() string {
@@ -122,6 +135,12 @@ func (hm *hookManager) Init() error {
 		hm.hookNamesInOrder = append(hm.hookNamesInOrder, hook.Name)
 	}
 
+	// Validate conversion chains and create index with conversion paths.
+	err = hm.UpdateConversionChains()
+	if err != nil {
+		return fmt.Errorf("check conversion configs: %v", err)
+	}
+
 	return nil
 }
 
@@ -148,7 +167,7 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
 	}
 
-	_, err = hook.WithConfig(configOutput)
+	_, err = hook.LoadConfig(configOutput)
 	if err != nil {
 		return nil, fmt.Errorf("creating hook '%s': %s", hookName, err.Error())
 	}
@@ -160,6 +179,13 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 			"hook":    hook.Name,
 			"binding": kubeCfg.BindingName,
 			"queue":   kubeCfg.Queue,
+		}
+	}
+	for _, conversionCfg := range hook.GetConfig().KubernetesConversion {
+		conversionCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
+		conversionCfg.Webhook.Metadata.MetricLabels = map[string]string{
+			"hook":    hook.Name,
+			"binding": conversionCfg.BindingName,
 		}
 	}
 	for _, validatingCfg := range hook.GetConfig().KubernetesValidating {
@@ -174,7 +200,8 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	hookCtrl := controller.NewHookController()
 	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
 	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
-	hookCtrl.InitValidatingBindings(hook.GetConfig().KubernetesValidating, hm.webhookManager)
+	hookCtrl.InitConversionBindings(hook.GetConfig().KubernetesConversion, hm.conversionWebhookManager)
+	hookCtrl.InitValidatingBindings(hook.GetConfig().KubernetesValidating, hm.validatingWebhookManager)
 
 	hook.WithHookController(hookCtrl)
 	hook.WithTmpDir(hm.TempDir())
@@ -294,4 +321,43 @@ func (hm *hookManager) HandleValidatingEvent(event ValidatingEvent, createTaskFn
 			})
 		}
 	}
+}
+
+// HandleConversionEvent receives a crdName and calculates a sequence of hooks to run.
+func (hm *hookManager) HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+	vHooks, _ := hm.GetHooksInOrder(KubernetesConversion)
+
+	for _, hookName := range vHooks {
+		h := hm.GetHook(hookName)
+		if h.HookController.CanHandleConversionEvent(event, rule) {
+			h.HookController.HandleConversionEvent(event, rule, func(info controller.BindingExecutionInfo) {
+				if createTaskFn != nil {
+					createTaskFn(h, info)
+				}
+			})
+		}
+	}
+}
+
+func (hm *hookManager) UpdateConversionChains() error {
+	vHooks, _ := hm.GetHooksInOrder(KubernetesConversion)
+
+	// Update conversionChains.
+	for _, hookName := range vHooks {
+		h := hm.GetHook(hookName)
+
+		for _, cfg := range h.Config.KubernetesConversion {
+			crdName := cfg.Webhook.CrdName
+			chain := hm.conversionChains.Get(crdName)
+			for _, conversionRule := range cfg.Webhook.Rules {
+				chain.Put(conversionRule)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (hm *hookManager) FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule {
+	return hm.conversionChains.FindConversionChain(crdName, rule)
 }

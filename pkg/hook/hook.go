@@ -13,12 +13,14 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/validating_webhook/types"
+	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
+	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
+	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
 type CommonHook interface {
@@ -28,13 +30,14 @@ type CommonHook interface {
 type HookResult struct {
 	Usage              *executor.CmdUsage
 	Metrics            []operation.MetricOperation
+	ConversionResponse *conversion.Response
 	ValidatingResponse *ValidatingResponse
 }
 
 type Hook struct {
 	Name   string // The unique name like '002-prometheus-hooks/startup_hook'.
 	Path   string // The absolute path to the executable file.
-	Config *HookConfig
+	Config *config.HookConfig
 
 	HookController controller.HookController
 
@@ -45,7 +48,7 @@ func NewHook(name, path string) *Hook {
 	return &Hook{
 		Name:   name,
 		Path:   path,
-		Config: &HookConfig{},
+		Config: &config.HookConfig{},
 	}
 }
 
@@ -53,7 +56,7 @@ func (h *Hook) WithTmpDir(dir string) {
 	h.TmpDir = dir
 }
 
-func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
+func (h *Hook) LoadConfig(configOutput []byte) (hook *Hook, err error) {
 	err = h.Config.LoadAndValidate(configOutput)
 	if err != nil {
 		return h, fmt.Errorf("load hook '%s' config: %s\nhook --config output: %s", h.Name, err.Error(), configOutput)
@@ -62,16 +65,12 @@ func (h *Hook) WithConfig(configOutput []byte) (hook *Hook, err error) {
 	return h, nil
 }
 
-func (h *Hook) GetConfig() *HookConfig {
+func (h *Hook) GetConfig() *config.HookConfig {
 	return h.Config
 }
 
 func (h *Hook) WithHookController(hookController controller.HookController) {
 	h.HookController = hookController
-}
-
-func (h *Hook) GetHookController() controller.HookController {
-	return h.HookController
 }
 
 func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) (*HookResult, error) {
@@ -95,6 +94,11 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 		return nil, err
 	}
 
+	conversionPath, err := h.prepareConversionResponseFile()
+	if err != nil {
+		return nil, err
+	}
+
 	// remove tmp file on hook exit
 	defer func() {
 		if app.DebugKeepTmpFiles != "yes" {
@@ -109,6 +113,7 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 	if contextPath != "" {
 		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
 		envs = append(envs, fmt.Sprintf("METRICS_PATH=%s", metricsPath))
+		envs = append(envs, fmt.Sprintf("CONVERSION_RESPONSE_PATH=%s", conversionPath))
 		envs = append(envs, fmt.Sprintf("VALIDATING_RESPONSE_PATH=%s", validatingPath))
 	}
 
@@ -131,6 +136,11 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 		return result, fmt.Errorf("got bad validating response: %s", err)
 	}
 
+	result.ConversionResponse, err = conversion.ResponseFromFile(conversionPath)
+	if err != nil {
+		return result, fmt.Errorf("got bad conversion response: %s", err)
+	}
+
 	return result, nil
 }
 
@@ -144,44 +154,59 @@ func (h *Hook) GetConfigDescription() string {
 		msgs = append(msgs, fmt.Sprintf("OnStartup:%d", int64(h.Config.OnStartup.Order)))
 	}
 	if len(h.Config.Schedules) > 0 {
-		crontabs := map[string]bool{}
+		crontabs := map[string]struct{}{}
 		for _, schCfg := range h.Config.Schedules {
-			crontabs[schCfg.ScheduleEntry.Crontab] = true
+			crontabs[schCfg.ScheduleEntry.Crontab] = struct{}{}
 		}
-		crontabList := []string{}
+		crontabList := make([]string, 0, len(crontabs))
 		for crontab := range crontabs {
 			crontabList = append(crontabList, crontab)
 		}
 		msgs = append(msgs, fmt.Sprintf("Schedules: '%s'", strings.Join(crontabList, "', '")))
 	}
 	if len(h.Config.OnKubernetesEvents) > 0 {
-		kinds := map[string]bool{}
+		kinds := map[string]struct{}{}
 		for _, kubeCfg := range h.Config.OnKubernetesEvents {
-			kinds[kubeCfg.Monitor.Kind] = true
+			kinds[kubeCfg.Monitor.Kind] = struct{}{}
 		}
-		kindList := []string{}
+		kindList := make([]string, 0, len(kinds))
 		for kind := range kinds {
 			kindList = append(kindList, kind)
 		}
 		msgs = append(msgs, fmt.Sprintf("Watch k8s kinds: '%s'", strings.Join(kindList, "', '")))
 	}
 	if len(h.Config.KubernetesValidating) > 0 {
-		kinds := map[string]bool{}
+		kinds := map[string]struct{}{}
 		for _, validating := range h.Config.KubernetesValidating {
 			if validating.Webhook == nil {
 				continue
 			}
 			for _, rule := range validating.Webhook.Rules {
 				for _, resource := range rule.Resources {
-					kinds[strings.ToLower(resource)] = true
+					kinds[strings.ToLower(resource)] = struct{}{}
 				}
 			}
 		}
-		kindList := []string{}
+		kindList := make([]string, 0, len(kinds))
 		for kind := range kinds {
 			kindList = append(kindList, kind)
 		}
 		msgs = append(msgs, fmt.Sprintf("Validate k8s kinds: '%s'", strings.Join(kindList, "', '")))
+	}
+	if len(h.Config.KubernetesConversion) > 0 {
+		crds := map[string]struct{}{}
+		for _, cfg := range h.Config.KubernetesConversion {
+			if cfg.Webhook == nil {
+				// This should not happen.
+				continue
+			}
+			crds[cfg.Webhook.CrdName] = struct{}{}
+		}
+		crdList := make([]string, 0, len(crds))
+		for crd := range crds {
+			crdList = append(crdList, crd)
+		}
+		msgs = append(msgs, fmt.Sprintf("Conversion for crds: '%s'", strings.Join(crdList, "', '")))
 	}
 	return strings.Join(msgs, ", ")
 }
@@ -223,4 +248,15 @@ func (h *Hook) prepareValidatingResponseFile() (string, error) {
 	}
 
 	return validatingPath, nil
+}
+
+func (h *Hook) prepareConversionResponseFile() (string, error) {
+	conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.NewV4().String()))
+
+	err := ioutil.WriteFile(conversionPath, []byte{}, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	return conversionPath, nil
 }

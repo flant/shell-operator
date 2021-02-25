@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	apixv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,6 +49,7 @@ type KubernetesClient interface {
 
 	DefaultNamespace() string
 	Dynamic() dynamic.Interface
+	ApiExt() apixv1client.ApiextensionsV1Interface
 
 	APIResourceList(apiVersion string) ([]*metav1.APIResourceList, error)
 	APIResource(apiVersion string, kind string) (*metav1.APIResource, error)
@@ -77,6 +79,7 @@ type kubernetesClient struct {
 	configPath       string
 	defaultNamespace string
 	dynamicClient    dynamic.Interface
+	apiExtClient     apixv1client.ApiextensionsV1Interface
 	qps              float32
 	burst            int
 	server           string
@@ -110,6 +113,10 @@ func (c *kubernetesClient) DefaultNamespace() string {
 
 func (c *kubernetesClient) Dynamic() dynamic.Interface {
 	return c.dynamicClient
+}
+
+func (c *kubernetesClient) ApiExt() apixv1client.ApiextensionsV1Interface {
+	return c.apiExtClient
 }
 
 func (c *kubernetesClient) Init() error {
@@ -176,6 +183,11 @@ func (c *kubernetesClient) Init() error {
 	}
 
 	c.dynamicClient, err = dynamic.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	c.apiExtClient, err = apixv1client.NewForConfig(config)
 	if err != nil {
 		return err
 	}

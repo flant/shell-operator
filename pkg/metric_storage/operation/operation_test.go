@@ -15,7 +15,7 @@ func Test_ValidateMetricOperations(t *testing.T) {
 	}{
 		{
 			"simple",
-			`{"group":"azaza", "action":"expire"}`,
+			`{"group":"someGroup", "action":"expire"}`,
 			true,
 		},
 		{
@@ -30,7 +30,7 @@ func Test_ValidateMetricOperations(t *testing.T) {
 		},
 		{
 			"invalid",
-			`{"group":"azaza", "action":"expired"}`,
+			`{"group":"someGroup", "action":"expired"}`,
 			false,
 		},
 	}

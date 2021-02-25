@@ -1,0 +1,14 @@
+apiVersion: "stable.example.com/v1alpha1"
+kind: CronTab
+metadata:
+  name: crontab-v1alpha1
+  labels:
+    heritage: example-210
+spec:
+  cron:
+    - "*"
+    - "*"
+    - "*"
+    - "*"
+    - "*/5"
+  imageName: repo.example.com/my-awesome-cron-image:v1

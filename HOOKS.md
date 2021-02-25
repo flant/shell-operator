@@ -328,6 +328,12 @@ Use a hook as handler for [ValidationWebhookConfiguration](https://kubernetes.io
 
 See syntax and parameters in [BINDING_VALIDATING.md](BINDING_VALIDATING.md)
 
+### kubernetesCustomResourceConversion
+
+Use a hook as handler for [custom resource conversion](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning).
+
+See syntax and parameters in [BINDING_CONVERSION.md](BINDING_CONVERSION.md)
+
 ## Binding context
 
 When an event associated with a hook is triggered, Shell-operator executes the hook without arguments. The information about the event that led to the hook execution is called the **binding context** and is written in JSON format to a temporary file. The path to this file is available to hook via environment variable `BINDING_CONTEXT_PATH`.

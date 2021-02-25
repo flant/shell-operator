@@ -3,7 +3,7 @@
 NAMESPACE=example-204
 SERVICE_NAME=example-204-validating-service
 
-CERT_NAME=${SERVICE_NAME}.${NAMESPACE}
+COMMON_NAME=${SERVICE_NAME}.${NAMESPACE}
 
 set -eo pipefail
 
@@ -14,7 +14,7 @@ echo
 
 mkdir -p validating-certs && cd validating-certs
 
-if [[ -e cert.key  ]] ; then
+if [[ -e ca.csr  ]] ; then
   read -p "Regenerate certificates? (yes/no) [no]: "
   if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]
   then
@@ -22,77 +22,56 @@ if [[ -e cert.key  ]] ; then
   fi
 fi
 
-RM_FILES="cert.crt cert.key cert.csr ca.crt"
+RM_FILES="ca* cert*"
 echo ">>> Remove ${RM_FILES}"
 rm -f $RM_FILES
 
-# generate cert.key, cert.csr
-echo ">>> Generate cert.key and cert.csr"
-cat <<EOF | cfssl genkey - | cfssljson -bare server
+echo ">>> Generate CA key and certificate"
+cat <<EOF | cfssl gencert -initca - | cfssljson -bare ca
 {
-  "hosts": [
-    "${CERT_NAME}.svc",
-    "${CERT_NAME}.svc.cluster.local"
-  ],
-  "CN": "${CERT_NAME}.svc",
+  "CN": "Shell-operator example 204-validating-webhook Root CA",
   "key": {
-    "algo": "ecdsa",
-    "size": 256
+    "algo": "rsa",
+    "size": 2048
   }
 }
 EOF
 
-mv server-key.pem cert.key
-mv server.csr cert.csr
 
-echo ">>> Delete previous CertificateSigningRequest"
-kubectl delete certificatesigningrequest/${CERT_NAME} --ignore-not-found
-
-
-echo ">>> Create CertificateSigningRequest"
-
-# create CertificateSigningRequest resource
-# name is in form serviceName.namespace
-if [[ ${CSR_V1BETA1} == "yes" ]] ; then
-  cat <<EOF | kubectl apply -f -
-apiVersion: certificates.k8s.io/v1beta1
-kind: CertificateSigningRequest
-metadata:
-  name: ${CERT_NAME}
-  labels:
-    heritage: example-204
-spec:
-  request: $(cat cert.csr | base64 | tr -d '\n')
-  usages:
-  - digital signature
-  - key encipherment
-  - server auth
+CFSSL_CONFIG=$(cat <<EOF
+{
+  "signing": {
+    "default": {
+      "expiry": "8760h"
+    },
+    "profiles": {
+      "server": {
+        "usages": [
+          "signing",
+          "digital signing",
+          "key encipherment",
+          "server auth"
+        ],
+        "expiry": "8760h"
+      }
+    }
+  }
+}
 EOF
-else
-  cat <<EOF | kubectl apply -f -
-apiVersion: certificates.k8s.io/v1
-kind: CertificateSigningRequest
-metadata:
-  name: ${CERT_NAME}
-  labels:
-    heritage: example-204
-spec:
-  request: $(cat cert.csr | base64 | tr -d '\n')
-  signerName: kubernetes.io/kube-apiserver-client
-  usages:
-  - digital signature
-  - key encipherment
-  - server auth
+)
+
+echo ">>> Generate cert.key and cert.crt"
+cat <<EOF | cfssl gencert -ca ca.pem -ca-key ca-key.pem -config <(echo "$CFSSL_CONFIG") -profile=server - | cfssljson -bare tls
+{
+  "CN": "${COMMON_NAME}.svc",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "hosts": [
+    "${COMMON_NAME}",
+    "${COMMON_NAME}.svc",
+    "${COMMON_NAME}.svc.cluster.local"
+  ]
+}
 EOF
-fi
-
-kubectl certificate approve $CERT_NAME
-
-echo ">>> Retrieve server.crt"
-kubectl get certificatesigningrequest $CERT_NAME -o jsonpath='{.status.certificate}' | base64 -d > cert.crt
-
-echo ">>> Delete CertificateSigningRequest"
-(kubectl delete certificatesigningrequest/${CERT_NAME} || true )
-
-echo ">>> Retrieve ca.crt"
-kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d > ca.crt

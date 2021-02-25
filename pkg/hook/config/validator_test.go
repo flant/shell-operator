@@ -178,7 +178,7 @@ kubernetesValidating:
   failurePolicy: Ignore
   labelSelector:
     matchExpressions:
-      - key: azaza
+      - key: someKey
         operator: Exists
   rules:
   - apiVersions: ["v1"]

@@ -212,14 +212,24 @@ There should be a Service for shell-operator (see [Availability](https://kuberne
 Command line options:
 
 ```
---validating-webhook-server-cert="/validating-certs/cert.crt"
-                             A path to a server certificate for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_SERVER_CERT.
---validating-webhook-server-key="/validating-certs/cert.key"
-                             A path to a server private key for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_SERVER_KEY.
---validating-webhook-ca="/validating-certs/ca.crt"
-                             A path to a ca bundle for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_CA.
---validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
-                             A path to a server certificate for ValidatingWebhook. Can be set with $VALIDATING_WEBHOOK_CLIENT_CA.
---validating-webhook-service-name=VALIDATING-WEBHOOK-SERVICE-NAME ...
-                             A name of a service in front of a shell-operator. Can be set with $VALIDATING_WEBHOOK_SERVICE_NAME.
+  --validating-webhook-configuration-name="shell-operator-hooks"
+                                 A name of a ValidatingWebhookConfiguration resource. Can be set with
+                                 $VALIDATING_WEBHOOK_CONFIGURATION_NAME.
+  --validating-webhook-service-name="shell-operator-validating-svc"
+                                 A name of a service used in ValidatingWebhookConfiguration. Can be set
+                                 with $VALIDATING_WEBHOOK_SERVICE_NAME.
+  --validating-webhook-server-cert="/validating-certs/tls.crt"
+                                 A path to a server certificate for service used in
+                                 ValidatingWebhookConfiguration. Can be set with
+                                 $VALIDATING_WEBHOOK_SERVER_CERT.
+  --validating-webhook-server-key="/validating-certs/tls.key"
+                                 A path to a server private key for service used in
+                                 ValidatingWebhookConfiguration. Can be set with
+                                 $VALIDATING_WEBHOOK_SERVER_KEY.
+  --validating-webhook-ca="/validating-certs/ca.crt"
+                                 A path to a ca certificate for ValidatingWebhookConfiguration. Can be set
+                                 with $VALIDATING_WEBHOOK_CA.
+  --validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
+                                 A path to a server certificate for ValidatingWebhookConfiguration. Can be
+                                 set with $VALIDATING_WEBHOOK_CLIENT_CA.
 ```

@@ -62,7 +62,7 @@ func Test_Hook_WithConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			hook = NewHook("hook-sh", "/hooks/hook.sh")
-			_, err = hook.WithConfig([]byte(test.jsonData))
+			_, err = hook.LoadConfig([]byte(test.jsonData))
 			test.fn()
 		})
 	}
