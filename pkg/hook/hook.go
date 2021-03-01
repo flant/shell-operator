@@ -1,6 +1,7 @@
 package hook
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kennygrant/sanitize"
+	"golang.org/x/time/rate"
 	uuid "gopkg.in/satori/go.uuid.v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -40,6 +42,7 @@ type Hook struct {
 	Config *config.HookConfig
 
 	HookController controller.HookController
+	RateLimiter    *rate.Limiter
 
 	TmpDir string
 }
@@ -62,11 +65,17 @@ func (h *Hook) LoadConfig(configOutput []byte) (hook *Hook, err error) {
 		return h, fmt.Errorf("load hook '%s' config: %s\nhook --config output: %s", h.Name, err.Error(), configOutput)
 	}
 
+	h.RateLimiter = CreateRateLimiter(h.Config)
+
 	return h, nil
 }
 
 func (h *Hook) GetConfig() *config.HookConfig {
 	return h.Config
+}
+
+func (h *Hook) RateLimitWait(ctx context.Context) error {
+	return h.RateLimiter.Wait(ctx)
 }
 
 func (h *Hook) WithHookController(hookController controller.HookController) {
@@ -208,6 +217,9 @@ func (h *Hook) GetConfigDescription() string {
 		}
 		msgs = append(msgs, fmt.Sprintf("Conversion for crds: '%s'", strings.Join(crdList, "', '")))
 	}
+	if h.Config.Settings != nil {
+		msgs = append(msgs, fmt.Sprintf("Rate: %s/%d", h.Config.Settings.ExecutionMinInterval.String(), h.Config.Settings.ExecutionBurst))
+	}
 	return strings.Join(msgs, ", ")
 }
 
@@ -259,4 +271,15 @@ func (h *Hook) prepareConversionResponseFile() (string, error) {
 	}
 
 	return conversionPath, nil
+}
+
+func CreateRateLimiter(cfg *config.HookConfig) *rate.Limiter {
+	// Create rate limiter
+	limit := rate.Inf // no rate limit by default
+	burst := 1        // no more then 1 event at time
+	if cfg.Settings != nil {
+		limit = rate.Every(cfg.Settings.ExecutionMinInterval)
+		burst = cfg.Settings.ExecutionBurst
+	}
+	return rate.NewLimiter(limit, burst)
 }

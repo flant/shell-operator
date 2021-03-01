@@ -28,7 +28,7 @@ config parameter.
 */
 
 var (
-	DelayOnQueueIsEmpty = 3 * time.Second
+	DelayOnQueueIsEmpty = 250 * time.Millisecond
 	DelayOnFailedTask   = 5 * time.Second
 	DelayOnRepeat       = 25 * time.Millisecond
 )

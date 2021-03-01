@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/onsi/gomega"
 
@@ -724,6 +725,36 @@ kubernetesCustomResourceConversion:
   conversions:
   - fromVersion: q
     to: q
+`,
+			func() {
+				g.Expect(err).Should(HaveOccurred())
+			},
+		},
+		{
+			"v1 settings",
+			`
+configVersion: v1
+settings:
+  executionMinInterval: 30s
+  executionBurst: 1
+`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.Version).To(Equal("v1"))
+				g.Expect(hookConfig.V0).To(BeNil())
+				g.Expect(hookConfig.V1).NotTo(BeNil())
+				g.Expect(hookConfig.Settings).NotTo(BeNil())
+				g.Expect(hookConfig.Settings.ExecutionMinInterval).To(Equal(time.Duration(time.Second * 30)))
+				g.Expect(hookConfig.Settings.ExecutionBurst).To(Equal(1))
+			},
+		},
+		{
+			"v1 settings with error",
+			`
+configVersion: v1
+settings:
+  executionMinInterval: 30ks
+  executionBurst: 1
 `,
 			func() {
 				g.Expect(err).Should(HaveOccurred())

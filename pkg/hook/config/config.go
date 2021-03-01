@@ -23,6 +23,7 @@ type HookConfig struct {
 	OnKubernetesEvents   []OnKubernetesEventConfig
 	KubernetesValidating []ValidatingConfig
 	KubernetesConversion []ConversionConfig
+	Settings             *Settings
 }
 
 // LoadAndValidate loads config from bytes and validate it. Returns multierror.

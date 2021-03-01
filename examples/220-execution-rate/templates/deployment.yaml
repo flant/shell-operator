@@ -1,0 +1,33 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shell-operator
+  labels:
+    heritage: example-220
+    app: shell-operator-example-220
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shell-operator-example-220
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        heritage: example-220
+        app: shell-operator-example-220
+      annotations:
+        checksum/hook: {{ .Files.Get "hooks/settings-rate-limit.sh" | sha256sum }}
+    spec:
+      containers:
+      - name: shell-operator
+        image: {{ .Values.shellOperator.image | quote }}
+        imagePullPolicy: Always
+        env:
+        - name: SHELL_OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+      serviceAccountName: example-220-acc
