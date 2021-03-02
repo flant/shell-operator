@@ -2,16 +2,16 @@ package object_patch
 
 type OperationSpec struct {
 	Operation   OperationType `json:"operation" yaml:"operation"`
-	ApiVersion  string        `json:"apiVersion" yaml:"apiVersion"`
-	Kind        string        `json:"kind" yaml:"kind"`
-	Namespace   string        `json:"namespace" yaml:"namespace"`
-	Name        string        `json:"name" yaml:"name"`
-	Subresource string        `json:"subresource" yaml:"subresource"`
+	ApiVersion  string        `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	Kind        string        `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Namespace   string        `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Name        string        `json:"name,omitempty" yaml:"name,omitempty"`
+	Subresource string        `json:"subresource,omitempty" yaml:"subresource,omitempty"`
 
-	Object     map[string]interface{} `json:"object" yaml:"object"`
-	JQFilter   string                 `json:"jqFilter" yaml:"jqFilter"`
-	MergePatch map[string]interface{} `json:"mergePatch" yaml:"mergePatch"`
-	JSONPatch  []interface{}          `json:"jsonPatch" yaml:"jsonPatch"`
+	Object     map[string]interface{} `json:"object,omitempty" yaml:"object,omitempty"`
+	JQFilter   string                 `json:"jqFilter,omitempty" yaml:"jqFilter,omitempty"`
+	MergePatch map[string]interface{} `json:"mergePatch,omitempty" yaml:"mergePatch,omitempty"`
+	JSONPatch  []interface{}          `json:"jsonPatch,omitempty" yaml:"jsonPatch,omitempty"`
 }
 
 type OperationType string
@@ -24,7 +24,7 @@ const (
 	DeleteInBackground OperationType = "DeleteInBackground"
 	DeleteNonCascading OperationType = "DeleteNonCascading"
 
-	JQPatch    OperationType = "JQFilter"
+	JQPatch    OperationType = "JQPatch"
 	MergePatch OperationType = "MergePatch"
 	JSONPatch  OperationType = "JSONPatch"
 )

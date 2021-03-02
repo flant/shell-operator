@@ -3,20 +3,23 @@ operation: JQPatch
 apiVersion: core/v1
 kind: ConfigMap
 name: "test"
+namespace: "default"
 jqFilter: '.data = {"test": test}'
 ---
 operation: MergePatch
 apiVersion: core/v1
 kind: ConfigMap
 name: "test"
+namespace: "default"
 mergePatch:
   data:
     test: test
 ---
-operation: jsonPatch
+operation: JSONPatch
 apiVersion: core/v1
 kind: ConfigMap
 name: "test"
+namespace: "default"
 jsonPatch:
 - op: replace
   path: /data

@@ -36,16 +36,19 @@ func (o *ObjectPatcher) ParseSpecs(specBytes []byte) ([]OperationSpec, error) {
 		return nil, err
 	}
 
-	err = validateSpecs(specs)
-	if err != nil {
-		return nil, err
+	var validationErrors = &multierror.Error{}
+	for _, spec := range specs {
+		err = ValidateOperationSpec(spec, GetSchema("v0"), "")
+		if err != nil {
+			validationErrors = multierror.Append(validationErrors, err)
+		}
 	}
 
-	return specs, err
+	return specs, validationErrors.ErrorOrNil()
 }
 
 func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSpec) error {
-	var applyErrors *multierror.Error
+	var applyErrors = &multierror.Error{}
 	for _, spec := range specs {
 		var operationError error
 
@@ -55,11 +58,11 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 		case CreateOrUpdate:
 			operationError = o.CreateOrUpdateObject(&unstructured.Unstructured{Object: spec.Object}, spec.Namespace, spec.Subresource)
 		case Delete:
-			operationError = o.DeleteObject(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name)
+			operationError = o.DeleteObject(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case DeleteInBackground:
-			operationError = o.DeleteObjectInBackground(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name)
+			operationError = o.DeleteObjectInBackground(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case DeleteNonCascading:
-			operationError = o.DeleteObjectNonCascading(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name)
+			operationError = o.DeleteObjectNonCascading(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case JQPatch:
 			operationError = o.JQPatchObject(spec.JQFilter, spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case MergePatch:
@@ -71,7 +74,7 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 
 			operationError = o.MergePatchObject(jsonMergePatch, spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case JSONPatch:
-			jsonJsonPatch, err := json.Marshal(spec.MergePatch)
+			jsonJsonPatch, err := json.Marshal(spec.JSONPatch)
 			if err != nil {
 				applyErrors = multierror.Append(applyErrors, err)
 				continue
@@ -85,7 +88,6 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 		}
 	}
 
-	//goland:noinspection GoNilness
 	return applyErrors.ErrorOrNil()
 }
 
@@ -274,25 +276,25 @@ func (o *ObjectPatcher) JSONPatchObject(jsonPatch []byte, apiVersion, kind, name
 	return err
 }
 
-func (o *ObjectPatcher) DeleteObject(apiVersion, kind, namespace, name string) error {
-	return o.deleteObjectInternal(apiVersion, kind, namespace, name, metav1.DeletePropagationForeground)
+func (o *ObjectPatcher) DeleteObject(apiVersion, kind, namespace, name, subresource string) error {
+	return o.deleteObjectInternal(apiVersion, kind, namespace, name, subresource, metav1.DeletePropagationForeground)
 }
 
-func (o *ObjectPatcher) DeleteObjectInBackground(apiVersion, kind, namespace, name string) error {
-	return o.deleteObjectInternal(apiVersion, kind, namespace, name, metav1.DeletePropagationBackground)
+func (o *ObjectPatcher) DeleteObjectInBackground(apiVersion, kind, namespace, name, subresource string) error {
+	return o.deleteObjectInternal(apiVersion, kind, namespace, name, subresource, metav1.DeletePropagationBackground)
 }
 
-func (o *ObjectPatcher) DeleteObjectNonCascading(apiVersion, kind, namespace, name string) error {
-	return o.deleteObjectInternal(apiVersion, kind, namespace, name, metav1.DeletePropagationOrphan)
+func (o *ObjectPatcher) DeleteObjectNonCascading(apiVersion, kind, namespace, name, subresource string) error {
+	return o.deleteObjectInternal(apiVersion, kind, namespace, name, subresource, metav1.DeletePropagationOrphan)
 }
 
-func (o *ObjectPatcher) deleteObjectInternal(apiVersion, kind, namespace, name string, propagation metav1.DeletionPropagation) error {
+func (o *ObjectPatcher) deleteObjectInternal(apiVersion, kind, namespace, name, subresource string, propagation metav1.DeletionPropagation) error {
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
 		return err
 	}
 
-	err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Delete(name, &metav1.DeleteOptions{PropagationPolicy: &propagation})
+	err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Delete(name, &metav1.DeleteOptions{PropagationPolicy: &propagation}, subresource)
 	if err != nil {
 		return err
 	}

@@ -30,10 +30,10 @@ type CommonHook interface {
 }
 
 type HookResult struct {
-	Usage              *executor.CmdUsage
-	Metrics            []operation.MetricOperation
-	ConversionResponse *conversion.Response
-	ValidatingResponse *ValidatingResponse
+	Usage                *executor.CmdUsage
+	Metrics              []operation.MetricOperation
+	ConversionResponse   *conversion.Response
+	ValidatingResponse   *ValidatingResponse
 	KubernetesPatchBytes []byte
 }
 

@@ -18,6 +18,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -36,7 +37,6 @@ import (
 	"github.com/flant/shell-operator/pkg/utils/measure"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/validating"
-	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 var WaitQueuesTimeout = time.Second * 10

@@ -3,13 +3,16 @@ operation: Delete
 apiVersion: core/v1
 kind: ConfigMap
 name: "test"
+namespace: "default"
 ---
 operation: DeleteInBackground
 apiVersion: core/v1
 kind: ConfigMap
 name: "test"
+namespace: "default"
 ---
 operation: DeleteNonCascading
 apiVersion: core/v1
 kind: ConfigMap
 name: "test"
+namespace: "default"

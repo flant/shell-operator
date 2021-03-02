@@ -117,7 +117,7 @@ rapidly changing object, for example `status` field with many concurrent changes
 * `kind` — object's Kind.
 * `namespace` — object's Namespace. If empty, implies operation on a Cluster-level resource.
 * `name` — object's name.
-* `jqExpression` — describes transformations to perform on an object.
+* `jqFilter` — describes transformations to perform on an object.
 * `subresource` — e.g., `status`.
 
 ##### Example
@@ -128,7 +128,7 @@ rapidly changing object, for example `status` field with many concurrent changes
   "kind": "Deployment",
   "namespace": "default",
   "name": "nginx",
-  "jqExpression": ".spec.replicas = 1"
+  "jqFilter": ".spec.replicas = 1"
 }
 ```
 
@@ -147,7 +147,7 @@ rapidly changing object, for example `status` field with many concurrent changes
 
 ```json
 {
-  "operationType": "MergePatch",
+  "operation": "MergePatch",
   "kind": "Deployment",
   "namespace": "default",
   "name": "nginx",
@@ -167,14 +167,14 @@ rapidly changing object, for example `status` field with many concurrent changes
 * `kind` — object's Kind.
 * `namespace` — object's Namespace. If empty, implies operation on a Cluster-level resource.
 * `name` — object's name.
-* `jsonPatch` — describes transformations to perform on an object.
+* `JSONPatch` — describes transformations to perform on an object.
 * `subresource` — e.g., `status`.
 
 ##### Example
 
 ```json
 {
-  "operationType": "JSONPatch",
+  "operation": "JSONPatch",
   "kind": "Deployment",
   "namespace": "default",
   "name": "nginx",
