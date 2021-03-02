@@ -702,8 +702,9 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 				goto Metrics
 			}
 
-			err = op.ObjectPatcher.GenerateFromJSONAndExecuteOperations(specs)
-			if err != nil {
+			kubernetesPatchErr := op.ObjectPatcher.GenerateFromJSONAndExecuteOperations(specs)
+			if kubernetesPatchErr != nil && !hookMeta.AllowFailure {
+				err = kubernetesPatchErr
 				goto Metrics
 			}
 		}
