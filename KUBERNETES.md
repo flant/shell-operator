@@ -91,7 +91,7 @@ The path to the file is found in the `$KUBERNETES_PATCH_PATH` environment variab
 * `kind` — object's Kind.
 * `namespace` — object's namespace. If empty, implies operation on a cluster-level resource.
 * `name` — object's name.
-* `subresource` — e.g., `status`.
+* `subresource` — a subresource name if subresource is to be transformed. For example, `status`.
 
 #### Example
 
@@ -109,6 +109,10 @@ The path to the file is found in the `$KUBERNETES_PATCH_PATH` environment variab
 Use `JQPatch` for almost everything. Consider using `MergePatch` or `JSONPatch` if you are attempting to modify 
 rapidly changing object, for example `status` field with many concurrent changes (and incrementing `resourceVersion`).
 
+Be careful, when updating a `.status` field. If a `/status` subresource is enabled on a resource,
+it'll ignore updates to the `.status` field if you haven't specified `subresource: status` in the operation spec.
+More info [here](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status).
+
 #### JQPatch
 
 * `operation` — specifies an operation's type.
@@ -118,8 +122,7 @@ rapidly changing object, for example `status` field with many concurrent changes
 * `namespace` — object's Namespace. If empty, implies operation on a Cluster-level resource.
 * `name` — object's name.
 * `jqFilter` — describes transformations to perform on an object.
-* `subresource` — e.g., `status`.
-
+* `subresource` — a subresource name if subresource is to be transformed. For example, `status`.
 ##### Example
 
 ```json
@@ -167,8 +170,8 @@ rapidly changing object, for example `status` field with many concurrent changes
 * `kind` — object's Kind.
 * `namespace` — object's Namespace. If empty, implies operation on a Cluster-level resource.
 * `name` — object's name.
-* `JSONPatch` — describes transformations to perform on an object.
-* `subresource` — e.g., `status`.
+* `jsonPatch` — describes transformations to perform on an object.
+* `subresource` — a subresource name if subresource is to be transformed. For example, `status`.
 
 ##### Example
 
