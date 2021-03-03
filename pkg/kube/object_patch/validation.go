@@ -47,7 +47,6 @@ definitions:
   patch:
     type: object
     required:
-    - apiVersion
     - kind
     - name
     properties:
