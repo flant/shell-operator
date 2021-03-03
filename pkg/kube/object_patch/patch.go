@@ -174,7 +174,14 @@ func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, 
 	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
 	if errors.IsAlreadyExists(err) {
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			_, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Update(object, metav1.UpdateOptions{}, generateSubresources(subresource)...)
+			existingObj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Get(object.GetName(), metav1.GetOptions{}, generateSubresources(subresource)...)
+			if err != nil {
+				return err
+			}
+
+			objCopy := object.DeepCopy()
+			objCopy.SetResourceVersion(existingObj.GetResourceVersion())
+			_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(objCopy.GetNamespace()).Update(objCopy, metav1.UpdateOptions{}, generateSubresources(subresource)...)
 			return err
 		})
 	}
