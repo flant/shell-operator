@@ -125,6 +125,11 @@ var _ = Describe("Kubernetes API object patching", func() {
 			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(testCM.Name, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
+
+		It("should successfully delete an object if it doesn't exist", func() {
+			err := ObjectPatcher.DeleteObject(testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
+			Expect(err).Should(Succeed())
+		})
 	})
 
 	Context("patching an object", func() {
