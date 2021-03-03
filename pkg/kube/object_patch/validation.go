@@ -35,7 +35,6 @@ definitions:
   delete:
     type: object
     required:
-    - apiVersion
     - kind
     - name
     properties:
