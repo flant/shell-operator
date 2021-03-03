@@ -54,9 +54,9 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 
 		switch spec.Operation {
 		case Create:
-			operationError = o.CreateObject(&unstructured.Unstructured{Object: spec.Object}, spec.Namespace, spec.Subresource)
+			operationError = o.CreateObject(&unstructured.Unstructured{Object: spec.Object}, spec.Subresource)
 		case CreateOrUpdate:
-			operationError = o.CreateOrUpdateObject(&unstructured.Unstructured{Object: spec.Object}, spec.Namespace, spec.Subresource)
+			operationError = o.CreateOrUpdateObject(&unstructured.Unstructured{Object: spec.Object}, spec.Subresource)
 		case Delete:
 			operationError = o.DeleteObject(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case DeleteInBackground:
@@ -140,7 +140,7 @@ func unmarshalFromYaml(yamlSpecs []byte) ([]OperationSpec, error) {
 	return specSlice, nil
 }
 
-func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, namespace, subresource string) error {
+func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, subresource string) error {
 	if object == nil {
 		return fmt.Errorf("cannot create empty object")
 	}
@@ -153,12 +153,12 @@ func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, namespac
 		return err
 	}
 
-	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
+	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
 
 	return err
 }
 
-func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, namespace, subresource string) error {
+func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, subresource string) error {
 	if object == nil {
 		return fmt.Errorf("cannot create empty object")
 	}
@@ -171,10 +171,10 @@ func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, 
 		return err
 	}
 
-	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
+	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
 	if errors.IsAlreadyExists(err) {
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			_, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Update(object, metav1.UpdateOptions{}, generateSubresources(subresource)...)
+			_, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Update(object, metav1.UpdateOptions{}, generateSubresources(subresource)...)
 			return err
 		})
 	}

@@ -17,11 +17,7 @@ var Schemas = map[string]string{
 definitions:
   common:
     type: object
-    required:
-    - namespace
     properties:
-      namespace:
-        type: string
       subresource:
         type: string
   create:
