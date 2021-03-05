@@ -688,12 +688,6 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 			t.SetProp("conversionResponse", result.ConversionResponse)
 			taskLogEntry.Infof("ConversionResponse from hook: %s", result.ConversionResponse.Dump())
 		}
-		err = op.HookMetricStorage.SendBatch(result.Metrics, map[string]string{
-			"hook": hookMeta.HookName,
-		})
-		if err != nil {
-			goto Metrics
-		}
 
 		if len(result.KubernetesPatchBytes) > 0 {
 			var specs []object_patch.OperationSpec
@@ -706,6 +700,13 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 			if err != nil {
 				goto Metrics
 			}
+		}
+
+		err = op.HookMetricStorage.SendBatch(result.Metrics, map[string]string{
+			"hook": hookMeta.HookName,
+		})
+		if err != nil {
+			goto Metrics
 		}
 	}
 
