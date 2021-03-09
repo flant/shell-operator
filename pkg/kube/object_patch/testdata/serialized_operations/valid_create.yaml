@@ -1,0 +1,16 @@
+---
+operation: Create
+namespace: default
+object:
+  apiVersion: core/v1
+  kind: ConfigMap
+  data:
+    test: test
+---
+operation: CreateOrUpdate
+namespace: default
+object:
+  apiVersion: core/v1
+  kind: ConfigMap
+  data:
+    test: test

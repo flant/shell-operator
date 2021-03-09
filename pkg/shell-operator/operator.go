@@ -16,7 +16,9 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/kube/object_patch"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -33,7 +35,6 @@ import (
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/flant/shell-operator/pkg/utils/measure"
-	"github.com/flant/shell-operator/pkg/utils/structured-logger"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
@@ -51,6 +52,7 @@ type ShellOperator struct {
 	// separate metric storage for hook metrics if separate listen port is configured
 	HookMetricStorage *metric_storage.MetricStorage
 	KubeClient        kube.KubernetesClient
+	ObjectPatcher     *object_patch.ObjectPatcher
 
 	ScheduleManager   schedule_manager.ScheduleManager
 	KubeEventsManager kube_events_manager.KubeEventsManager
@@ -186,6 +188,8 @@ func (op *ShellOperator) Init() (err error) {
 			return err
 		}
 	}
+
+	op.ObjectPatcher = object_patch.NewObjectPatcher(op.KubeClient)
 
 	// Initialize the task queues set with the "main" queue.
 	op.TaskQueues = queue.NewTaskQueueSet()
@@ -680,11 +684,29 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 			t.SetProp("conversionResponse", result.ConversionResponse)
 			taskLogEntry.Infof("ConversionResponse from hook: %s", result.ConversionResponse.Dump())
 		}
+
+		if len(result.KubernetesPatchBytes) > 0 {
+			var specs []object_patch.OperationSpec
+			specs, err = object_patch.ParseSpecs(result.KubernetesPatchBytes)
+			if err != nil {
+				goto Metrics
+			}
+
+			err = op.ObjectPatcher.GenerateFromJSONAndExecuteOperations(specs)
+			if err != nil {
+				goto Metrics
+			}
+		}
+
 		err = op.HookMetricStorage.SendBatch(result.Metrics, map[string]string{
 			"hook": hookMeta.HookName,
 		})
+		if err != nil {
+			goto Metrics
+		}
 	}
 
+Metrics:
 	success := 0.0
 	errors := 0.0
 	allowed := 0.0

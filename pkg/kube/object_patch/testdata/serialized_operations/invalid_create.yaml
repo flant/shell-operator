@@ -1,0 +1,8 @@
+---
+operation: Create
+namespace: default
+object:
+---
+operation: CreateOrUpdate
+namespace: default
+object:

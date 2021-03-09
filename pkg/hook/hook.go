@@ -30,10 +30,11 @@ type CommonHook interface {
 }
 
 type HookResult struct {
-	Usage              *executor.CmdUsage
-	Metrics            []operation.MetricOperation
-	ConversionResponse *conversion.Response
-	ValidatingResponse *ValidatingResponse
+	Usage                *executor.CmdUsage
+	Metrics              []operation.MetricOperation
+	ConversionResponse   *conversion.Response
+	ValidatingResponse   *ValidatingResponse
+	KubernetesPatchBytes []byte
 }
 
 type Hook struct {
@@ -108,12 +109,18 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 		return nil, err
 	}
 
+	kubernetesPatchPath, err := h.prepareObjectPatchFile()
+	if err != nil {
+		return nil, err
+	}
+
 	// remove tmp file on hook exit
 	defer func() {
 		if app.DebugKeepTmpFiles != "yes" {
 			os.Remove(contextPath)
 			os.Remove(metricsPath)
 			os.Remove(validatingPath)
+			os.Remove(kubernetesPatchPath)
 		}
 	}()
 
@@ -124,6 +131,7 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 		envs = append(envs, fmt.Sprintf("METRICS_PATH=%s", metricsPath))
 		envs = append(envs, fmt.Sprintf("CONVERSION_RESPONSE_PATH=%s", conversionPath))
 		envs = append(envs, fmt.Sprintf("VALIDATING_RESPONSE_PATH=%s", validatingPath))
+		envs = append(envs, fmt.Sprintf("KUBERNETES_PATCH_PATH=%s", kubernetesPatchPath))
 	}
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
@@ -148,6 +156,11 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 	result.ConversionResponse, err = conversion.ResponseFromFile(conversionPath)
 	if err != nil {
 		return result, fmt.Errorf("got bad conversion response: %s", err)
+	}
+
+	result.KubernetesPatchBytes, err = ioutil.ReadFile(kubernetesPatchPath)
+	if err != nil {
+		return result, fmt.Errorf("can't read object patch file: %s", err)
 	}
 
 	return result, nil
@@ -282,4 +295,15 @@ func CreateRateLimiter(cfg *config.HookConfig) *rate.Limiter {
 		burst = cfg.Settings.ExecutionBurst
 	}
 	return rate.NewLimiter(limit, burst)
+}
+
+func (h *Hook) prepareObjectPatchFile() (string, error) {
+	objectPatchPath := filepath.Join(h.TmpDir, fmt.Sprintf("%s-object-patch-%s", h.SafeName(), uuid.NewV4().String()))
+
+	err := ioutil.WriteFile(objectPatchPath, []byte{}, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	return objectPatchPath, nil
 }
