@@ -7,8 +7,6 @@ List of possible operations and corresponding JSON specifications can be found b
 
 The path to the file is found in the `$KUBERNETES_PATCH_PATH` environment variable.
 
-> TODO: bash examples
-
 ## Operations
 
 ### Create

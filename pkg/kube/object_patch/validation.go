@@ -165,7 +165,7 @@ func LoadSchema(name string) (*spec.Schema, error) {
 // See https://github.com/kubernetes/apiextensions-apiserver/blob/1bb376f70aa2c6f2dec9a8c7f05384adbfac7fbb/pkg/apiserver/validation/validation.go#L47
 func ValidateOperationSpec(obj interface{}, s *spec.Schema, rootName string) (multiErr error) {
 	if s == nil {
-		return fmt.Errorf("validate config: schema is not provided")
+		return fmt.Errorf("validate kubernetes patch spec: schema is not provided")
 	}
 
 	validator := validate.NewSchemaValidator(s, nil, rootName, strfmt.Default)
@@ -179,9 +179,9 @@ func ValidateOperationSpec(obj interface{}, s *spec.Schema, rootName string) (mu
 	for _, err := range result.Errors {
 		allErrs = multierror.Append(allErrs, err)
 	}
-	// NOTE: no validation errors, but config is not valid!
+	// NOTE: no validation errors, but kubernetes patch spec is not valid!
 	if allErrs.Len() == 1 {
-		allErrs = multierror.Append(allErrs, fmt.Errorf("configuration is not valid"))
+		allErrs = multierror.Append(allErrs, fmt.Errorf("kubernetes patch spec is not valid"))
 	}
 
 	if allErrs.Len() > 1 {

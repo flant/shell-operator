@@ -30,7 +30,7 @@ func NewObjectPatcher(kubeClient kube.KubernetesClient) *ObjectPatcher {
 	return &ObjectPatcher{kubeClient: kubeClient}
 }
 
-func (o *ObjectPatcher) ParseSpecs(specBytes []byte) ([]OperationSpec, error) {
+func ParseSpecs(specBytes []byte) ([]OperationSpec, error) {
 	specs, err := unmarshalFromJSONOrYAML(specBytes)
 	if err != nil {
 		return nil, err

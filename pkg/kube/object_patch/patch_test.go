@@ -3,6 +3,8 @@ package object_patch
 import (
 	"io/ioutil"
 	"testing"
+
+	. "github.com/onsi/gomega"
 )
 
 // TODO: Kubernetes API interaction is tested only in in the integration tests. Unit tests with the FakeClient would be faster.
@@ -17,6 +19,8 @@ func mustReadFile(filePath string) []byte {
 }
 
 func TestParseSpecs(t *testing.T) {
+	g := NewWithT(t)
+
 	tests := []struct {
 		name         string
 		testFilePath string
@@ -55,12 +59,13 @@ func TestParseSpecs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o := &ObjectPatcher{kubeClient: nil}
 			testSpecs := mustReadFile(tt.testFilePath)
 
-			_, err := o.ParseSpecs(testSpecs)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+			_, err := ParseSpecs(testSpecs)
+			if tt.wantErr {
+				g.Expect(err).To(HaveOccurred())
+			} else {
+				g.Expect(err).ToNot(HaveOccurred())
 			}
 		})
 	}

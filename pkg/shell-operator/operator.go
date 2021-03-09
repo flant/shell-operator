@@ -96,10 +96,6 @@ func (op *ShellOperator) WithKubernetesClient(klient kube.KubernetesClient) {
 	op.KubeClient = klient
 }
 
-func (op *ShellOperator) WithObjectPatcher(objectPatcher *object_patch.ObjectPatcher) {
-	op.ObjectPatcher = objectPatcher
-}
-
 func (op *ShellOperator) WithMetricStorage(metricStorage *metric_storage.MetricStorage) {
 	op.MetricStorage = metricStorage
 }
@@ -691,7 +687,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 
 		if len(result.KubernetesPatchBytes) > 0 {
 			var specs []object_patch.OperationSpec
-			specs, err = op.ObjectPatcher.ParseSpecs(result.KubernetesPatchBytes)
+			specs, err = object_patch.ParseSpecs(result.KubernetesPatchBytes)
 			if err != nil {
 				goto Metrics
 			}
