@@ -61,7 +61,7 @@ func KindCreateCluster(clusterName string) error {
 		return fmt.Errorf("no kind nodes for created cluster '%s'", clusterName)
 	}
 	for _, node := range n {
-		fmt.Printf(node.String())
+		fmt.Printf("%s ", node.String())
 	}
 
 	return nil

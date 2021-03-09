@@ -179,9 +179,10 @@ func (m *JsonLogMatcher) HandleLine(line string) {
 	}
 	//Ω(line).Should(HavePrefix("{"))
 
-	logRecord, err := NewJsonLogRecord().FromString(line)
+	logRecord, _ := NewJsonLogRecord().FromString(line)
 	//Ω(err).ShouldNot(HaveOccurred())
 
+	var err error
 	if step.Matcher != nil {
 		res := step.Matcher(logRecord)
 		if res {
@@ -261,7 +262,7 @@ func (matcher *FinishAllMatchersSuccessfullyMatcher) Match(actual interface{}) (
 func (matcher *FinishAllMatchersSuccessfullyMatcher) FailureMessage(actual interface{}) (message string) {
 	msgs := []string{}
 	if !matcher.finished {
-		msgs = append(msgs, fmt.Sprintf("is finished"))
+		msgs = append(msgs, "is finished")
 	}
 	if matcher.err != nil {
 		msgs = append(msgs, fmt.Sprintf("has no error. Got %v", matcher.err))

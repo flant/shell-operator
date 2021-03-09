@@ -9,7 +9,7 @@ import (
 type JsonLogRecord map[string]string
 
 func NewJsonLogRecord() JsonLogRecord {
-	return make(JsonLogRecord, 0)
+	return make(JsonLogRecord)
 }
 
 func (j JsonLogRecord) FromString(s string) (JsonLogRecord, error) {
