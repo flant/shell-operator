@@ -201,11 +201,11 @@ func (matcher *HaveMetricMatcher) Match(actual interface{}) (success bool, err e
 }
 
 func (matcher *HaveMetricMatcher) FailureMessage(actual interface{}) (message string) {
-	return fmt.Sprintf("Expected ShellOperator has metric")
+	return "Expected ShellOperator has metric"
 }
 
 func (matcher *HaveMetricMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return fmt.Sprintf("Expected ShellOperator has no metric")
+	return "Expected ShellOperator has no metric"
 }
 
 func HaveMetricValue() types.GomegaMatcher {

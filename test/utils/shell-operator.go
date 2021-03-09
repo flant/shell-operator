@@ -111,5 +111,5 @@ func (matcher *BeShellOperatorStoppedMatcher) FailureMessage(actual interface{})
 }
 
 func (matcher *BeShellOperatorStoppedMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return fmt.Sprintf("Expected ShellOperator stopped with error")
+	return "Expected ShellOperator stopped with error"
 }
