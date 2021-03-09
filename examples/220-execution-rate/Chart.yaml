@@ -1,0 +1,4 @@
+apiVersion: v1
+name: 210-conversion-webhook
+version: 1.0.0
+description: Shell-operator CRD conversion hook example

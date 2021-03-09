@@ -65,6 +65,14 @@ properties:
     type: string
     enum:
     - v1
+  settings:
+    type: object
+    additionalProperties: false
+    properties:
+      executionMinInterval:
+        type: string
+      executionBurst:
+        type: integer
   onStartup:
     title: onStartup binding
     description: |

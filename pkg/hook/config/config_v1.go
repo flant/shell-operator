@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/flant/shell-operator/pkg/webhook/conversion"
+	"strconv"
+	"time"
+
 	"github.com/hashicorp/go-multierror"
 	"gopkg.in/robfig/cron.v2"
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -14,6 +16,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/validating"
 	"github.com/flant/shell-operator/pkg/webhook/validating/validation"
 )
@@ -25,6 +28,7 @@ type HookConfigV1 struct {
 	OnKubernetesEvent    []OnKubernetesEventConfigV1    `json:"kubernetes"`
 	KubernetesValidating []KubernetesValidatingConfigV1 `json:"kubernetesValidating"`
 	KubernetesConversion []KubernetesConversionConfigV1 `json:"kubernetesCustomResourceConversion"`
+	Settings             *SettingsV1                    `json:"settings"`
 }
 
 // Schedule configuration
@@ -88,8 +92,19 @@ type KubernetesConversionConfigV1 struct {
 	Conversions          []conversion.Rule `json:"conversions,omitempty"`
 }
 
+// version 1 of hook settings
+type SettingsV1 struct {
+	ExecutionMinInterval string `json:"executionMinInterval,omitempty"`
+	ExecutionBurst       string `json:"executionBurst,omitempty"`
+}
+
 // ConvertAndCheck fills non-versioned structures and run inter-field checks not covered by OpenAPI schemas.
 func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
+	c.Settings, err = cv1.CheckAndConvertSettings(cv1.Settings)
+	if err != nil {
+		return err
+	}
+
 	c.OnStartup, err = c.ConvertOnStartup(cv1.OnStartup)
 	if err != nil {
 		return err
@@ -459,4 +474,29 @@ func (cv1 *HookConfigV1) ConvertConversion(cfgV1 KubernetesConversionConfigV1) (
 	cfg.Webhook.Metadata.MetricLabels = map[string]string{}
 
 	return cfg, nil
+}
+
+// CheckAndConvertSettings validates a duration and returns a Settings struct.
+func (cv1 *HookConfigV1) CheckAndConvertSettings(settings *SettingsV1) (out *Settings, allErr error) {
+	if settings == nil {
+		return nil, nil
+	}
+
+	interval, err := time.ParseDuration(settings.ExecutionMinInterval)
+	if err != nil {
+		allErr = multierror.Append(allErr, fmt.Errorf("executionMinInterval is invalid: %v", err))
+	}
+
+	burst, err := strconv.ParseInt(settings.ExecutionBurst, 10, 32)
+	if err != nil {
+		allErr = multierror.Append(allErr, fmt.Errorf("executionMinInterval is invalid: %v", err))
+	}
+	if allErr != nil {
+		return nil, allErr
+	}
+
+	return &Settings{
+		ExecutionMinInterval: interval,
+		ExecutionBurst:       int(burst),
+	}, nil
 }

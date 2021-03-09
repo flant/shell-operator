@@ -620,6 +620,15 @@ func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.T
 // TODO use Context to pass labels and a queue name
 func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 	var hookMeta = HookMetadataAccessor(t)
+	taskHook := op.HookManager.GetHook(hookMeta.HookName)
+
+	err := taskHook.RateLimitWait(context.Background())
+	if err != nil {
+		// This could happen when the Context is canceled, so just repeat the task until the queue is stopped.
+		return queue.TaskResult{
+			Status: "Repeat",
+		}
+	}
 
 	metricLabels := map[string]string{
 		"hook":    hookMeta.HookName,
@@ -628,6 +637,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 	}
 	taskWaitTime := time.Since(t.GetQueuedAt()).Seconds()
 	op.MetricStorage.CounterAdd("{PREFIX}task_wait_in_queue_seconds_total", taskWaitTime, metricLabels)
+
 	defer measure.Duration(func(d time.Duration) {
 		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_seconds", d.Seconds(), metricLabels)
 	})()
@@ -642,7 +652,6 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 	taskLogEntry := log.WithFields(utils.LabelsToLogFields(hookLogLabels))
 	taskLogEntry.Info("Execute hook")
 
-	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 	if taskHook.Config.Version == "v1" {
 		bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
 		if bcs != nil {

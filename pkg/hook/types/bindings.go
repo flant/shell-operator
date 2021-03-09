@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
@@ -59,4 +61,9 @@ type ValidatingConfig struct {
 	IncludeSnapshotsFrom []string
 	Group                string
 	Webhook              *validating.ValidatingWebhookConfig
+}
+
+type Settings struct {
+	ExecutionMinInterval time.Duration
+	ExecutionBurst       int
 }

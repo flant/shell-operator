@@ -1,0 +1,2 @@
+shellOperator:
+  image: localhost:5000/shell-operator:example-220

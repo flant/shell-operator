@@ -51,6 +51,8 @@ kubernetes:
 kubernetesValidating:
 - {VALIDATING_PARAMETERS}
 - {VALIDATING_PARAMETERS}
+settings:
+  SETTINGS_PARAMETERS
 ```
 
 or in JSON format:
@@ -70,7 +72,8 @@ or in JSON format:
   "kubernetesValidating": [
     {VALIDATING_PARAMETERS},
     {VALIDATING_PARAMETERS}
-  ]
+  ],
+  "settings": {SETTINGS_PARAMETERS}
 }
 ```
 
@@ -403,7 +406,7 @@ kubernetes:
 
 During startup, the hook receives all existing objects with "Synchronization"-type binding context:
 
-```json
+```yaml
 [
   {
     "binding": "kubernetes",
@@ -422,9 +425,9 @@ During startup, the hook receives all existing objects with "Synchronization"-ty
       {
         "object": {
           "kind": "Pod",
-          "metadata":{
-            "name":"kube-proxy-...",
-            "namespace":"kube-system",
+          "metadata": {
+            "name": "kube-proxy-...",
+            "namespace": "kube-system",
             ...
           },
         }
@@ -439,7 +442,7 @@ During startup, the hook receives all existing objects with "Synchronization"-ty
 
 If pod `pod-321d12` is then added into namespace 'default', then the hook will be executed with the "Event"-type binding context:
 
-```json
+```yaml
 [
   {
     "binding": "kubernetes",
@@ -470,15 +473,15 @@ Snapshot is a list of cached kubernetes objects and corresponding jqFilter resul
 
 `snapshots` format:
 
-```json
+```yaml
     "snapshots": {
       "binding-name-1": [ 
         {
           "object": {
             "kind": "Pod",
-            "metadata":{
-              "name":"etcd-...",
-              "namespace":"kube-system",
+            "metadata": {
+              "name": "etcd-...",
+              "namespace": "kube-system",
               ...
             },
           },
@@ -498,7 +501,7 @@ Note that disabling full objects make sense only if `jqFilter` is defined, as it
 
 For example, this binding configuration will execute hook with empty items in `objects` field of "Synchronization" binding context:
  
-```
+```yaml
 kubernetes:
 - name: pods
   kinds: Pod   
@@ -522,20 +525,20 @@ kubernetes:
 
 #### "Synchronization" binding context with snapshots
 
-During startup, the hook will be executed with the "Synchronization" binding context with `snapshots` JSON object:
+During startup, the hook will be executed with the "Synchronization" binding context with `snapshots` and `objects`:
 
-```json
+```yaml
 [
   {
-    "binding": "kubernetes",
+    "binding": "monitor-pods",
     "type": "Synchronization",
     "objects": [
       {
         "object": {
           "kind": "Pod",
-          "metadata":{
-            "name":"etcd-...",
-            "namespace":"kube-system",
+          "metadata": {
+            "name": "etcd-...",
+            "namespace": "kube-system",
             "labels": { ... },
             ...
           },
@@ -548,9 +551,9 @@ During startup, the hook will be executed with the "Synchronization" binding con
       {
         "object": {
           "kind": "Pod",
-          "metadata":{
-            "name":"kube-proxy-...",
-            "namespace":"kube-system",
+          "metadata": {
+            "name": "kube-proxy-...",
+            "namespace": "kube-system",
             ...
           },
         },
@@ -566,9 +569,9 @@ During startup, the hook will be executed with the "Synchronization" binding con
         {
           "object": {
             "kind": "Pod",
-            "metadata":{
-              "name":"etcd-...",
-              "namespace":"kube-system",
+            "metadata": {
+              "name": "etcd-...",
+              "namespace": "kube-system",
               ...
             },
           },
@@ -585,10 +588,10 @@ During startup, the hook will be executed with the "Synchronization" binding con
 
 If pod `pod-321d12` is then added into the "default" namespace, then the hook will be executed with the "Event" binding context with `object` and `filterResult` fields:
 
-```json
+```yaml
 [
   {
-    "binding": "kubernetes",
+    "binding": "monitor-pods",
     "type": "Event",
     "watchEvent": "Added",
     "object": {
@@ -610,9 +613,9 @@ If pod `pod-321d12` is then added into the "default" namespace, then the hook wi
         {
           "object": {
             "kind": "Pod",
-            "metadata":{
-              "name":"etcd-...",
-              "namespace":"kube-system",
+            "metadata": {
+              "name": "etcd-...",
+              "namespace": "kube-system",
               ...
             },
           },
@@ -629,7 +632,7 @@ If pod `pod-321d12` is then added into the "default" namespace, then the hook wi
 
 at 12:02, the hook will be executed with the following binding context:
 
-```json
+```yaml
 [
   {
     "binding": "incremental",
@@ -639,9 +642,9 @@ at 12:02, the hook will be executed with the following binding context:
         {
           "object": {
             "kind": "Pod",
-            "metadata":{
-              "name":"etcd-...",
-              "namespace":"kube-system",
+            "metadata": {
+              "name": "etcd-...",
+              "namespace": "kube-system",
               ...
             },
           },
@@ -692,7 +695,7 @@ kubernetes:
 
 During startup, the hook will be executed with the "Synchronization" binding context with `snapshots` JSON object:
 
-```json
+```yaml
 [
   {
     "binding": "pods",
@@ -702,9 +705,9 @@ During startup, the hook will be executed with the "Synchronization" binding con
         {
           "object": {
             "kind": "Pod",
-            "metadata":{
-              "name":"etcd-...",
-              "namespace":"kube-system",
+            "metadata": {
+              "name": "etcd-...",
+              "namespace": "kube-system",
               ...
             },
           },
@@ -716,9 +719,9 @@ During startup, the hook will be executed with the "Synchronization" binding con
         {
           "object": {
             "kind": "ConfigMap",
-            "metadata":{
-              "name":"etcd-...",
-              "namespace":"kube-system",
+            "metadata": {
+              "name": "etcd-...",
+              "namespace": "kube-system",
               ...
             },
           },
@@ -735,7 +738,7 @@ During startup, the hook will be executed with the "Synchronization" binding con
 
 If pod `pod-dfbd12` is then added into the "default" namespace, then the hook will be executed with the "Group" binding context:
 
-```json
+```yaml
 [
   {
     "binding": "pods",
@@ -776,7 +779,7 @@ If pod `pod-dfbd12` is then added into the "default" namespace, then the hook wi
 
 Every minute it will be executed with the same binding context with fresh snapshots:
 
-```json
+```yaml
 [
   {
     "binding": "pods",
@@ -792,3 +795,43 @@ Every minute it will be executed with the same binding context with fresh snapsh
   }
 ]
 ```
+
+### settings
+
+An optional block with hook-level settings.
+
+#### Syntax
+
+```yaml
+configVersion: v1
+settings:
+  executionMinPeriod: 3s
+  executionBurst: 1
+```
+
+#### Parameters
+
+- `executionMinPeriod` defines a minimum time between hook executions.
+- `executionBurst` a number of allowed executions during a period.
+
+#### Execution rate
+
+`executionMinPeriod` and `executionBurst` are parameters for "token bucket" algorithm. These parameters are used to throttle hook executions and wait for more events in the queue. It is wise to use a separate queue for bindings in such a hook, as a hook with execution rate settings and with default ("main") queue can hold the execution of other hooks.
+
+#### Example
+
+```yaml
+configVersion: v1
+kubernetes:
+- name: "all-pods-in-ns"
+  kind: pod
+  executeHookOnEvent: ["Modified"]
+  namespace:
+    nameSelector: ["default"]
+  queue: handle-pods-queue
+settings:
+  executionMinPeriod: 3s
+  executionBurst: 1
+```
+
+Hook with these settings will be executed once in 3 seconds.
