@@ -1,11 +1,13 @@
-package kubeclient
+// +build integration
+
+package kubeclient_test
 
 import (
 	"encoding/json"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	uuid "gopkg.in/satori/go.uuid.v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,10 +38,6 @@ var testObject = &corev1.ConfigMap{
 	},
 }
 
-func TestObjectPatch(t *testing.T) {
-	RunIntegrationSuite(t, "kube client suite", "kube-client-test")
-}
-
 var _ = Describe("Kubernetes API object patching", func() {
 	Context("creating an object", func() {
 		var (
@@ -49,18 +47,18 @@ var _ = Describe("Kubernetes API object patching", func() {
 
 		BeforeEach(func() {
 			testCM = testObject.DeepCopy()
-			testCM.Namespace = creationNamespace
+			testCM.Namespace = creationNamespace + "-" + randomSuffix()
 
 			var err error
 			unstructuredCM, err = generateUnstructured(testCM)
 			Expect(err).To(Succeed())
 
-			Expect(ensureNamespace(creationNamespace)).To(Succeed())
-			Expect(ensureTestObject(creationNamespace, testCM)).To(Succeed())
+			Expect(ensureNamespace(testCM.Namespace)).To(Succeed())
+			Expect(ensureTestObject(testCM.Namespace, testCM)).To(Succeed())
 		})
 
 		AfterEach(func() {
-			Expect(removeNamespace(creationNamespace))
+			Expect(removeNamespace(testCM.Namespace))
 		})
 
 		It("should fail to Create() an object if it already exists", func() {
@@ -81,7 +79,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			err = ObjectPatcher.CreateOrUpdateObject(unstructuredNewTestCM, "")
 			Expect(err).To(Succeed())
 
-			cm, err := KubeClient.CoreV1().ConfigMaps(creationNamespace).Get(newTestCM.Name, metav1.GetOptions{})
+			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(newTestCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(cm.Data).To(Equal(newTestCM.Data))
 		})
@@ -96,7 +94,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			err = ObjectPatcher.CreateOrUpdateObject(unstructuredSeparateTestCM, "")
 			Expect(err).To(Succeed())
 
-			_, err = KubeClient.CoreV1().ConfigMaps(creationNamespace).Get(separateTestCM.Name, metav1.GetOptions{})
+			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(separateTestCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 		})
 	})
@@ -108,14 +106,14 @@ var _ = Describe("Kubernetes API object patching", func() {
 
 		BeforeEach(func() {
 			testCM = testObject.DeepCopy()
-			testCM.Namespace = deletionNamespace
+			testCM.Namespace = deletionNamespace + "-" + randomSuffix()
 
-			Expect(ensureNamespace(deletionNamespace)).To(Succeed())
-			Expect(ensureTestObject(deletionNamespace, testCM)).To(Succeed())
+			Expect(ensureNamespace(testCM.Namespace)).To(Succeed())
+			Expect(ensureTestObject(testCM.Namespace, testCM)).To(Succeed())
 		})
 
 		AfterEach(func() {
-			Expect(removeNamespace(deletionNamespace))
+			Expect(removeNamespace(testCM.Namespace))
 		})
 
 		It("should successfully delete an object", func() {
@@ -139,14 +137,14 @@ var _ = Describe("Kubernetes API object patching", func() {
 
 		BeforeEach(func() {
 			testCM = testObject.DeepCopy()
-			testCM.Namespace = patchNamespace
+			testCM.Namespace = patchNamespace + "-" + randomSuffix()
 
-			Expect(ensureNamespace(patchNamespace)).To(Succeed())
-			Expect(ensureTestObject(patchNamespace, testCM)).To(Succeed())
+			Expect(ensureNamespace(testCM.Namespace)).To(Succeed())
+			Expect(ensureTestObject(testCM.Namespace, testCM)).To(Succeed())
 		})
 
 		AfterEach(func() {
-			Expect(removeNamespace(patchNamespace))
+			Expect(removeNamespace(testCM.Namespace))
 		})
 
 		It("should successfully JQPatch an object", func() {
@@ -178,7 +176,7 @@ data:
 			Expect(existingCM.Data["firstField"]).To(Equal("mergePatched"))
 		})
 
-		It("should successfully MergePatch an object", func() {
+		It("should successfully JSONPatch an object", func() {
 			err := ObjectPatcher.JSONPatchObject([]byte(`[{ "op": "replace", "path": "/data/firstField", "value": "jsonPatched"}]`),
 				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).To(Succeed())
@@ -223,4 +221,8 @@ func generateUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 	unstructuredCM.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 
 	return unstructuredCM, err
+}
+
+func randomSuffix() string {
+	return uuid.NewV4().String()[0:8]
 }

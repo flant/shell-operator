@@ -119,6 +119,7 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 		if app.DebugKeepTmpFiles != "yes" {
 			os.Remove(contextPath)
 			os.Remove(metricsPath)
+			os.Remove(conversionPath)
 			os.Remove(validatingPath)
 			os.Remove(kubernetesPatchPath)
 		}
