@@ -25,17 +25,25 @@ type BindingContextAccessor interface {
 	GetBindingContext() []BindingContext
 }
 
+type MonitorIDAccessor interface {
+	GetMonitorIDs() []string
+}
+
 type HookMetadata struct {
 	HookName       string // hook name
 	Binding        string // binding name
 	Group          string
 	BindingType    BindingType
 	BindingContext []BindingContext
-	AllowFailure   bool // Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
+	AllowFailure   bool     // Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
+	MonitorIDs     []string // monitor ids for Synchronization tasks
+
+	ExecuteOnSynchronization bool // A flag to skip hook execution in Synchronization tasks.
 }
 
 var _ HookNameAccessor = HookMetadata{}
 var _ BindingContextAccessor = HookMetadata{}
+var _ MonitorIDAccessor = HookMetadata{}
 var _ task.MetadataDescriptable = HookMetadata{}
 
 func HookMetadataAccessor(t task.Task) (hookMeta HookMetadata) {
@@ -66,6 +74,10 @@ func (m HookMetadata) GetBindingContext() []BindingContext {
 
 func (m HookMetadata) GetAllowFailure() bool {
 	return m.AllowFailure
+}
+
+func (m HookMetadata) GetMonitorIDs() []string {
+	return m.MonitorIDs
 }
 
 func (m *HookMetadata) WithHookName(name string) *HookMetadata {
@@ -102,4 +114,9 @@ func (m HookMetadata) GetDescription() string {
 		additional += ":" + m.Binding
 	}
 	return fmt.Sprintf("%s:%s%s", string(m.BindingType), m.HookName, additional)
+}
+
+func (m HookMetadata) IsSynchronization() bool {
+	// Synchronization binding contexts are not combined with others, so check the first item is enough.
+	return len(m.BindingContext) > 0 && m.BindingContext[0].IsSynchronization()
 }

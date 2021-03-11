@@ -23,7 +23,8 @@ type Monitor interface {
 	Start(context.Context)
 	Stop()
 	PauseHandleEvents()
-	GetExistedObjects() []ObjectAndFilterResult
+	Snapshot() []ObjectAndFilterResult
+	EnableKubeEventCb()
 	GetConfig() *MonitorConfig
 }
 
@@ -40,7 +41,6 @@ type monitor struct {
 	VaryingInformers map[string][]ResourceInformer
 
 	eventCb func(KubeEvent)
-
 	// Index of namespaces statically defined in monitor configuration
 	staticNamespaces map[string]bool
 
@@ -192,17 +192,17 @@ func (m *monitor) CreateInformers() error {
 	return nil
 }
 
-// GetExistedObjects returns all existed objects from all created informers
-func (m *monitor) GetExistedObjects() []ObjectAndFilterResult {
+// Snapshot returns all existed objects from all created informers
+func (m *monitor) Snapshot() []ObjectAndFilterResult {
 	objects := make([]ObjectAndFilterResult, 0)
 
 	for _, informer := range m.ResourceInformers {
-		objects = append(objects, informer.GetExistedObjects()...)
+		objects = append(objects, informer.CachedObjects()...)
 	}
 
 	for nsName := range m.VaryingInformers {
 		for _, informer := range m.VaryingInformers[nsName] {
-			objects = append(objects, informer.GetExistedObjects()...)
+			objects = append(objects, informer.CachedObjects()...)
 		}
 	}
 
@@ -210,6 +210,19 @@ func (m *monitor) GetExistedObjects() []ObjectAndFilterResult {
 	sort.Sort(ByNamespaceAndName(objects))
 
 	return objects
+}
+
+// EnableKubeEventCb turns on event callback for each informer. This also calls
+// eventCb for events saved during "Synchronization" hook execution.
+func (m *monitor) EnableKubeEventCb() {
+	for _, informer := range m.ResourceInformers {
+		informer.EnableKubeEventCb()
+	}
+	for nsName := range m.VaryingInformers {
+		for _, informer := range m.VaryingInformers[nsName] {
+			informer.EnableKubeEventCb()
+		}
+	}
 }
 
 // CreateInformersForNamespace creates informers bounded to the namespace. If no matchName is specified,

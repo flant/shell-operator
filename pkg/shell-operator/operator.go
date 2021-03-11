@@ -557,6 +557,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 	return res
 }
 
+// TaskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
 func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.TaskResult {
 	var hookMeta = HookMetadataAccessor(t)
 
@@ -586,12 +587,14 @@ func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.T
 	err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
 		newTask := task.NewTask(HookRun).
 			WithMetadata(HookMetadata{
-				HookName:       taskHook.Name,
-				BindingType:    OnKubernetesEvent,
-				BindingContext: info.BindingContext,
-				AllowFailure:   info.AllowFailure,
-				Binding:        info.Binding,
-				Group:          info.Group,
+				HookName:                 taskHook.Name,
+				BindingType:              OnKubernetesEvent,
+				BindingContext:           info.BindingContext,
+				AllowFailure:             info.AllowFailure,
+				Binding:                  info.Binding,
+				Group:                    info.Group,
+				MonitorIDs:               []string{info.KubernetesBinding.Monitor.Metadata.MonitorId},
+				ExecuteOnSynchronization: info.KubernetesBinding.ExecuteHookOnSynchronization,
 			}).
 			WithLogLabels(hookLogLabels).
 			WithQueueName("main")
@@ -607,11 +610,7 @@ func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.T
 		res.Status = "Fail"
 	} else {
 		success = 1.0
-		// return Synchronization tasks to add to the queue head.
-		// Informers can be started now — their events will
-		// be added to the tail of the main queue or to the other queues.
-		op.HookManager.GetHook(hookMeta.HookName).HookController.StartMonitors()
-		taskLogEntry.Infof("Kubernetes binding for hook enabled successfully")
+		taskLogEntry.Infof("Kubernetes bindings for hook are enabled successfully, %d tasks generated", len(hookRunTasks))
 		res.Status = "Success"
 		now := time.Now()
 		for _, t := range hookRunTasks {
@@ -659,17 +658,91 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 	hookLogLabels["queue"] = t.GetQueueName()
 
 	taskLogEntry := log.WithFields(utils.LabelsToLogFields(hookLogLabels))
-	taskLogEntry.Info("Execute hook")
 
-	if taskHook.Config.Version == "v1" {
-		bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
-		if bcs != nil {
-			hookMeta.BindingContext = bcs
-			t.UpdateMetadata(hookMeta)
+	isSynchronization := hookMeta.IsSynchronization()
+	shouldRunHook := true
+	if isSynchronization {
+		// There were no Synchronization for v0 hooks, skip hook execution.
+		if taskHook.Config.Version == "v0" {
+			shouldRunHook = false
+		}
+		// Explicit "executeOnSynchronization: false"
+		if !hookMeta.ExecuteOnSynchronization {
+			shouldRunHook = false
 		}
 	}
 
+	if shouldRunHook && taskHook.Config.Version == "v1" {
+		// Do not combine Synchronization with Event
+		shouldCombine := true
+		if hookMeta.BindingType == OnKubernetesEvent {
+			// Do not combine Synchronizations without group
+			if hookMeta.BindingContext[0].Type == TypeSynchronization && hookMeta.Group == "" {
+				shouldCombine = false
+			}
+		}
+		if shouldCombine {
+			combineResult := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
+			if combineResult != nil {
+				hookMeta.BindingContext = combineResult.BindingContexts
+				// Extra monitor IDs can be returned if several Synchronization for Group are combined.
+				if len(combineResult.MonitorIDs) > 0 {
+					hookMeta.MonitorIDs = combineResult.MonitorIDs
+				}
+				t.UpdateMetadata(hookMeta)
+			}
+		}
+	}
+
+	var res queue.TaskResult
+	// Default when shouldRunHook is false.
+	res.Status = "Success"
+
+	if shouldRunHook {
+		taskLogEntry.Info("Execute hook")
+
+		success := 0.0
+		errors := 0.0
+		allowed := 0.0
+		err = op.HandleRunHook(t, taskHook, hookMeta, taskLogEntry, hookLogLabels, metricLabels)
+		if err != nil {
+			if hookMeta.AllowFailure {
+				allowed = 1.0
+				taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
+				res.Status = "Success"
+			} else {
+				errors = 1.0
+				t.UpdateFailureMessage(err.Error())
+				t.WithQueuedAt(time.Now()) // Reset queueAt for correct results in 'task_wait_in_queue' metric.
+				taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
+				res.Status = "Fail"
+			}
+		} else {
+			success = 1.0
+			taskLogEntry.Infof("Hook executed successfully")
+			res.Status = "Success"
+		}
+		op.MetricStorage.CounterAdd("{PREFIX}hook_run_allowed_errors_total", allowed, metricLabels)
+		op.MetricStorage.CounterAdd("{PREFIX}hook_run_errors_total", errors, metricLabels)
+		op.MetricStorage.CounterAdd("{PREFIX}hook_run_success_total", success, metricLabels)
+	}
+
+	// Unlock Kubernetes events for all monitors when Synchronization task is done.
+	if isSynchronization && res.Status == "Success" {
+		taskLogEntry.Info("Unlock kubernetes.Event tasks")
+		for _, monitorID := range hookMeta.MonitorIDs {
+			taskHook.HookController.UnlockKubernetesEventsFor(monitorID)
+		}
+	}
+
+	return res
+}
+
+func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMeta HookMetadata, taskLogEntry *log.Entry, hookLogLabels map[string]string, metricLabels map[string]string) error {
 	result, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+	if err != nil {
+		return err
+	}
 
 	if result != nil && result.Usage != nil {
 		taskLogEntry.Infof("Usage: %+v", result.Usage)
@@ -678,74 +751,56 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(result.Usage.MaxRss)*1024, metricLabels)
 	}
 
-	if err == nil {
-		// Save validatingResponse in task props for future use.
-		if result.ValidatingResponse != nil {
-			t.SetProp("validatingResponse", result.ValidatingResponse)
-			taskLogEntry.Infof("ValidatingResponse from hook: %s", result.ValidatingResponse.Dump())
-		}
-		// Save conversionResponse in task props for future use.
-		if result.ConversionResponse != nil {
-			t.SetProp("conversionResponse", result.ConversionResponse)
-			taskLogEntry.Infof("ConversionResponse from hook: %s", result.ConversionResponse.Dump())
-		}
-
-		if len(result.KubernetesPatchBytes) > 0 {
-			var specs []object_patch.OperationSpec
-			specs, err = object_patch.ParseSpecs(result.KubernetesPatchBytes)
-			if err != nil {
-				goto Metrics
-			}
-
-			err = op.ObjectPatcher.GenerateFromJSONAndExecuteOperations(specs)
-			if err != nil {
-				goto Metrics
-			}
-		}
-
-		err = op.HookMetricStorage.SendBatch(result.Metrics, map[string]string{
-			"hook": hookMeta.HookName,
-		})
+	// Try to apply Kubernetes actions.
+	if len(result.KubernetesPatchBytes) > 0 {
+		var specs []object_patch.OperationSpec
+		specs, err = object_patch.ParseSpecs(result.KubernetesPatchBytes)
 		if err != nil {
-			goto Metrics
+			return err
+		}
+		err = op.ObjectPatcher.GenerateFromJSONAndExecuteOperations(specs)
+		if err != nil {
+			return err
 		}
 	}
 
-Metrics:
-	success := 0.0
-	errors := 0.0
-	allowed := 0.0
-	var res queue.TaskResult
+	// Try to update custom metrics
+	err = op.HookMetricStorage.SendBatch(result.Metrics, map[string]string{
+		"hook": hookMeta.HookName,
+	})
 	if err != nil {
-		if hookMeta.AllowFailure {
-			allowed = 1.0
-			taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
-			res.Status = "Success"
-		} else {
-			errors = 1.0
-			t.UpdateFailureMessage(err.Error())
-			t.WithQueuedAt(time.Now()) // Reset queueAt for correct results in 'task_wait_in_queue' metric.
-			taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
-			res.Status = "Fail"
-		}
-	} else {
-		success = 1.0
-		taskLogEntry.Infof("Hook executed successfully")
-		res.Status = "Success"
+		return err
 	}
 
-	op.MetricStorage.CounterAdd("{PREFIX}hook_run_allowed_errors_total", allowed, metricLabels)
-	op.MetricStorage.CounterAdd("{PREFIX}hook_run_errors_total", errors, metricLabels)
-	op.MetricStorage.CounterAdd("{PREFIX}hook_run_success_total", success, metricLabels)
-	return res
+	// Save validatingResponse in task props for future use.
+	if result.ValidatingResponse != nil {
+		t.SetProp("validatingResponse", result.ValidatingResponse)
+		taskLogEntry.Infof("ValidatingResponse from hook: %s", result.ValidatingResponse.Dump())
+	}
+
+	// Save conversionResponse in task props for future use.
+	if result.ConversionResponse != nil {
+		t.SetProp("conversionResponse", result.ConversionResponse)
+		taskLogEntry.Infof("ConversionResponse from hook: %s", result.ConversionResponse.Dump())
+	}
+
+	return nil
+}
+
+type CombineResult struct {
+	BindingContexts []BindingContext
+	MonitorIDs      []string
 }
 
 // CombineBindingContextForHook combines binding contexts from a sequence of task with similar
 // hook name and task type into array of binding context and delete excess tasks from queue.
-// Also, compacts sequences of binding contexts with similar group.
+//
+// Also, sequences of binding contexts with similar group are compacted in one binding context.
+//
 // If input task has no metadata, result will be nil.
-// Metadata should implement HookNameAccessor and BindingContextAccessor interfaces.
-func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) []BindingContext {
+// Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
+// DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
+func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
 	if q == nil {
 		return nil
 	}
@@ -755,6 +810,8 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 		return nil
 	}
 	var hookName = taskMeta.(HookNameAccessor).GetHookName()
+
+	var res = new(CombineResult)
 
 	var otherTasks = make([]task.Task, 0)
 	var stopIterate = false
@@ -794,15 +851,19 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 
 	// Combine binding context and make a map to delete excess tasks
 	var combinedContext = make([]BindingContext, 0)
+	var monitorIDs = taskMeta.(MonitorIDAccessor).GetMonitorIDs()
 	var tasksFilter = make(map[string]bool)
 	// current task always remain in queue
 	combinedContext = append(combinedContext, taskMeta.(BindingContextAccessor).GetBindingContext()...)
 	tasksFilter[t.GetId()] = true
 	for _, tsk := range otherTasks {
 		combinedContext = append(combinedContext, tsk.GetMetadata().(BindingContextAccessor).GetBindingContext()...)
+		tskMonitorIDs := tsk.GetMetadata().(MonitorIDAccessor).GetMonitorIDs()
+		if len(tskMonitorIDs) > 0 {
+			monitorIDs = append(monitorIDs, tskMonitorIDs...)
+		}
 		tasksFilter[tsk.GetId()] = false
 	}
-	log.Infof("Will delete %d tasks from queue '%s'", len(tasksFilter)-1, t.GetQueueName())
 
 	// Delete tasks with false in tasksFilter map
 	op.TaskQueues.GetByName(t.GetQueueName()).Filter(func(tsk task.Task) bool {
@@ -815,22 +876,31 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	// group is used to compact binding contexts when only snapshots are needed
 	var compactedContext = make([]BindingContext, 0)
 	for i := 0; i < len(combinedContext); i++ {
-		var shouldSkip = false
-		var groupName = combinedContext[i].Metadata.Group
+		var keep = true
 
-		// binding context is ignored for similar group
+		// Binding context is ignored if next binding context has the similar group.
+		var groupName = combinedContext[i].Metadata.Group
 		if groupName != "" && (i+1 <= len(combinedContext)-1) && combinedContext[i+1].Metadata.Group == groupName {
-			shouldSkip = true
+			keep = false
 		}
 
-		if shouldSkip {
-			continue
-		} else {
+		if keep {
 			compactedContext = append(compactedContext, combinedContext[i])
 		}
 	}
 
-	return compactedContext
+	// Describe what was done.
+	compactMsg := ""
+	if len(compactedContext) < len(combinedContext) {
+		compactMsg = fmt.Sprintf("are combined and compacted to %d contexts", len(compactedContext))
+	} else {
+		compactMsg = fmt.Sprintf("are combined to %d contexts", len(combinedContext))
+	}
+	log.Infof("Binding contexts from %d tasks %s. %d tasks are dropped from queue '%s'", len(otherTasks)+1, compactMsg, len(tasksFilter)-1, t.GetQueueName())
+
+	res.BindingContexts = compactedContext
+	res.MonitorIDs = monitorIDs
+	return res
 }
 
 // PrepopulateMainQueue adds tasks to run hooks with OnStartup bindings
@@ -880,7 +950,7 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 				}).
 				WithQueuedAt(time.Now())
 			mainQueue.AddLast(newTask)
-			logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
+			logEntry.Infof("queue task %s for hook %s", newTask.GetDescription(), hookName)
 		}
 
 		if h.GetConfig().HasBinding(Schedule) {

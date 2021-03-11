@@ -13,14 +13,14 @@ import (
 )
 
 type BindingExecutionInfo struct {
-	BindingContext         []BindingContext
-	IncludeSnapshots       []string
-	IncludeAllSnapshots    bool
-	AllowFailure           bool
-	QueueName              string
-	Binding                string
-	Group                  string
-	WaitForSynchronization bool
+	BindingContext      []BindingContext
+	IncludeSnapshots    []string
+	IncludeAllSnapshots bool
+	AllowFailure        bool
+	QueueName           string
+	Binding             string
+	Group               string
+	KubernetesBinding   OnKubernetesEventConfig
 }
 
 // В каждый хук надо будет положить этот объект.
@@ -45,7 +45,7 @@ type HookController interface {
 	CanHandleValidatingEvent(event ValidatingEvent) bool
 	CanHandleConversionEvent(event conversion.Event, rule conversion.Rule) bool
 
-	// These method should call underlying BindingController to get binding context
+	// These method should call an underlying *Binding*Controller to get binding context
 	// and then add Snapshots to binding context
 	HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error
 	HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo))
@@ -53,7 +53,8 @@ type HookController interface {
 	HandleValidatingEvent(event ValidatingEvent, createTasksFn func(BindingExecutionInfo))
 	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTasksFn func(BindingExecutionInfo))
 
-	StartMonitors()
+	UnlockKubernetesEvents()
+	UnlockKubernetesEventsFor(monitorID string)
 	StopMonitors()
 
 	EnableScheduleBindings()
@@ -219,9 +220,15 @@ func (hc *hookController) HandleScheduleEvent(crontab string, createTasksFn func
 	}
 }
 
-func (hc *hookController) StartMonitors() {
+func (hc *hookController) UnlockKubernetesEvents() {
 	if hc.KubernetesController != nil {
-		hc.KubernetesController.StartMonitors()
+		hc.KubernetesController.UnlockEvents()
+	}
+}
+
+func (hc *hookController) UnlockKubernetesEventsFor(monitorID string) {
+	if hc.KubernetesController != nil {
+		hc.KubernetesController.UnlockEventsFor(monitorID)
 	}
 }
 
@@ -306,10 +313,17 @@ func (hc *hookController) UpdateSnapshots(context []BindingContext) []BindingCon
 		return context
 	}
 
+	// Turn on cached snapshots mode to retrieve snapshots only once. (Synchronization and self-include)
+	hc.KubernetesController.StartCachedSnapshotMode()
+	defer hc.KubernetesController.StopCachedSnapshotMode()
+
 	newContext := []BindingContext{}
 	for _, bc := range context {
 		newBc := bc
 		newBc.Snapshots = hc.KubernetesSnapshotsFor(bc.Metadata.BindingType, bc.Binding)
+		if newBc.Metadata.BindingType == OnKubernetesEvent && newBc.Type == TypeSynchronization {
+			newBc.Objects = hc.KubernetesController.SnapshotsFor(bc.Binding)
+		}
 		newContext = append(newContext, newBc)
 	}
 

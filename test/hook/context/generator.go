@@ -135,7 +135,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 		return GeneratedBindingContexts{}, fmt.Errorf("couldn't enable kubernetes bindings: %v", err)
 	}
 
-	b.HookCtrl.StartMonitors()
+	b.HookCtrl.UnlockKubernetesEvents()
 
 	<-time.After(time.Millisecond) // tick to trigger informers
 	bindingContexts = b.HookCtrl.UpdateSnapshots(bindingContexts)

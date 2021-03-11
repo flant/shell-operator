@@ -67,7 +67,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 
 	monitor.Metadata.MonitorId = "MonitorId"
 
-	_, err := mgr.AddMonitor(monitor)
+	err := mgr.AddMonitor(monitor)
 
 	if assert.NoError(t, err) {
 		assert.Len(t, mgr.Monitors, 1)
@@ -155,14 +155,10 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	}
 	monitor.Metadata.MonitorId = "MonitorId"
 
-	_, err := mgr.AddMonitor(monitor)
+	err := mgr.AddMonitor(monitor)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
-
-	mgr.Start()
-
-	fmt.Printf("mgr Started\n")
 
 	// First event — Synchronization, second and third are Event
 	eventCounter := 0
@@ -336,14 +332,10 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	}
 	monitor.Metadata.MonitorId = "MonitorId"
 
-	_, err := mgr.AddMonitor(monitor)
+	err := mgr.AddMonitor(monitor)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
-
-	mgr.Start()
-
-	fmt.Printf("mgr Started\n")
 
 	// First event — Synchronization, second and third are Event
 	eventCounter := 0

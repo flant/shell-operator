@@ -88,7 +88,6 @@ jobs:
         run: |
           go build ./cmd/shell-operator
 
-
 # MacOS build works fine because jq package already has static libraries.
 # Windows build requires jq compilation, this should be done in libjq-go.
 # TODO Does cross-compile can help here?
