@@ -805,18 +805,18 @@ An optional block with hook-level settings.
 ```yaml
 configVersion: v1
 settings:
-  executionMinPeriod: 3s
+  executionMinInterval: 3s
   executionBurst: 1
 ```
 
 #### Parameters
 
-- `executionMinPeriod` defines a minimum time between hook executions.
+- `executionMinInterval` defines a minimum time between hook executions.
 - `executionBurst` a number of allowed executions during a period.
 
 #### Execution rate
 
-`executionMinPeriod` and `executionBurst` are parameters for "token bucket" algorithm. These parameters are used to throttle hook executions and wait for more events in the queue. It is wise to use a separate queue for bindings in such a hook, as a hook with execution rate settings and with default ("main") queue can hold the execution of other hooks.
+`executionMinInterval` and `executionBurst` are parameters for "token bucket" algorithm. These parameters are used to throttle hook executions and wait for more events in the queue. It is wise to use a separate queue for bindings in such a hook, as a hook with execution rate settings and with default ("main") queue can hold the execution of other hooks.
 
 #### Example
 
@@ -830,7 +830,7 @@ kubernetes:
     nameSelector: ["default"]
   queue: handle-pods-queue
 settings:
-  executionMinPeriod: 3s
+  executionMinInterval: 3s
   executionBurst: 1
 ```
 
