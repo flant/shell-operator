@@ -29,7 +29,6 @@ import (
 	// route klog messages from client-go to logrus
 	_ "github.com/flant/shell-operator/pkg/utils/klogtologrus"
 
-	"github.com/flant/shell-operator/pkg/metric_storage"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 )
 
@@ -46,7 +45,8 @@ type KubernetesClient interface {
 	WithServer(server string)
 	WithRateLimiterSettings(qps float32, burst int)
 	WithTimeout(time time.Duration)
-	WithMetricStorage(metricStorage *metric_storage.MetricStorage)
+	WithMetricStorage(metricStorage MetricStorage)
+	WithMetricLabels(labels map[string]string)
 
 	Init() error
 
@@ -87,7 +87,8 @@ type kubernetesClient struct {
 	burst            int
 	timeout          time.Duration
 	server           string
-	metricStorage    *metric_storage.MetricStorage
+	metricStorage    MetricStorage
+	metricLabels     map[string]string
 }
 
 func (c *kubernetesClient) WithServer(server string) {
@@ -111,8 +112,12 @@ func (c *kubernetesClient) WithTimeout(timeout time.Duration) {
 	c.timeout = timeout
 }
 
-func (c *kubernetesClient) WithMetricStorage(metricStorage *metric_storage.MetricStorage) {
+func (c *kubernetesClient) WithMetricStorage(metricStorage MetricStorage) {
 	c.metricStorage = metricStorage
+}
+
+func (c *kubernetesClient) WithMetricLabels(labels map[string]string) {
+	c.metricLabels = labels
 }
 
 func (c *kubernetesClient) DefaultNamespace() string {
@@ -203,16 +208,15 @@ func (c *kubernetesClient) Init() error {
 	}
 
 	if c.metricStorage != nil {
-		RegisterKubernetesClientMetrics(c.metricStorage)
 		metrics.Register(
-			NewRequestLatencyMetric(c.metricStorage),
-			NewRequestResultMetric(c.metricStorage),
+			NewRequestLatencyMetric(c.metricStorage, c.metricLabels),
+			NewRequestResultMetric(c.metricStorage, c.metricLabels),
 		)
 		// client-go supports more metrics in v0.18.* versions
 		//metrics.Register(metrics.RegisterOpts{
-		//	RequestLatency:        NewLatencyMetric(c.metricStorage),
-		//	RateLimiterLatency:    NewRateLimiterMetric(c.metricStorage),
-		//	RequestResult:         NewResultMetric(c.metricStorage),
+		//	RequestLatency:        NewRequestLatencyMetric(c.metricStorage, c.metricLabels),
+		//	RateLimiterLatency:    NewRateLimiterLatencyMetric(c.metricStorage, c.metricLabels),
+		//	RequestResult:         NewRequestResultMetric(c.metricStorage, c.metricLabels),
 		//})
 	}
 

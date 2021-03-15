@@ -182,6 +182,8 @@ func (op *ShellOperator) Init() (err error) {
 		op.KubeClient.WithRateLimiterSettings(app.KubeClientQps, app.KubeClientBurst)
 		op.KubeClient.WithTimeout(app.KubeClientTimeout)
 		op.KubeClient.WithMetricStorage(op.MetricStorage)
+		// Register metrics from kube client.
+		kube.RegisterKubernetesClientMetrics(op.MetricStorage, nil)
 		// Initialize kube client for kube events hooks.
 		err = op.KubeClient.Init()
 		if err != nil {

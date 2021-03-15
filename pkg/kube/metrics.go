@@ -1,33 +1,42 @@
 package kube
 
 import (
-	"github.com/flant/shell-operator/pkg/metric_storage"
-	"k8s.io/client-go/tools/metrics"
 	"net/url"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/client-go/tools/metrics"
 )
 
-/**
- Prometheus implementation for metrics in kubernetes/client-go:
+// Backends to use Prometheus client to export metrics from kubernetes/client-go.
+//
+// There are 2 steps to setup exporting:
+// 1. Register metrics in Prometheus client with RegisterKubernetesClientMetrics
+// 2. Register backends in client-go.
+//
+// Backends are used to send metrics from client-go to a Prometheus client.
+// Backends are implemented interfaces from https://github.com/kubernetes/client-go/blob/master/tools/metrics/metrics.go
 
-// LatencyMetric observes client latency partitioned by verb and url.
-type LatencyMetric interface {
-	Observe(verb string, u url.URL, latency time.Duration)
+// Extraction of methods from metric_storage.go to prevent cycle dependencies.
+type MetricStorage interface {
+	RegisterCounter(metric string, labels map[string]string) *prometheus.CounterVec
+	CounterAdd(metric string, value float64, labels map[string]string)
+	RegisterHistogram(metric string, labels map[string]string) *prometheus.HistogramVec
+	RegisterHistogramWithBuckets(metric string, labels map[string]string, buckets []float64) *prometheus.HistogramVec
+	HistogramObserve(metric string, value float64, labels map[string]string)
 }
 
-// ResultMetric counts response codes partitioned by method and host.
-type ResultMetric interface {
-	Increment(code string, method string, host string)
-}
+// RegisterKubernetesClientMetrics defines metrics in Prometheus client.
+func RegisterKubernetesClientMetrics(metricStorage MetricStorage, metricLabels map[string]string) {
+	labels := map[string]string{}
+	for k := range metricLabels {
+		labels[k] = ""
+	}
+	labels["verb"] = ""
+	labels["url"] = ""
 
-*/
-
-func RegisterKubernetesClientMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterHistogramWithBuckets("{PREFIX}kubernetes_client_request_latency_seconds",
-		map[string]string{
-			"verb": "",
-			"url":  "",
-		},
+		labels,
 		[]float64{
 			0.0,
 			0.001, 0.002, 0.005, // 1,2,5 milliseconds
@@ -52,30 +61,39 @@ func RegisterKubernetesClientMetrics(metricStorage *metric_storage.MetricStorage
 	//		10, // 10 seconds
 	//	})
 
-	metricStorage.RegisterCounter("{PREFIX}kubernetes_client_request_result_total",
-		map[string]string{
-			"code":   "",
-			"method": "",
-			"host":   "",
-		})
+	labels = map[string]string{}
+	for k := range metricLabels {
+		labels[k] = ""
+	}
+	labels["code"] = ""
+	labels["method"] = ""
+	labels["host"] = ""
+
+	metricStorage.RegisterCounter("{PREFIX}kubernetes_client_request_result_total", labels)
 }
 
-func NewRequestLatencyMetric(metricStorage *metric_storage.MetricStorage) metrics.LatencyMetric {
-	return ClientRequestLatencyMetric{metricStorage}
+func NewRequestLatencyMetric(metricStorage MetricStorage, labels map[string]string) metrics.LatencyMetric {
+	return ClientRequestLatencyMetric{metricStorage, labels}
 }
 
 type ClientRequestLatencyMetric struct {
-	metricStorage *metric_storage.MetricStorage
+	metricStorage MetricStorage
+	labels        map[string]string
 }
 
 func (c ClientRequestLatencyMetric) Observe(verb string, u url.URL, latency time.Duration) {
+	labels := map[string]string{}
+	for k, v := range c.labels {
+		labels[k] = v
+	}
+	labels["verb"] = verb
+	labels["url"] = u.String()
+
 	c.metricStorage.HistogramObserve(
 		"{PREFIX}kubernetes_client_request_latency_seconds",
 		latency.Seconds(),
-		map[string]string{
-			"verb": verb,
-			"url":  u.String(),
-		})
+		labels,
+	)
 }
 
 // RateLimiterLAtenct metric for versions v0.18.*
@@ -97,20 +115,26 @@ func (c ClientRequestLatencyMetric) Observe(verb string, u url.URL, latency time
 //		})
 //}
 
-func NewRequestResultMetric(metricStorage *metric_storage.MetricStorage) metrics.ResultMetric {
-	return ClientRequestResultMetric{metricStorage}
+func NewRequestResultMetric(metricStorage MetricStorage, labels map[string]string) metrics.ResultMetric {
+	return ClientRequestResultMetric{metricStorage, labels}
 }
 
 type ClientRequestResultMetric struct {
-	metricStorage *metric_storage.MetricStorage
+	metricStorage MetricStorage
+	labels        map[string]string
 }
 
 func (c ClientRequestResultMetric) Increment(code string, method string, host string) {
+	labels := map[string]string{}
+	for k, v := range c.labels {
+		labels[k] = v
+	}
+	labels["code"] = code
+	labels["method"] = method
+	labels["host"] = host
+
 	c.metricStorage.CounterAdd("{PREFIX}kubernetes_client_request_result_total",
 		1.0,
-		map[string]string{
-			"code":   code,
-			"method": method,
-			"host":   host,
-		})
+		labels,
+	)
 }
