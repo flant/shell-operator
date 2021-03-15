@@ -1,6 +1,10 @@
 package app
 
-import "gopkg.in/alecthomas/kingpin.v2"
+import (
+	"time"
+
+	"gopkg.in/alecthomas/kingpin.v2"
+)
 
 var KubeContext = ""
 var KubeConfig = ""
@@ -9,6 +13,8 @@ var KubeClientQpsDefault = "5" // DefaultQPS from k8s.io/client-go/rest/config.g
 var KubeClientQps float32
 var KubeClientBurstDefault = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
 var KubeClientBurst int
+var KubeClientTimeoutDefault = "10s"
+var KubeClientTimeout time.Duration
 
 func DefineKubeClientFlags(cmd *kingpin.CmdClause) {
 	cmd.Flag("kube-context", "The name of the kubeconfig context to use. Can be set with $KUBE_CONTEXT.").
@@ -30,6 +36,11 @@ func DefineKubeClientFlags(cmd *kingpin.CmdClause) {
 		Envar("KUBE_CLIENT_BURST").
 		Default(KubeClientBurstDefault).
 		IntVar(&KubeClientBurst)
+
+	cmd.Flag("kube-client-timeout", "Timeout for each request to the Kubernetes API server. Can be set with $KUBE_CLIENT_TIMEOUT").
+		Envar("KUBE_CLIENT_TIMEOUT").
+		Default(KubeClientTimeoutDefault).
+		DurationVar(&KubeClientTimeout)
 
 	cmd.Flag("kube-server", "The address and port of the Kubernetes API server. Can be set with $KUBE_SERVER.").
 		Envar("KUBE_SERVER").

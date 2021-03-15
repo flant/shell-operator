@@ -180,6 +180,7 @@ func (op *ShellOperator) Init() (err error) {
 		op.KubeClient.WithContextName(app.KubeContext)
 		op.KubeClient.WithConfigPath(app.KubeConfig)
 		op.KubeClient.WithRateLimiterSettings(app.KubeClientQps, app.KubeClientBurst)
+		op.KubeClient.WithTimeout(app.KubeClientTimeout)
 		op.KubeClient.WithMetricStorage(op.MetricStorage)
 		// Initialize kube client for kube events hooks.
 		err = op.KubeClient.Init()

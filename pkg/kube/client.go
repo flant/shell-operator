@@ -5,8 +5,10 @@ package kube
 import (
 	"fmt"
 	"io/ioutil"
-	"k8s.io/client-go/tools/metrics"
 	"strings"
+	"time"
+
+	"k8s.io/client-go/tools/metrics"
 
 	log "github.com/sirupsen/logrus"
 
@@ -43,6 +45,7 @@ type KubernetesClient interface {
 	WithConfigPath(configPath string)
 	WithServer(server string)
 	WithRateLimiterSettings(qps float32, burst int)
+	WithTimeout(time time.Duration)
 	WithMetricStorage(metricStorage *metric_storage.MetricStorage)
 
 	Init() error
@@ -82,6 +85,7 @@ type kubernetesClient struct {
 	apiExtClient     apixv1client.ApiextensionsV1Interface
 	qps              float32
 	burst            int
+	timeout          time.Duration
 	server           string
 	metricStorage    *metric_storage.MetricStorage
 }
@@ -101,6 +105,10 @@ func (c *kubernetesClient) WithConfigPath(path string) {
 func (c *kubernetesClient) WithRateLimiterSettings(qps float32, burst int) {
 	c.qps = qps
 	c.burst = burst
+}
+
+func (c *kubernetesClient) WithTimeout(timeout time.Duration) {
+	c.timeout = timeout
 }
 
 func (c *kubernetesClient) WithMetricStorage(metricStorage *metric_storage.MetricStorage) {
@@ -175,6 +183,8 @@ func (c *kubernetesClient) Init() error {
 
 	config.QPS = c.qps
 	config.Burst = c.burst
+
+	config.Timeout = c.timeout
 
 	c.Interface, err = kubernetes.NewForConfig(config)
 	if err != nil {
