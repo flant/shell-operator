@@ -44,6 +44,6 @@ func DefineKubeClientFlags(cmd *kingpin.CmdClause) {
 
 	cmd.Flag("kube-server", "The address and port of the Kubernetes API server. Can be set with $KUBE_SERVER.").
 		Envar("KUBE_SERVER").
-		Default(KubeClientBurstDefault).
-		IntVar(&KubeClientBurst)
+		Default(KubeServer).
+		StringVar(&KubeServer)
 }
