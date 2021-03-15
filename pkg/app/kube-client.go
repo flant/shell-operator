@@ -13,7 +13,7 @@ var KubeClientQpsDefault = "5" // DefaultQPS from k8s.io/client-go/rest/config.g
 var KubeClientQps float32
 var KubeClientBurstDefault = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
 var KubeClientBurst int
-var KubeClientTimeoutDefault = "10"
+var KubeClientTimeoutDefault = "10s"
 var KubeClientTimeout time.Duration
 
 func DefineKubeClientFlags(cmd *kingpin.CmdClause) {
