@@ -5,8 +5,10 @@ package kube
 import (
 	"fmt"
 	"io/ioutil"
-	"k8s.io/client-go/tools/metrics"
 	"strings"
+	"time"
+
+	"k8s.io/client-go/tools/metrics"
 
 	log "github.com/sirupsen/logrus"
 
@@ -34,6 +36,8 @@ import (
 const (
 	kubeTokenFilePath     = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	kubeNamespaceFilePath = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
+	kubeClientTimeout = 10 * time.Second
 )
 
 type KubernetesClient interface {
@@ -175,6 +179,8 @@ func (c *kubernetesClient) Init() error {
 
 	config.QPS = c.qps
 	config.Burst = c.burst
+
+	config.Timeout = kubeClientTimeout
 
 	c.Interface, err = kubernetes.NewForConfig(config)
 	if err != nil {
