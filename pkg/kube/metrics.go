@@ -37,20 +37,19 @@ func RegisterKubernetesClientMetrics(metricStorage *metric_storage.MetricStorage
 			10, // 10 seconds
 		})
 
-	// TODO update client-go to v.0.18.*
-	//metricStorage.RegisterHistogramWithBuckets("{PREFIX}kubernetes_client_rate_limiter_latency_seconds",
-	//	map[string]string{
-	//		"verb": "",
-	//		"url":  "",
-	//	},
-	//	[]float64{
-	//		0.0,
-	//		0.001, 0.002, 0.005, // 1,2,5 milliseconds
-	//		0.01, 0.02, 0.05, // 10,20,50 milliseconds
-	//		0.1, 0.2, 0.5, // 100,200,500 milliseconds
-	//		1, 2, 5, // 1,2,5 seconds
-	//		10, // 10 seconds
-	//	})
+	metricStorage.RegisterHistogramWithBuckets("{PREFIX}kubernetes_client_rate_limiter_latency_seconds",
+		map[string]string{
+			"verb": "",
+			"url":  "",
+		},
+		[]float64{
+			0.0,
+			0.001, 0.002, 0.005, // 1,2,5 milliseconds
+			0.01, 0.02, 0.05, // 10,20,50 milliseconds
+			0.1, 0.2, 0.5, // 100,200,500 milliseconds
+			1, 2, 5, // 1,2,5 seconds
+			10, // 10 seconds
+		})
 
 	metricStorage.RegisterCounter("{PREFIX}kubernetes_client_request_result_total",
 		map[string]string{
@@ -78,24 +77,24 @@ func (c ClientRequestLatencyMetric) Observe(verb string, u url.URL, latency time
 		})
 }
 
-// RateLimiterLAtenct metric for versions v0.18.*
-//func NewRateLimiterLatencyMetric(metricStorage *metric_storage.MetricStorage) metrics.LatencyMetric {
-//	return ClientRateLimiterLatencyMetric{metricStorage}
-//}
-//
-//type ClientRateLimiterLatencyMetric struct {
-//	metricStorage *metric_storage.MetricStorage
-//}
-//
-//func (c ClientRateLimiterLatencyMetric) Observe(verb string, u url.URL, latency time.Duration) {
-//	c.metricStorage.HistogramObserve(
-//		"{PREFIX}kubernetes_client_rate_limiter_latency_seconds",
-//		latency.Seconds(),
-//		map[string]string{
-//			"verb": verb,
-//			"url":  u.String(),
-//		})
-//}
+// RateLimiterLatency metric for versions v0.18.*
+func NewRateLimiterLatencyMetric(metricStorage *metric_storage.MetricStorage) metrics.LatencyMetric {
+	return ClientRateLimiterLatencyMetric{metricStorage}
+}
+
+type ClientRateLimiterLatencyMetric struct {
+	metricStorage *metric_storage.MetricStorage
+}
+
+func (c ClientRateLimiterLatencyMetric) Observe(verb string, u url.URL, latency time.Duration) {
+	c.metricStorage.HistogramObserve(
+		"{PREFIX}kubernetes_client_rate_limiter_latency_seconds",
+		latency.Seconds(),
+		map[string]string{
+			"verb": verb,
+			"url":  u.String(),
+		})
+}
 
 func NewRequestResultMetric(metricStorage *metric_storage.MetricStorage) metrics.ResultMetric {
 	return ClientRequestResultMetric{metricStorage}

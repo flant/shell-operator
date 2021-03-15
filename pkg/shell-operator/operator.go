@@ -627,7 +627,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 	var hookMeta = HookMetadataAccessor(t)
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
-	err := taskHook.RateLimitWait(context.Background())
+	err := taskHook.RateLimitWait(context.TODO())
 	if err != nil {
 		// This could happen when the Context is canceled, so just repeat the task until the queue is stopped.
 		return queue.TaskResult{

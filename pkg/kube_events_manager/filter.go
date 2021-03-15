@@ -19,7 +19,7 @@ import (
 // over result and return ObjectAndFilterResult. If jqFilter is empty, no filter
 // is required and checksum is calculated over full json representation of the object.
 func ApplyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) (result string, err error), obj *unstructured.Unstructured) (*ObjectAndFilterResult, error) {
-	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
+	defer trace.StartRegion(context.TODO(), "ApplyJqFilter").End()
 
 	res := &ObjectAndFilterResult{
 		Object: obj,

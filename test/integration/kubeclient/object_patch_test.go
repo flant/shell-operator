@@ -3,6 +3,7 @@
 package kubeclient_test
 
 import (
+	"context"
 	"encoding/json"
 
 	. "github.com/onsi/ginkgo"
@@ -79,7 +80,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			err = ObjectPatcher.CreateOrUpdateObject(unstructuredNewTestCM, "")
 			Expect(err).To(Succeed())
 
-			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(newTestCM.Name, metav1.GetOptions{})
+			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), newTestCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(cm.Data).To(Equal(newTestCM.Data))
 		})
@@ -94,7 +95,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			err = ObjectPatcher.CreateOrUpdateObject(unstructuredSeparateTestCM, "")
 			Expect(err).To(Succeed())
 
-			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(separateTestCM.Name, metav1.GetOptions{})
+			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), separateTestCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 		})
 	})
@@ -120,7 +121,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			err := ObjectPatcher.DeleteObjectInBackground(testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).Should(Succeed())
 
-			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(testCM.Name, metav1.GetOptions{})
+			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), testCM.Name, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
@@ -151,7 +152,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			err := ObjectPatcher.JQPatchObject(`.data.firstField = "JQPatched"`, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).Should(Succeed())
 
-			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(testCM.Name, metav1.GetOptions{})
+			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), testCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(existingCM.Data["firstField"]).To(Equal("JQPatched"))
 		})
@@ -171,7 +172,7 @@ data:
 			err = ObjectPatcher.MergePatchObject(mergePatchJson, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).To(Succeed())
 
-			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(testCM.Name, metav1.GetOptions{})
+			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), testCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(existingCM.Data["firstField"]).To(Equal("mergePatched"))
 		})
@@ -181,7 +182,7 @@ data:
 				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).To(Succeed())
 
-			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(testCM.Name, metav1.GetOptions{})
+			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), testCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(existingCM.Data["firstField"]).To(Equal("jsonPatched"))
 		})

@@ -85,7 +85,7 @@ func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func
 
 	listOptions := metav1.ListOptions{}
 	tweakListOptions(&listOptions)
-	existedObjects, err := ni.KubeClient.CoreV1().Namespaces().List(listOptions)
+	existedObjects, err := ni.KubeClient.CoreV1().Namespaces().List(context.TODO(), listOptions)
 
 	if err != nil {
 		log.Errorf("list existing namespaces: %v", err)

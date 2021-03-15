@@ -3,6 +3,7 @@
 package kubeclient_test
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/flant/shell-operator/test/integration/suite"
@@ -20,7 +21,7 @@ var _ = Describe("Kubernetes API client package", func() {
 	When("client connect outside of the cluster", func() {
 
 		It("should list deployments", func() {
-			list, err := KubeClient.AppsV1().Deployments("").List(metav1.ListOptions{})
+			list, err := KubeClient.AppsV1().Deployments("").List(context.Background(), metav1.ListOptions{})
 			Ω(err).Should(Succeed())
 			Ω(list.Items).Should(Not(HaveLen(0)))
 		})
