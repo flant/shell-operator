@@ -63,7 +63,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should fail to Create() an object if it already exists", func() {
-			err := ObjectPatcher.CreateObject(unstructuredCM, "")
+			err := ObjectPatcher.CreateObject(context.TODO(), unstructuredCM, "")
 			Expect(err).To(Not(Succeed()))
 		})
 
@@ -77,7 +77,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			unstructuredNewTestCM, err := generateUnstructured(newTestCM)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.CreateOrUpdateObject(unstructuredNewTestCM, "")
+			err = ObjectPatcher.CreateOrUpdateObject(context.TODO(), unstructuredNewTestCM, "")
 			Expect(err).To(Succeed())
 
 			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), newTestCM.Name, metav1.GetOptions{})
@@ -92,7 +92,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			unstructuredSeparateTestCM, err := generateUnstructured(separateTestCM)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.CreateOrUpdateObject(unstructuredSeparateTestCM, "")
+			err = ObjectPatcher.CreateOrUpdateObject(context.TODO(), unstructuredSeparateTestCM, "")
 			Expect(err).To(Succeed())
 
 			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), separateTestCM.Name, metav1.GetOptions{})
@@ -118,7 +118,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully delete an object", func() {
-			err := ObjectPatcher.DeleteObjectInBackground(testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
+			err := ObjectPatcher.DeleteObjectInBackground(context.TODO(), testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).Should(Succeed())
 
 			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), testCM.Name, metav1.GetOptions{})
@@ -126,7 +126,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully delete an object if it doesn't exist", func() {
-			err := ObjectPatcher.DeleteObject(testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
+			err := ObjectPatcher.DeleteObject(context.TODO(), testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -149,7 +149,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully JQPatch an object", func() {
-			err := ObjectPatcher.JQPatchObject(`.data.firstField = "JQPatched"`, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
+			err := ObjectPatcher.JQPatchObject(context.TODO(), `.data.firstField = "JQPatched"`, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).Should(Succeed())
 
 			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), testCM.Name, metav1.GetOptions{})
@@ -169,7 +169,7 @@ data:
 			mergePatchJson, err := json.Marshal(mergePatch)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.MergePatchObject(mergePatchJson, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
+			err = ObjectPatcher.MergePatchObject(context.TODO(), mergePatchJson, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).To(Succeed())
 
 			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), testCM.Name, metav1.GetOptions{})
@@ -178,8 +178,7 @@ data:
 		})
 
 		It("should successfully JSONPatch an object", func() {
-			err := ObjectPatcher.JSONPatchObject([]byte(`[{ "op": "replace", "path": "/data/firstField", "value": "jsonPatched"}]`),
-				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
+			err := ObjectPatcher.JSONPatchObject(context.TODO(), []byte(`[{ "op": "replace", "path": "/data/firstField", "value": "jsonPatched"}]`), testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name, "")
 			Expect(err).To(Succeed())
 
 			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.Background(), testCM.Name, metav1.GetOptions{})
@@ -197,7 +196,7 @@ func ensureNamespace(name string) error {
 		panic(err)
 	}
 
-	return ObjectPatcher.CreateOrUpdateObject(unstructuredNS, "")
+	return ObjectPatcher.CreateOrUpdateObject(context.TODO(), unstructuredNS, "")
 }
 
 func ensureTestObject(namespace string, obj interface{}) error {
@@ -206,11 +205,11 @@ func ensureTestObject(namespace string, obj interface{}) error {
 		panic(err)
 	}
 
-	return ObjectPatcher.CreateOrUpdateObject(unstructuredObj, "")
+	return ObjectPatcher.CreateOrUpdateObject(context.TODO(), unstructuredObj, "")
 }
 
 func removeNamespace(name string) error {
-	return ObjectPatcher.DeleteObject("", "Namespace", "", name, "")
+	return ObjectPatcher.DeleteObject(context.TODO(), "", "Namespace", "", name, "")
 }
 
 func generateUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
