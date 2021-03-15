@@ -49,7 +49,7 @@ func ParseSpecs(specBytes []byte) ([]OperationSpec, error) {
 }
 
 func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSpec) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var applyErrors = &multierror.Error{}
