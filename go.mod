@@ -14,18 +14,18 @@ require (
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.9.0
-	github.com/prometheus/client_golang v1.0.0
-	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.4.0
-	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
+	github.com/prometheus/client_golang v1.7.1
+	github.com/sirupsen/logrus v1.6.0
+	github.com/stretchr/testify v1.6.1
+	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/satori/go.uuid.v1 v1.2.0
-	gopkg.in/yaml.v3 v3.0.0-20191120175047-4206685974f2
-	k8s.io/api v0.17.0
-	k8s.io/apiextensions-apiserver v0.17.0
-	k8s.io/apimachinery v0.17.0
-	k8s.io/client-go v0.17.0
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+	k8s.io/api v0.20.3
+	k8s.io/apiextensions-apiserver v0.20.3
+	k8s.io/apimachinery v0.20.3
+	k8s.io/client-go v0.20.3
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/kind v0.7.0
 	sigs.k8s.io/yaml v1.2.0

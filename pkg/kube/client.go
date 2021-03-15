@@ -1,7 +1,5 @@
 package kube
 
-// TODO do not copy, use import "github.com/flant/kubedog/pkg/kube"
-
 import (
 	"fmt"
 	"io/ioutil"
@@ -194,16 +192,11 @@ func (c *kubernetesClient) Init() error {
 
 	if c.metricStorage != nil {
 		RegisterKubernetesClientMetrics(c.metricStorage)
-		metrics.Register(
-			NewRequestLatencyMetric(c.metricStorage),
-			NewRequestResultMetric(c.metricStorage),
-		)
-		// client-go supports more metrics in v0.18.* versions
-		//metrics.Register(metrics.RegisterOpts{
-		//	RequestLatency:        NewLatencyMetric(c.metricStorage),
-		//	RateLimiterLatency:    NewRateLimiterMetric(c.metricStorage),
-		//	RequestResult:         NewResultMetric(c.metricStorage),
-		//})
+		metrics.Register(metrics.RegisterOpts{
+			RequestLatency:     NewRequestLatencyMetric(c.metricStorage),
+			RateLimiterLatency: NewRateLimiterLatencyMetric(c.metricStorage),
+			RequestResult:      NewRequestResultMetric(c.metricStorage),
+		})
 	}
 
 	logEntry.Infof("Kubernetes client is configured successfully with '%s' config", configType)

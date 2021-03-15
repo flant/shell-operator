@@ -178,11 +178,11 @@ func (ei *resourceInformer) CachedObjectsBytes() int64 {
 // LoadExistedObjects get a list of existed objects in namespace that match selectors and
 // fills Checksum map with checksums of existing objects.
 func (ei *resourceInformer) LoadExistedObjects() error {
-	defer trace.StartRegion(context.Background(), "LoadExistedObjects").End()
+	defer trace.StartRegion(context.TODO(), "LoadExistedObjects").End()
 	objList, err := ei.KubeClient.Dynamic().
 		Resource(ei.GroupVersionResource).
 		Namespace(ei.Namespace).
-		List(ei.ListOptions)
+		List(context.TODO(), ei.ListOptions)
 	if err != nil {
 		log.Errorf("%s: initial list resources of kind '%s': %v", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, err)
 		return err
@@ -266,7 +266,7 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 	defer measure.Duration(func(d time.Duration) {
 		ei.metricStorage.HistogramObserve("{PREFIX}kube_event_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels)
 	})()
-	defer trace.StartRegion(context.Background(), "HandleWatchEvent").End()
+	defer trace.StartRegion(context.TODO(), "HandleWatchEvent").End()
 
 	if staleObj, stale := object.(cache.DeletedFinalStateUnknown); stale {
 		object = staleObj.Obj

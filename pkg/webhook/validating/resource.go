@@ -1,9 +1,10 @@
 package validating
 
 import (
-	log "github.com/sirupsen/logrus"
+	"context"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -63,7 +64,7 @@ func (w *WebhookResource) UpdateConfiguration() error {
 
 func (w *WebhookResource) DeleteConfiguration() error {
 	return w.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().
-		Delete(w.ConfigurationName, &metav1.DeleteOptions{})
+		Delete(context.TODO(), w.ConfigurationName, metav1.DeleteOptions{})
 }
 
 func (w *WebhookResource) CreateWebhookPath(webhook *ValidatingWebhookConfig) *string {
@@ -89,19 +90,19 @@ func (w *WebhookResource) CreateOrUpdateConfiguration(conf *v1.ValidatingWebhook
 	listOpts := metav1.ListOptions{
 		FieldSelector: "metadata.name=" + conf.Name,
 	}
-	list, err := client.List(listOpts)
+	list, err := client.List(context.TODO(), listOpts)
 	if err != nil {
 		return err
 	}
 	if len(list.Items) == 0 {
-		_, err = client.Create(conf)
+		_, err = client.Create(context.TODO(), conf, metav1.CreateOptions{})
 		if err != nil {
 			log.Errorf("Create ValidatingWebhookConfiguration/%s: %v", conf.Name, err)
 		}
 	} else {
 		newConf := list.Items[0]
 		newConf.Webhooks = conf.Webhooks
-		_, err = client.Update(&newConf)
+		_, err = client.Update(context.TODO(), &newConf, metav1.UpdateOptions{})
 		if err != nil {
 			log.Errorf("Replace ValidatingWebhookConfiguration/%s: %v", conf.Name, err)
 		}

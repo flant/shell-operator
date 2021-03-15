@@ -75,7 +75,7 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) (*KubeEve
 	monitor.WithMetricStorage(mgr.metricStorage)
 	monitor.WithConfig(monitorConfig)
 	monitor.WithKubeEventCb(func(ev KubeEvent) {
-		defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
+		defer trace.StartRegion(context.TODO(), "EmitKubeEvent").End()
 		outEvent := mgr.MakeKubeEvent(monitor, ev)
 		if outEvent != nil {
 			mgr.KubeEventCh <- *outEvent

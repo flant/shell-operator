@@ -2,6 +2,7 @@ package object_patch
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -153,7 +154,7 @@ func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, subresou
 		return err
 	}
 
-	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
+	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(subresource)...)
 
 	return err
 }
@@ -171,17 +172,17 @@ func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, 
 		return err
 	}
 
-	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
+	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(subresource)...)
 	if errors.IsAlreadyExists(err) {
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			existingObj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Get(object.GetName(), metav1.GetOptions{}, generateSubresources(subresource)...)
+			existingObj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Get(context.TODO(), object.GetName(), metav1.GetOptions{}, generateSubresources(subresource)...)
 			if err != nil {
 				return err
 			}
 
 			objCopy := object.DeepCopy()
 			objCopy.SetResourceVersion(existingObj.GetResourceVersion())
-			_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(objCopy.GetNamespace()).Update(objCopy, metav1.UpdateOptions{}, generateSubresources(subresource)...)
+			_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(objCopy.GetNamespace()).Update(context.TODO(), objCopy, metav1.UpdateOptions{}, generateSubresources(subresource)...)
 			return err
 		})
 	}
@@ -202,7 +203,7 @@ func (o *ObjectPatcher) FilterObject(filterFunc func(*unstructured.Unstructured)
 	}
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(name, metav1.GetOptions{})
+		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -222,7 +223,7 @@ func (o *ObjectPatcher) FilterObject(filterFunc func(*unstructured.Unstructured)
 			return err
 		}
 
-		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Update(filteredObj, metav1.UpdateOptions{}, generateSubresources(subresource)...)
+		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Update(context.TODO(), filteredObj, metav1.UpdateOptions{}, generateSubresources(subresource)...)
 		if err != nil {
 			return err
 		}
@@ -240,7 +241,7 @@ func (o *ObjectPatcher) JQPatchObject(jqPatch, apiVersion, kind, namespace, name
 	}
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(name, metav1.GetOptions{})
+		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -250,7 +251,7 @@ func (o *ObjectPatcher) JQPatchObject(jqPatch, apiVersion, kind, namespace, name
 			return err
 		}
 
-		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Update(patchedObj, metav1.UpdateOptions{}, generateSubresources(subresource)...)
+		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Update(context.TODO(), patchedObj, metav1.UpdateOptions{}, generateSubresources(subresource)...)
 		if err != nil {
 			return err
 		}
@@ -267,7 +268,7 @@ func (o *ObjectPatcher) MergePatchObject(mergePatch []byte, apiVersion, kind, na
 		return err
 	}
 
-	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Patch(name, types.MergePatchType, mergePatch, metav1.PatchOptions{}, generateSubresources(subresource)...)
+	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Patch(context.TODO(), name, types.MergePatchType, mergePatch, metav1.PatchOptions{}, generateSubresources(subresource)...)
 
 	return err
 }
@@ -278,7 +279,7 @@ func (o *ObjectPatcher) JSONPatchObject(jsonPatch []byte, apiVersion, kind, name
 		return err
 	}
 
-	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Patch(name, types.JSONPatchType, jsonPatch, metav1.PatchOptions{}, generateSubresources(subresource)...)
+	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Patch(context.TODO(), name, types.JSONPatchType, jsonPatch, metav1.PatchOptions{}, generateSubresources(subresource)...)
 
 	return err
 }
@@ -301,7 +302,7 @@ func (o *ObjectPatcher) deleteObjectInternal(apiVersion, kind, namespace, name, 
 		return err
 	}
 
-	err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Delete(name, &metav1.DeleteOptions{PropagationPolicy: &propagation}, subresource)
+	err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &propagation}, subresource)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -314,7 +315,7 @@ func (o *ObjectPatcher) deleteObjectInternal(apiVersion, kind, namespace, name, 
 	}
 
 	err = wait.Poll(time.Second, 20*time.Second, func() (done bool, err error) {
-		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(name, metav1.GetOptions{})
+		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return true, nil
 		}
