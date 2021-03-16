@@ -42,7 +42,7 @@ You can configure the operator with the following environment variables and cli 
 | --kube-config | KUBE_CONFIG | `""` | Path to the kubeconfig file. (as a `$KUBECONFIG` for kubectl) |
 | --kube-client-qps | KUBE_CLIENT_QPS | `5` | QPS for rate limiter of k8s.io/client-go |
 | --kube-client-burst | KUBE_CLIENT_BURST | `10` | burst for rate limiter of k8s.io/client-go |
-| --kube-client-timeout | KUBE_CLIENT_TIMEOUT | `10s` | timeout for each request to the Kubernetes API server |
+| --object-patcher-kube-client-timeout | OBJECT_PATCHER_KUBE_CLIENT_TIMEOUT | `10s` | timeout for object patcher's requests to the Kubernetes API server |
 | --jq-library-path | JQ_LIBRARY_PATH | `""` | Prepend directory to the search list for jq modules (works as `jq -L`). |
 | n/a | JQ_EXEC | `""` | Set to `yes` to use jq as executable — it is more for **developing purposes**. |
 | --log-level | LOG_LEVEL | `"info"` | Logging level: `debug`, `info`, `error`. |

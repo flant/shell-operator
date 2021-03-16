@@ -54,6 +54,10 @@ type ShellOperator struct {
 	KubeClient        kube.KubernetesClient
 	ObjectPatcher     *object_patch.ObjectPatcher
 
+	// Labels for kube clients
+	MainKubeClientMetricLabels          map[string]string
+	ObjectPatcherKubeClientMetricLabels map[string]string
+
 	ScheduleManager   schedule_manager.ScheduleManager
 	KubeEventsManager kube_events_manager.KubeEventsManager
 
@@ -176,21 +180,21 @@ func (op *ShellOperator) Init() (err error) {
 	}
 
 	if op.KubeClient == nil {
-		op.KubeClient = kube.NewKubernetesClient()
-		op.KubeClient.WithContextName(app.KubeContext)
-		op.KubeClient.WithConfigPath(app.KubeConfig)
-		op.KubeClient.WithRateLimiterSettings(app.KubeClientQps, app.KubeClientBurst)
-		op.KubeClient.WithTimeout(app.KubeClientTimeout)
-		op.KubeClient.WithMetricStorage(op.MetricStorage)
-		// Initialize kube client for kube events hooks.
-		err = op.KubeClient.Init()
+		kube.RegisterKubernetesClientMetrics(op.MetricStorage, op.GetMainKubeClientMetricLabels())
+		op.KubeClient, err = op.InitMainKubeClient()
 		if err != nil {
-			log.Errorf("MAIN Fatal: initialize kube client: %s\n", err)
+			log.Errorf("MAIN Fatal: initialize 'main' Kubernetes client: %s\n", err)
 			return err
 		}
 	}
 
-	op.ObjectPatcher = object_patch.NewObjectPatcher(op.KubeClient)
+	// Initialize ObjectPatcher with its own Kubernetes client.
+	patcherKubeClient, err := op.InitObjectPatcherKubeClient()
+	if err != nil {
+		log.Errorf("MAIN Fatal: initialize 'object_patcher' Kubernetes client: %s\n", err)
+		return err
+	}
+	op.ObjectPatcher = object_patch.NewObjectPatcher(patcherKubeClient)
 
 	// Initialize the task queues set with the "main" queue.
 	op.TaskQueues = queue.NewTaskQueueSet()
