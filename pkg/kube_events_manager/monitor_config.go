@@ -2,9 +2,9 @@ package kube_events_manager
 
 import (
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
@@ -29,7 +29,7 @@ type MonitorConfig struct {
 	LogEntry                *log.Entry
 	Mode                    KubeEventMode
 	KeepFullObjectsInMemory bool
-	FilterFunc              func(obj *unstructured.Unstructured) (result string, err error)
+	FilterFunc              func(*unstructured.Unstructured) (interface{}, error)
 }
 
 func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {

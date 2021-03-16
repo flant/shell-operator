@@ -54,7 +54,7 @@ func convertBindingContexts(bindingContexts []BindingContext) (GeneratedBindingC
 		return res, fmt.Errorf("marshaling binding context error: %v", err)
 	}
 
-	res.BindingContexts = bindingContexts
+	res.BindingContexts = compactedBindingContexts
 	res.Rendered = string(data)
 	return res, nil
 }
