@@ -7,7 +7,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-multierror"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -24,13 +26,19 @@ import (
 
 type ObjectPatcher struct {
 	kubeClient kube.KubernetesClient
+	logger     *log.Entry
 }
 
 func NewObjectPatcher(kubeClient kube.KubernetesClient) *ObjectPatcher {
-	return &ObjectPatcher{kubeClient: kubeClient}
+	return &ObjectPatcher{
+		kubeClient: kubeClient,
+		logger:     log.WithField("operator.component", "KubernetesObjectPatcher"),
+	}
 }
 
 func ParseSpecs(specBytes []byte) ([]OperationSpec, error) {
+	log.Debugf("parsing patches:\n%s", specBytes)
+
 	specs, err := unmarshalFromJSONOrYAML(specBytes)
 	if err != nil {
 		return nil, err
@@ -48,8 +56,13 @@ func ParseSpecs(specBytes []byte) ([]OperationSpec, error) {
 }
 
 func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSpec) error {
+	log.Debug("Starting spec apply process")
+	defer log.Debug("Finished spec apply process")
+
 	var applyErrors = &multierror.Error{}
 	for _, spec := range specs {
+		log.Debugf("Applying spec: %s", spew.Sdump(spec))
+
 		var operationError error
 
 		switch spec.Operation {
@@ -141,6 +154,9 @@ func unmarshalFromYaml(yamlSpecs []byte) ([]OperationSpec, error) {
 }
 
 func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, subresource string) error {
+	log.Debug("Started Create")
+	defer log.Debug("Finished Create")
+
 	if object == nil {
 		return fmt.Errorf("cannot create empty object")
 	}
@@ -153,12 +169,17 @@ func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, subresou
 		return err
 	}
 
+	log.Debug("Started Create API call")
 	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
+	log.Debug("Finished Create API call")
 
 	return err
 }
 
 func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, subresource string) error {
+	log.Debug("Started CreateOrUpdate")
+	defer log.Debug("Finished CreateOrUpdate")
+
 	if object == nil {
 		return fmt.Errorf("cannot create empty object")
 	}
@@ -171,17 +192,27 @@ func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, 
 		return err
 	}
 
+	log.Debug("Started Create API call")
 	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
+	log.Debug("Finished Create API call")
+
 	if errors.IsAlreadyExists(err) {
+		log.Debug("Object already exists, attempting to Update it with optimistic lock")
+
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			log.Debug("Started Get API call")
 			existingObj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Get(object.GetName(), metav1.GetOptions{}, generateSubresources(subresource)...)
+			log.Debug("Finished Get API call")
 			if err != nil {
 				return err
 			}
 
 			objCopy := object.DeepCopy()
 			objCopy.SetResourceVersion(existingObj.GetResourceVersion())
+
+			log.Debug("Started Update API call")
 			_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(objCopy.GetNamespace()).Update(objCopy, metav1.UpdateOptions{}, generateSubresources(subresource)...)
+			log.Debug("Finished Update API call")
 			return err
 		})
 	}
@@ -191,6 +222,9 @@ func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, 
 
 func (o *ObjectPatcher) FilterObject(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error),
 	apiVersion, kind, namespace, name, subresource string) error {
+
+	log.Debug("Started FilterObject")
+	defer log.Debug("Finished FilterObject")
 
 	if filterFunc == nil {
 		return fmt.Errorf("FilterFunc is nil")
@@ -202,12 +236,16 @@ func (o *ObjectPatcher) FilterObject(filterFunc func(*unstructured.Unstructured)
 	}
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		log.Debug("Started Get API call")
 		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(name, metav1.GetOptions{})
+		log.Debug("Finished Get API call")
 		if err != nil {
 			return err
 		}
 
+		log.Debug("Started filtering object via filterFunc")
 		filteredObj, err := filterFunc(obj)
+		log.Debug("Finished filtering object via filterFunc")
 		if err != nil {
 			return err
 		}
@@ -222,7 +260,9 @@ func (o *ObjectPatcher) FilterObject(filterFunc func(*unstructured.Unstructured)
 			return err
 		}
 
+		log.Debug("Started Update API call")
 		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Update(filteredObj, metav1.UpdateOptions{}, generateSubresources(subresource)...)
+		log.Debug("Finished Update API call")
 		if err != nil {
 			return err
 		}
@@ -234,23 +274,32 @@ func (o *ObjectPatcher) FilterObject(filterFunc func(*unstructured.Unstructured)
 }
 
 func (o *ObjectPatcher) JQPatchObject(jqPatch, apiVersion, kind, namespace, name, subresource string) error {
+	log.Debug("Started JQPatchObject")
+	defer log.Debug("Finished JQPatchObject")
+
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
 		return err
 	}
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		log.Debug("Started Get API call")
 		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(name, metav1.GetOptions{})
+		log.Debug("Finished Get API call")
 		if err != nil {
 			return err
 		}
 
+		log.Debug("Started applying jqPatch")
 		patchedObj, err := applyJQPatch(jqPatch, obj)
+		log.Debug("Finished applying jqPatch")
 		if err != nil {
 			return err
 		}
 
+		log.Debug("Started Update API call")
 		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Update(patchedObj, metav1.UpdateOptions{}, generateSubresources(subresource)...)
+		log.Debug("Finished Update API call")
 		if err != nil {
 			return err
 		}
@@ -262,7 +311,12 @@ func (o *ObjectPatcher) JQPatchObject(jqPatch, apiVersion, kind, namespace, name
 }
 
 func (o *ObjectPatcher) MergePatchObject(mergePatch []byte, apiVersion, kind, namespace, name, subresource string) error {
+	log.Debug("Started MergePatchObject")
+	defer log.Debug("Finished MergePatchObject")
+
+	log.Debug("Started Patch API call")
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
+	log.Debug("Finished Patch API call")
 	if err != nil {
 		return err
 	}
@@ -273,25 +327,39 @@ func (o *ObjectPatcher) MergePatchObject(mergePatch []byte, apiVersion, kind, na
 }
 
 func (o *ObjectPatcher) JSONPatchObject(jsonPatch []byte, apiVersion, kind, namespace, name, subresource string) error {
+	log.Debug("Started JSONPatchObject")
+	defer log.Debug("Finished JSONPatchObject")
+
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
 		return err
 	}
 
+	log.Debug("Started Patch API call")
 	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Patch(name, types.JSONPatchType, jsonPatch, metav1.PatchOptions{}, generateSubresources(subresource)...)
+	log.Debug("Finished Patch API call")
 
 	return err
 }
 
 func (o *ObjectPatcher) DeleteObject(apiVersion, kind, namespace, name, subresource string) error {
+	log.Debug("Started DeleteObject")
+	defer log.Debug("Finished DeleteObject")
+
 	return o.deleteObjectInternal(apiVersion, kind, namespace, name, subresource, metav1.DeletePropagationForeground)
 }
 
 func (o *ObjectPatcher) DeleteObjectInBackground(apiVersion, kind, namespace, name, subresource string) error {
+	log.Debug("Started DeleteObjectInBackground")
+	defer log.Debug("Finished DeleteObjectInBackground")
+
 	return o.deleteObjectInternal(apiVersion, kind, namespace, name, subresource, metav1.DeletePropagationBackground)
 }
 
 func (o *ObjectPatcher) DeleteObjectNonCascading(apiVersion, kind, namespace, name, subresource string) error {
+	log.Debug("Started DeleteObjectNonCascading")
+	defer log.Debug("Finished DeleteObjectNonCascading")
+
 	return o.deleteObjectInternal(apiVersion, kind, namespace, name, subresource, metav1.DeletePropagationOrphan)
 }
 
@@ -301,7 +369,9 @@ func (o *ObjectPatcher) deleteObjectInternal(apiVersion, kind, namespace, name, 
 		return err
 	}
 
+	log.Debug("Started Delete API call")
 	err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Delete(name, &metav1.DeleteOptions{PropagationPolicy: &propagation}, subresource)
+	log.Debug("Finished Delete API call")
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -313,8 +383,11 @@ func (o *ObjectPatcher) deleteObjectInternal(apiVersion, kind, namespace, name, 
 		return nil
 	}
 
+	log.Debug("Waiting for object deletion")
 	err = wait.Poll(time.Second, 20*time.Second, func() (done bool, err error) {
+		log.Debug("Started Get API call")
 		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(name, metav1.GetOptions{})
+		log.Debug("Finished Get API call")
 		if errors.IsNotFound(err) {
 			return true, nil
 		}
