@@ -99,10 +99,11 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 	}
 	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
 
-	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+	combineResult := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
 
 	// Should combine binding contexts from 4 tasks.
-	g.Expect(bcs).Should(HaveLen(4))
+	g.Expect(combineResult).ShouldNot(BeNil())
+	g.Expect(combineResult.BindingContexts).Should(HaveLen(4))
 	// Should delete 3 tasks
 	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks) - 3))
 }
@@ -159,9 +160,9 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 	}
 	g.Expect(op.TaskQueues.GetByName("test_no_combine").Length()).Should(Equal(len(tasks)))
 
-	bcs := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_no_combine"), tasks[0], nil)
+	combineResult := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_no_combine"), tasks[0], nil)
 	// Should return nil if no combine
-	g.Expect(bcs).Should(BeNil())
+	g.Expect(combineResult).Should(BeNil())
 	// Should not delete tasks
 	g.Expect(op.TaskQueues.GetByName("test_no_combine").Length()).Should(Equal(len(tasks)))
 }
@@ -259,9 +260,10 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 	}
 	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
 
-	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+	combineResult := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
 	// Should compact 4 tasks into 4 binding context and combine 3 binding contexts into one.
-	g.Expect(bcList).Should(HaveLen(2))
+	g.Expect(combineResult).ShouldNot(BeNil())
+	g.Expect(combineResult.BindingContexts).Should(HaveLen(2))
 
 	// Should delete 3 tasks
 	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks) - 3))
@@ -408,9 +410,12 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	}
 	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
 
-	bcList := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+	combineResult := op.CombineBindingContextForHook(op.TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
 	// Should leave 3 tasks in queue.
+	g.Expect(combineResult).ShouldNot(BeNil())
 	g.Expect(op.TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(3))
+
+	bcList := combineResult.BindingContexts
 
 	// Should combine binding contexts from 7 tasks. Should compact 3 binding contexts into 1.
 	g.Expect(bcList).Should(HaveLen(5))

@@ -346,7 +346,7 @@ Temporary files have unique names to prevent collisions between queues and are d
 Binging context is a JSON-array of structures with the following fields:
 
 - `binding` — a string from the `name` or `group` parameters. If these parameters has not been set in the binding configuration, then strings "schedule" or "kubernetes" are used. For a hook executed at startup, this value is always "onStartup".
-- `type` — "Schedule" for `schedule` bindings. "Synchronization" or "Event" for `kubernetes` bindings. "Synchronization" or "Group" if `group` is defined.
+- `type` — "Schedule" for `schedule` bindings. "Synchronization" or "Event" for `kubernetes` bindings. "Group" if `group` is defined.
 
 The hook receives "Event"-type binding context on Kubernetes event and it contains more fields:
 - `watchEvent` — the possible value is one of the values you can use with `executeHookOnEvent` parameter: "Added", "Modified" or "Deleted".
@@ -354,10 +354,10 @@ The hook receives "Event"-type binding context on Kubernetes event and it contai
 - `filterResult` — the result of `jq` execution with specified `jqFilter` on the above mentioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
 
 The hook receives existed objects on startup for each binding with "Synchronization"-type binding context:
-- `objects` — a list of existing objects that match selectors in binding configuration. Each item of this list contains `object` and `filterResult` fields. If the list is empty, the value of `objects` is an empty array.
+- `objects` — a list of existing objects that match selectors in binding configuration. Each item of this list contains `object` and `filterResult` fields. The state of items is actual **for the moment of the hook execution**. If the list is empty, the value of `objects` is an empty array.
 
 If `group` or `includeSnapshotsFrom` are defined, the hook receives binding context with additional field:
-- `snapshots` — a map that contains a list of objects for each binding name from `includeSnapshotsFrom` or for each `kubernetes` binding in a group. If `includeSnapshotsFrom` list is empty, the field is omitted.
+- `snapshots` — a map that contains an up-to-date lists of objects for each binding name from `includeSnapshotsFrom` or for each `kubernetes` binding with a similar `group`. If `includeSnapshotsFrom` list is empty, the field is omitted.
 
 ### `onStartup` binding context example
 
@@ -438,6 +438,8 @@ During startup, the hook receives all existing objects with "Synchronization"-ty
 ]
 ```
 
+> Note: hook execution at startup with "Synchronization" binding context can be turned off with `executeHookOnSynchronization: false`
+
 #### "Event" binding context
 
 If pod `pod-321d12` is then added into namespace 'default', then the hook will be executed with the "Event"-type binding context:
@@ -467,13 +469,17 @@ If pod `pod-321d12` is then added into namespace 'default', then the hook will b
 
 ### Snapshots
 
-Shell-operator caches a list of resources for each `kubernetes` binding. Another bindings can access this list via `includeSnapshotsFrom` parameter. Also, there is a `group` parameter to automatically get all snapshots from multiple bindings and deduplicate executions.
+"Event"-type binding context contains an object state at the moment of the event. Actual objects' state for the moment of the execution can be received in a form of _Snapshots_.
 
-Snapshot is a list of cached kubernetes objects and corresponding jqFilter results. To access the snapshot from particular binding, there is a map `snapshots` in the binding context where the key is a binding name and the value is the snapshot.
+Shell-operator maintains an up-to-date list of objects for each `kubernetes` binding. `schedule` and `kubernetes` bindings can be configured to receive these lists via `includeSnapshotsFrom` parameter. Also, there is a `group` parameter to automatically receive all snapshots from multiple bindings and to deduplicate executions.
 
-`snapshots` format:
+Snapshot is a JSON array of Kubernetes objects and corresponding jqFilter results. To access the snapshot during the hook execution, there is a map `snapshots` in the binding context. The key of this map is a binding name, and the value is the snapshot.
+
+`snapshots` example:
 
 ```yaml
+[
+  { "binding": ...,
     "snapshots": {
       "binding-name-1": [ 
         {
@@ -489,10 +495,10 @@ Snapshot is a list of cached kubernetes objects and corresponding jqFilter resul
         },
         ...
       ]
-    }
+    }}]
 ```
 
-- `object` — it is a JSON dump of Kubernetes object.
+- `object` — a JSON dump of Kubernetes object.
 - `filterResult` — a JSON result of applying `jqFilter` to the Kubernetes object.
 
 Keeping dumps for `object` fields can take a lot of memory. There is a parameter `keepFullObjectsInMemory: false` to disable full dumps.
@@ -508,20 +514,30 @@ kubernetes:
   keepFullObjectsInMemory: false
 ```
 
-To illustrate `includeSnapshotsFrom` parameter, consider the hook that monitors changes of labels of all Pods and do something interesting on schedule:
+### Snapshots example
+
+To illustrate the `includeSnapshotsFrom` parameter, consider the hook that reacts to changes of labels of all Pods and requires the content of the ConfigMap named "settings-for-my-hook". There is also a schedule to do periodic checks:
 
 ```yaml
 configVersion: v1
 schedule:
-- name: incremental
-  crontab: "0 2 */3 * * *"
-  includeSnapshotsFrom: ["monitor-pods"]
+- name: periodic-checking
+  crontab: "0 */3 * * *"
+  includeSnapshotsFrom: ["monitor-pods", "cm"]
 kubernetes:
+- name: configmap-content
+  kind: ConfigMap
+  nameSelector:
+    matchNames: ["settings-for-my-hook"]
+  executeHookOnSynchronization: false
+  executeHookOnEvent: []
 - name: monitor-pods
   kind: Pod
   jqFilter: '.metadata.labels'
-  includeSnapshotsFrom: ["monitor-pods"]
+  includeSnapshotsFrom: ["cm"]
 ```
+
+This hook will not be executed for events related to the binding "configmap-content". `executeHookOnSynchronization: false` accompanied by `executeHookOnEvent: []` defines a "snapshot-only" binding. This is one of the techniques to reduce the number of `kubectl` invocations.
 
 #### "Synchronization" binding context with snapshots
 
@@ -565,19 +581,14 @@ During startup, the hook will be executed with the "Synchronization" binding con
       ...
     ],
     "snapshots": {
-      "monitor-pods": [
+      "configmap-content": [
         {
           "object": {
-            "kind": "Pod",
-            "metadata": {
-              "name": "etcd-...",
-              "namespace": "kube-system",
-              ...
-            },
-          },
-          "filterResult": { ... },
-        },
-        ...
+            "kind": "ConfigMap",
+            "metadata": {"name": "settings-for-my-hook", ... },
+            "data": {"field1": ... }
+          }
+        }
       ]
     }
   }
@@ -609,19 +620,14 @@ If pod `pod-321d12` is then added into the "default" namespace, then the hook wi
     },
     "filterResult": { ... },
     "snapshots": {
-      "monitor-pods": [
+      "configmap-content": [
         {
           "object": {
-            "kind": "Pod",
-            "metadata": {
-              "name": "etcd-...",
-              "namespace": "kube-system",
-              ...
-            },
-          },
-          "filterResult": { ... },
-        },
-        ...
+            "kind": "ConfigMap",
+            "metadata": {"name": "settings-for-my-hook", ... },
+            "data": {"field1": ... }
+          }
+        }
       ]
     }
   }
@@ -630,12 +636,12 @@ If pod `pod-321d12` is then added into the "default" namespace, then the hook wi
 
 #### "Schedule" binding context with snapshots
 
-at 12:02, the hook will be executed with the following binding context:
+Every 3 hours, the hook will be executed with the binding context that include 2 snapshots ("monitor-pods" and "configmap-content"):
 
 ```yaml
 [
   {
-    "binding": "incremental",
+    "binding": "periodic-checking",
     "type": "Schedule",
     "snapshots": {
       "monitor-pods": [
@@ -651,6 +657,15 @@ at 12:02, the hook will be executed with the following binding context:
           "filterResult": { ... },
         },
         ...
+      ],
+      "configmap-content": [
+        {
+          "object": {
+            "kind": "ConfigMap",
+            "metadata": {"name": "settings-for-my-hook", ... },
+            "data": {"field1": ... }
+          }
+        }
       ]
     }
   }
@@ -659,49 +674,67 @@ at 12:02, the hook will be executed with the following binding context:
 
 ### Binding context of grouped bindings
 
-`group` parameter defines a named group of bindings. Group is used when the source of event is not important and data in snapshots is enough for the hook. When binding with `group` is triggered with the event, the hook receives snapshots from all bindings with equal `group` name. Also, adjacent tasks with equal `group` in the same queue are "compacted" and hook is executed only once. So it is wise to use the same queue for all hooks in a group.
+`group` parameter defines a named group of bindings. Group is used when the source of the event is not important, and data in snapshots is enough for the hook. When binding with `group` is triggered with the event, the hook receives snapshots from all `kubernetes` bindings with the same `group` name.
 
-`executeHookOnSynchronization`, `executeHookOnEvent` and `keepFullObjectsInMemory` can be used with `group`.
+Adjacent tasks for `kubernetes` and `schedule` bindings with the same `group` and `queue` are "compacted", and the hook is executed only once. So it is wise to use the same `queue` for all hooks in a group. This "compaction" mechanism is not available for `kubernetesValidating` and `kubernetesCustomResourceConversion` bindings as they're not queued.
+
+`executeHookOnSynchronization`, `executeHookOnEvent` and `keepFullObjectsInMemory` can be used  with `group`. Their effects are as described above for non-grouped bindings.
 
 `group` parameter is compatible with `includeSnapshotsFrom` parameter. `includeSnapshotsFrom` can be used to include additional snapshots into binding context.
 
 Binding context for group contains:
-- `binding` field with group name.
-- `type` field with "Synchronization" or "Group" string.
-- `snapshots` field if there is at least one `kubernetes` binding in the group and in `includeSnapshotsFrom`.
+- `binding` field with the group name.
+- `type` field with the value "Group".
+- `snapshots` field if there is at least one `kubernetes` binding in the group or `includeSnapshotsFrom` is not empty.
 
-Consider the hook that is executed on changes of labels of all Pods, changes in ConfigMap and also on schedule:
+### Group binding context example
+
+Consider the hook that is executed on changes of labels of all Pods, changes in ConfigMap's data and also on schedule:
 
 ```yaml
 configVersion: v1
 schedule:
-- name: incremental
-  crontab: "* * * * *"
+- name: periodic-checking
+  crontab: "0 */3 * * *"
   group: "pods"
 kubernetes:
-- name: monitor_pods
+- name: monitor-pods
   apiVersion: v1
   kind: Pod
   jqFilter: '.metadata.labels'
   group: "pods"
-- name: monitor_configmap
+- name: configmap-content
   apiVersion: v1
   kind: ConfigMap
+  nameSelector:
+    matchNames: ["settings-for-my-hook"]
   jqFilter: '.data'
-  group: "pods" 
+  group: "pods"
+
 ```
 
-#### "Synchronization" binding context for group
+#### binding context for grouped bindings
 
-During startup, the hook will be executed with the "Synchronization" binding context with `snapshots` JSON object:
+Grouped bindings is used when only the occurrence of an event is important. So, the hook receives actual state of Pods and the ConfigMap on every of these events:
+
+- During startup.
+- A new Pod is added.
+- The Pod is deleted.
+- Labels of the Pod are changed.
+- ConfigMap/settings-for-my-hook is deleted.
+- ConfigMap/settings-for-my-hook is added.
+- Data field is changed in ConfigMap/settings-for-my-hook.
+- Every 3 hours.
+
+Binding context for these events will be the same:
 
 ```yaml
 [
   {
     "binding": "pods",
-    "type": "Synchronization",
+    "type": "Group",
     "snapshots": {
-      "monitor_pods": [
+      "monitor-pods": [
         {
           "object": {
             "kind": "Pod",
@@ -715,7 +748,7 @@ During startup, the hook will be executed with the "Synchronization" binding con
         },
         ...
       ],
-      "monitor_configmap": [
+      "configmap-content": [
         {
           "object": {
             "kind": "ConfigMap",
@@ -727,68 +760,6 @@ During startup, the hook will be executed with the "Synchronization" binding con
           },
           "filterResult": { ... },
         },
-        ...
-      ]
-    }
-  }
-]
-```
-
-#### "Group" binding context
-
-If pod `pod-dfbd12` is then added into the "default" namespace, then the hook will be executed with the "Group" binding context:
-
-```yaml
-[
-  {
-    "binding": "pods",
-    "type": "Group",
-    "snapshots": {
-      "monitor_pods": [
-        {
-          "object": {
-            "kind": "Pod",
-            "metadata":{
-              "name":"etcd-...",
-              "namespace":"kube-system",
-              ...
-            },
-          },
-          "filterResult": { ... },
-        },
-        ...
-      ],
-      "monitor_configmap": [
-        {
-          "object": {
-            "kind": "ConfigMap",
-            "metadata":{
-              "name":"etcd-...",
-              "namespace":"kube-system",
-              ...
-            },
-          },
-          "filterResult": { ... },
-        },
-        ...
-      ]
-    }
-  }
-]
-```
-
-Every minute it will be executed with the same binding context with fresh snapshots:
-
-```yaml
-[
-  {
-    "binding": "pods",
-    "type": "Group",
-    "snapshots": {
-      "monitor_pods": [
-        ...
-      ],
-      "monitor_configmaps": [
         ...
       ]
     }
@@ -834,4 +805,4 @@ settings:
   executionBurst: 1
 ```
 
-Hook with these settings will be executed once in 3 seconds.
+If the Shell-operator will receive a lot of events for the "all-pods-in-ns" binding, the hook will be executed no more than once in 3 seconds.

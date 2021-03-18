@@ -65,7 +65,6 @@ func KindCreateCluster(clusterName string) error {
 	}
 
 	return nil
-
 }
 
 func KindDeleteCluster(clusterName string) error {

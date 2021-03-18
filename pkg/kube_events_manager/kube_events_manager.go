@@ -15,13 +15,13 @@ type KubeEventsManager interface {
 	WithContext(ctx context.Context)
 	WithMetricStorage(mstor *metric_storage.MetricStorage)
 	WithKubeClient(client kube.KubernetesClient)
-	AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error)
-	HasMonitor(monitorId string) bool
-	GetMonitor(monitorId string) Monitor
-	StartMonitor(monitorId string)
-	Start()
 
-	StopMonitor(configId string) error
+	AddMonitor(monitorConfig *MonitorConfig) error
+	HasMonitor(monitorID string) bool
+	GetMonitor(monitorID string) Monitor
+	StartMonitor(monitorID string)
+	StopMonitor(monitorID string) error
+
 	Ch() chan KubeEvent
 	PauseHandleEvents()
 }
@@ -67,7 +67,7 @@ func (mgr *kubeEventsManager) WithKubeClient(client kube.KubernetesClient) {
 // AddMonitor creates a monitor with informers and return a KubeEvent with existing objects.
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
-func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) (*KubeEvent, error) {
+func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	log.Debugf("Add MONITOR %+v", monitorConfig)
 	monitor := NewMonitor()
 	monitor.WithContext(mgr.ctx)
@@ -76,78 +76,47 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) (*KubeEve
 	monitor.WithConfig(monitorConfig)
 	monitor.WithKubeEventCb(func(ev KubeEvent) {
 		defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
-		outEvent := mgr.MakeKubeEvent(monitor, ev)
-		if outEvent != nil {
-			mgr.KubeEventCh <- *outEvent
-		}
+		mgr.KubeEventCh <- ev
 	})
 
 	err := monitor.CreateInformers()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	mgr.Monitors[monitorConfig.Metadata.MonitorId] = monitor
 
-	return mgr.MakeKubeEvent(monitor), nil
+	return nil
 }
 
-func (mgr *kubeEventsManager) MakeKubeEvent(monitor Monitor, ev ...KubeEvent) *KubeEvent {
-	if len(ev) == 0 {
-		// Ignore first Synchronization for v0 config
-		if monitor.GetConfig().Mode == ModeV0 {
-			return nil
-		}
-		return &KubeEvent{
-			MonitorId: monitor.GetConfig().Metadata.MonitorId,
-			Type:      TypeSynchronization,
-			Objects:   monitor.GetExistedObjects(),
-		}
-	}
-
-	return &KubeEvent{
-		MonitorId:   ev[0].MonitorId,
-		Type:        TypeEvent,
-		WatchEvents: ev[0].WatchEvents,
-		Objects:     ev[0].Objects,
-		//Object:       ev[0].Object,
-		//FilterResult: ev[0].FilterResult,
-	}
-}
-
-// HasMonitor returns true if there is a monitor with configId
-func (mgr *kubeEventsManager) HasMonitor(monitorId string) bool {
-	_, has := mgr.Monitors[monitorId]
+// HasMonitor returns true if there is a monitor with monitorID.
+func (mgr *kubeEventsManager) HasMonitor(monitorID string) bool {
+	_, has := mgr.Monitors[monitorID]
 	return has
 }
 
-func (mgr *kubeEventsManager) GetMonitor(monitorId string) Monitor {
-	return mgr.Monitors[monitorId]
+// GetMonitor returns monitor by its ID.
+func (mgr *kubeEventsManager) GetMonitor(monitorID string) Monitor {
+	return mgr.Monitors[monitorID]
 }
 
-// StartMonitor starts all informers for monitor
-func (mgr *kubeEventsManager) StartMonitor(monitorId string) {
-	monitor := mgr.Monitors[monitorId]
+// StartMonitor starts all informers for the monitor.
+func (mgr *kubeEventsManager) StartMonitor(monitorID string) {
+	monitor := mgr.Monitors[monitorID]
 	monitor.Start(mgr.ctx)
 }
 
-// Start starts all informers, created by monitors
-func (mgr *kubeEventsManager) Start() {
-	for _, monitor := range mgr.Monitors {
-		monitor.Start(mgr.ctx)
-	}
-}
-
-// StopMonitor stops monitor and removes it from Monitors
-func (mgr *kubeEventsManager) StopMonitor(configId string) error {
-	monitor, ok := mgr.Monitors[configId]
+// StopMonitor stops monitor and removes it from the index.
+func (mgr *kubeEventsManager) StopMonitor(monitorID string) error {
+	monitor, ok := mgr.Monitors[monitorID]
 	if ok {
 		monitor.Stop()
-		delete(mgr.Monitors, configId)
+		delete(mgr.Monitors, monitorID)
 	}
 	return nil
 }
 
+// Ch returns a channel to receive KubeEvent objects.
 func (mgr *kubeEventsManager) Ch() chan KubeEvent {
 	return mgr.KubeEventCh
 }

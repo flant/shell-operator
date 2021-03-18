@@ -18,15 +18,11 @@ import (
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 )
 
-//var verBcs map[string]string
-//var _ = Ω(JqFilter(verBcs, `.[0] | has("objects")`)).To(Equal("true"), JqFilter(verBcs, `.`))
-//var _ = Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, Equal(true)))
-
 func Test(t *testing.T) {
 	RunIntegrationSuite(t, "KubeEventManager suite", "kube-event-manager-test")
 }
 
-var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
+var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent objects", func() {
 	var KubeEventsManager kube_events_manager.KubeEventsManager
 
 	BeforeEach(func() {
@@ -37,7 +33,6 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 
 	Context("with configVersion: v1", func() {
 		var monitorConfig *kube_events_manager.MonitorConfig
-		var ev *KubeEvent
 
 		BeforeEach(func() {
 			monitorConfig = &kube_events_manager.MonitorConfig{
@@ -55,22 +50,22 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 			}
 			monitorConfig.Metadata.MonitorId = "test-abcd"
 
-			var err error
-			ev, err = KubeEventsManager.AddMonitor(monitorConfig)
+			err := KubeEventsManager.AddMonitor(monitorConfig)
 			Ω(err).ShouldNot(HaveOccurred())
-			fmt.Printf("ev: %#v\n", ev)
+			KubeEventsManager.StartMonitor(monitorConfig.Metadata.MonitorId)
 		})
 
-		It("should return KubeEvent Synchronization on AddMonitor", func(done Done) {
-			Ω(ev.MonitorId).To(Equal(monitorConfig.Metadata.MonitorId))
+		It("should have cached objects", func(done Done) {
+			Expect(KubeEventsManager.HasMonitor(monitorConfig.Metadata.MonitorId)).Should(BeTrue())
 
-			Ω(ev.Objects).Should(HaveLen(0), "No pods in default namespace, synchronization should have no objects")
+			m := KubeEventsManager.GetMonitor(monitorConfig.Metadata.MonitorId)
+			Expect(m).ShouldNot(BeNil())
+			snapshot := m.Snapshot()
+			Expect(snapshot).ShouldNot(BeNil())
+			Expect(snapshot).Should(HaveLen(0), "No pods in default namespace. Snapshot at start should have no objects.")
 
-			//bcList := hook.ConvertKubeEventToBindingContext(*ev, "kubernetes")
-			//verBcs := hook.ConvertBindingContextList("v1", bcList)
-
-			//Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, "true"))
-			//Ω(verBcs).To(MatchJq(`.[0].objects | map(select(has("filterResult"))) | length`, "0"))
+			// Unlock KubeEvent emitting.
+			m.EnableKubeEventCb()
 
 			close(done)
 
@@ -84,9 +79,6 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 			})
 
 			It("should return KubeEvent with type 'Event'", func(done Done) {
-				Ω(KubeEventsManager.HasMonitor(monitorConfig.Metadata.MonitorId)).To(BeTrue())
-				KubeEventsManager.Start()
-
 				ev := <-KubeEventsManager.Ch()
 
 				fmt.Printf("%#v\n", ev)
@@ -97,23 +89,7 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 				Ω(ev.Objects).ShouldNot(BeNil())
 				Ω(ev.Objects).Should(HaveLen(1))
 				Ω(ev.Objects[0].Object.GetName()).Should(Equal("test"))
-
-				//Ω(ev.Object).ShouldNot(BeNil())
-				//Ω(ev.FilterResult).Should(Equal(""))
-
-				//bcList := kube_event.ConvertKubeEventToBindingContext(ev, "kubernetes")
-				//verBcs := hook.ConvertBindingContextList("v1", bcList)
-
-				//Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, "false"))
-				//Ω(verBcs).To(MatchJq(`.[0] | has("filterResult")`, "false"))
-
-				//Ω(verBcs).To(MatchJq(`.[0] | length`, "4"))
-				//Ω(verBcs).To(MatchJq(`.[0].binding`, `"kubernetes"`))
-				//Ω(verBcs).To(MatchJq(`.[0].type`, `"Event"`))
-				//Ω(verBcs).To(MatchJq(`.[0].watchEvent`, `"Added"`))
-
-				//Ω(verBcs).To(MatchJq(`.[0] | has("object")`, `true`))
-				//Ω(verBcs).To(MatchJq(`.[0].object.metadata.name`, `"test"`))
+				Ω(ev.Objects[0].FilterResult).Should(Equal(""))
 
 				close(done)
 			}, 25)
@@ -122,13 +98,5 @@ var _ = Describe("Subscription to Pods should emit KubeEvent objects", func() {
 				Kubectl(ContextName).Delete("default", "pod/test")
 			})
 		})
-
-		//It("should find GroupVersionResource for Pod by kind", func() {
-		//	gvr, err := kube.GroupVersionResourceByKind("Pod")
-		//	Ω(err).Should(Succeed())
-		//	Ω(gvr.Resource).Should(Equal("pods"))
-		//	Ω(gvr.Group).Should(Equal(""))
-		//	Ω(gvr.Version).Should(Equal("v1"))
-		//})
 	})
 })

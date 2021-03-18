@@ -357,21 +357,24 @@ func (q *TaskQueue) Start() {
 				t.IncrementFailureCount()
 				q.Status = fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String())
 			case "Success":
-				// add tasks after current task in reverse order
+				// Insert new tasks right after the current task in reverse order.
 				for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
 					q.AddAfter(t.GetId(), taskRes.AfterTasks[i])
 				}
+				q.DoWithHeadLock(func(q *TaskQueue) {
+					// Current head task is handled, remove it.
+					q.Remove(t.GetId())
+					// Also, add HeadTasks in reverse order
+					// at the start of the queue. The first task in HeadTasks
+					// become the new first task in the queue.
+					for i := len(taskRes.HeadTasks) - 1; i >= 0; i-- {
+						q.AddFirst(taskRes.HeadTasks[i])
+					}
+				})
 				// Add tasks to the end of the queue
 				for _, newTask := range taskRes.TailTasks {
 					q.AddLast(newTask)
 				}
-				// Remove current task and add tasks to the head
-				q.DoWithHeadLock(func(q *TaskQueue) {
-					q.Remove(t.GetId())
-					for _, newTask := range taskRes.HeadTasks {
-						q.AddFirst(newTask)
-					}
-				})
 				q.Status = ""
 			case "Repeat":
 				// repeat a current task after a small delay
