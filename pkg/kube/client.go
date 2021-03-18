@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/metrics"
 
 	log "github.com/sirupsen/logrus"
@@ -78,6 +80,7 @@ var _ KubernetesClient = &kubernetesClient{}
 
 type kubernetesClient struct {
 	kubernetes.Interface
+	cachedDiscovery  discovery.CachedDiscoveryInterface
 	contextName      string
 	configPath       string
 	defaultNamespace string
@@ -220,6 +223,21 @@ func (c *kubernetesClient) Init() error {
 		//})
 	}
 
+	cacheDiscoveryDir, err := ioutil.TempDir("", "kube-cache-discovery-*")
+	if err != nil {
+		return err
+	}
+
+	cacheHttpDir, err := ioutil.TempDir("", "kube-cache-http-*")
+	if err != nil {
+		return err
+	}
+
+	c.cachedDiscovery, err = disk.NewCachedDiscoveryClientForConfig(config, cacheDiscoveryDir, cacheHttpDir, 10*time.Minute)
+	if err != nil {
+		return err
+	}
+
 	logEntry.Infof("Kubernetes client is configured successfully with '%s' config", configType)
 
 	return nil
@@ -313,7 +331,7 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 	if apiVersion == "" {
 		// Get all preferred resources.
 		// Can return errors if api controllers are not available.
-		return c.Discovery().ServerPreferredResources()
+		return c.discovery().ServerPreferredResources()
 	} else {
 		// Get only resources for desired group and version
 		gv, err := schema.ParseGroupVersion(apiVersion)
@@ -321,7 +339,7 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 			return nil, fmt.Errorf("apiVersion '%s' is invalid", apiVersion)
 		}
 
-		list, err := c.Discovery().ServerResourcesForGroupVersion(gv.String())
+		list, err := c.discovery().ServerResourcesForGroupVersion(gv.String())
 		if err != nil {
 			return nil, fmt.Errorf("apiVersion '%s' has no supported resources in cluster: %v", apiVersion, err)
 		}
@@ -352,20 +370,18 @@ func (c *kubernetesClient) APIResource(apiVersion string, kind string) (res *met
 		return nil, err
 	}
 
-	for _, list := range lists {
-		for _, resource := range list.APIResources {
-			// TODO is it ok to ignore resources with no verbs?
-			if len(resource.Verbs) == 0 {
-				continue
-			}
+	resource := getApiResourceFromResourceLists(kind, lists)
+	if resource != nil {
+		return resource, nil
+	}
 
-			if equalLowerCasedToOneOf(kind, append(resource.ShortNames, resource.Kind, resource.Name)...) {
-				gv, _ := schema.ParseGroupVersion(list.GroupVersion)
-				resource.Group = gv.Group
-				resource.Version = gv.Version
-				return &resource, nil
-			}
-		}
+	if c.cachedDiscovery != nil {
+		c.cachedDiscovery.Invalidate()
+	}
+
+	resource = getApiResourceFromResourceLists(kind, lists)
+	if resource != nil {
+		return resource, nil
 	}
 
 	// If resource is not found, append additional error, may be the custom API of the resource is not available.
@@ -395,6 +411,13 @@ func (c *kubernetesClient) GroupVersionResource(apiVersion string, kind string) 
 
 }
 
+func (c *kubernetesClient) discovery() discovery.DiscoveryInterface {
+	if c.cachedDiscovery != nil {
+		return c.cachedDiscovery
+	}
+	return c.Discovery()
+}
+
 func equalLowerCasedToOneOf(term string, choices ...string) bool {
 	if len(choices) == 0 {
 		return false
@@ -407,4 +430,24 @@ func equalLowerCasedToOneOf(term string, choices ...string) bool {
 	}
 
 	return false
+}
+
+func getApiResourceFromResourceLists(kind string, resourceLists []*metav1.APIResourceList) *metav1.APIResource {
+	for _, list := range resourceLists {
+		for _, resource := range list.APIResources {
+			// TODO is it ok to ignore resources with no verbs?
+			if len(resource.Verbs) == 0 {
+				continue
+			}
+
+			if equalLowerCasedToOneOf(kind, append(resource.ShortNames, resource.Kind, resource.Name)...) {
+				gv, _ := schema.ParseGroupVersion(list.GroupVersion)
+				resource.Group = gv.Group
+				resource.Version = gv.Version
+				return &resource
+			}
+		}
+	}
+
+	return nil
 }
