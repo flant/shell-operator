@@ -331,7 +331,7 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 	if apiVersion == "" {
 		// Get all preferred resources.
 		// Can return errors if api controllers are not available.
-		return c.cachedDiscovery.ServerPreferredResources()
+		return c.discovery().ServerPreferredResources()
 	} else {
 		// Get only resources for desired group and version
 		gv, err := schema.ParseGroupVersion(apiVersion)
@@ -339,7 +339,7 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 			return nil, fmt.Errorf("apiVersion '%s' is invalid", apiVersion)
 		}
 
-		list, err := c.cachedDiscovery.ServerResourcesForGroupVersion(gv.String())
+		list, err := c.discovery().ServerResourcesForGroupVersion(gv.String())
 		if err != nil {
 			return nil, fmt.Errorf("apiVersion '%s' has no supported resources in cluster: %v", apiVersion, err)
 		}
@@ -375,7 +375,9 @@ func (c *kubernetesClient) APIResource(apiVersion string, kind string) (res *met
 		return resource, nil
 	}
 
-	c.cachedDiscovery.Invalidate()
+	if c.cachedDiscovery != nil {
+		c.cachedDiscovery.Invalidate()
+	}
 
 	resource = getApiResourceFromResourceLists(kind, lists)
 	if resource != nil {
@@ -407,6 +409,13 @@ func (c *kubernetesClient) GroupVersionResource(apiVersion string, kind string) 
 		Version:  apiRes.Version,
 	}, nil
 
+}
+
+func (c *kubernetesClient) discovery() discovery.DiscoveryInterface {
+	if c.cachedDiscovery != nil {
+		return c.cachedDiscovery
+	}
+	return c.Discovery()
 }
 
 func equalLowerCasedToOneOf(term string, choices ...string) bool {
