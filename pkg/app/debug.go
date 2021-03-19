@@ -10,6 +10,8 @@ var DebugUnixSocket = "/var/run/shell-operator/debug.socket"
 
 var DebugKeepTmpFiles = "no"
 
+var DebugKubernetesAPI = false
+
 // SetupDebugSettings init global flags for debug
 func DefineDebugFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
 
@@ -20,6 +22,12 @@ func DefineDebugFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
 		Hidden().
 		Default(DebugKeepTmpFiles).
 		StringVar(&DebugKeepTmpFiles)
+
+	cmd.Flag("debug-kubernetes-api", "enable client-go debug messages").
+		Envar("DEBUG_KUBERNETES_API").
+		Hidden().
+		Default("false").
+		BoolVar(&DebugKubernetesAPI)
 
 	// A command to show help about hidden debug-* flags
 	kpApp.Command("debug-options", "Show help for debug flags of a start command.").Hidden().PreAction(func(_ *kingpin.ParseContext) error {

@@ -12,6 +12,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/flant/shell-operator/pkg/utils/klogtologrus"
 	"github.com/flant/shell-operator/pkg/utils/klogtologrus/test/service"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -25,6 +26,7 @@ func Test_adapter_catches_klog_WarnInfoError(t *testing.T) {
 
 	log.SetOutput(buf)
 	log.SetFormatter(&log.JSONFormatter{DisableTimestamp: true})
+	klogtologrus.InitAdapter(false)
 
 	tests := []struct {
 		level string

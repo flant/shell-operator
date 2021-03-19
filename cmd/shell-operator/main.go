@@ -6,9 +6,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/flant/shell-operator/pkg/debug"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
+
+	"github.com/flant/shell-operator/pkg/debug"
+	"github.com/flant/shell-operator/pkg/utils/klogtologrus"
 
 	"github.com/flant/shell-operator/pkg/app"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
@@ -20,6 +22,12 @@ func main() {
 
 	// override usage template to reveal additional commands with information about start command
 	kpApp.UsageTemplate(app.OperatorUsageTemplate(app.AppName))
+
+	// Initialize klog wrapper when all values are parsed
+	kpApp.Action(func(c *kingpin.ParseContext) error {
+		klogtologrus.InitAdapter(app.DebugKubernetesAPI)
+		return nil
+	})
 
 	// print version
 	kpApp.Command("version", "Show version.").Action(func(c *kingpin.ParseContext) error {
