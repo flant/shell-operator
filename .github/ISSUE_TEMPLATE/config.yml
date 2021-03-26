@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Community forum
-    url: https://community.flant.com/c/shell-operator/7
+  - name: 💬 Github Discussions
+    url: https://github.com/flant/shell-operator/discussions
     about: Please ask and answer questions here
