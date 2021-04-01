@@ -247,3 +247,48 @@ metadata:
 	g.Expect(bindingContexts[0].Snapshots).To(HaveKey("secret"))
 	g.Expect(bindingContexts[0].Snapshots).To(HaveKey("deployment"))
 }
+
+func Test_ExecuteOnSynchronization_false(t *testing.T) {
+	g := NewWithT(t)
+
+	c, err := NewBindingContextController(`
+configVersion: v1
+kubernetes:
+- apiVersion: v1
+  includeSnapshotsFrom:
+  - selected_pods
+  kind: Pod
+  name: selected_pods
+- apiVersion: v1
+  includeSnapshotsFrom:
+  - selected_pods
+  kind: Pod
+  name: selected_pods_nosync
+  executeHookOnSynchronization: false
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	// Synchronization contexts
+	contexts, err := c.Run(`
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	parsedBindingContexts := parseContexts(contexts.Rendered)
+
+	g.Expect(parsedBindingContexts).To(HaveLen(1))
+
+	g.Expect(string(parsedBindingContexts[0].Type)).To(Equal("Synchronization"))
+	g.Expect(parsedBindingContexts[0].Objects).To(HaveLen(2))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
+
+}

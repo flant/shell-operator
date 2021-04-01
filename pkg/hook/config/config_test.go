@@ -376,6 +376,24 @@ schedule:
 			},
 		},
 		{
+			"v1 kubernetes error on empty value in matchLabels",
+			`{
+              "configVersion":"v1",
+			  "kubernetes":[
+			    {
+                "apiVersion":"v1", "kind":"Pod",
+                "nameSelector": {
+                  "matchNames": ["app"]
+                },
+                "labelSelector":{"matchLabels":{"node-role.kubernetes.io/master":""}}
+                }
+              ]
+            }`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+			},
+		},
+		{
 			"v1 includeSnapshotsFrom for group",
 			`
               configVersion: v1
