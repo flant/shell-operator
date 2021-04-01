@@ -129,7 +129,9 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 
 	bindingContexts := make([]BindingContext, 0)
 	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
-		bindingContexts = append(bindingContexts, info.BindingContext...)
+		if info.KubernetesBinding.ExecuteHookOnSynchronization {
+			bindingContexts = append(bindingContexts, info.BindingContext...)
+		}
 	})
 	if err != nil {
 		return GeneratedBindingContexts{}, fmt.Errorf("couldn't enable kubernetes bindings: %v", err)
