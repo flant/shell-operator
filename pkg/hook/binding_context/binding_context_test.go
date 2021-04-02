@@ -131,7 +131,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 							"kind": "Deployment",
 						},
 					},
-					FilterResult: "{\"labels\":{\"label-name\":\"label-value\"}}",
+					FilterResult: `{"labels":{"label-name":"label-value"}}`,
 				}
 				obj.Metadata.JqFilter = ".metadata.labels"
 				bc.Objects = append(bc.Objects, obj)

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -42,8 +41,10 @@ type ObjectAndFilterResult struct {
 		RemoveObject bool
 	}
 	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
-	FilterResult string
-	ObjectBytes  int64 // length of Object
+	FilterResult interface{}
+	// since len() return int, there is no reason to use larger int
+	FilterResultSize int
+	ObjectSize       int
 }
 
 func (o ObjectAndFilterResult) Map() map[string]interface{} {
@@ -57,13 +58,19 @@ func (o ObjectAndFilterResult) Map() map[string]interface{} {
 		return m
 	}
 	// Add filterResult field only if it was requested
-	inJson := o.FilterResult
-	if inJson == "" {
+	filterResString, ok := o.FilterResult.(string)
+	if !ok || filterResString == "" {
 		m["filterResult"] = nil
 		return m
 	}
+
+	if filterResString == "" {
+		m["filterResult"] = nil
+		return m
+	}
+
 	var res interface{}
-	err := json.Unmarshal([]byte(inJson), &res)
+	err := json.Unmarshal([]byte(filterResString), &res)
 	if err != nil {
 		log.Errorf("Possible bug!!! Cannot unmarshal jq filter '%s' result: %s", o.Metadata.JqFilter, err)
 		m["filterResult"] = nil
@@ -80,7 +87,7 @@ func (o ObjectAndFilterResult) MarshalJSON() ([]byte, error) {
 
 func (o *ObjectAndFilterResult) RemoveFullObject() {
 	o.Object = nil
-	o.ObjectBytes = 0
+	o.ObjectSize = 0
 	o.Metadata.RemoveObject = true
 }
 
@@ -88,9 +95,10 @@ type ObjectAndFilterResults map[string]*ObjectAndFilterResult
 
 func (a ObjectAndFilterResults) Bytes() (size int64) {
 	for _, o := range a {
-		size += int64(len(o.FilterResult))
-		size += o.ObjectBytes
+		size += int64(o.FilterResultSize)
+		size += int64(o.ObjectSize)
 	}
+
 	return
 }
 
