@@ -210,6 +210,71 @@ metadata:
 	g.Expect(string(bindingContexts[0].Type)).To(Equal("Synchronization"))
 }
 
+func Test_Synchronization(t *testing.T) {
+	g := NewWithT(t)
+
+	c, err := NewBindingContextController(`
+configVersion: v1
+kubernetes:
+- apiVersion: apps/v1
+  includeSnapshotsFrom:
+  - deployment
+  kind: Deployment
+  name: deployment
+- apiVersion: v1
+  kind: ConfigMap
+  name: cms
+  executeHookOnSynchronization: false
+- apiVersion: v1
+  includeSnapshotsFrom:
+  - deployment
+  - cms
+  kind: Pod
+  name: pods
+- apiVersion: v1
+  kind: Secret
+  name: secrets-grouped
+  group: group1
+- apiVersion: v1
+  kind: ConfigMap
+  name: cms-grouped
+  group: group1
+- apiVersion: v1
+  kind: Pod
+  name: pods-grouped
+  group: group1
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	contexts, err := c.Run(`
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-res-obj-2
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-obj-1
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	bindingContexts := parseContexts(contexts.Rendered)
+
+	g.Expect(bindingContexts).To(HaveLen(3))
+
+	g.Expect(bindingContexts[0].Snapshots["deployment"]).To(HaveLen(1))
+	g.Expect(string(bindingContexts[0].Type)).To(Equal("Synchronization"))
+
+	g.Expect(string(bindingContexts[1].Type)).To(Equal("Synchronization"))
+	g.Expect(bindingContexts[1].Snapshots["deployment"]).To(HaveLen(1))
+	g.Expect(bindingContexts[1].Snapshots["cms"]).To(HaveLen(1))
+
+	g.Expect(string(bindingContexts[2].Type)).To(Equal("Group"))
+	g.Expect(bindingContexts[2].Snapshots["cms-grouped"]).To(HaveLen(1))
+}
+
 func Test_Groups(t *testing.T) {
 	g := NewWithT(t)
 
@@ -291,4 +356,123 @@ metadata:
 	g.Expect(parsedBindingContexts[0].Objects).To(HaveLen(2))
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
+}
+
+func Test_RunSchedule(t *testing.T) {
+	g := NewWithT(t)
+
+	c, err := NewBindingContextController(`
+configVersion: v1
+kubernetes:
+- apiVersion: v1
+  includeSnapshotsFrom:
+  - selected_pods
+  kind: Pod
+  name: selected_pods
+schedule:
+- name: every_minute
+  crontab: "* * * * *"
+  includeSnapshotsFrom:
+  - selected_pods
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	// Synchronization contexts
+	contexts, err := c.Run(`
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	parsedBindingContexts := parseContexts(contexts.Rendered)
+
+	g.Expect(string(parsedBindingContexts[0].Type)).To(Equal("Synchronization"))
+	g.Expect(parsedBindingContexts[0].Objects).To(HaveLen(2))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
+
+	// Object added
+	contexts, err = c.ChangeState(`
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod3
+spec:
+  containers: []
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts.Rendered)
+
+	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Added"))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
+
+	// Object modified
+	contexts, err = c.ChangeState(`
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod3
+spec:
+  containers:
+  - name: test
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts.Rendered)
+
+	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Modified"))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
+
+	// Object deleted
+	contexts, err = c.ChangeState(`
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts.Rendered)
+
+	g.Expect(string(parsedBindingContexts[0].WatchEvent)).To(Equal("Deleted"))
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
+
+	// Run schedule
+	contexts, err = c.RunSchedule("* * * * *")
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts.Rendered)
+	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 }

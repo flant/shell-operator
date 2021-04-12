@@ -25,7 +25,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 	k8s.io/api v0.17.0
 	k8s.io/apiextensions-apiserver v0.17.0
-	k8s.io/apimachinery v0.17.0
+	k8s.io/apimachinery v0.20.5 // version is bumped to please Go 1.16 (package ... imported from implicitly required module)
 	k8s.io/client-go v0.17.0
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/kind v0.10.0
