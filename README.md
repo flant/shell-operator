@@ -243,9 +243,16 @@ Shell-operator has been presented during KubeCon + CloudNativeCon Europe 2020 Vi
 * [text summary](https://medium.com/flant-com/meet-the-shell-operator-kubecon-36c14ba2f8fe);
 * [slides](https://speakerdeck.com/flant/go-bash-meet-the-shell-operator).
 
-Some other publications on shell-operator:
-* "[Kubernetes operators made easy with shell-operator: project status & news](https://medium.com/flant-com/shell-operator-for-kubernetes-update-2f1f9f9ebfb1)" (Jul'20);
-* "[Announcing shell-operator to simplify creating of Kubernetes operators](https://medium.com/flant-com/kubernetes-shell-operator-76c596b42f23)" (May'19).
+Official publications on shell-operator:
+* "[shell-operator v1.0.0: the long-awaited release of our tool to create Kubernetes operators](https://blog.flant.com/shell-operator-v1-release-for-kubernetes-operators/)" (Apr'21);
+* "[shell-operator & addon-operator news: hooks as admission webhooks, Helm 3, OpenAPI, Go hooks, and more!](https://blog.flant.com/shell-operator-addon-operator-v1-rc1-changes/)" (Feb'21);
+* "[Kubernetes operators made easy with shell-operator: project status & news](https://blog.flant.com/kubernetes-operators-made-easy-with-shell-operator-project-status-news/)" (Jul'20);
+* "[Announcing shell-operator to simplify creating of Kubernetes operators](https://blog.flant.com/announcing-shell-operator-to-simplify-creating-of-kubernetes-operators/)" (May'19).
+
+Other languages:
+* Chinese: "[介绍一个不太小的工具：Shell Operator](https://blog.fleeto.us/post/shell-operator/)"; "[使用shell-operator实现Operator](https://cloud.tencent.com/developer/article/1701733)";
+* Dutch: "[Een operator om te automatiseren – Hoe pak je dat aan?](https://www.hcs-company.com/blog/operator-automatiseren-namespace-openshift)";
+* Russian: "[shell-operator v1.0.0: долгожданный релиз нашего проекта для Kubernetes-операторов](https://habr.com/ru/company/flant/blog/551456/)"; "[Представляем shell-operator: создавать операторы для Kubernetes стало ещё проще](https://habr.com/ru/company/flant/blog/447442/)".
 
 # Community
 
