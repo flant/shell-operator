@@ -8,6 +8,7 @@ import (
 	"github.com/flant/shell-operator/pkg/hook"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
+	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube/fake"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
@@ -19,44 +20,6 @@ var FakeCluster *fake.FakeCluster
 type GeneratedBindingContexts struct {
 	Rendered        string
 	BindingContexts []BindingContext
-}
-
-// convertBindingContexts render json with array of binding contexts
-func convertBindingContexts(bindingContexts []BindingContext) (GeneratedBindingContexts, error) {
-	// Compact groups
-	lastGroup := ""
-	lastGroupIndex := 0
-	compactedBindingContexts := make([]BindingContext, 0, len(bindingContexts))
-
-	for _, bindingContext := range bindingContexts {
-		if bindingContext.Metadata.Group == "" {
-			lastGroup = ""
-			compactedBindingContexts = append(compactedBindingContexts, bindingContext)
-			continue
-		}
-
-		if lastGroup != bindingContext.Metadata.Group {
-			compactedBindingContexts = append(compactedBindingContexts, bindingContext)
-			lastGroup = bindingContext.Metadata.Group
-			lastGroupIndex = len(compactedBindingContexts) - 1
-			continue
-		}
-
-		compactedBindingContexts[lastGroupIndex] = bindingContext
-	}
-
-	res := GeneratedBindingContexts{}
-
-	// Support only v1 binding contexts.
-	bcList := ConvertBindingContextList("v1", compactedBindingContexts)
-	data, err := bcList.Json()
-	if err != nil {
-		return res, fmt.Errorf("marshaling binding context error: %v", err)
-	}
-
-	res.BindingContexts = compactedBindingContexts
-	res.Rendered = string(data)
-	return res, nil
 }
 
 type BindingContextController struct {
@@ -127,10 +90,10 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 
 	b.Hook.WithHookController(b.HookCtrl)
 
-	bindingContexts := make([]BindingContext, 0)
+	cc := NewContextCombiner()
 	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
 		if info.KubernetesBinding.ExecuteHookOnSynchronization {
-			bindingContexts = append(bindingContexts, info.BindingContext...)
+			cc.AddBindingContext(types.OnKubernetesEvent, info)
 		}
 	})
 	if err != nil {
@@ -140,15 +103,14 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	b.HookCtrl.UnlockKubernetesEvents()
 
 	<-time.After(time.Millisecond) // tick to trigger informers
-	bindingContexts = b.HookCtrl.UpdateSnapshots(bindingContexts)
-	return convertBindingContexts(bindingContexts)
+	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
 func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBindingContexts, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), b.UpdateTimeout)
 	defer cancel()
 
-	bindingContexts := make([]BindingContext, 0)
+	cc := NewContextCombiner()
 
 	for _, state := range newState {
 		generatedEvents, err := b.Controller.ChangeState(state)
@@ -160,7 +122,7 @@ func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBin
 			select {
 			case ev := <-b.KubeEventsManager.Ch():
 				b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
-					bindingContexts = append(bindingContexts, info.BindingContext...)
+					cc.AddBindingContext(types.OnKubernetesEvent, info)
 				})
 				continue
 			case <-ctx.Done():
@@ -168,26 +130,25 @@ func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBin
 			}
 		}
 	}
-	bindingContexts = b.HookCtrl.UpdateSnapshots(bindingContexts)
-	return convertBindingContexts(bindingContexts)
+	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
 func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQuantity int, newState string) (GeneratedBindingContexts, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	bindingContexts := make([]BindingContext, 0)
+	cc := NewContextCombiner()
 
 	_, err := b.Controller.ChangeState(newState)
 	if err != nil {
 		return GeneratedBindingContexts{}, fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
 	}
 
-	for len(bindingContexts) != desiredQuantity {
+	for cc.QueueLen() != desiredQuantity {
 		select {
 		case ev := <-b.KubeEventsManager.Ch():
 			b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
-				bindingContexts = append(bindingContexts, info.BindingContext...)
+				cc.AddBindingContext(types.OnKubernetesEvent, info)
 			})
 			continue
 		case <-ctx.Done():
@@ -195,17 +156,26 @@ func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQ
 		}
 	}
 
-	bindingContexts = b.HookCtrl.UpdateSnapshots(bindingContexts)
-	return convertBindingContexts(bindingContexts)
+	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
 func (b *BindingContextController) RunSchedule(crontab string) (GeneratedBindingContexts, error) {
-	bindingContexts := make([]BindingContext, 0)
-
+	cc := NewContextCombiner()
 	b.HookCtrl.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
-		bindingContexts = append(bindingContexts, b.HookCtrl.UpdateSnapshots(info.BindingContext)...)
+		cc.AddBindingContext(types.Schedule, info)
 	})
-	return convertBindingContexts(bindingContexts)
+	return cc.CombinedAndUpdated(b.HookCtrl)
+}
+
+func (b *BindingContextController) RunBindingWithAllSnapshots(binding types.BindingType) (GeneratedBindingContexts, error) {
+	bc := BindingContext{
+		Binding:   string(binding),
+		Snapshots: b.HookCtrl.KubernetesSnapshots(),
+	}
+	bc.Metadata.BindingType = binding
+	bc.Metadata.IncludeAllSnapshots = true
+
+	return ConvertToGeneratedBindingContexts([]BindingContext{bc})
 }
 
 func (b *BindingContextController) Stop() {
