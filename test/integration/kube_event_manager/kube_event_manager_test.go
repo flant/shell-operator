@@ -7,15 +7,14 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/flant/shell-operator/test/integration/suite"
-	. "github.com/flant/shell-operator/test/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	. "github.com/flant/shell-operator/test/integration/suite"
+	. "github.com/flant/shell-operator/test/utils"
 )
 
 func Test(t *testing.T) {
@@ -51,7 +50,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			monitorConfig.Metadata.MonitorId = "test-abcd"
 
 			err := KubeEventsManager.AddMonitor(monitorConfig)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ShouldNot(HaveOccurred())
 			KubeEventsManager.StartMonitor(monitorConfig.Metadata.MonitorId)
 		})
 
@@ -64,34 +63,32 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			Expect(snapshot).ShouldNot(BeNil())
 			Expect(snapshot).Should(HaveLen(0), "No pods in default namespace. Snapshot at start should have no objects.")
 
-			// Unlock KubeEvent emitting.
-			m.EnableKubeEventCb()
-
 			close(done)
-
-		}, 6)
+		}, 10)
 
 		When("Pod is Added", func() {
-
 			JustBeforeEach(func() {
 				app.SetupLogging()
+
+				// Unlock KubeEvent emitting.
+				m := KubeEventsManager.GetMonitor(monitorConfig.Metadata.MonitorId)
+				m.EnableKubeEventCb()
+
 				Kubectl(ContextName).Apply("default", "testdata/test-pod.yaml")
 			})
 
-			It("should return KubeEvent with type 'Event'", func(done Done) {
+			It("should return KubeEvent with type 'Event'", func() {
 				ev := <-KubeEventsManager.Ch()
 
-				fmt.Printf("%#v\n", ev)
+				fmt.Fprintf(GinkgoWriter, "Receive %#v\n", ev)
 
-				Ω(ev.MonitorId).To(Equal(monitorConfig.Metadata.MonitorId))
-				Ω(string(ev.Type)).To(Equal("Event"))
+				Expect(ev.MonitorId).To(Equal(monitorConfig.Metadata.MonitorId))
+				Expect(string(ev.Type)).To(Equal("Event"))
 
-				Ω(ev.Objects).ShouldNot(BeNil())
-				Ω(ev.Objects).Should(HaveLen(1))
-				Ω(ev.Objects[0].Object.GetName()).Should(Equal("test"))
-				Ω(ev.Objects[0].FilterResult).Should(Equal(""))
-
-				close(done)
+				Expect(ev.Objects).ShouldNot(BeNil())
+				Expect(ev.Objects).Should(HaveLen(1))
+				Expect(ev.Objects[0].Object.GetName()).Should(Equal("test"))
+				Expect(ev.Objects[0].FilterResult).Should(BeNil(), "filterResult should be empty if monitor has no jqFilter or filterFunc")
 			}, 25)
 
 			AfterEach(func() {

@@ -381,7 +381,13 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			Objects:     []ObjectAndFilterResult{*objFilterRes},
 		}
 
-		if ei.eventCbEnabled {
+		// fix race with EnableKubeEventCb.
+		eventCbEnabled := false
+		ei.eventBufLock.Lock()
+		eventCbEnabled = ei.eventCbEnabled
+		ei.eventBufLock.Unlock()
+
+		if eventCbEnabled {
 			// Pass event info to callback.
 			ei.EventCb(kubeEvent)
 		} else {
