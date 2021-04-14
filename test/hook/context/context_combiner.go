@@ -48,7 +48,7 @@ func (c *ContextCombiner) AddBindingContext(bindingType types.BindingType, info 
 		BindingContext: info.BindingContext,
 		AllowFailure:   info.AllowFailure,
 	})
-	t.WithQueueName("main")
+	t.WithQueueName(TestQueueName)
 	c.q.AddLast(t)
 }
 
