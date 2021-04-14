@@ -34,7 +34,7 @@ Shell-operator provides:
   * [`onStartup`](#onstartup)
   * [`schedule`](#schedule)
 * [Prometheus target](#prometheus-target)
-* [Examples](#examples)
+* [Examples and notable users](#examples-and-notable-users)
 * [Articles & talks](#articles--talks)
 * [Community](#community)
 * [License](#license)
@@ -223,9 +223,17 @@ schedule:
 
 Shell-operator provides a `/metrics` endpoint. More on this in [METRICS](METRICS.md) document.
 
-# Examples
+# Examples and notable users
 
-More examples can be found in the [examples](examples/) directory.
+More examples of how you can use shell-operator are available in the [examples](examples/) directory.
+
+Prominent shell-operator use cases include:
+
+* [Deckhouse](https://deckhouse.io/) Kubernetes platform where both projects, shell-operator and addon-operator, are used as the core technology to configure & extend K8s features;
+* KubeSphere Kubernetes platform's [installer](https://github.com/kubesphere/ks-installer);
+* [Kafka DevOps solution](https://github.com/confluentinc/streaming-ops) from Confluent.
+
+Please find out & share more examples in [Show & tell discussions](https://github.com/flant/shell-operator/discussions/categories/show-and-tell).
 
 # Articles & talks
 
