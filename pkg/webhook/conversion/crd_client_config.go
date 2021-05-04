@@ -20,7 +20,7 @@ type CrdClientConfig struct {
 	CABundle    []byte
 }
 
-var SupportedConversionReviewVersions = []string{"v1"}
+var SupportedConversionReviewVersions = []string{"v1", "v1beta1"}
 
 func (c *CrdClientConfig) Update() error {
 	client := c.KubeClient

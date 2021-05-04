@@ -2,5 +2,4 @@ templates
 .helmignore
 Chart.yaml
 crontab*.yaml
-README.md
 values.yaml

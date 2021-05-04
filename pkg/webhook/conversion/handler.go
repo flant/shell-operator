@@ -70,6 +70,7 @@ func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Reque
 }
 
 // See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#write-a-conversion-webhook-server
+// This code always response with v1 ConversionReview: it works for 1.16+.
 func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.ConversionReview, error) {
 	crdName := DetectCrdName(path)
 	log.Infof("Got ConversionReview request for crd/%s", crdName)
