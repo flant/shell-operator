@@ -14,9 +14,6 @@ import (
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
-// FakeCluster is global for now. It can be encapsulated in BindingContextController lately.
-var FakeCluster *fake.FakeCluster
-
 type GeneratedBindingContexts struct {
 	Rendered        string
 	BindingContexts []BindingContext
@@ -33,17 +30,19 @@ type BindingContextController struct {
 	ScheduleManager   schedulemanager.ScheduleManager
 
 	UpdateTimeout time.Duration
+
+	fakeCluster *fake.FakeCluster
 }
 
 func NewBindingContextController(config string) (*BindingContextController, error) {
-	FakeCluster = fake.NewFakeCluster()
-
 	return &BindingContextController{
 		HookMap:    make(map[string]string),
 		HookConfig: config,
 
 		Controller:    NewStateController(),
 		UpdateTimeout: 1500 * time.Millisecond,
+
+		fakeCluster: fake.NewFakeCluster(fake.ClusterVersionV119),
 	}, nil
 }
 
@@ -54,7 +53,7 @@ func (b *BindingContextController) WithHook(h *hook.Hook) {
 
 // RegisterCRD registers custom resources for the cluster
 func (b *BindingContextController) RegisterCRD(group, version, kind string, namespaced bool) {
-	FakeCluster.RegisterCRD(group, version, kind, namespaced)
+	b.fakeCluster.RegisterCRD(group, version, kind, namespaced)
 }
 
 // BindingContextsGenerator generates binding contexts for hook tests
@@ -63,7 +62,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
 	b.KubeEventsManager.WithContext(ctx)
-	b.KubeEventsManager.WithKubeClient(FakeCluster.KubeClient)
+	b.KubeEventsManager.WithKubeClient(b.fakeCluster.KubeClient)
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager()
 	b.ScheduleManager.WithContext(ctx)

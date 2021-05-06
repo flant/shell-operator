@@ -149,7 +149,7 @@ kubernetes:
 
 	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
 
-	gvr, err := FakeCluster.FindGVR("my.crd.io/v1alpha1", "MyResource")
+	gvr, err := c.fakeCluster.FindGVR("my.crd.io/v1alpha1", "MyResource")
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(gvr).ShouldNot(BeNil())
 	g.Expect(gvr.Group).To(Equal("my.crd.io"))
