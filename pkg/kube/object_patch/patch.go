@@ -179,8 +179,8 @@ func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, subresou
 }
 
 func (o *ObjectPatcher) CreateObjectIfNotExists(object *unstructured.Unstructured, subresource string) error {
-	log.Debug("Started Create")
-	defer log.Debug("Finished Create")
+	log.Debug("Started CreateObjectIfNotExists")
+	defer log.Debug("Finished CreateObjectIfNotExists")
 
 	if object == nil {
 		return fmt.Errorf("cannot create empty object")
