@@ -23,7 +23,7 @@ type FakeCluster struct {
 	Discovery *fakediscovery.FakeDiscovery
 }
 
-func NewFakeCluster() *FakeCluster {
+func NewFakeCluster(ver ClusterVersion) *FakeCluster {
 	fc := &FakeCluster{}
 	fc.KubeClient = kube.NewFakeKubernetesClient()
 
@@ -32,8 +32,8 @@ func NewFakeCluster() *FakeCluster {
 	if !ok {
 		panic("couldn't convert Discovery() to *FakeDiscovery")
 	}
-	fc.Discovery.FakedServerVersion = &version.Info{GitCommit: "v1.17.0"}
-	fc.Discovery.Resources = ClusterResources()
+	fc.Discovery.FakedServerVersion = &version.Info{GitCommit: ver.String(), Major: ver.Major(), Minor: ver.Minor()}
+	fc.Discovery.Resources = ClusterResources(ver)
 
 	return fc
 }
@@ -68,7 +68,7 @@ func (fc *FakeCluster) RegisterCRD(group, version, kind string, namespaced bool)
 }
 
 func (fc *FakeCluster) FindGVR(apiVersion, kind string) (*schema.GroupVersionResource, error) {
-	gvr := FindGvr(fc.Discovery.Resources, apiVersion, kind)
+	gvr := findGvr(fc.Discovery.Resources, apiVersion, kind)
 	if gvr == nil {
 		return nil, fmt.Errorf("GVR for %s is not find", kind)
 	}
@@ -76,7 +76,7 @@ func (fc *FakeCluster) FindGVR(apiVersion, kind string) (*schema.GroupVersionRes
 }
 
 func (fc *FakeCluster) MustFindGVR(apiVersion, kind string) *schema.GroupVersionResource {
-	return FindGvr(fc.Discovery.Resources, apiVersion, kind)
+	return findGvr(fc.Discovery.Resources, apiVersion, kind)
 }
 
 func (fc *FakeCluster) CreateSimpleNamespaced(ns string, kind string, name string) {
@@ -133,6 +133,26 @@ func (fc *FakeCluster) Update(ns string, m manifest.Manifest) error {
 	_, err = fc.KubeClient.Dynamic().Resource(*gvr).Namespace(m.Namespace(ns)).Update(m.ToUnstructured(), metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("updating object failed: %v", err)
+	}
+	return nil
+}
+
+func findGvr(resources []*metav1.APIResourceList, apiVersion, kindOrName string) *schema.GroupVersionResource {
+	for _, apiResourceGroup := range resources {
+		if apiVersion != "" && apiResourceGroup.GroupVersion != apiVersion {
+			continue
+		}
+		for _, apiResource := range apiResourceGroup.APIResources {
+			if strings.EqualFold(apiResource.Kind, kindOrName) || strings.EqualFold(apiResource.Name, kindOrName) {
+				// ignore parse error, because FakeClusterResources should be valid
+				gv, _ := schema.ParseGroupVersion(apiResourceGroup.GroupVersion)
+				return &schema.GroupVersionResource{
+					Resource: apiResource.Name,
+					Group:    gv.Group,
+					Version:  gv.Version,
+				}
+			}
+		}
 	}
 	return nil
 }
