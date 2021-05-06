@@ -8,29 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type ClusterVersion string
-
-const (
-	ClusterVersionV115 ClusterVersion = "v1.15.0"
-	ClusterVersionV116 ClusterVersion = "v1.16.0"
-	ClusterVersionV117 ClusterVersion = "v1.17.0"
-	ClusterVersionV118 ClusterVersion = "v1.18.0"
-	ClusterVersionV119 ClusterVersion = "v1.19.0"
-	ClusterVersionV120 ClusterVersion = "v1.20.0"
-)
-
-func (cv ClusterVersion) String() string {
-	return string(cv)
-}
-
-func (cv ClusterVersion) Major() string {
-	return string(cv)[1:2]
-}
-
-func (cv ClusterVersion) Minor() string {
-	return string(cv)[3:5]
-}
-
+// ClusterResources returns cluster resources depends on k8s version
 func ClusterResources(version ClusterVersion) []*metav1.APIResourceList {
 	switch version {
 	case ClusterVersionV115:
@@ -53,4 +31,28 @@ func ClusterResources(version ClusterVersion) []*metav1.APIResourceList {
 	}
 
 	return nil
+}
+
+// ClusterVersion k8s cluster version
+type ClusterVersion string
+
+const (
+	ClusterVersionV115 ClusterVersion = "v1.15.0"
+	ClusterVersionV116 ClusterVersion = "v1.16.0"
+	ClusterVersionV117 ClusterVersion = "v1.17.0"
+	ClusterVersionV118 ClusterVersion = "v1.18.0"
+	ClusterVersionV119 ClusterVersion = "v1.19.0"
+	ClusterVersionV120 ClusterVersion = "v1.20.0"
+)
+
+func (cv ClusterVersion) String() string {
+	return string(cv)
+}
+
+func (cv ClusterVersion) Major() string {
+	return string(cv)[1:2]
+}
+
+func (cv ClusterVersion) Minor() string {
+	return string(cv)[3:5]
 }
