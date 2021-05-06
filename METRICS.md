@@ -52,6 +52,12 @@ Operation to register a gauge and set its value:
 {"name":"metric_name","action":"set","value":33,"labels":{"label1":"value1"}}
 ```
 
+Operation to register a histogram and observe a duration (not yet supported for grouped metrics):
+
+```json
+{"name":"metric_name","action":"observe","value":42, "buckets": [1,2,5,10,20,50,100,200,500], "labels":{"label1":"value1"}}
+```
+
 Labels are not required, but Shell-operator adds a `hook` label with a path to a hook script relative to hooks directory.
 
 Several metrics can be exported at once. For example, this script will create 2 metrics:
