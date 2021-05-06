@@ -14,9 +14,6 @@ import (
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
-// FakeCluster is global for now. It can be encapsulated in BindingContextController lately.
-var FakeCluster *fake.FakeCluster
-
 type GeneratedBindingContexts struct {
 	Rendered        string
 	BindingContexts []BindingContext
@@ -33,17 +30,24 @@ type BindingContextController struct {
 	ScheduleManager   schedulemanager.ScheduleManager
 
 	UpdateTimeout time.Duration
+
+	fakeCluster *fake.FakeCluster
 }
 
-func NewBindingContextController(config string) (*BindingContextController, error) {
-	FakeCluster = fake.NewFakeCluster()
-
+func NewBindingContextController(config string, version ...fake.ClusterVersion) (*BindingContextController, error) {
+	k8sVersion := fake.ClusterVersionV119
+	if len(version) > 0 {
+		k8sVersion = version[0]
+	}
+	fc := fake.NewFakeCluster(k8sVersion)
 	return &BindingContextController{
 		HookMap:    make(map[string]string),
 		HookConfig: config,
 
-		Controller:    NewStateController(),
+		Controller:    NewStateController(fc),
 		UpdateTimeout: 1500 * time.Millisecond,
+
+		fakeCluster: fc,
 	}, nil
 }
 
@@ -52,9 +56,15 @@ func (b *BindingContextController) WithHook(h *hook.Hook) {
 	b.HookConfig = ""
 }
 
+// WithFakeCluster add some external cluster to current controllers
+func (b *BindingContextController) WithFakeCluster(c *fake.FakeCluster) {
+	b.fakeCluster = c
+	b.Controller.fakeCluster = c
+}
+
 // RegisterCRD registers custom resources for the cluster
 func (b *BindingContextController) RegisterCRD(group, version, kind string, namespaced bool) {
-	FakeCluster.RegisterCRD(group, version, kind, namespaced)
+	b.fakeCluster.RegisterCRD(group, version, kind, namespaced)
 }
 
 // BindingContextsGenerator generates binding contexts for hook tests
@@ -63,7 +73,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
 	b.KubeEventsManager.WithContext(ctx)
-	b.KubeEventsManager.WithKubeClient(FakeCluster.KubeClient)
+	b.KubeEventsManager.WithKubeClient(b.fakeCluster.KubeClient)
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager()
 	b.ScheduleManager.WithContext(ctx)

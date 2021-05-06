@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/flant/shell-operator/pkg/kube/fake"
 	"github.com/flant/shell-operator/pkg/utils/manifest"
 )
 
@@ -12,12 +13,15 @@ var defaultNamespace = "default"
 // StateController holds objects state for FakeCluster
 type StateController struct {
 	CurrentState map[string]manifest.Manifest
+
+	fakeCluster *fake.FakeCluster
 }
 
 // NewStateController creates controller to apply state changes
-func NewStateController() *StateController {
+func NewStateController(fc *fake.FakeCluster) *StateController {
 	return &StateController{
 		CurrentState: make(map[string]manifest.Manifest),
+		fakeCluster:  fc,
 	}
 }
 
@@ -30,7 +34,7 @@ func (c *StateController) SetInitialState(initialState string) error {
 	newState := make(map[string]manifest.Manifest)
 
 	for _, m := range manifests {
-		err = FakeCluster.Create(defaultNamespace, m)
+		err = c.fakeCluster.Create(defaultNamespace, m)
 		if err != nil {
 			return fmt.Errorf("create initial state: %v", err)
 		}
@@ -60,7 +64,7 @@ func (c *StateController) ChangeState(newRawState string) (int, error) {
 		currM, ok := c.CurrentState[m.Id()]
 		if !ok {
 			// Create object if not exist
-			err = FakeCluster.Create(defaultNamespace, m)
+			err = c.fakeCluster.Create(defaultNamespace, m)
 			//err := createObject(newStateObject, newUnstructuredObject)
 			if err != nil {
 				return generatedEvents, err
@@ -70,7 +74,7 @@ func (c *StateController) ChangeState(newRawState string) (int, error) {
 		} else {
 			// Update object if changed
 			if !reflect.DeepEqual(currM, m) {
-				err := FakeCluster.Update(defaultNamespace, m)
+				err := c.fakeCluster.Update(defaultNamespace, m)
 				if err != nil {
 					return generatedEvents, err
 				}
@@ -83,7 +87,7 @@ func (c *StateController) ChangeState(newRawState string) (int, error) {
 	for currId, currM := range c.CurrentState {
 		if _, ok := newState[currId]; !ok {
 			// Delete object
-			err := FakeCluster.Delete(defaultNamespace, currM)
+			err := c.fakeCluster.Delete(defaultNamespace, currM)
 			if err != nil {
 				return generatedEvents, err
 			}

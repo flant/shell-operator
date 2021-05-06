@@ -1,0 +1,116 @@
+#!/bin/bash
+
+function error_log(){
+   echo "$(date) | $1"
+   exit 1
+}
+
+if ! type -t readarray >/dev/null; then
+  # Very minimal readarray implementation using read. Does NOT work with lines that contain double-quotes due to eval()
+  readarray() {
+    local cmd opt t v=MAPFILE
+    while [ -n "$1" ]; do
+      case "$1" in
+      -h|--help) echo "minimal substitute readarray for older bash"; exit; ;;
+      -r) shift; opt="$opt -r"; ;;
+      -t) shift; t=1; ;;
+      -u)
+          shift;
+          if [ -n "$1" ]; then
+            opt="$opt -u $1";
+            shift
+          fi
+          ;;
+      *)
+          if [[ "$1" =~ ^[A-Za-z_]+$ ]]; then
+            v="$1"
+            shift
+          else
+            echo -en "${C_BOLD}${C_RED}Error: ${C_RESET}Unknown option: '$1'\n" 1>&2
+            exit
+          fi
+          ;;
+      esac
+    done
+    cmd="read $opt"
+    eval "$v=()"
+    while IFS= eval "$cmd line"; do
+      line=$(echo "$line" | sed -e "s#\([\"\`]\)#\\\\\1#g" )
+      eval "${v}+=(\"$line\")"
+    done
+  }
+fi
+
+function get_resources(){
+  rawPath=$1
+  kubectl get --raw "$rawPath" | jq -r '.resources[] | select(.name | contains("/") | not)'
+}
+
+function print_group(){
+  group=$1
+  groupVersion=$2
+
+  cat <<EOF
+    {
+        GroupVersion: "${groupVersion}",
+        APIResources: []metav1.APIResource{
+EOF
+  for resource in $(echo "$group" | jq -c '.') ; do
+    kind=$(echo "$resource" | jq -r '.kind')
+    namespaced=$(echo "$resource" | jq -r '.namespaced')
+    name=$(echo "$resource" | jq -r '.name')
+
+    version=$(echo "$resource" | jq -r '.version // "null"')
+    objectGroup=""
+    if [[ "$version" == "null" ]]; then
+      version=$(echo "$groupVersion" | awk -F'/' '{ print $1}')
+      objectGroup=$(echo "$groupVersion" | awk -F'/' '{ print $2}')
+    fi
+
+    verbs=$(echo "$resource" | jq -rc '.verbs' | tail -c +2 | sed 's/.$//')
+    cat <<EOF
+            {
+                    Kind:    "${kind}",
+                    Name:    "${name}",
+                    Verbs:   metav1.Verbs{${verbs}},
+                    Group:   "${objectGroup}",
+                    Version: "${version}",
+                    Namespaced: ${namespaced},
+            },
+EOF
+  done
+      cat <<EOF
+        },
+    },
+EOF
+}
+
+if ! jq --version >> /dev/null ; then
+  error_log "jq package must be installed to run the generator"
+fi
+if ! kubectl version >> /dev/null ; then
+  error_log 'kubectl must be installed and must be allowed to connect to kube-apiserver'
+fi
+
+readarray -t api_versions < <(kubectl get --raw /apis | jq -r '.groups[].preferredVersion.groupVersion')
+readarray -t namespaces < <(kubectl get ns --no-headers | awk '{print $1}')
+serverVersion=$(kubectl version --short | grep Server | awk '{print $3}' | cut -c 1,2,4,5)
+
+resFile=${serverVersion}_resources.go
+
+cat <<EOF > $resFile
+package fake
+
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+var ${serverVersion}ClusterResources = []*metav1.APIResourceList{
+EOF
+
+resources=$(get_resources /api/v1)
+print_group "$resources" "v1" >> $resFile
+
+for path in "${api_versions[@]}"; do
+  resources=$(get_resources /apis/${path})
+  print_group "$resources" "$path" >> $resFile
+done
+echo '}' >> $resFile
