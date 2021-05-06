@@ -72,7 +72,7 @@ oneOf:
   - properties:
       operation:
         type: string
-        enum: ["Create", "CreateOrUpdate"]
+        enum: ["Create", "CreateOrUpdate", "CreateIfNotExists"]
   - "$ref": "#/definitions/common"
   - "$ref": "#/definitions/create"
 - allOf:

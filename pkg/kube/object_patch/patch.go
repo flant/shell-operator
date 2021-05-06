@@ -68,6 +68,8 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 		switch spec.Operation {
 		case Create:
 			operationError = o.CreateObject(&unstructured.Unstructured{Object: spec.Object}, spec.Subresource)
+		case CreateIfNotExists:
+			operationError = o.CreateObjectIfNotExists(&unstructured.Unstructured{Object: spec.Object}, spec.Subresource)
 		case CreateOrUpdate:
 			operationError = o.CreateOrUpdateObject(&unstructured.Unstructured{Object: spec.Object}, spec.Subresource)
 		case Delete:
@@ -172,6 +174,34 @@ func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, subresou
 	log.Debug("Started Create API call")
 	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
 	log.Debug("Finished Create API call")
+
+	return err
+}
+
+func (o *ObjectPatcher) CreateObjectIfNotExists(object *unstructured.Unstructured, subresource string) error {
+	log.Debug("Started Create")
+	defer log.Debug("Finished Create")
+
+	if object == nil {
+		return fmt.Errorf("cannot create empty object")
+	}
+
+	apiVersion := object.GetAPIVersion()
+	kind := object.GetKind()
+
+	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
+	if err != nil {
+		return err
+	}
+
+	log.Debug("Started Create API call")
+	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(object, metav1.CreateOptions{}, generateSubresources(subresource)...)
+	log.Debug("Finished Create API call")
+
+	if errors.IsAlreadyExists(err) {
+		log.Debug("resource already exists, exiting without error")
+		return nil
+	}
 
 	return err
 }

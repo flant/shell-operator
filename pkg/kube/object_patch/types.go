@@ -17,8 +17,9 @@ type OperationSpec struct {
 type OperationType string
 
 const (
-	CreateOrUpdate OperationType = "CreateOrUpdate"
-	Create         OperationType = "Create"
+	CreateOrUpdate    OperationType = "CreateOrUpdate"
+	Create            OperationType = "Create"
+	CreateIfNotExists OperationType = "CreateIfNotExists"
 
 	Delete             OperationType = "Delete"
 	DeleteInBackground OperationType = "DeleteInBackground"
