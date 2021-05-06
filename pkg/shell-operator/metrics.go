@@ -27,9 +27,10 @@ func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 		[]float64{
 			0.0,
 			0.000001, 0.000002, 0.000005, // 1,2,5 microseconds
-			0.00001, 0.00002, 0.00005, // 10,20,50 microsends
+			0.00001, 0.00002, 0.00005, // 10,20,50 microseconds
 			0.0001, 0.0002, 0.0005, // 100, 200, 500 microseconds
 			0.001, 0.002, 0.005, // 1,2,5 milliseconds
+			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 		},
 	)
 
@@ -52,7 +53,8 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10, 20, 50 seconds
+			100, 200, 500, // 100,200,500 seconds
 		},
 	)
 	// Duration of handling kubernetes event.
@@ -65,7 +67,8 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10, 20, 50 seconds
+			100, 200, 500, // 100,200,500 seconds
 		},
 	)
 }
@@ -93,7 +96,8 @@ func RegisterHookMetrics(metricStorage *metric_storage.MetricStorage) {
 			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10,20,50 seconds
+			100, 200, 500, // 100,200,500 seconds
 		},
 	)
 
@@ -107,7 +111,8 @@ func RegisterHookMetrics(metricStorage *metric_storage.MetricStorage) {
 			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10,20,50 seconds
+			100, 200, 500, // 100,200,500 seconds
 		},
 	)
 	// User CPU usage.
@@ -120,7 +125,8 @@ func RegisterHookMetrics(metricStorage *metric_storage.MetricStorage) {
 			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10,20,50 seconds
+			100, 200, 500, // 100,200,500 seconds
 		},
 	)
 	// Max RSS in bytes.

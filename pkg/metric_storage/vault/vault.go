@@ -77,7 +77,7 @@ func (v *GroupedVault) CounterAdd(group string, name string, value float64, labe
 func (v *GroupedVault) GaugeSet(group string, name string, value float64, labels map[string]string) {
 	c, err := v.GetOrCreateGaugeCollector(name, LabelNames(labels))
 	if err != nil {
-		log.Errorf("CounterAdd: %v", err)
+		log.Errorf("GaugeSet: %v", err)
 		return
 	}
 	c.Set(group, value, labels)

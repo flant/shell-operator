@@ -12,13 +12,14 @@ import (
 )
 
 type MetricOperation struct {
-	Name   string            `json:"name"`
-	Add    *float64          `json:"add,omitempty"` // shortcut for action=add value=num
-	Set    *float64          `json:"set,omitempty"` // shortcut for action=set value=num
-	Value  *float64          `json:"value,omitempty"`
-	Labels map[string]string `json:"labels"`
-	Group  string            `json:"group,omitempty"`
-	Action string            `json:"action,omitempty"`
+	Name    string            `json:"name"`
+	Add     *float64          `json:"add,omitempty"` // shortcut for action=add value=num
+	Set     *float64          `json:"set,omitempty"` // shortcut for action=set value=num
+	Value   *float64          `json:"value,omitempty"`
+	Buckets []float64         `json:"buckets,omitempty"`
+	Labels  map[string]string `json:"labels"`
+	Group   string            `json:"group,omitempty"`
+	Action  string            `json:"action,omitempty"`
 }
 
 func (m MetricOperation) String() string {
@@ -42,6 +43,9 @@ func (m MetricOperation) String() string {
 	}
 	if m.Add != nil {
 		parts = append(parts, fmt.Sprintf("add=%f", *m.Add))
+	}
+	if m.Buckets != nil {
+		parts = append(parts, fmt.Sprintf("buckets=%+v", m.Buckets))
 	}
 	if m.Labels != nil {
 		parts = append(parts, fmt.Sprintf("labels=%+v", m.Labels))
@@ -111,11 +115,11 @@ func ValidateMetricOperation(op MetricOperation) error {
 	var opErrs *multierror.Error
 
 	if op.Action == "" {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("one of: 'action', 'set' or 'add' is required: %s", op))
+		opErrs = multierror.Append(opErrs, fmt.Errorf("one of: 'action', 'set', 'add' or 'observe' is required: %s", op))
 	}
 
 	if op.Group == "" {
-		if op.Action != "set" && op.Action != "add" {
+		if op.Action != "set" && op.Action != "add" && op.Action != "observe" {
 			opErrs = multierror.Append(opErrs, fmt.Errorf("unsupported action '%s': %s", op.Action, op))
 		}
 	} else {
@@ -136,6 +140,9 @@ func ValidateMetricOperation(op MetricOperation) error {
 	}
 	if op.Action == "add" && op.Value == nil {
 		opErrs = multierror.Append(opErrs, fmt.Errorf("'value' is required for action 'add': %s", op))
+	}
+	if op.Action == "observe" && op.Value == nil {
+		opErrs = multierror.Append(opErrs, fmt.Errorf("'value' is required for action 'observe': %s", op))
 	}
 
 	if op.Set != nil && op.Add != nil {

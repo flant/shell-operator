@@ -43,7 +43,7 @@ func RegisterKubernetesClientMetrics(metricStorage MetricStorage, metricLabels m
 			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10,20,50 seconds
 		})
 
 	// TODO update client-go to v.0.18.*
