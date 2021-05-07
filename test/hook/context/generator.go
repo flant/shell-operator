@@ -31,10 +31,15 @@ type BindingContextController struct {
 
 	UpdateTimeout time.Duration
 
-	fakeCluster *fake.FakeCluster
+	fakeCluster           *fake.FakeCluster
+	defaultClusterVersion fake.ClusterVersion
 }
 
-func NewBindingContextController(config string) (*BindingContextController, error) {
+func NewBindingContextController(config string, version ...fake.ClusterVersion) (*BindingContextController, error) {
+	k8sVersion := fake.ClusterVersionV119
+	if len(version) > 0 {
+		k8sVersion = version[0]
+	}
 	return &BindingContextController{
 		HookMap:    make(map[string]string),
 		HookConfig: config,
@@ -42,7 +47,7 @@ func NewBindingContextController(config string) (*BindingContextController, erro
 		Controller:    NewStateController(),
 		UpdateTimeout: 1500 * time.Millisecond,
 
-		fakeCluster: fake.NewFakeCluster(fake.ClusterVersionV119),
+		fakeCluster: fake.NewFakeCluster(k8sVersion),
 	}, nil
 }
 

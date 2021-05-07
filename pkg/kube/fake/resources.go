@@ -2,6 +2,7 @@ package fake
 
 // set current kube-context to cluster with necessary version and run go generate
 // it will create file with desired version and resources
+// you can use existing cluster or kind/minikube/etc
 //go:generate ./scripts/resources_generator
 
 import (
