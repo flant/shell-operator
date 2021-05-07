@@ -18,10 +18,10 @@ type StateController struct {
 }
 
 // NewStateController creates controller to apply state changes
-func NewStateController() *StateController {
+func NewStateController(fc *fake.FakeCluster) *StateController {
 	return &StateController{
 		CurrentState: make(map[string]manifest.Manifest),
-		fakeCluster:  fake.NewFakeCluster(fake.ClusterVersionV119),
+		fakeCluster:  fc,
 	}
 }
 

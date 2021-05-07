@@ -39,20 +39,26 @@ func NewBindingContextController(config string, version ...fake.ClusterVersion) 
 	if len(version) > 0 {
 		k8sVersion = version[0]
 	}
+	fc := fake.NewFakeCluster(k8sVersion)
 	return &BindingContextController{
 		HookMap:    make(map[string]string),
 		HookConfig: config,
 
-		Controller:    NewStateController(),
+		Controller:    NewStateController(fc),
 		UpdateTimeout: 1500 * time.Millisecond,
 
-		fakeCluster: fake.NewFakeCluster(k8sVersion),
+		fakeCluster: fc,
 	}, nil
 }
 
 func (b *BindingContextController) WithHook(h *hook.Hook) {
 	b.Hook = h
 	b.HookConfig = ""
+}
+
+func (b *BindingContextController) WithFakeCluster(c *fake.FakeCluster) {
+	b.fakeCluster = c
+	b.Controller.fakeCluster = c
 }
 
 // RegisterCRD registers custom resources for the cluster
