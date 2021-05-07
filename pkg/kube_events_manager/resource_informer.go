@@ -239,7 +239,7 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 		var err error
 		func() {
 			defer measure.Duration(func(d time.Duration) {
-				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels)
+				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 			})()
 			objFilterRes, err = ApplyFilter(ei.Monitor.JqFilter, ei.Monitor.FilterFunc, &obj)
 		}()
@@ -296,7 +296,7 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 	}
 
 	defer measure.Duration(func(d time.Duration) {
-		ei.metricStorage.HistogramObserve("{PREFIX}kube_event_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.HistogramObserve("{PREFIX}kube_event_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 	})()
 	defer trace.StartRegion(context.Background(), "HandleWatchEvent").End()
 
@@ -313,7 +313,7 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 	var err error
 	func() {
 		defer measure.Duration(func(d time.Duration) {
-			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels)
+			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 		})()
 		objFilterRes, err = ApplyFilter(ei.Monitor.JqFilter, ei.Monitor.FilterFunc, obj)
 	}()

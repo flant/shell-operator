@@ -144,6 +144,9 @@ func ValidateMetricOperation(op MetricOperation) error {
 	if op.Action == "observe" && op.Value == nil {
 		opErrs = multierror.Append(opErrs, fmt.Errorf("'value' is required for action 'observe': %s", op))
 	}
+	if op.Action == "observe" && op.Buckets == nil {
+		opErrs = multierror.Append(opErrs, fmt.Errorf("'buckets' is required for action 'observe': %s", op))
+	}
 
 	if op.Set != nil && op.Add != nil {
 		opErrs = multierror.Append(opErrs, fmt.Errorf("'set' and 'add' are mutual exclusive: %s", op))
