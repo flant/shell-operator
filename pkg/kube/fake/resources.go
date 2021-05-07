@@ -12,9 +12,6 @@ import (
 // ClusterResources returns cluster resources depends on k8s version
 func ClusterResources(version ClusterVersion) []*metav1.APIResourceList {
 	switch version {
-	case ClusterVersionV115:
-		return v115ClusterResources
-
 	case ClusterVersionV116:
 		return v116ClusterResources
 
@@ -41,7 +38,6 @@ func ClusterResources(version ClusterVersion) []*metav1.APIResourceList {
 type ClusterVersion string
 
 const (
-	ClusterVersionV115 ClusterVersion = "v1.15.0"
 	ClusterVersionV116 ClusterVersion = "v1.16.0"
 	ClusterVersionV117 ClusterVersion = "v1.17.0"
 	ClusterVersionV118 ClusterVersion = "v1.18.0"
