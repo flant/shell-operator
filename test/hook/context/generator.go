@@ -31,8 +31,7 @@ type BindingContextController struct {
 
 	UpdateTimeout time.Duration
 
-	fakeCluster           *fake.FakeCluster
-	defaultClusterVersion fake.ClusterVersion
+	fakeCluster *fake.FakeCluster
 }
 
 func NewBindingContextController(config string, version ...fake.ClusterVersion) (*BindingContextController, error) {
