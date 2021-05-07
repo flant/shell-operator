@@ -56,6 +56,7 @@ func (b *BindingContextController) WithHook(h *hook.Hook) {
 	b.HookConfig = ""
 }
 
+// WithFakeCluster add some external cluster to current controllers
 func (b *BindingContextController) WithFakeCluster(c *fake.FakeCluster) {
 	b.fakeCluster = c
 	b.Controller.fakeCluster = c
