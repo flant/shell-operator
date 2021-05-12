@@ -37,7 +37,7 @@ jobs:
           echo "========================================="
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v1.1.0
         with:
           platforms: "${{ env.QEMU_PLATFORMS }}"
 
