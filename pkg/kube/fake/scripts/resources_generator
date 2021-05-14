@@ -92,7 +92,7 @@ if ! kubectl version >> /dev/null ; then
   error_log 'kubectl must be installed and must be allowed to connect to kube-apiserver'
 fi
 
-readarray -t api_versions < <(kubectl get --raw /apis | jq -r '.groups[].preferredVersion.groupVersion')
+readarray -t api_versions < <(kubectl get --raw /apis | jq -r '.groups[].versions[].groupVersion')
 readarray -t namespaces < <(kubectl get ns --no-headers | awk '{print $1}')
 serverVersion=$(kubectl version --short | grep Server | awk '{print $3}' | cut -c 1,2,4,5)
 
@@ -114,3 +114,5 @@ for path in "${api_versions[@]}"; do
   print_group "$resources" "$path" >> $resFile
 done
 echo '}' >> $resFile
+
+go fmt $resFile
