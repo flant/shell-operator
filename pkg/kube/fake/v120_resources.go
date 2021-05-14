@@ -158,6 +158,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "apiregistration.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "APIService",
+				Name:       "apiservices",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "apiregistration.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
 		GroupVersion: "apps/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -216,6 +229,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "events.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "Event",
+				Name:       "events",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "events.k8s.io",
+				Namespaced: true,
+			},
+		},
+	},
+	{
 		GroupVersion: "authentication.k8s.io/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -223,6 +249,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Name:       "tokenreviews",
 				Verbs:      metav1.Verbs{"create"},
 				Group:      "v1",
+				Version:    "authentication.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
+		GroupVersion: "authentication.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "TokenReview",
+				Name:       "tokenreviews",
+				Verbs:      metav1.Verbs{"create"},
+				Group:      "v1beta1",
 				Version:    "authentication.k8s.io",
 				Namespaced: false,
 			},
@@ -266,6 +305,43 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "authorization.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "LocalSubjectAccessReview",
+				Name:       "localsubjectaccessreviews",
+				Verbs:      metav1.Verbs{"create"},
+				Group:      "v1beta1",
+				Version:    "authorization.k8s.io",
+				Namespaced: true,
+			},
+			{
+				Kind:       "SelfSubjectAccessReview",
+				Name:       "selfsubjectaccessreviews",
+				Verbs:      metav1.Verbs{"create"},
+				Group:      "v1beta1",
+				Version:    "authorization.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "SelfSubjectRulesReview",
+				Name:       "selfsubjectrulesreviews",
+				Verbs:      metav1.Verbs{"create"},
+				Group:      "v1beta1",
+				Version:    "authorization.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "SubjectAccessReview",
+				Name:       "subjectaccessreviews",
+				Verbs:      metav1.Verbs{"create"},
+				Group:      "v1beta1",
+				Version:    "authorization.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
 		GroupVersion: "autoscaling/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -273,6 +349,32 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Name:       "horizontalpodautoscalers",
 				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				Group:      "v1",
+				Version:    "autoscaling",
+				Namespaced: true,
+			},
+		},
+	},
+	{
+		GroupVersion: "autoscaling/v2beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "HorizontalPodAutoscaler",
+				Name:       "horizontalpodautoscalers",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v2beta1",
+				Version:    "autoscaling",
+				Namespaced: true,
+			},
+		},
+	},
+	{
+		GroupVersion: "autoscaling/v2beta2",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "HorizontalPodAutoscaler",
+				Name:       "horizontalpodautoscalers",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v2beta2",
 				Version:    "autoscaling",
 				Namespaced: true,
 			},
@@ -292,6 +394,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "batch/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "CronJob",
+				Name:       "cronjobs",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "batch",
+				Namespaced: true,
+			},
+		},
+	},
+	{
 		GroupVersion: "certificates.k8s.io/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -299,6 +414,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Name:       "certificatesigningrequests",
 				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				Group:      "v1",
+				Version:    "certificates.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
+		GroupVersion: "certificates.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "CertificateSigningRequest",
+				Name:       "certificatesigningrequests",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
 				Version:    "certificates.k8s.io",
 				Namespaced: false,
 			},
@@ -328,6 +456,27 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Name:       "networkpolicies",
 				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				Group:      "v1",
+				Version:    "networking.k8s.io",
+				Namespaced: true,
+			},
+		},
+	},
+	{
+		GroupVersion: "networking.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "IngressClass",
+				Name:       "ingressclasses",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "networking.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "Ingress",
+				Name:       "ingresses",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
 				Version:    "networking.k8s.io",
 				Namespaced: true,
 			},
@@ -405,6 +554,43 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "rbac.authorization.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "ClusterRoleBinding",
+				Name:       "clusterrolebindings",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "rbac.authorization.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "ClusterRole",
+				Name:       "clusterroles",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "rbac.authorization.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "RoleBinding",
+				Name:       "rolebindings",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "rbac.authorization.k8s.io",
+				Namespaced: true,
+			},
+			{
+				Kind:       "Role",
+				Name:       "roles",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "rbac.authorization.k8s.io",
+				Namespaced: true,
+			},
+		},
+	},
+	{
 		GroupVersion: "storage.k8s.io/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -442,6 +628,43 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "storage.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "CSIDriver",
+				Name:       "csidrivers",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "storage.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "CSINode",
+				Name:       "csinodes",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "storage.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "StorageClass",
+				Name:       "storageclasses",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "storage.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "VolumeAttachment",
+				Name:       "volumeattachments",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "storage.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
 		GroupVersion: "admissionregistration.k8s.io/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -463,6 +686,27 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "admissionregistration.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "MutatingWebhookConfiguration",
+				Name:       "mutatingwebhookconfigurations",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "admissionregistration.k8s.io",
+				Namespaced: false,
+			},
+			{
+				Kind:       "ValidatingWebhookConfiguration",
+				Name:       "validatingwebhookconfigurations",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "admissionregistration.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
 		GroupVersion: "apiextensions.k8s.io/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -470,6 +714,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Name:       "customresourcedefinitions",
 				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				Group:      "v1",
+				Version:    "apiextensions.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
+		GroupVersion: "apiextensions.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "CustomResourceDefinition",
+				Name:       "customresourcedefinitions",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
 				Version:    "apiextensions.k8s.io",
 				Namespaced: false,
 			},
@@ -489,6 +746,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "scheduling.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "PriorityClass",
+				Name:       "priorityclasses",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "scheduling.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
 		GroupVersion: "coordination.k8s.io/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -502,6 +772,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 		},
 	},
 	{
+		GroupVersion: "coordination.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "Lease",
+				Name:       "leases",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
+				Version:    "coordination.k8s.io",
+				Namespaced: true,
+			},
+		},
+	},
+	{
 		GroupVersion: "node.k8s.io/v1",
 		APIResources: []metav1.APIResource{
 			{
@@ -509,6 +792,19 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Name:       "runtimeclasses",
 				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				Group:      "v1",
+				Version:    "node.k8s.io",
+				Namespaced: false,
+			},
+		},
+	},
+	{
+		GroupVersion: "node.k8s.io/v1beta1",
+		APIResources: []metav1.APIResource{
+			{
+				Kind:       "RuntimeClass",
+				Name:       "runtimeclasses",
+				Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				Group:      "v1beta1",
 				Version:    "node.k8s.io",
 				Namespaced: false,
 			},
@@ -560,48 +856,8 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Namespaced: false,
 			},
 			{
-				Kind:       "IPAMHandle",
-				Name:       "ipamhandles",
-				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
-				Group:      "v1",
-				Version:    "crd.projectcalico.org",
-				Namespaced: false,
-			},
-			{
-				Kind:       "GlobalNetworkSet",
-				Name:       "globalnetworksets",
-				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
-				Group:      "v1",
-				Version:    "crd.projectcalico.org",
-				Namespaced: false,
-			},
-			{
-				Kind:       "IPAMBlock",
-				Name:       "ipamblocks",
-				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
-				Group:      "v1",
-				Version:    "crd.projectcalico.org",
-				Namespaced: false,
-			},
-			{
-				Kind:       "IPAMConfig",
-				Name:       "ipamconfigs",
-				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
-				Group:      "v1",
-				Version:    "crd.projectcalico.org",
-				Namespaced: false,
-			},
-			{
-				Kind:       "NetworkPolicy",
-				Name:       "networkpolicies",
-				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
-				Group:      "v1",
-				Version:    "crd.projectcalico.org",
-				Namespaced: true,
-			},
-			{
-				Kind:       "ClusterInformation",
-				Name:       "clusterinformations",
+				Kind:       "BlockAffinity",
+				Name:       "blockaffinities",
 				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
 				Group:      "v1",
 				Version:    "crd.projectcalico.org",
@@ -616,24 +872,16 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Namespaced: false,
 			},
 			{
-				Kind:       "GlobalNetworkPolicy",
-				Name:       "globalnetworkpolicies",
+				Kind:       "IPAMConfig",
+				Name:       "ipamconfigs",
 				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
 				Group:      "v1",
 				Version:    "crd.projectcalico.org",
 				Namespaced: false,
 			},
 			{
-				Kind:       "BGPPeer",
-				Name:       "bgppeers",
-				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
-				Group:      "v1",
-				Version:    "crd.projectcalico.org",
-				Namespaced: false,
-			},
-			{
-				Kind:       "HostEndpoint",
-				Name:       "hostendpoints",
+				Kind:       "IPAMHandle",
+				Name:       "ipamhandles",
 				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
 				Group:      "v1",
 				Version:    "crd.projectcalico.org",
@@ -648,16 +896,64 @@ var v120ClusterResources = []*metav1.APIResourceList{
 				Namespaced: false,
 			},
 			{
-				Kind:       "BlockAffinity",
-				Name:       "blockaffinities",
+				Kind:       "NetworkSet",
+				Name:       "networksets",
+				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
+				Group:      "v1",
+				Version:    "crd.projectcalico.org",
+				Namespaced: true,
+			},
+			{
+				Kind:       "GlobalNetworkPolicy",
+				Name:       "globalnetworkpolicies",
 				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
 				Group:      "v1",
 				Version:    "crd.projectcalico.org",
 				Namespaced: false,
 			},
 			{
-				Kind:       "NetworkSet",
-				Name:       "networksets",
+				Kind:       "GlobalNetworkSet",
+				Name:       "globalnetworksets",
+				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
+				Group:      "v1",
+				Version:    "crd.projectcalico.org",
+				Namespaced: false,
+			},
+			{
+				Kind:       "HostEndpoint",
+				Name:       "hostendpoints",
+				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
+				Group:      "v1",
+				Version:    "crd.projectcalico.org",
+				Namespaced: false,
+			},
+			{
+				Kind:       "BGPPeer",
+				Name:       "bgppeers",
+				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
+				Group:      "v1",
+				Version:    "crd.projectcalico.org",
+				Namespaced: false,
+			},
+			{
+				Kind:       "ClusterInformation",
+				Name:       "clusterinformations",
+				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
+				Group:      "v1",
+				Version:    "crd.projectcalico.org",
+				Namespaced: false,
+			},
+			{
+				Kind:       "IPAMBlock",
+				Name:       "ipamblocks",
+				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
+				Group:      "v1",
+				Version:    "crd.projectcalico.org",
+				Namespaced: false,
+			},
+			{
+				Kind:       "NetworkPolicy",
+				Name:       "networkpolicies",
 				Verbs:      metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
 				Group:      "v1",
 				Version:    "crd.projectcalico.org",
