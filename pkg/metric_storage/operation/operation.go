@@ -115,7 +115,7 @@ func ValidateMetricOperation(op MetricOperation) error {
 	var opErrs *multierror.Error
 
 	if op.Action == "" {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("one of: 'action', 'set', 'add' or 'observe' is required: %s", op))
+		opErrs = multierror.Append(opErrs, fmt.Errorf("one of: 'action', 'set' or 'add' is required: %s", op))
 	}
 
 	if op.Group == "" {

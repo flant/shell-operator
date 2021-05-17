@@ -17,9 +17,6 @@ import (
 )
 
 const (
-	HistogramDefaultStart float64 = 0.0
-	HistogramDefaultWidth float64 = 2
-	HistogramDefaultCount int     = 40
 	PrefixTemplate                = "{PREFIX}"
 )
 
@@ -256,9 +253,6 @@ func (m *MetricStorage) Histogram(metric string, labels map[string]string, bucke
 }
 
 func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]string, buckets []float64) *prometheus.HistogramVec {
-	if m != nil && len(buckets) != 0 {
-		m.HistogramBuckets[metric] = buckets
-	}
 	metricName := m.ResolveMetricName(metric)
 
 	defer func() {
@@ -278,10 +272,16 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 
 	log.WithField("operator.component", "metricsStorage").
 		Infof("Create metric histogram %s", metricName)
-	buckets, has := m.HistogramBuckets[metric]
-	if !has {
-		buckets = prometheus.LinearBuckets(HistogramDefaultStart, HistogramDefaultWidth, HistogramDefaultCount)
+	b, has := m.HistogramBuckets[metric]
+	// This shouldn't happen except when entering this concurrently
+	// If there are buckets for this histogram about to be registered, keep them
+	// Otherwise, use the new buckets.
+	// No need to check for nil or empty slice, as the p8s lib will use DefBuckets
+	//(https://pkg.go.dev/github.com/prometheus/client_golang/prometheus#HistogramOpts)
+	if has {
+		buckets = b
 	}
+
 	vec = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    metricName,
 		Help:    metricName,
@@ -366,8 +366,16 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 		m.CounterAdd(op.Name, *op.Value, labels)
 		return
 	}
+	if op.Add != nil {
+		m.CounterAdd(op.Name, *op.Add, labels)
+		return
+	}
 	if op.Action == "set" && op.Value != nil {
 		m.GaugeSet(op.Name, *op.Value, labels)
+		return
+	}
+	if op.Set != nil {
+		m.GaugeSet(op.Name, *op.Set, labels)
 		return
 	}
 	if op.Action == "observe" && op.Value != nil && op.Buckets != nil {
@@ -390,8 +398,14 @@ func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.Metri
 		if op.Action == "add" && op.Value != nil {
 			m.GroupedVault.CounterAdd(group, op.Name, *op.Value, labels)
 		}
+		if op.Add != nil {
+			m.GroupedVault.CounterAdd(group, op.Name, *op.Add, labels)
+		}
 		if op.Action == "set" && op.Value != nil {
 			m.GroupedVault.GaugeSet(group, op.Name, *op.Value, labels)
+		}
+		if op.Set != nil {
+			m.GroupedVault.GaugeSet(group, op.Name, *op.Set, labels)
 		}
 	}
 }
