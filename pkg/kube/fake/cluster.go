@@ -53,7 +53,7 @@ func (fc *FakeCluster) RegisterCRD(group, version, kind string, namespaced bool)
 	scheme.Scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: group, Version: version, Kind: kind}, &unstructured.Unstructured{})
 	newResource := metav1.APIResource{
 		Kind:       kind,
-		Name:       strings.ToLower(kind) + "s",
+		Name:       Pluralize(kind),
 		Verbs:      metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 		Group:      group,
 		Version:    version,
@@ -159,4 +159,13 @@ func findGvr(resources []*metav1.APIResourceList, apiVersion, kindOrName string)
 		}
 	}
 	return nil
+}
+
+// Pluralize simplest way to make plural form (like resource) from object Kind
+// ex: User -> users
+func Pluralize(kind string) string {
+	if kind == "" {
+		return kind
+	}
+	return strings.ToLower(kind) + "s"
 }
