@@ -1,6 +1,7 @@
 package fake
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -24,6 +25,9 @@ type FakeCluster struct {
 }
 
 func NewFakeCluster(ver ClusterVersion) *FakeCluster {
+	if ver == "" {
+		ver = ClusterVersionV119
+	}
 	fc := &FakeCluster{}
 	fc.KubeClient = kube.NewFakeKubernetesClient()
 
@@ -41,7 +45,7 @@ func NewFakeCluster(ver ClusterVersion) *FakeCluster {
 func (fc *FakeCluster) CreateNs(ns string) {
 	nsObj := &corev1.Namespace{}
 	nsObj.Name = ns
-	_, _ = fc.KubeClient.CoreV1().Namespaces().Create(nsObj)
+	_, _ = fc.KubeClient.CoreV1().Namespaces().Create(context.TODO(), nsObj, metav1.CreateOptions{})
 }
 
 // RegisterCRD registers custom resources for the cluster
@@ -85,7 +89,7 @@ func (fc *FakeCluster) CreateSimpleNamespaced(ns string, kind string, name strin
 	gvr := fc.MustFindGVR("", kind)
 	obj := manifest.NewManifest(gvr.GroupVersion().String(), kind, name).ToUnstructured()
 
-	_, err := fc.KubeClient.Dynamic().Resource(*gvr).Namespace(ns).Create(obj, metav1.CreateOptions{})
+	_, err := fc.KubeClient.Dynamic().Resource(*gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -93,7 +97,7 @@ func (fc *FakeCluster) CreateSimpleNamespaced(ns string, kind string, name strin
 
 func (fc *FakeCluster) DeleteSimpleNamespaced(ns string, kind string, name string) {
 	gvr := fc.MustFindGVR("", kind)
-	err := fc.KubeClient.Dynamic().Resource(*gvr).Namespace(ns).Delete(name, &metav1.DeleteOptions{})
+	err := fc.KubeClient.Dynamic().Resource(*gvr).Namespace(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -104,7 +108,7 @@ func (fc *FakeCluster) Create(ns string, m manifest.Manifest) error {
 	if err != nil {
 		return err
 	}
-	_, err = fc.KubeClient.Dynamic().Resource(*gvr).Namespace(m.Namespace(ns)).Create(m.ToUnstructured(), metav1.CreateOptions{})
+	_, err = fc.KubeClient.Dynamic().Resource(*gvr).Namespace(m.Namespace(ns)).Create(context.TODO(), m.ToUnstructured(), metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("creating object failed: %v", err)
 	}
@@ -117,7 +121,7 @@ func (fc *FakeCluster) Delete(ns string, m manifest.Manifest) error {
 		return err
 	}
 
-	err = fc.KubeClient.Dynamic().Resource(*gvr).Namespace(m.Namespace(ns)).Delete(m.Name(), &metav1.DeleteOptions{})
+	err = fc.KubeClient.Dynamic().Resource(*gvr).Namespace(m.Namespace(ns)).Delete(context.TODO(), m.Name(), metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("deleting object failed: %v", err)
 	}
@@ -130,7 +134,7 @@ func (fc *FakeCluster) Update(ns string, m manifest.Manifest) error {
 		return err
 	}
 
-	_, err = fc.KubeClient.Dynamic().Resource(*gvr).Namespace(m.Namespace(ns)).Update(m.ToUnstructured(), metav1.UpdateOptions{})
+	_, err = fc.KubeClient.Dynamic().Resource(*gvr).Namespace(m.Namespace(ns)).Update(context.TODO(), m.ToUnstructured(), metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("updating object failed: %v", err)
 	}

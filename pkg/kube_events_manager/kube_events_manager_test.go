@@ -134,7 +134,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 			"spec": "pod-0",
 		},
 	}
-	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj, metav1.CreateOptions{}, []string{}...)
+	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
 
 	// Init() replacement
 	mgr := NewKubeEventsManager()
@@ -192,7 +192,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 						"spec": "pod-1",
 					},
 				}
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj1, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj1, metav1.CreateOptions{}, []string{}...)
 				// Inject second event into the fake client.
 				obj2 := &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -205,7 +205,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 						"spec": "pod-2",
 					},
 				}
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj2, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj2, metav1.CreateOptions{}, []string{}...)
 				t.Logf("DynamicClient Created pod\n")
 				state.podsCreated = true
 				break
@@ -313,7 +313,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 			"spec": "pod-0",
 		},
 	}
-	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj, metav1.CreateOptions{}, []string{}...)
+	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
 
 	//// Init() replacement
 	mgr := NewKubeEventsManager()
@@ -360,7 +360,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 
 				obj.Object["spec"] = "pod-0-new-spec"
 
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Update(obj, metav1.UpdateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Update(context.TODO(), obj, metav1.UpdateOptions{}, []string{}...)
 
 				// Inject an event into the fake client.
 				obj1 := &unstructured.Unstructured{
@@ -374,7 +374,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 						"spec": "pod-1",
 					},
 				}
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj1, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj1, metav1.CreateOptions{}, []string{}...)
 				// Inject second event into the fake client.
 				obj2 := &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -387,7 +387,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 						"spec": "pod-2",
 					},
 				}
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(obj2, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj2, metav1.CreateOptions{}, []string{}...)
 				t.Logf("DynamicClient Created pod\n")
 				state.podsCreated = true
 				break

@@ -1,6 +1,7 @@
 package conversion
 
 import (
+	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -29,7 +30,7 @@ func (c *CrdClientConfig) Update() error {
 		FieldSelector: "metadata.name=" + c.CrdName,
 	}
 
-	crdList, err := client.ApiExt().CustomResourceDefinitions().List(listOpts)
+	crdList, err := client.ApiExt().CustomResourceDefinitions().List(context.TODO(), listOpts)
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func (c *CrdClientConfig) Update() error {
 
 	webhook.ConversionReviewVersions = SupportedConversionReviewVersions
 
-	_, err = client.ApiExt().CustomResourceDefinitions().Update(&crd)
+	_, err = client.ApiExt().CustomResourceDefinitions().Update(context.TODO(), &crd, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}

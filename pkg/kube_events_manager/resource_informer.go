@@ -214,7 +214,7 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 	objList, err := ei.KubeClient.Dynamic().
 		Resource(ei.GroupVersionResource).
 		Namespace(ei.Namespace).
-		List(ei.ListOptions)
+		List(context.TODO(), ei.ListOptions)
 	if err != nil {
 		log.Errorf("%s: initial list resources of kind '%s': %v", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, err)
 		return err

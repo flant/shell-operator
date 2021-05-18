@@ -212,8 +212,10 @@ func (c *kubernetesClient) Init() error {
 
 	if c.metricStorage != nil {
 		metrics.Register(
-			NewRequestLatencyMetric(c.metricStorage, c.metricLabels),
-			NewRequestResultMetric(c.metricStorage, c.metricLabels),
+			metrics.RegisterOpts{
+				RequestLatency: NewRequestLatencyMetric(c.metricStorage, c.metricLabels),
+				RequestResult:  NewRequestResultMetric(c.metricStorage, c.metricLabels),
+			},
 		)
 		// client-go supports more metrics in v0.18.* versions
 		//metrics.Register(metrics.RegisterOpts{
