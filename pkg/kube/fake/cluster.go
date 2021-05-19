@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flant/shell-operator/pkg/utils/manifest"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+
+	"github.com/flant/shell-operator/pkg/utils/manifest"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -30,20 +31,20 @@ func NewFakeCluster(ver ClusterVersion) *FakeCluster {
 	}
 	cres := ClusterResources(ver)
 
-	gvrToListKind := make(map[schema.GroupVersionResource]string)
-	for _, gr := range cres {
-		for _, res := range gr.APIResources {
-			gvr := schema.GroupVersionResource{
-				Group:    res.Group,
-				Version:  res.Version,
-				Resource: res.Name,
-			}
-			gvrToListKind[gvr] = res.Kind + "List"
-		}
-	}
+	// gvrToListKind := make(map[schema.GroupVersionResource]string)
+	// for _, gr := range cres {
+	// 	for _, res := range gr.APIResources {
+	// 		gvr := schema.GroupVersionResource{
+	// 			Group:    res.Group,
+	// 			Version:  res.Version,
+	// 			Resource: res.Name,
+	// 		}
+	// 		gvrToListKind[gvr] = res.Kind + "List"
+	// 	}
+	// }
 
 	fc := &FakeCluster{}
-	fc.KubeClient = kube.NewFakeKubernetesClient(gvrToListKind)
+	fc.KubeClient = kube.NewFakeKubernetesClient(nil)
 
 	var ok bool
 	fc.Discovery, ok = fc.KubeClient.Discovery().(*fakediscovery.FakeDiscovery)

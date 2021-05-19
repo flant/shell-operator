@@ -66,14 +66,14 @@ var NewKubernetesClient = func() KubernetesClient {
 	return &kubernetesClient{}
 }
 
-func NewFakeKubernetesClient(gvrToListKind map[schema.GroupVersionResource]string) KubernetesClient {
+func NewFakeKubernetesClient(_ map[schema.GroupVersionResource]string) KubernetesClient {
 	scheme := runtime.NewScheme()
 	objs := []runtime.Object{}
 
 	return &kubernetesClient{
 		Interface:        fake.NewSimpleClientset(),
 		defaultNamespace: "default",
-		dynamicClient:    fakedynamic.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrToListKind, objs...),
+		dynamicClient:    fakedynamic.NewSimpleDynamicClient(scheme, objs...),
 	}
 }
 
