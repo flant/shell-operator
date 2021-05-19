@@ -17,16 +17,16 @@ require (
 	github.com/onsi/gomega v1.9.0
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.6.0
-	github.com/stretchr/testify v1.4.0
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	github.com/stretchr/testify v1.6.1
+	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/satori/go.uuid.v1 v1.2.0
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
-	k8s.io/api v0.19.2
-	k8s.io/apiextensions-apiserver v0.19.2
-	k8s.io/apimachinery v0.20.5 // version is bumped to please Go 1.16 (package ... imported from implicitly required module)
-	k8s.io/client-go v0.19.2
+	k8s.io/api v0.20.7
+	k8s.io/apiextensions-apiserver v0.20.7
+	k8s.io/apimachinery v0.20.7
+	k8s.io/client-go v0.20.7
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/kind v0.10.0
 	sigs.k8s.io/yaml v1.2.0
@@ -41,6 +41,3 @@ replace github.com/onsi/ginkgo v1.11.0 => github.com/flant/ginkgo v1.11.1-0.2020
 
 // version from k8s.io/client-go
 //replace k8s.io/klog => k8s.io/klog v0.0.0-20190306015804-8e90cee79f82
-
-// kind 0.10.0 requires 0.19.2
-replace k8s.io/apimachinery => k8s.io/apimachinery v0.19.2
