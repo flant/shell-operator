@@ -28,8 +28,10 @@ func NewFakeCluster(ver ClusterVersion) *FakeCluster {
 	if ver == "" {
 		ver = ClusterVersionV119
 	}
+	cres := ClusterResources(ver)
+
 	fc := &FakeCluster{}
-	fc.KubeClient = kube.NewFakeKubernetesClient()
+	fc.KubeClient = kube.NewFakeKubernetesClient(nil)
 
 	var ok bool
 	fc.Discovery, ok = fc.KubeClient.Discovery().(*fakediscovery.FakeDiscovery)
@@ -37,7 +39,7 @@ func NewFakeCluster(ver ClusterVersion) *FakeCluster {
 		panic("couldn't convert Discovery() to *FakeDiscovery")
 	}
 	fc.Discovery.FakedServerVersion = &version.Info{GitCommit: ver.String(), Major: ver.Major(), Minor: ver.Minor()}
-	fc.Discovery.Resources = ClusterResources(ver)
+	fc.Discovery.Resources = cres
 
 	return fc
 }
@@ -175,7 +177,7 @@ func Pluralize(kind string) string {
 	// maybe we dont need more complex pluralizer here
 	// but if we do, can take smth like https://github.com/gertd/go-pluralize
 	if strings.HasSuffix(kind, "s") {
-		return kind + "s"
+		return kind + "es"
 	}
 
 	if strings.HasSuffix(kind, "cy") {

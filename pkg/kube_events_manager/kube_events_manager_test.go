@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,7 +20,10 @@ import (
 func Test_MainKubeEventsManager_Run(t *testing.T) {
 	// Init() replacement
 
-	kubeClient := kube.NewFakeKubernetesClient()
+	gvrToListKind := map[schema.GroupVersionResource]string{
+		{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+	}
+	kubeClient := kube.NewFakeKubernetesClient(gvrToListKind)
 
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
@@ -91,7 +93,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kubeClient := kube.NewFakeKubernetesClient()
+	kubeClient := kube.NewFakeKubernetesClient(nil)
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
@@ -246,7 +248,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kubeClient := kube.NewFakeKubernetesClient()
+	kubeClient := kube.NewFakeKubernetesClient(nil)
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
