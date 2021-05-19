@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/disk"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/tools/metrics"
 
 	log "github.com/sirupsen/logrus"
@@ -333,7 +334,14 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 	if apiVersion == "" {
 		// Get all preferred resources.
 		// Can return errors if api controllers are not available.
-		return c.discovery().ServerPreferredResources()
+		switch c.discovery().(type) {
+		case *fakediscovery.FakeDiscovery:
+			_, res, err := c.discovery().ServerGroupsAndResources()
+			return res, err
+
+		default:
+			return c.discovery().ServerPreferredResources()
+		}
 	} else {
 		// Get only resources for desired group and version
 		gv, err := schema.ParseGroupVersion(apiVersion)
