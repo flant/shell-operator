@@ -30,8 +30,20 @@ func NewFakeCluster(ver ClusterVersion) *FakeCluster {
 	}
 	cres := ClusterResources(ver)
 
+	gvrToListKind := make(map[schema.GroupVersionResource]string)
+	for _, gr := range cres {
+		for _, res := range gr.APIResources {
+			gvr := schema.GroupVersionResource{
+				Group:    res.Group,
+				Version:  res.Version,
+				Resource: res.Name,
+			}
+			gvrToListKind[gvr] = res.Kind + "List"
+		}
+	}
+
 	fc := &FakeCluster{}
-	fc.KubeClient = kube.NewFakeKubernetesClient(nil)
+	fc.KubeClient = kube.NewFakeKubernetesClient(gvrToListKind)
 
 	var ok bool
 	fc.Discovery, ok = fc.KubeClient.Discovery().(*fakediscovery.FakeDiscovery)
