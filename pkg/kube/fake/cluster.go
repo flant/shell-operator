@@ -163,9 +163,24 @@ func findGvr(resources []*metav1.APIResourceList, apiVersion, kindOrName string)
 
 // Pluralize simplest way to make plural form (like resource) from object Kind
 // ex: User -> users
+//     Prometheus -> prometheuses
+//     NetworkPolicy -> netwrokpolicies
 func Pluralize(kind string) string {
 	if kind == "" {
 		return kind
 	}
-	return strings.ToLower(kind) + "s"
+
+	kind = strings.ToLower(kind)
+
+	// maybe we dont need more complex pluralizer here
+	// but if we do, can take smth like https://github.com/gertd/go-pluralize
+	if strings.HasSuffix(kind, "s") {
+		return kind + "s"
+	}
+
+	if strings.HasSuffix(kind, "cy") {
+		return strings.TrimSuffix(kind, "y") + "ies"
+	}
+
+	return kind + "s"
 }

@@ -63,8 +63,12 @@ EOF
     version=$(echo "$resource" | jq -r '.version // "null"')
     objectGroup=""
     if [[ "$version" == "null" ]]; then
-      version=$(echo "$groupVersion" | awk -F'/' '{ print $1}')
-      objectGroup=$(echo "$groupVersion" | awk -F'/' '{ print $2}')
+      if [[ "$groupVersion" == *"/"* ]]; then
+        version=$(echo "$groupVersion" | awk -F'/' '{ print $2 }')
+        objectGroup=$(echo "$groupVersion" | awk -F'/' '{ print $1 }')
+      else
+        version="$groupVersion"
+      fi
     fi
 
     verbs=$(echo "$resource" | jq -rc '.verbs' | tail -c +2 | sed 's/.$//')
