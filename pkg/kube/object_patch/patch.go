@@ -64,6 +64,32 @@ func ParseSpecs(specBytes []byte) ([]OperationSpec, error) {
 	return specs, validationErrors.ErrorOrNil()
 }
 
+func (o *ObjectPatcher) fakeClusterPreferredVersion(spec OperationSpec) (string, error) {
+	preferred, err := o.kubeClient.Discovery().ServerPreferredResources()
+	if err != nil {
+		return "", err
+	}
+	if len(preferred) > 0 {
+		// its not a fake cluster, we can hold empty version, it works for production
+		return "", nil
+	}
+
+	_, resources, err := o.kubeClient.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		return "", err
+	}
+
+	for _, gr := range resources {
+		for _, res := range gr.APIResources {
+			if res.Kind == spec.Kind {
+				return res.Version, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("preferred version for Kind: %s not found", spec.Kind)
+}
+
 func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSpec) error {
 	log.Debug("Starting spec apply process")
 	defer log.Debug("Finished spec apply process")
@@ -71,6 +97,16 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 	var applyErrors = &multierror.Error{}
 	for _, spec := range specs {
 		log.Debugf("Applying spec: %s", spew.Sdump(spec))
+
+		// preferred resources does not exist on FakeCluster
+		// try to iterate and found first match
+		if spec.ApiVersion == "" {
+			ver, err := o.fakeClusterPreferredVersion(spec)
+			if err != nil {
+				return err
+			}
+			spec.ApiVersion = ver
+		}
 
 		var operationError error
 

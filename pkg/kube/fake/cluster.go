@@ -31,6 +31,7 @@ func NewFakeCluster(ver ClusterVersion) *FakeCluster {
 	}
 	cres := ClusterResources(ver)
 
+	// FIXME: below code will be used in go-client 0.20.x pass it to NewFakeKubernetesClient
 	// gvrToListKind := make(map[schema.GroupVersionResource]string)
 	// for _, gr := range cres {
 	// 	for _, res := range gr.APIResources {
