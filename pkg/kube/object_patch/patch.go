@@ -106,14 +106,20 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 	for _, spec := range specs {
 		log.Debugf("Applying spec: %s", spew.Sdump(spec))
 
-		// preferred resources does not exist on FakeCluster
-		// try to iterate and found first match
-		if spec.ApiVersion == "" {
-			normalizedSpec, err := o.fakeClusterPreferredVersion(spec)
-			if err != nil {
-				return err
+		switch spec.Operation {
+		case Create, CreateIfNotExists, CreateOrUpdate, MergePatch, JSONPatch:
+		// pass - we dont need it for operations with Object
+
+		default:
+			// preferred resources does not exist on FakeCluster
+			// try to iterate and found first match
+			if spec.ApiVersion == "" {
+				normalizedSpec, err := o.fakeClusterPreferredVersion(spec)
+				if err != nil {
+					return err
+				}
+				spec = normalizedSpec
 			}
-			spec = normalizedSpec
 		}
 
 		var operationError error
