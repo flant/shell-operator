@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -64,33 +65,37 @@ func ParseSpecs(specBytes []byte) ([]OperationSpec, error) {
 	return specs, validationErrors.ErrorOrNil()
 }
 
-func (o *ObjectPatcher) fakeClusterPreferredVersion(spec OperationSpec) (string, error) {
+func (o *ObjectPatcher) fakeClusterPreferredVersion(spec OperationSpec) (OperationSpec, error) {
 	preferred, err := o.kubeClient.Discovery().ServerPreferredResources()
 	if err != nil {
-		return "", err
+		return spec, err
 	}
 	if len(preferred) > 0 {
 		// its not a fake cluster, we can hold empty version, it works for production
-		return "", nil
+		return spec, nil
 	}
 
 	_, resources, err := o.kubeClient.Discovery().ServerGroupsAndResources()
 	if err != nil {
-		return "", err
+		return spec, err
 	}
 
 	for _, gr := range resources {
 		for _, res := range gr.APIResources {
-			if res.Kind == spec.Kind {
+			if strings.ToLower(res.Kind) == strings.ToLower(spec.Kind) {
+				// res.Kind could be lowercase, normalize it
+				spec.Kind = res.Kind
 				if res.Group == "" {
-					return res.Version, nil
+					spec.ApiVersion = res.Version
+					return spec, nil
 				}
-				return res.Group + "/" + res.Version, nil
+				spec.ApiVersion = res.Group + "/" + res.Version
+				return spec, nil
 			}
 		}
 	}
 
-	return "", fmt.Errorf("preferred version for Kind: %s not found", spec.Kind)
+	return spec, fmt.Errorf("preferred version for Kind: %s not found", spec.Kind)
 }
 
 func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSpec) error {
@@ -104,11 +109,11 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 		// preferred resources does not exist on FakeCluster
 		// try to iterate and found first match
 		if spec.ApiVersion == "" {
-			ver, err := o.fakeClusterPreferredVersion(spec)
+			normalizedSpec, err := o.fakeClusterPreferredVersion(spec)
 			if err != nil {
 				return err
 			}
-			spec.ApiVersion = ver
+			spec = normalizedSpec
 		}
 
 		var operationError error
