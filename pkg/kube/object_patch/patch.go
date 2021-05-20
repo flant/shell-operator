@@ -82,7 +82,10 @@ func (o *ObjectPatcher) fakeClusterPreferredVersion(spec OperationSpec) (string,
 	for _, gr := range resources {
 		for _, res := range gr.APIResources {
 			if res.Kind == spec.Kind {
-				return res.Version, nil
+				if res.Group == "" {
+					return res.Version, nil
+				}
+				return res.Group + "/" + res.Version, nil
 			}
 		}
 	}
