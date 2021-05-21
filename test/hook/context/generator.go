@@ -62,6 +62,10 @@ func (b *BindingContextController) WithFakeCluster(c *fake.FakeCluster) {
 	b.Controller.fakeCluster = c
 }
 
+func (b *BindingContextController) FakeCluster() *fake.FakeCluster {
+	return b.fakeCluster
+}
+
 // RegisterCRD registers custom resources for the cluster
 func (b *BindingContextController) RegisterCRD(group, version, kind string, namespaced bool) {
 	b.fakeCluster.RegisterCRD(group, version, kind, namespaced)

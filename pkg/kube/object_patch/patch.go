@@ -82,7 +82,7 @@ func (o *ObjectPatcher) fakeClusterPreferredVersion(spec OperationSpec) (Operati
 
 	for _, gr := range resources {
 		for _, res := range gr.APIResources {
-			if strings.ToLower(res.Kind) == strings.ToLower(spec.Kind) {
+			if strings.EqualFold(res.Kind, spec.Kind) {
 				// res.Kind could be lowercase, normalize it
 				spec.Kind = res.Kind
 				if res.Group == "" {
