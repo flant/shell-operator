@@ -10,7 +10,7 @@ import (
 
 // if we use default, then we are not able to emulate global resources due to fake cluster limitations
 // that's why empty namespace, specify default by your own if needed
-var defaultNamespace = ""
+var defaultNamespace = "default"
 
 // StateController holds objects state for FakeCluster
 type StateController struct {
