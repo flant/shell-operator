@@ -28,6 +28,10 @@ import (
 	"github.com/flant/shell-operator/pkg/jq"
 )
 
+const (
+	defaultNamespace = "default"
+)
+
 type ObjectPatcher struct {
 	kubeClient KubeClient
 	logger     *log.Entry
@@ -225,6 +229,10 @@ func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, subresou
 	apiVersion := object.GetAPIVersion()
 	kind := object.GetKind()
 
+	if object.GetNamespace() == "" {
+		object.SetNamespace(defaultNamespace)
+	}
+
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
 		return err
@@ -247,6 +255,10 @@ func (o *ObjectPatcher) CreateObjectIfNotExists(object *unstructured.Unstructure
 
 	apiVersion := object.GetAPIVersion()
 	kind := object.GetKind()
+
+	if object.GetNamespace() == "" {
+		object.SetNamespace(defaultNamespace)
+	}
 
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
@@ -275,6 +287,10 @@ func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, 
 
 	apiVersion := object.GetAPIVersion()
 	kind := object.GetKind()
+
+	if object.GetNamespace() == "" {
+		object.SetNamespace(defaultNamespace)
+	}
 
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
@@ -324,6 +340,10 @@ func (o *ObjectPatcher) FilterObject(filterFunc func(*unstructured.Unstructured)
 		return err
 	}
 
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
+
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		log.Debug("Started Get API call")
 		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -371,6 +391,10 @@ func (o *ObjectPatcher) JQPatchObject(jqPatch, apiVersion, kind, namespace, name
 		return err
 	}
 
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
+
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		log.Debug("Started Get API call")
 		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -410,6 +434,10 @@ func (o *ObjectPatcher) MergePatchObject(mergePatch []byte, apiVersion, kind, na
 		return err
 	}
 
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
+
 	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(namespace).Patch(context.TODO(), name, types.MergePatchType, mergePatch, metav1.PatchOptions{}, generateSubresources(subresource)...)
 
 	return err
@@ -422,6 +450,10 @@ func (o *ObjectPatcher) JSONPatchObject(jsonPatch []byte, apiVersion, kind, name
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
 		return err
+	}
+
+	if namespace == "" {
+		namespace = defaultNamespace
 	}
 
 	log.Debug("Started Patch API call")
@@ -456,6 +488,10 @@ func (o *ObjectPatcher) deleteObjectInternal(apiVersion, kind, namespace, name, 
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
 		return err
+	}
+
+	if namespace == "" {
+		namespace = defaultNamespace
 	}
 
 	log.Debug("Started Delete API call")
