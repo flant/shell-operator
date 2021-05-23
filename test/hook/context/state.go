@@ -66,7 +66,7 @@ func (c *StateController) ChangeState(newRawState string) (int, error) {
 		currM, ok := c.CurrentState[m.Id()]
 		if !ok {
 			// Create object if not exist
-			err = c.fakeCluster.Create(defaultNamespace, m)
+			err = c.fakeCluster.Create(m.Namespace(defaultNamespace), m)
 			//err := createObject(newStateObject, newUnstructuredObject)
 			if err != nil {
 				return generatedEvents, err
@@ -76,7 +76,7 @@ func (c *StateController) ChangeState(newRawState string) (int, error) {
 		} else {
 			// Update object if changed
 			if !reflect.DeepEqual(currM, m) {
-				err := c.fakeCluster.Update(defaultNamespace, m)
+				err := c.fakeCluster.Update(m.Namespace(defaultNamespace), m)
 				if err != nil {
 					return generatedEvents, err
 				}
@@ -89,7 +89,7 @@ func (c *StateController) ChangeState(newRawState string) (int, error) {
 	for currId, currM := range c.CurrentState {
 		if _, ok := newState[currId]; !ok {
 			// Delete object
-			err := c.fakeCluster.Delete(defaultNamespace, currM)
+			err := c.fakeCluster.Delete(currM.Namespace(defaultNamespace), currM)
 			if err != nil {
 				return generatedEvents, err
 			}
