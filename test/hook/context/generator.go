@@ -56,10 +56,8 @@ func (b *BindingContextController) WithHook(h *hook.Hook) {
 	b.HookConfig = ""
 }
 
-// WithFakeCluster add some external cluster to current controllers
-func (b *BindingContextController) WithFakeCluster(c *fake.FakeCluster) {
-	b.fakeCluster = c
-	b.Controller.fakeCluster = c
+func (b *BindingContextController) FakeCluster() *fake.FakeCluster {
+	return b.fakeCluster
 }
 
 // RegisterCRD registers custom resources for the cluster
@@ -123,12 +121,13 @@ func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBin
 	cc := NewContextCombiner()
 
 	for _, state := range newState {
-		generatedEvents, err := b.Controller.ChangeState(state)
+		_, err := b.Controller.ChangeState(state)
 		if err != nil {
 			return GeneratedBindingContexts{}, fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
 		}
 
-		for receivedEvents := 0; receivedEvents < generatedEvents; receivedEvents++ {
+	outer:
+		for {
 			select {
 			case ev := <-b.KubeEventsManager.Ch():
 				b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
@@ -136,7 +135,7 @@ func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBin
 				})
 				continue
 			case <-ctx.Done():
-				break
+				break outer
 			}
 		}
 	}

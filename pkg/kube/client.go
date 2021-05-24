@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/disk"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/tools/metrics"
 
 	log "github.com/sirupsen/logrus"
@@ -65,7 +66,10 @@ var NewKubernetesClient = func() KubernetesClient {
 	return &kubernetesClient{}
 }
 
-func NewFakeKubernetesClient() KubernetesClient {
+// NewFakeKubernetesClient instantiate new fake cluster client
+// map[schema.GroupVersionResource]string is not used at the moment, its placeholder for 0.20.x go-client
+// you have to pass gvk-List-kind there
+func NewFakeKubernetesClient(_ map[schema.GroupVersionResource]string) KubernetesClient {
 	scheme := runtime.NewScheme()
 	objs := []runtime.Object{}
 
@@ -212,15 +216,11 @@ func (c *kubernetesClient) Init() error {
 
 	if c.metricStorage != nil {
 		metrics.Register(
-			NewRequestLatencyMetric(c.metricStorage, c.metricLabels),
-			NewRequestResultMetric(c.metricStorage, c.metricLabels),
+			metrics.RegisterOpts{
+				RequestLatency: NewRequestLatencyMetric(c.metricStorage, c.metricLabels),
+				RequestResult:  NewRequestResultMetric(c.metricStorage, c.metricLabels),
+			},
 		)
-		// client-go supports more metrics in v0.18.* versions
-		//metrics.Register(metrics.RegisterOpts{
-		//	RequestLatency:        NewRequestLatencyMetric(c.metricStorage, c.metricLabels),
-		//	RateLimiterLatency:    NewRateLimiterLatencyMetric(c.metricStorage, c.metricLabels),
-		//	RequestResult:         NewRequestResultMetric(c.metricStorage, c.metricLabels),
-		//})
 	}
 
 	cacheDiscoveryDir, err := ioutil.TempDir("", "kube-cache-discovery-*")
@@ -331,7 +331,16 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 	if apiVersion == "" {
 		// Get all preferred resources.
 		// Can return errors if api controllers are not available.
-		return c.discovery().ServerPreferredResources()
+		switch c.discovery().(type) {
+		case *fakediscovery.FakeDiscovery:
+			// FakeDiscovery does not implement ServerPreferredResources method
+			// lets return all possible resources, its better then nil
+			_, res, err := c.discovery().ServerGroupsAndResources()
+			return res, err
+
+		default:
+			return c.discovery().ServerPreferredResources()
+		}
 	} else {
 		// Get only resources for desired group and version
 		gv, err := schema.ParseGroupVersion(apiVersion)
