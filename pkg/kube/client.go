@@ -330,6 +330,8 @@ func (c *kubernetesClient) APIResourceList(apiVersion string) (lists []*metav1.A
 		// Can return errors if api controllers are not available.
 		switch c.discovery().(type) {
 		case *fakediscovery.FakeDiscovery:
+			// FakeDiscovery does not implement ServerPreferredResources method
+			// lets return all possible resources, its better then nil
 			_, res, err := c.discovery().ServerGroupsAndResources()
 			return res, err
 
