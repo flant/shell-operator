@@ -9,7 +9,7 @@ import (
 )
 
 // if we use default, then we are not able to emulate global resources due to fake cluster limitations
-// that's why empty namespace, specify default by your own if needed
+// that's why an empty namespace is used here, specify namespace in a resource by your own if needed
 var defaultNamespace = ""
 
 // StateController holds objects state for FakeCluster

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -12,11 +13,8 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/flant/shell-operator/pkg/utils/manifest"
-
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/flant/shell-operator/pkg/kube"
+	"github.com/flant/shell-operator/pkg/utils/manifest"
 )
 
 type FakeCluster struct {
@@ -177,7 +175,7 @@ func findGvr(resources []*metav1.APIResourceList, apiVersion, kindOrName string)
 	return nil
 }
 
-// Pluralize simplest way to make plural form (like resource) from object Kind
+// Pluralize is the simplest way to make a plural form (like resource) from k8s object Kind
 // ex: User -> users
 //     Prometheus -> prometheuses
 //     NetworkPolicy -> netwrokpolicies
