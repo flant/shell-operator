@@ -52,6 +52,12 @@ Operation to register a gauge and set its value:
 {"name":"metric_name","action":"set","value":33,"labels":{"label1":"value1"}}
 ```
 
+Operation to register a histogram and observe a duration:
+
+```json
+{"name":"metric_name","action":"observe","value":42, "buckets": [1,2,5,10,20,50], "labels":{"label1":"value1"}}
+```
+
 Labels are not required, but Shell-operator adds a `hook` label with a path to a hook script relative to hooks directory.
 
 Several metrics can be exported at once. For example, this script will create 2 metrics:
@@ -61,7 +67,7 @@ echo '{"name":"hook_metric_count","action":"add","value":1,"labels":{"label1":"v
 echo '{"name":"hook_metrics_items","action":"add","value":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
 ```
 
-The metric name is used as-is, so several hooks can export same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.
+The metric name is used as-is, so several hooks can export the same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.
 
 There are fields "add" and "set" that can be used as shortcuts for action and value. This feature may be deprecated in future releases.
 
@@ -87,6 +93,8 @@ To expire all metrics in a group, use action "expire":
 ```
 {"group":"group_name_1", "action":"expire"}
 ```
+
+**WARNING**: "observe" is currently an unsupported _action_ for grouped metrics
 
 ### Example
 

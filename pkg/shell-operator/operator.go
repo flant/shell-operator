@@ -647,7 +647,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 	op.MetricStorage.CounterAdd("{PREFIX}task_wait_in_queue_seconds_total", taskWaitTime, metricLabels)
 
 	defer measure.Duration(func(d time.Duration) {
-		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_seconds", d.Seconds(), metricLabels)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_seconds", d.Seconds(), metricLabels, nil)
 	})()
 
 	hookLogLabels := map[string]string{}
@@ -746,8 +746,8 @@ func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 
 	if result != nil && result.Usage != nil {
 		taskLogEntry.Infof("Usage: %+v", result.Usage)
-		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", result.Usage.Sys.Seconds(), metricLabels)
-		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", result.Usage.User.Seconds(), metricLabels)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", result.Usage.Sys.Seconds(), metricLabels, nil)
+		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", result.Usage.User.Seconds(), metricLabels, nil)
 		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(result.Usage.MaxRss)*1024, metricLabels)
 	}
 

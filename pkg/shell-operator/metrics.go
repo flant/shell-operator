@@ -18,7 +18,7 @@ func RegisterCommonMetrics(metricStorage *metric_storage.MetricStorage) {
 }
 
 func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
-	metricStorage.RegisterHistogramWithBuckets(
+	metricStorage.RegisterHistogram(
 		"{PREFIX}tasks_queue_action_duration_seconds",
 		map[string]string{
 			"queue_name":   "",
@@ -26,10 +26,10 @@ func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 		},
 		[]float64{
 			0.0,
-			0.000001, 0.000002, 0.000005, // 1,2,5 microseconds
-			0.00001, 0.00002, 0.00005, // 10,20,50 microsends
 			0.0001, 0.0002, 0.0005, // 100, 200, 500 microseconds
 			0.001, 0.002, 0.005, // 1,2,5 milliseconds
+			0.01, 0.02, 0.05, // 10,20,50 milliseconds
+			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 		},
 	)
 
@@ -43,7 +43,7 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 	// Size of snapshot in JSON format.
 	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_bytes", labels)
 	// Duration of jqFilter applying.
-	metricStorage.RegisterHistogramWithBuckets(
+	metricStorage.RegisterHistogram(
 		"{PREFIX}kube_jq_filter_duration_seconds",
 		labels,
 		[]float64{
@@ -51,12 +51,11 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 			0.001, 0.002, 0.005, // 1,2,5 milliseconds
 			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
-			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			1, 2, 5, 10, // 1,2,5,10 seconds
 		},
 	)
 	// Duration of handling kubernetes event.
-	metricStorage.RegisterHistogramWithBuckets(
+	metricStorage.RegisterHistogram(
 		"{PREFIX}kube_event_duration_seconds",
 		labels,
 		[]float64{
@@ -64,8 +63,7 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 			0.001, 0.002, 0.005, // 1,2,5 milliseconds
 			0.01, 0.02, 0.05, // 10,20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
-			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			1, 2, 5, 10, // 1,2,5,10 seconds
 		},
 	)
 }
@@ -84,43 +82,43 @@ func RegisterHookMetrics(metricStorage *metric_storage.MetricStorage) {
 		"queue":   "",
 	}
 	// Duration of hook execution.
-	metricStorage.RegisterHistogramWithBuckets(
+	metricStorage.RegisterHistogram(
 		"{PREFIX}hook_run_seconds",
 		labels,
 		[]float64{
 			0.0,
-			0.001, 0.002, 0.005, // 1,2,5 milliseconds
-			0.01, 0.02, 0.05, // 10,20,50 milliseconds
+			0.02, 0.05, // 20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10,20,50 seconds
+			100, 200, 500, // 100,200,500 seconds
 		},
 	)
 
 	// System CPU usage.
-	metricStorage.RegisterHistogramWithBuckets(
+	metricStorage.RegisterHistogram(
 		"{PREFIX}hook_run_user_cpu_seconds",
 		labels,
 		[]float64{
 			0.0,
-			0.001, 0.002, 0.005, // 1,2,5 milliseconds
-			0.01, 0.02, 0.05, // 10,20,50 milliseconds
+			0.02, 0.05, // 20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10,20,50 seconds
+			100, 200, 500, // 100,200,500 seconds
 		},
 	)
 	// User CPU usage.
-	metricStorage.RegisterHistogramWithBuckets(
+	metricStorage.RegisterHistogram(
 		"{PREFIX}hook_run_sys_cpu_seconds",
 		labels,
 		[]float64{
 			0.0,
-			0.001, 0.002, 0.005, // 1,2,5 milliseconds
-			0.01, 0.02, 0.05, // 10,20,50 milliseconds
+			0.02, 0.05, // 20,50 milliseconds
 			0.1, 0.2, 0.5, // 100,200,500 milliseconds
 			1, 2, 5, // 1,2,5 seconds
-			10, // 10 seconds
+			10, 20, 50, // 10,20,50 seconds
+			100, 200, 500, // 100,200,500 seconds
 		},
 	)
 	// Max RSS in bytes.

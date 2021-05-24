@@ -109,7 +109,7 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 			q.measureActionFn = func() {}
 		} else {
 			q.measureActionFn = measure.Duration(func(d time.Duration) {
-				q.metricStorage.HistogramObserve("{PREFIX}tasks_queue_action_duration_seconds", d.Seconds(), map[string]string{"queue_name": q.Name, "queue_action": action})
+				q.metricStorage.HistogramObserve("{PREFIX}tasks_queue_action_duration_seconds", d.Seconds(), map[string]string{"queue_name": q.Name, "queue_action": action}, nil)
 			})
 		}
 	})

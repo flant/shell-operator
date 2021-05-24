@@ -17,9 +17,6 @@ import (
 )
 
 const (
-	HistogramDefaultStart float64 = 0.0
-	HistogramDefaultWidth float64 = 2
-	HistogramDefaultCount int     = 20
 	PrefixTemplate                = "{PREFIX}"
 )
 
@@ -232,8 +229,7 @@ func (m *MetricStorage) RegisterCounter(metric string, labels map[string]string)
 }
 
 // Histograms
-
-func (m *MetricStorage) HistogramObserve(metric string, value float64, labels map[string]string) {
+func (m *MetricStorage) HistogramObserve(metric string, value float64, labels map[string]string, buckets []float64) {
 	if m == nil {
 		return
 	}
@@ -243,28 +239,20 @@ func (m *MetricStorage) HistogramObserve(metric string, value float64, labels ma
 				Errorf("Metric histogram observe %s %v with %v: %v", m.ResolveMetricName(metric), LabelNames(labels), labels, r)
 		}
 	}()
-	m.Histogram(metric, labels).With(labels).Observe(value)
+	m.Histogram(metric, labels, buckets).With(labels).Observe(value)
 }
 
-func (m *MetricStorage) HistogramDefineBuckets(metric string, buckets []float64) {
-	if m == nil {
-		return
-	}
-	m.HistogramBuckets[metric] = buckets
-}
-
-func (m *MetricStorage) Histogram(metric string, labels map[string]string) *prometheus.HistogramVec {
+func (m *MetricStorage) Histogram(metric string, labels map[string]string, buckets []float64) *prometheus.HistogramVec {
 	m.histogramsLock.RLock()
 	vec, ok := m.Histograms[metric]
 	m.histogramsLock.RUnlock()
 	if ok {
 		return vec
 	}
-
-	return m.RegisterHistogram(metric, labels)
+	return m.RegisterHistogram(metric, labels, buckets)
 }
 
-func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]string) *prometheus.HistogramVec {
+func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]string, buckets []float64) *prometheus.HistogramVec {
 	metricName := m.ResolveMetricName(metric)
 
 	defer func() {
@@ -284,10 +272,16 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 
 	log.WithField("operator.component", "metricsStorage").
 		Infof("Create metric histogram %s", metricName)
-	buckets, has := m.HistogramBuckets[metric]
-	if !has {
-		buckets = prometheus.LinearBuckets(HistogramDefaultStart, HistogramDefaultWidth, HistogramDefaultCount)
+	b, has := m.HistogramBuckets[metric]
+	// This shouldn't happen except when entering this concurrently
+	// If there are buckets for this histogram about to be registered, keep them
+	// Otherwise, use the new buckets.
+	// No need to check for nil or empty slice, as the p8s lib will use DefBuckets
+	//(https://pkg.go.dev/github.com/prometheus/client_golang/prometheus#HistogramOpts)
+	if has {
+		buckets = b
 	}
+
 	vec = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    metricName,
 		Help:    metricName,
@@ -297,11 +291,6 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 	m.Registerer.MustRegister(vec)
 	m.Histograms[metric] = vec
 	return vec
-}
-
-func (m *MetricStorage) RegisterHistogramWithBuckets(metric string, labels map[string]string, buckets []float64) *prometheus.HistogramVec {
-	m.HistogramDefineBuckets(metric, buckets)
-	return m.RegisterHistogram(metric, labels)
 }
 
 // Batch operations for metrics from hooks
@@ -314,12 +303,16 @@ func (m *MetricStorage) SendBatchV0(ops []operation.MetricOperation, labels map[
 	for _, metricOp := range ops {
 		labels := MergeLabels(metricOp.Labels, labels)
 
-		if metricOp.Add != nil {
-			m.CounterAdd(metricOp.Name, *metricOp.Add, labels)
+		if metricOp.Action == "add" && metricOp.Value != nil {
+			m.CounterAdd(metricOp.Name, *metricOp.Value, labels)
 			continue
 		}
-		if metricOp.Set != nil {
-			m.GaugeSet(metricOp.Name, *metricOp.Set, labels)
+		if metricOp.Action == "set" && metricOp.Value != nil  {
+			m.GaugeSet(metricOp.Name, *metricOp.Value, labels)
+			continue
+		}
+		if metricOp.Action == "observe" && metricOp.Value != nil  && metricOp.Buckets != nil {
+			m.HistogramObserve(metricOp.Name, *metricOp.Value, labels, metricOp.Buckets)
 			continue
 		}
 		return fmt.Errorf("no operation in metric from module hook, name=%s", metricOp.Name)
@@ -369,13 +362,24 @@ func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[st
 func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabels map[string]string) {
 	labels := MergeLabels(op.Labels, commonLabels)
 
+	if op.Action == "add" && op.Value != nil {
+		m.CounterAdd(op.Name, *op.Value, labels)
+		return
+	}
 	if op.Add != nil {
 		m.CounterAdd(op.Name, *op.Add, labels)
+		return
+	}
+	if op.Action == "set" && op.Value != nil {
+		m.GaugeSet(op.Name, *op.Value, labels)
 		return
 	}
 	if op.Set != nil {
 		m.GaugeSet(op.Name, *op.Set, labels)
 		return
+	}
+	if op.Action == "observe" && op.Value != nil && op.Buckets != nil {
+		m.HistogramObserve(op.Name, *op.Value, labels, op.Buckets)
 	}
 }
 
@@ -394,8 +398,14 @@ func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.Metri
 		if op.Action == "add" && op.Value != nil {
 			m.GroupedVault.CounterAdd(group, op.Name, *op.Value, labels)
 		}
+		if op.Add != nil {
+			m.GroupedVault.CounterAdd(group, op.Name, *op.Add, labels)
+		}
 		if op.Action == "set" && op.Value != nil {
 			m.GroupedVault.GaugeSet(group, op.Name, *op.Value, labels)
+		}
+		if op.Set != nil {
+			m.GroupedVault.GaugeSet(group, op.Name, *op.Set, labels)
 		}
 	}
 }
