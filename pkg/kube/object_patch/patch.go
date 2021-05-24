@@ -108,10 +108,10 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 
 		switch spec.Operation {
 		case Create, CreateIfNotExists, CreateOrUpdate, MergePatch, JSONPatch:
-		// pass - we dont need it for operations with Object
+		// skip - we dont need it for operations with Object
 
 		default:
-			// preferred resources does not exist on FakeCluster
+			// preferred resources does not exist in the FakeCluster
 			// try to iterate and find the first match
 			if spec.ApiVersion == "" {
 				normalizedSpec, err := o.fakeClusterPreferredVersion(spec)
