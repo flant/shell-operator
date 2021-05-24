@@ -180,6 +180,7 @@ func findGvr(resources []*metav1.APIResourceList, apiVersion, kindOrName string)
 //     Prometheus -> prometheuses
 //     NetworkPolicy -> netwrokpolicies
 //     CustomPrometheusRules -> customprometheusrules
+//     Endpoints -> endpoints
 func Pluralize(kind string) string {
 	if kind == "" {
 		return kind
@@ -190,6 +191,8 @@ func Pluralize(kind string) string {
 	// maybe we dont need more complex pluralizer here
 	// but if we do, can take smth like https://github.com/gertd/go-pluralize
 	if strings.HasSuffix(kind, "es") {
+		return kind
+	} else if strings.HasSuffix(kind, "ts") {
 		return kind
 	} else if strings.HasSuffix(kind, "s") {
 		return kind + "es"
