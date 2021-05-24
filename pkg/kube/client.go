@@ -218,12 +218,6 @@ func (c *kubernetesClient) Init() error {
 				RequestResult:  NewRequestResultMetric(c.metricStorage, c.metricLabels),
 			},
 		)
-		// client-go supports more metrics in v0.18.* versions
-		//metrics.Register(metrics.RegisterOpts{
-		//	RequestLatency:        NewRequestLatencyMetric(c.metricStorage, c.metricLabels),
-		//	RateLimiterLatency:    NewRateLimiterLatencyMetric(c.metricStorage, c.metricLabels),
-		//	RequestResult:         NewRequestResultMetric(c.metricStorage, c.metricLabels),
-		//})
 	}
 
 	cacheDiscoveryDir, err := ioutil.TempDir("", "kube-cache-discovery-*")
