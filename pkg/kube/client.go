@@ -66,6 +66,9 @@ var NewKubernetesClient = func() KubernetesClient {
 	return &kubernetesClient{}
 }
 
+// NewFakeKubernetesClient instantiate new fake cluster client
+// map[schema.GroupVersionResource]string is not used at the moment, its placeholder for 0.20.x go-client
+// you have to pass gvk-List-kind there
 func NewFakeKubernetesClient(_ map[schema.GroupVersionResource]string) KubernetesClient {
 	scheme := runtime.NewScheme()
 	objs := []runtime.Object{}
