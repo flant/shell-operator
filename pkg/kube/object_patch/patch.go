@@ -112,7 +112,7 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 
 		default:
 			// preferred resources does not exist on FakeCluster
-			// try to iterate and found first match
+			// try to iterate and find the first match
 			if spec.ApiVersion == "" {
 				normalizedSpec, err := o.fakeClusterPreferredVersion(spec)
 				if err != nil {
