@@ -18,7 +18,7 @@ jobs:
         id: go
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
 
       # Restore go_modules.tar.gz from cache or download and pack them, upload archive as artifact for other jobs.
       # NOTE: cache action is limited to 400Mb artifacts and has a 2Gb space.

@@ -56,7 +56,7 @@ jobs:
         id: go
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
 
       # Restore go_modules.tar.gz from cache or download and pack them, upload archive as artifact for other jobs.
       # NOTE: cache action is limited to 400Mb artifacts and has a 2Gb space.
@@ -143,7 +143,7 @@ jobs:
         id: go
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
 
       # Restore go_modules.tar.gz from cache or download and pack them, upload archive as artifact for other jobs.
       # NOTE: cache action is limited to 400Mb artifacts and has a 2Gb space.
@@ -215,7 +215,7 @@ jobs:
       ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
 
       - name: Set up Go 1.15
         uses: actions/setup-go@v2
@@ -285,7 +285,7 @@ jobs:
       ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
 
       - name: Set up Go 1.15
         uses: actions/setup-go@v2
@@ -359,7 +359,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
 
       - name: Download coverage artifact
         uses: actions/download-artifact@v2
