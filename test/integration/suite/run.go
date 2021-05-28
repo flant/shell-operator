@@ -11,6 +11,7 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
+	. "github.com/flant/shell-operator/test/utils"
 )
 
 var (

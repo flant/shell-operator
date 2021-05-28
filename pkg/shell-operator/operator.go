@@ -180,6 +180,7 @@ func (op *ShellOperator) Init() (err error) {
 	}
 
 	if op.KubeClient == nil {
+		//nolint:staticcheck
 		klient.RegisterKubernetesClientMetrics(op.MetricStorage, op.GetMainKubeClientMetricLabels())
 		op.KubeClient, err = op.InitMainKubeClient()
 		if err != nil {
