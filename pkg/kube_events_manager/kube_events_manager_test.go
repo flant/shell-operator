@@ -93,7 +93,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kubeClient := klient.NewFakeKubernetesClient(nil)
+	kubeClient := klient.NewFake(nil)
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
@@ -248,7 +248,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kubeClient := klient.NewFakeKubernetesClient(nil)
+	kubeClient := klient.NewFake(nil)
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")

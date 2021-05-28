@@ -7,7 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/flant/shell-operator/pkg/kube"
+	klient "github.com/flant/kube-client/client"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric_storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
@@ -15,7 +15,7 @@ import (
 
 type Monitor interface {
 	WithContext(ctx context.Context)
-	WithKubeClient(client kube.KubernetesClient)
+	WithKubeClient(client klient.Client)
 	WithMetricStorage(mstor *metric_storage.MetricStorage)
 	WithConfig(config *MonitorConfig)
 	WithKubeEventCb(eventCb func(KubeEvent))
@@ -32,7 +32,7 @@ type Monitor interface {
 type monitor struct {
 	Name       string
 	Config     *MonitorConfig
-	KubeClient kube.KubernetesClient
+	KubeClient klient.Client
 	// Static list of informers
 	ResourceInformers []ResourceInformer
 	// Namespace informer to get new namespaces
@@ -64,7 +64,7 @@ func (m *monitor) WithContext(ctx context.Context) {
 	m.ctx, m.cancel = context.WithCancel(ctx)
 }
 
-func (m *monitor) WithKubeClient(client kube.KubernetesClient) {
+func (m *monitor) WithKubeClient(client klient.Client) {
 	m.KubeClient = client
 }
 

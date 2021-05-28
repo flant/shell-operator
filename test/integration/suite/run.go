@@ -12,13 +12,13 @@ import (
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
 	. "github.com/flant/shell-operator/test/utils"
 
-	"github.com/flant/shell-operator/pkg/kube"
+	klient "github.com/flant/kube-client/client"
 )
 
 var (
 	ClusterName   string
 	ContextName   string
-	KubeClient    kube.KubernetesClient
+	KubeClient    klient.Client
 	ObjectPatcher *object_patch.ObjectPatcher
 )
 

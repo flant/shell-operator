@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/flant/shell-operator/pkg/kube/fake"
-	"github.com/flant/shell-operator/pkg/utils/manifest"
+	"github.com/flant/kube-client/fake"
+	"github.com/flant/kube-client/manifest"
 )
 
 // if we use default, then we are not able to emulate global resources due to fake cluster limitations
@@ -16,11 +16,11 @@ var defaultNamespace = ""
 type StateController struct {
 	CurrentState map[string]manifest.Manifest
 
-	fakeCluster *fake.FakeCluster
+	fakeCluster *fake.Cluster
 }
 
 // NewStateController creates controller to apply state changes
-func NewStateController(fc *fake.FakeCluster) *StateController {
+func NewStateController(fc *fake.Cluster) *StateController {
 	return &StateController{
 		CurrentState: make(map[string]manifest.Manifest),
 		fakeCluster:  fc,

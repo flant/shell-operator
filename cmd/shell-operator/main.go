@@ -9,8 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/flant/kube-client/klogtologrus"
 	"github.com/flant/shell-operator/pkg/debug"
-	"github.com/flant/shell-operator/pkg/utils/klogtologrus"
 
 	"github.com/flant/shell-operator/pkg/app"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"

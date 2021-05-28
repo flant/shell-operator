@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/davecgh/go-spew v1.1.1
+	github.com/flant/kube-client v0.0.5
 	github.com/flant/libjq-go v1.6.2-0.20200616114952-907039e8a02a // branch: master
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-openapi/spec v0.19.3
@@ -11,7 +12,6 @@ require (
 	github.com/go-openapi/swag v0.19.5
 	github.com/go-openapi/validate v0.19.7
 	github.com/hashicorp/go-multierror v1.0.0
-	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.9.0
