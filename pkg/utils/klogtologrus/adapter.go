@@ -4,7 +4,7 @@ import (
 	"flag"
 
 	log "github.com/sirupsen/logrus"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Override output writer for klog to log messages with logrus.
