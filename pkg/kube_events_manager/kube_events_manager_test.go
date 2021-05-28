@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 
-	"github.com/flant/shell-operator/pkg/kube"
+	klient "github.com/flant/kube-client/client"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -23,7 +23,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 	gvrToListKind := map[schema.GroupVersionResource]string{
 		{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 	}
-	kubeClient := kube.NewFakeKubernetesClient(gvrToListKind)
+	kubeClient := klient.NewFake(gvrToListKind)
 
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
@@ -93,7 +93,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kubeClient := kube.NewFakeKubernetesClient(nil)
+	kubeClient := klient.NewFakeKubernetesClient(nil)
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
@@ -248,7 +248,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kubeClient := kube.NewFakeKubernetesClient(nil)
+	kubeClient := klient.NewFakeKubernetesClient(nil)
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")

@@ -28,7 +28,7 @@ func NewStateController(fc *fake.FakeCluster) *StateController {
 }
 
 func (c *StateController) SetInitialState(initialState string) error {
-	manifests, err := manifest.GetManifestListFromYamlDocuments(initialState)
+	manifests, err := manifest.ListFromYamlDocs(initialState)
 	if err != nil {
 		return fmt.Errorf("create initial state: %v", err)
 	}
@@ -50,7 +50,7 @@ func (c *StateController) SetInitialState(initialState string) error {
 
 // ChangeState apply changes to current objects state
 func (c *StateController) ChangeState(newRawState string) (int, error) {
-	newManifests, err := manifest.GetManifestListFromYamlDocuments(newRawState)
+	newManifests, err := manifest.ListFromYamlDocs(newRawState)
 	if err != nil {
 		return 0, fmt.Errorf("error while changing state: %v", err)
 	}

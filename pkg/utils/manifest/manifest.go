@@ -18,7 +18,7 @@ func getFieldString(m map[string]interface{}, field string) string {
 	return ""
 }
 
-func NewManifest(apiVersion, kind, name string) Manifest {
+func New(apiVersion, kind, name string) Manifest {
 	return Manifest(map[string]interface{}{
 		"apiVersion": apiVersion,
 		"kind":       kind,
@@ -28,7 +28,7 @@ func NewManifest(apiVersion, kind, name string) Manifest {
 	})
 }
 
-func NewManifestFromYaml(yamlOrJson string) (Manifest, error) {
+func NewFromYAML(yamlOrJson string) (Manifest, error) {
 	var m Manifest
 	err := yaml.Unmarshal([]byte(yamlOrJson), &m)
 	if err != nil {
@@ -37,8 +37,8 @@ func NewManifestFromYaml(yamlOrJson string) (Manifest, error) {
 	return m, nil
 }
 
-func MustManifestFromYaml(yamlOrJson string) Manifest {
-	m, err := NewManifestFromYaml(yamlOrJson)
+func MustFromYAML(yamlOrJson string) Manifest {
+	m, err := NewFromYAML(yamlOrJson)
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +97,7 @@ func (m Manifest) SetNamespace(ns string) {
 	m.Metadata()["namespace"] = ns
 }
 
-func (m Manifest) ToUnstructured() *unstructured.Unstructured {
+func (m Manifest) Unstructured() *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: m,
 	}

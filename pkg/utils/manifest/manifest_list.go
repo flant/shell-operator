@@ -2,11 +2,11 @@ package manifest
 
 import "github.com/flant/shell-operator/pkg/utils/manifest/releaseutil"
 
-func GetManifestListFromYamlDocuments(rawManifests string) ([]Manifest, error) {
+func ListFromYamlDocs(rawManifests string) ([]Manifest, error) {
 	var manifests []Manifest
 
 	for _, doc := range releaseutil.SplitManifests(rawManifests) {
-		m, err := NewManifestFromYaml(doc)
+		m, err := NewFromYAML(doc)
 		if err != nil {
 			return nil, err
 		}

@@ -98,7 +98,7 @@ spec:
 
 func Test_RenderedChart_To_ManifestList(t *testing.T) {
 	g := NewWithT(t)
-	manifests, err := GetManifestListFromYamlDocuments(renderOutput)
+	manifests, err := ListFromYamlDocs(renderOutput)
 
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(manifests).To(HaveLen(3), "GetManifestListFromYamlDocuments should return only templates with all basic fields: kind, apiVersion and metadata.name")
