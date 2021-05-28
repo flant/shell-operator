@@ -80,7 +80,7 @@ func Test_klog_should_not_output_to_Stderr(t *testing.T) {
 
 	stderr := captureStderr(func() {
 		fmt.Fprintf(os.Stderr, "asdasdasd")
-		//service.DoWithCallToKlogPoweredLib()
+		// service.DoWithCallToKlogPoweredLib()
 	})
 
 	g.Expect(stderr).ShouldNot(ContainSubstring("klog powered lib"))

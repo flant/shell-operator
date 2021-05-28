@@ -1,7 +1,7 @@
 package klog_powered_lib
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func ActionWithKlogWarn() {

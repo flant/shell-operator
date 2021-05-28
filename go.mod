@@ -27,7 +27,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.19.11
 	k8s.io/apimachinery v0.19.11
 	k8s.io/client-go v0.19.11
-	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.2.0 // it is important too keep it in sync with client-go klog version
 	sigs.k8s.io/kind v0.10.0
 	sigs.k8s.io/yaml v1.2.0
 )
@@ -37,7 +37,4 @@ replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v
 
 replace github.com/onsi/ginkgo v1.11.0 => github.com/flant/ginkgo v1.11.1-0.20200206071017-2216da3b016c // fix_coverage_combining
 
-//replace github.com/flant/libjq-go => ../libjq-go
-
-// version from k8s.io/client-go
-//replace k8s.io/klog => k8s.io/klog v0.0.0-20190306015804-8e90cee79f82
+// replace github.com/flant/libjq-go => ../libjq-go
