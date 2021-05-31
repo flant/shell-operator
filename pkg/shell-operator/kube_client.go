@@ -1,8 +1,8 @@
 package shell_operator
 
 import (
+	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/kube"
 )
 
 var DefaultMainKubeClientMetricLabels = map[string]string{"component": "main"}
@@ -24,13 +24,14 @@ func (op *ShellOperator) GetObjectPatcherKubeClientMetricLabels() map[string]str
 
 // InitMainKubeClient initializes a Kubernetes client for hooks. No timeout specified, because
 // timeout will reset connections for Watchers.
-func (op *ShellOperator) InitMainKubeClient() (kube.KubernetesClient, error) {
-	client := kube.NewKubernetesClient()
+func (op *ShellOperator) InitMainKubeClient() (klient.Client, error) {
+	client := klient.New()
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
 	client.WithRateLimiterSettings(app.KubeClientQps, app.KubeClientBurst)
 	client.WithMetricStorage(op.MetricStorage)
 	client.WithMetricLabels(op.GetMainKubeClientMetricLabels())
+
 	if err := client.Init(); err != nil {
 		return nil, err
 	}
@@ -38,14 +39,16 @@ func (op *ShellOperator) InitMainKubeClient() (kube.KubernetesClient, error) {
 }
 
 // InitObjectPatcherKubeClient initializes a Kubernetes client for ObjectPatcher. Timeout is specified here.
-func (op *ShellOperator) InitObjectPatcherKubeClient() (kube.KubernetesClient, error) {
-	client := kube.NewKubernetesClient()
+func (op *ShellOperator) InitObjectPatcherKubeClient() (klient.Client, error) {
+	client := klient.New()
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
 	client.WithRateLimiterSettings(app.ObjectPatcherKubeClientQps, app.ObjectPatcherKubeClientBurst)
-	client.WithTimeout(app.ObjectPatcherKubeClientTimeout)
 	client.WithMetricStorage(op.MetricStorage)
 	client.WithMetricLabels(op.GetObjectPatcherKubeClientMetricLabels())
+
+	client.WithTimeout(app.ObjectPatcherKubeClientTimeout)
+
 	if err := client.Init(); err != nil {
 		return nil, err
 	}

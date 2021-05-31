@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	PrefixTemplate                = "{PREFIX}"
+	PrefixTemplate = "{PREFIX}"
 )
 
 // MetricStorage is used to register metric values.
@@ -307,11 +307,11 @@ func (m *MetricStorage) SendBatchV0(ops []operation.MetricOperation, labels map[
 			m.CounterAdd(metricOp.Name, *metricOp.Value, labels)
 			continue
 		}
-		if metricOp.Action == "set" && metricOp.Value != nil  {
+		if metricOp.Action == "set" && metricOp.Value != nil {
 			m.GaugeSet(metricOp.Name, *metricOp.Value, labels)
 			continue
 		}
-		if metricOp.Action == "observe" && metricOp.Value != nil  && metricOp.Buckets != nil {
+		if metricOp.Action == "observe" && metricOp.Value != nil && metricOp.Buckets != nil {
 			m.HistogramObserve(metricOp.Name, *metricOp.Value, labels, metricOp.Buckets)
 			continue
 		}

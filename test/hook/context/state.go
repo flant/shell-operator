@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/flant/shell-operator/pkg/kube/fake"
-	"github.com/flant/shell-operator/pkg/utils/manifest"
+	"github.com/flant/kube-client/fake"
+	"github.com/flant/kube-client/manifest"
 )
 
 // if we use default, then we are not able to emulate global resources due to fake cluster limitations
@@ -16,11 +16,11 @@ var defaultNamespace = ""
 type StateController struct {
 	CurrentState map[string]manifest.Manifest
 
-	fakeCluster *fake.FakeCluster
+	fakeCluster *fake.Cluster
 }
 
 // NewStateController creates controller to apply state changes
-func NewStateController(fc *fake.FakeCluster) *StateController {
+func NewStateController(fc *fake.Cluster) *StateController {
 	return &StateController{
 		CurrentState: make(map[string]manifest.Manifest),
 		fakeCluster:  fc,
@@ -28,7 +28,7 @@ func NewStateController(fc *fake.FakeCluster) *StateController {
 }
 
 func (c *StateController) SetInitialState(initialState string) error {
-	manifests, err := manifest.GetManifestListFromYamlDocuments(initialState)
+	manifests, err := manifest.ListFromYamlDocs(initialState)
 	if err != nil {
 		return fmt.Errorf("create initial state: %v", err)
 	}
@@ -50,7 +50,7 @@ func (c *StateController) SetInitialState(initialState string) error {
 
 // ChangeState apply changes to current objects state
 func (c *StateController) ChangeState(newRawState string) (int, error) {
-	newManifests, err := manifest.GetManifestListFromYamlDocuments(newRawState)
+	newManifests, err := manifest.ListFromYamlDocs(newRawState)
 	if err != nil {
 		return 0, fmt.Errorf("error while changing state: %v", err)
 	}

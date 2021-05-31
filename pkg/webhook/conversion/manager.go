@@ -5,7 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/flant/shell-operator/pkg/kube"
+	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
@@ -23,7 +23,7 @@ type EventHandlerFn func(event Event) (*Response, error)
 //     - Start server loop.
 //     - Update clientConfig in each registered CRD.
 type WebhookManager struct {
-	KubeClient kube.KubernetesClient
+	KubeClient klient.Client
 
 	EventHandlerFn EventHandlerFn
 	Settings       *WebhookSettings

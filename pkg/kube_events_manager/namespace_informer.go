@@ -13,12 +13,12 @@ import (
 	corev1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/flant/shell-operator/pkg/kube"
+	klient "github.com/flant/kube-client/client"
 )
 
 type NamespaceInformer interface {
 	WithContext(ctx context.Context)
-	WithKubeClient(client kube.KubernetesClient)
+	WithKubeClient(client klient.Client)
 	CreateSharedInformer(addFn func(string), delFn func(string)) error
 	GetExistedObjects() map[string]bool
 	Start()
@@ -31,7 +31,7 @@ type namespaceInformer struct {
 	cancel  context.CancelFunc
 	stopped bool
 
-	KubeClient     kube.KubernetesClient
+	KubeClient     klient.Client
 	Monitor        *MonitorConfig
 	SharedInformer cache.SharedInformer
 
@@ -56,7 +56,7 @@ func (ni *namespaceInformer) WithContext(ctx context.Context) {
 	ni.ctx, ni.cancel = context.WithCancel(ctx)
 }
 
-func (ni *namespaceInformer) WithKubeClient(client kube.KubernetesClient) {
+func (ni *namespaceInformer) WithKubeClient(client klient.Client) {
 	ni.KubeClient = client
 }
 

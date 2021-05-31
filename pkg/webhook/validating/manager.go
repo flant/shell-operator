@@ -7,7 +7,7 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
-	"github.com/flant/shell-operator/pkg/kube"
+	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
@@ -24,7 +24,7 @@ const DefaultConfigurationId = "hooks"
 //   - Call AddWEbhook for every binding in hooks
 //   - Start() to run server and create ValidatingWebhookConfiguration
 type WebhookManager struct {
-	KubeClient kube.KubernetesClient
+	KubeClient klient.Client
 
 	ValidatingEventHandlerFn ValidatingEventHandlerFn
 
@@ -44,7 +44,7 @@ func NewWebhookManager() *WebhookManager {
 	}
 }
 
-func (m *WebhookManager) WithKubeClient(kubeClient kube.KubernetesClient) {
+func (m *WebhookManager) WithKubeClient(kubeClient klient.Client) {
 	m.KubeClient = kubeClient
 }
 

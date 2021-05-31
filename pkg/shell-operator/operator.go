@@ -21,11 +21,11 @@ import (
 	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
+	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/hook/controller"
-	"github.com/flant/shell-operator/pkg/kube"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/metric_storage"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
@@ -51,7 +51,7 @@ type ShellOperator struct {
 	MetricStorage *metric_storage.MetricStorage
 	// separate metric storage for hook metrics if separate listen port is configured
 	HookMetricStorage *metric_storage.MetricStorage
-	KubeClient        kube.KubernetesClient
+	KubeClient        klient.Client
 	ObjectPatcher     *object_patch.ObjectPatcher
 
 	// Labels for kube clients
@@ -96,7 +96,7 @@ func (op *ShellOperator) Stop() {
 	}
 }
 
-func (op *ShellOperator) WithKubernetesClient(klient kube.KubernetesClient) {
+func (op *ShellOperator) WithKubernetesClient(klient klient.Client) {
 	op.KubeClient = klient
 }
 
@@ -180,7 +180,8 @@ func (op *ShellOperator) Init() (err error) {
 	}
 
 	if op.KubeClient == nil {
-		kube.RegisterKubernetesClientMetrics(op.MetricStorage, op.GetMainKubeClientMetricLabels())
+		//nolint:staticcheck
+		klient.RegisterKubernetesClientMetrics(op.MetricStorage, op.GetMainKubeClientMetricLabels())
 		op.KubeClient, err = op.InitMainKubeClient()
 		if err != nil {
 			log.Errorf("MAIN Fatal: initialize 'main' Kubernetes client: %s\n", err)
