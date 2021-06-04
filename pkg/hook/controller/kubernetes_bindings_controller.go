@@ -23,6 +23,7 @@ type KubernetesBindingsController interface {
 	WithKubernetesBindings([]OnKubernetesEventConfig)
 	WithKubeEventsManager(kube_events_manager.KubeEventsManager)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
+	UpdateMonitor(monitorId string, kind, apiVersion string) error
 	StartCachedSnapshotMode()
 	StopCachedSnapshotMode()
 	UnlockEvents()
@@ -97,6 +98,57 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 	}
 
 	return res, nil
+}
+
+func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
+	// Find binding for monitorId
+	link, ok := c.BindingMonitorLinks[monitorId]
+	if !ok {
+		return nil
+	}
+
+	bindingName := link.BindingConfig.BindingName
+	// Stop and remove previous monitor instance.
+	err := c.kubeEventsManager.StopMonitor(monitorId)
+	if err != nil {
+		return fmt.Errorf("stop monitor for binding '%s': %v", bindingName, err)
+	}
+
+	// remove snapshots cache for monitor
+	// TODO is it required?
+	delete(c.snapshotsCache, bindingName)
+
+	// Monitor config is a pointer, so is should be updated.
+	if link.BindingConfig.Monitor.Kind != kind {
+		log.Infof("Monitor in hook controller is not updated: kind='%s', apiVersion='%s'. Desired: kind='%s', apiVersion='%s'. I force update them now.",
+			link.BindingConfig.Monitor.Kind, link.BindingConfig.Monitor.ApiVersion,
+			kind, apiVersion)
+		link.BindingConfig.Monitor.Kind = kind
+		link.BindingConfig.Monitor.ApiVersion = apiVersion
+		link.BindingConfig.Monitor.Metadata.MetricLabels["kind"] = kind
+	}
+
+	// Recreate monitor with new kind.
+	err = c.kubeEventsManager.AddMonitor(link.BindingConfig.Monitor)
+	if err != nil {
+		return fmt.Errorf("recreate monitor for binding '%s': %v", bindingName, err)
+	}
+
+	// Synchronization has no meaning for UpdateMonitor. Just emit Added event to handle objects of
+	// a new kind.
+	kubeEvent := KubeEvent{
+		MonitorId:   monitorId,
+		Type:        TypeEvent,
+		WatchEvents: []WatchEventType{WatchEventAdded},
+		Objects:     nil,
+	}
+	c.kubeEventsManager.Ch() <- kubeEvent
+
+	// Start monitor and allow emitting kubernetes events immediately.
+	c.kubeEventsManager.StartMonitor(monitorId)
+	c.UnlockEventsFor(monitorId)
+
+	return nil
 }
 
 // StartSnapshotMode enables the cache for accessed snapshots.
