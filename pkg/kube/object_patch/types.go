@@ -16,7 +16,8 @@ type OperationSpec struct {
 	JSONPatch  []interface{}          `json:"jsonPatch,omitempty" yaml:"jsonPatch,omitempty"`
 
 	// FilterFunc makes sense only for OperationType==Filter, mutate objects in go hooks
-	FilterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error) `json:"filterFunc,omitempty" yaml:"filterFunc,omitempty"`
+	// It's used only in go-hooks that's why it should not (and can not) be marshalled to json and yaml
+	FilterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error) `json:"-" yaml:"-"`
 }
 
 type OperationType string
