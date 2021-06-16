@@ -1,5 +1,7 @@
 package object_patch
 
+import "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 type OperationSpec struct {
 	Operation   OperationType `json:"operation" yaml:"operation"`
 	ApiVersion  string        `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
@@ -12,6 +14,9 @@ type OperationSpec struct {
 	JQFilter   string                 `json:"jqFilter,omitempty" yaml:"jqFilter,omitempty"`
 	MergePatch map[string]interface{} `json:"mergePatch,omitempty" yaml:"mergePatch,omitempty"`
 	JSONPatch  []interface{}          `json:"jsonPatch,omitempty" yaml:"jsonPatch,omitempty"`
+
+	// FilterFunc makes sense only for OperationType==Filter, mutate objects in go hooks
+	FilterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error) `json:"filterFunc,omitempty" yaml:"filterFunc,omitempty"`
 }
 
 type OperationType string
@@ -28,4 +33,6 @@ const (
 	JQPatch    OperationType = "JQPatch"
 	MergePatch OperationType = "MergePatch"
 	JSONPatch  OperationType = "JSONPatch"
+
+	Filter OperationType = "Filter"
 )

@@ -12,8 +12,10 @@ import (
 )
 
 type MetricOperation struct {
-	Name    string            `json:"name"`
-	Add     *float64          `json:"add,omitempty"` // shortcut for action=add value=num
+	Name string `json:"name"`
+	// Deprecated: use Value + Action="add" instead. Add only works for parsing from file
+	Add *float64 `json:"add,omitempty"` // shortcut for action=add value=num
+	// Deprecated: use Value + Action="set" instead. Set only works for parsing from file
 	Set     *float64          `json:"set,omitempty"` // shortcut for action=set value=num
 	Value   *float64          `json:"value,omitempty"`
 	Buckets []float64         `json:"buckets,omitempty"`
@@ -23,7 +25,7 @@ type MetricOperation struct {
 }
 
 func (m MetricOperation) String() string {
-	parts := []string{}
+	parts := make([]string, 0)
 
 	if m.Group != "" {
 		parts = append(parts, "group="+m.Group)
