@@ -56,6 +56,7 @@ type HookController interface {
 	UnlockKubernetesEvents()
 	UnlockKubernetesEventsFor(monitorID string)
 	StopMonitors()
+	UpdateMonitor(monitorId string, kind, apiVersion string) error
 
 	EnableScheduleBindings()
 	DisableScheduleBindings()
@@ -236,6 +237,13 @@ func (hc *hookController) StopMonitors() {
 	if hc.KubernetesController != nil {
 		hc.KubernetesController.StopMonitors()
 	}
+}
+
+func (hc *hookController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
+	if hc.KubernetesController != nil {
+		return hc.KubernetesController.UpdateMonitor(monitorId, kind, apiVersion)
+	}
+	return nil
 }
 
 func (hc *hookController) EnableScheduleBindings() {

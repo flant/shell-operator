@@ -7,9 +7,9 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 // A link between a binding config and a Monitor.
@@ -23,6 +23,7 @@ type KubernetesBindingsController interface {
 	WithKubernetesBindings([]OnKubernetesEventConfig)
 	WithKubeEventsManager(kube_events_manager.KubeEventsManager)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
+	UpdateMonitor(monitorId string, kind, apiVersion string) error
 	StartCachedSnapshotMode()
 	StopCachedSnapshotMode()
 	UnlockEvents()
@@ -97,6 +98,57 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 	}
 
 	return res, nil
+}
+
+func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
+	// Find binding for monitorId
+	link, ok := c.BindingMonitorLinks[monitorId]
+	if !ok {
+		return nil
+	}
+
+	bindingName := link.BindingConfig.BindingName
+	// Stop and remove previous monitor instance.
+	err := c.kubeEventsManager.StopMonitor(monitorId)
+	if err != nil {
+		return fmt.Errorf("stop monitor for binding '%s': %v", bindingName, err)
+	}
+
+	// Clean snapshots from cache for the stopped monitor.
+	delete(c.snapshotsCache, bindingName)
+
+	// Update monitor config if kind or apiVersion are changed.
+	if link.BindingConfig.Monitor.Kind != kind || link.BindingConfig.Monitor.ApiVersion != apiVersion {
+		link.BindingConfig.Monitor.Kind = kind
+		link.BindingConfig.Monitor.ApiVersion = apiVersion
+		link.BindingConfig.Monitor.Metadata.MetricLabels["kind"] = kind
+	}
+
+	// Recreate monitor with new kind.
+	err = c.kubeEventsManager.AddMonitor(link.BindingConfig.Monitor)
+	if err != nil {
+		return fmt.Errorf("recreate monitor for binding '%s': %v", bindingName, err)
+	}
+
+	log.WithFields(utils.LabelsToLogFields(link.BindingConfig.Monitor.Metadata.LogLabels)).
+		Infof("Monitor for '%s' is recreated with new kind=%s and apiVersion=%s",
+			link.BindingConfig.BindingName, link.BindingConfig.Monitor.Kind, link.BindingConfig.Monitor.ApiVersion)
+
+	// Synchronization has no meaning for UpdateMonitor. Just emit Added event to handle objects of
+	// a new kind.
+	kubeEvent := KubeEvent{
+		MonitorId:   monitorId,
+		Type:        TypeEvent,
+		WatchEvents: []WatchEventType{WatchEventAdded},
+		Objects:     nil,
+	}
+	c.kubeEventsManager.Ch() <- kubeEvent
+
+	// Start monitor and allow emitting kubernetes events immediately.
+	c.kubeEventsManager.StartMonitor(monitorId)
+	c.UnlockEventsFor(monitorId)
+
+	return nil
 }
 
 // StartSnapshotMode enables the cache for accessed snapshots.

@@ -94,6 +94,11 @@ func (m *monitor) CreateInformers() error {
 		WithFields(utils.LabelsToLogFields(m.Config.Metadata.LogLabels)).
 		WithField("binding.name", m.Config.Metadata.DebugName)
 
+	if m.Config.Kind == "" && m.Config.ApiVersion == "" {
+		logEntry.Debugf("Create Informers for Config with empty kind and apiVersion: %+v", m.Config)
+		return nil
+	}
+
 	logEntry.Debugf("Create Informers Config: %+v", m.Config)
 	nsNames := m.Config.Namespaces()
 	if len(nsNames) > 0 {
@@ -262,6 +267,7 @@ func (m *monitor) Start(parentCtx context.Context) {
 	m.ctx, m.cancel = context.WithCancel(parentCtx)
 
 	for _, informer := range m.ResourceInformers {
+		informer.WithContext(m.ctx)
 		go informer.Start()
 	}
 
@@ -275,13 +281,16 @@ func (m *monitor) Start(parentCtx context.Context) {
 	}
 
 	if m.NamespaceInformer != nil {
+		m.NamespaceInformer.WithContext(m.ctx)
 		go m.NamespaceInformer.Start()
 	}
 }
 
 // Stop stops all informers
 func (m *monitor) Stop() {
-	m.cancel()
+	if m.cancel != nil {
+		m.cancel()
+	}
 }
 
 // PauseHandleEvents set flags for all informers to ignore incoming events.
