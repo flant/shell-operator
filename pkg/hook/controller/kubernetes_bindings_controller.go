@@ -7,9 +7,9 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 // A link between a binding config and a Monitor.
@@ -114,15 +114,11 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 		return fmt.Errorf("stop monitor for binding '%s': %v", bindingName, err)
 	}
 
-	// remove snapshots cache for monitor
-	// TODO is it required?
+	// Clean snapshots from cache for the stopped monitor.
 	delete(c.snapshotsCache, bindingName)
 
-	// Monitor config is a pointer, so is should be updated.
-	if link.BindingConfig.Monitor.Kind != kind {
-		log.Infof("Monitor in hook controller is not updated: kind='%s', apiVersion='%s'. Desired: kind='%s', apiVersion='%s'. I force update them now.",
-			link.BindingConfig.Monitor.Kind, link.BindingConfig.Monitor.ApiVersion,
-			kind, apiVersion)
+	// Update monitor config if kind or apiVersion are changed.
+	if link.BindingConfig.Monitor.Kind != kind || link.BindingConfig.Monitor.ApiVersion != apiVersion {
 		link.BindingConfig.Monitor.Kind = kind
 		link.BindingConfig.Monitor.ApiVersion = apiVersion
 		link.BindingConfig.Monitor.Metadata.MetricLabels["kind"] = kind
@@ -133,6 +129,10 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 	if err != nil {
 		return fmt.Errorf("recreate monitor for binding '%s': %v", bindingName, err)
 	}
+
+	log.WithFields(utils.LabelsToLogFields(link.BindingConfig.Monitor.Metadata.LogLabels)).
+		Infof("Monitor for '%s' is recreated with new kind=%s and apiVersion=%s",
+			link.BindingConfig.BindingName, link.BindingConfig.Monitor.Kind, link.BindingConfig.Monitor.ApiVersion)
 
 	// Synchronization has no meaning for UpdateMonitor. Just emit Added event to handle objects of
 	// a new kind.
