@@ -7,27 +7,27 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type specGenerator struct {
+type patchCollector struct {
 	patchOperations []OperationSpec
 }
 
-// NewSpecGenerator creates OperationSpec generator which is compatible with ObjectPatcher interface
-func NewSpecGenerator() *specGenerator {
-	return &specGenerator{
+// NewPatchCollector creates OperationSpec collector which is compatible with ObjectPatcher interface
+func NewPatchCollector() *patchCollector {
+	return &patchCollector{
 		patchOperations: make([]OperationSpec, 0),
 	}
 }
 
-func (dop *specGenerator) CreateOrUpdateObject(object *unstructured.Unstructured, subresource string) error {
+func (dop *patchCollector) CreateOrUpdateObject(object *unstructured.Unstructured, subresource string) error {
 	return dop.create(CreateOrUpdate, object, subresource)
 }
 
-func (dop *specGenerator) CreateObject(object *unstructured.Unstructured, subresource string) error {
+func (dop *patchCollector) CreateObject(object *unstructured.Unstructured, subresource string) error {
 	return dop.create(Create, object, subresource)
 }
 
 // Deprecated: use MergePatch instead
-func (dop *specGenerator) JQPatchObject(jqPatch, apiVersion, kind, namespace, name, subresource string) error {
+func (dop *patchCollector) JQPatchObject(jqPatch, apiVersion, kind, namespace, name, subresource string) error {
 	patch := OperationSpec{
 		Operation:   JQPatch,
 		ApiVersion:  apiVersion,
@@ -43,7 +43,7 @@ func (dop *specGenerator) JQPatchObject(jqPatch, apiVersion, kind, namespace, na
 	return nil
 }
 
-func (dop *specGenerator) MergePatchObject(mergePatch []byte, apiVersion, kind, namespace, name, subresource string) error {
+func (dop *patchCollector) MergePatchObject(mergePatch []byte, apiVersion, kind, namespace, name, subresource string) error {
 	var patch map[string]interface{}
 	err := json.Unmarshal(mergePatch, &patch)
 	if err != nil {
@@ -64,7 +64,7 @@ func (dop *specGenerator) MergePatchObject(mergePatch []byte, apiVersion, kind, 
 	return nil
 }
 
-func (dop *specGenerator) JSONPatchObject(jsonPatch []byte, apiVersion, kind, namespace, name, subresource string) error {
+func (dop *patchCollector) JSONPatchObject(jsonPatch []byte, apiVersion, kind, namespace, name, subresource string) error {
 	var patch []interface{}
 	err := json.Unmarshal(jsonPatch, &patch)
 	if err != nil {
@@ -85,19 +85,19 @@ func (dop *specGenerator) JSONPatchObject(jsonPatch []byte, apiVersion, kind, na
 	return nil
 }
 
-func (dop *specGenerator) DeleteObject(apiVersion, kind, namespace, name, subresource string) error {
+func (dop *patchCollector) DeleteObject(apiVersion, kind, namespace, name, subresource string) error {
 	return dop.delete(Delete, apiVersion, kind, namespace, name, subresource)
 }
 
-func (dop *specGenerator) DeleteObjectInBackground(apiVersion, kind, namespace, name, subresource string) error {
+func (dop *patchCollector) DeleteObjectInBackground(apiVersion, kind, namespace, name, subresource string) error {
 	return dop.delete(DeleteInBackground, apiVersion, kind, namespace, name, subresource)
 }
 
-func (dop *specGenerator) DeleteObjectNonCascading(apiVersion, kind, namespace, name, subresource string) error {
+func (dop *patchCollector) DeleteObjectNonCascading(apiVersion, kind, namespace, name, subresource string) error {
 	return dop.delete(DeleteNonCascading, apiVersion, kind, namespace, name, subresource)
 }
 
-func (dop *specGenerator) FilterObject(
+func (dop *patchCollector) FilterObject(
 	filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error),
 	apiVersion, kind, namespace, name, subresource string,
 ) error {
@@ -120,11 +120,11 @@ func (dop *specGenerator) FilterObject(
 }
 
 // Operations returns all stored operations
-func (dop *specGenerator) Operations() []OperationSpec {
+func (dop *patchCollector) Operations() []OperationSpec {
 	return dop.patchOperations
 }
 
-func (dop *specGenerator) delete(operation OperationType, apiVersion, kind, namespace, name, subresource string) error {
+func (dop *patchCollector) delete(operation OperationType, apiVersion, kind, namespace, name, subresource string) error {
 	op := OperationSpec{
 		Operation:   operation,
 		ApiVersion:  apiVersion,
@@ -139,7 +139,7 @@ func (dop *specGenerator) delete(operation OperationType, apiVersion, kind, name
 	return nil
 }
 
-func (dop *specGenerator) create(operation OperationType, object *unstructured.Unstructured, subresource string) error {
+func (dop *patchCollector) create(operation OperationType, object *unstructured.Unstructured, subresource string) error {
 	op := OperationSpec{
 		Operation:   operation,
 		ApiVersion:  object.GetAPIVersion(),
