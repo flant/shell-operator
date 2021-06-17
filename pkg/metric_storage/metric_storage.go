@@ -366,6 +366,7 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 		m.CounterAdd(op.Name, *op.Value, labels)
 		return
 	}
+	// nolint:staticcheck
 	if op.Add != nil {
 		m.CounterAdd(op.Name, *op.Add, labels)
 		return
@@ -374,6 +375,7 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 		m.GaugeSet(op.Name, *op.Value, labels)
 		return
 	}
+	// nolint:staticcheck
 	if op.Set != nil {
 		m.GaugeSet(op.Name, *op.Set, labels)
 		return
@@ -398,12 +400,14 @@ func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.Metri
 		if op.Action == "add" && op.Value != nil {
 			m.GroupedVault.CounterAdd(group, op.Name, *op.Value, labels)
 		}
+		// nolint:staticcheck
 		if op.Add != nil {
 			m.GroupedVault.CounterAdd(group, op.Name, *op.Add, labels)
 		}
 		if op.Action == "set" && op.Value != nil {
 			m.GroupedVault.GaugeSet(group, op.Name, *op.Value, labels)
 		}
+		// nolint:staticcheck
 		if op.Set != nil {
 			m.GroupedVault.GaugeSet(group, op.Name, *op.Set, labels)
 		}

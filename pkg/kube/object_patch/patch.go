@@ -137,6 +137,8 @@ func (o *ObjectPatcher) GenerateFromJSONAndExecuteOperations(specs []OperationSp
 			operationError = o.DeleteObjectInBackground(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case DeleteNonCascading:
 			operationError = o.DeleteObjectNonCascading(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
+		case Filter:
+			operationError = o.FilterObject(spec.FilterFunc, spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case JQPatch:
 			operationError = o.JQPatchObject(spec.JQFilter, spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name, spec.Subresource)
 		case MergePatch:
