@@ -754,12 +754,12 @@ func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 
 	// Try to apply Kubernetes actions.
 	if len(result.KubernetesPatchBytes) > 0 {
-		var specs []object_patch.OperationSpec
-		specs, err = object_patch.ParseSpecs(result.KubernetesPatchBytes)
+		var operations []*object_patch.Operation
+		operations, err = object_patch.ParseOperations(result.KubernetesPatchBytes)
 		if err != nil {
 			return err
 		}
-		err = op.ObjectPatcher.GenerateFromJSONAndExecuteOperations(specs)
+		err = op.ObjectPatcher.ExecuteOperations(operations)
 		if err != nil {
 			return err
 		}

@@ -52,6 +52,8 @@ definitions:
         type: string
       name:
         type: string
+      ignoreMissingObject:
+        type: boolean
 
 type: object
 additionalProperties: false
@@ -66,6 +68,7 @@ properties:
   jsonPatch: {}
   jqFilter: {}
   mergePatch: {}
+  ignoreMissingObject: {}
 
 oneOf:
 - allOf:
