@@ -25,9 +25,11 @@ definitions:
     - object
     properties:
       object:
-        type: object
-        additionalProperties: true
-        minProperties: 1
+        oneOf:
+        - type: object
+          additionalProperties: true
+          minProperties: 1
+        - type: string
   delete:
     type: object
     required:
@@ -105,8 +107,10 @@ oneOf:
           type: string
           enum: ["MergePatch"]
         mergePatch:
-          type: object
-          minProperties: 1
+          oneOf:
+          - type: object
+            minProperties: 1
+          - type: string
     - required:
       - operation
       - jsonPatch
@@ -115,19 +119,21 @@ oneOf:
           type: string
           enum: ["JSONPatch"]
         jsonPatch:
-          type: array
-          minItems: 1
-          items:
-          - type: object
-            required: ["op", "path", "value"]
-            properties:
-              op:
-                type: string
-                minLength: 1
-              path:
-                type: string
-                minLength: 1
-              value: {}
+          oneOf:
+          - type: array
+            minItems: 1
+            items:
+            - type: object
+              required: ["op", "path", "value"]
+              properties:
+                op:
+                  type: string
+                  minLength: 1
+                path:
+                  type: string
+                  minLength: 1
+                value: {}
+          - type: string
   - "$ref": "#/definitions/common"
   - "$ref": "#/definitions/patch"
 `,

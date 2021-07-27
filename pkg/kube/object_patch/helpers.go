@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8yaml "sigs.k8s.io/yaml"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/jq"
@@ -116,4 +117,28 @@ func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 		}
 		return &unstructured.Unstructured{Object: objectContent}, nil
 	}
+}
+
+func convertPatchToBytes(patch interface{}) ([]byte, error) {
+	var err error
+	var intermediate interface{}
+	switch v := patch.(type) {
+	case []byte:
+		err = k8yaml.Unmarshal(v, &intermediate)
+	case string:
+		err = k8yaml.Unmarshal([]byte(v), &intermediate)
+	default:
+		intermediate = v
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Try to encode to JSON.
+	var patchBytes []byte
+	patchBytes, err = json.Marshal(intermediate)
+	if err != nil {
+		return nil, err
+	}
+	return patchBytes, nil
 }

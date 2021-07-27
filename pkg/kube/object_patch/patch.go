@@ -3,7 +3,6 @@ package object_patch
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -85,16 +84,6 @@ func (o *ObjectPatcher) ExecuteOperation(operation Operation) error {
 	return nil
 }
 
-// Delete uses apiVersion, kind, namespace and name to delete object from cluster.
-//
-// Options:
-// - WithSubresource - delete a specified subresource
-// - InForeground -  remove object when all dependants are removed (default)
-// - InBackground - remove object immediately, dependants remove in background
-// - NonCascading - remove object, dependants become orphan
-//
-// Missing object is ignored by default.
-
 func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 	if op.object == nil {
 		return fmt.Errorf("cannot create empty object")
@@ -173,21 +162,9 @@ func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 
 	}
 
-	var err error
-
-	// Convert patch data.
-	var patchBytes []byte
-	switch v := op.patch.(type) {
-	case []byte:
-		patchBytes = v
-	case string:
-		patchBytes = []byte(v)
-	default:
-		// try to encode to json
-		patchBytes, err = json.Marshal(v)
-		if err != nil {
-			return fmt.Errorf("json encode %s patch for %s/%s/%s/%s: %v", op.patchType, op.apiVersion, op.kind, op.namespace, op.name, err)
-		}
+	patchBytes, err := convertPatchToBytes(op.patch)
+	if err != nil {
+		return fmt.Errorf("encode %s patch for %s/%s/%s/%s: %v", op.patchType, op.apiVersion, op.kind, op.namespace, op.name, err)
 	}
 	if patchBytes == nil {
 		return fmt.Errorf("%s patch is nil for %s/%s/%s/%s", op.patchType, op.apiVersion, op.kind, op.namespace, op.name)

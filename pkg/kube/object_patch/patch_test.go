@@ -150,6 +150,21 @@ data:
 			shouldNotBeError,
 		},
 		{
+			"merge patch using map",
+			func(patcher *ObjectPatcher) error {
+				return patcher.ExecuteOperation(NewMergePatchOperation(
+					map[string]interface{}{
+						"data": map[string]interface{}{
+							newField: newValue,
+						},
+					},
+					"v1", "ConfigMap", namespace, name,
+				))
+			},
+			shouldAdd,
+			shouldNotBeError,
+		},
+		{
 			"merge patch via YAML spec",
 			func(patcher *ObjectPatcher) error {
 				operations, err := ParseOperations([]byte(fmt.Sprintf(`
@@ -208,6 +223,45 @@ mergePatch:
 				return patcher.ExecuteOperations(operations)
 			},
 			shouldNotAdd,
+			shouldNotBeError,
+		},
+		{
+			"merge patch via string in YAML spec",
+			func(patcher *ObjectPatcher) error {
+				operations, err := ParseOperations([]byte(fmt.Sprintf(`
+operation: MergePatch
+kind: ConfigMap
+namespace: %s
+name: %s
+mergePatch: |
+  data:
+    %s: "%s"
+`, namespace, name, newField, newValue)))
+				if err != nil {
+					return err
+				}
+				return patcher.ExecuteOperations(operations)
+			},
+			shouldAdd,
+			shouldNotBeError,
+		},
+		{
+			"merge patch via stringified JSON in YAML spec",
+			func(patcher *ObjectPatcher) error {
+				operations, err := ParseOperations([]byte(fmt.Sprintf(`
+operation: MergePatch
+kind: ConfigMap
+namespace: %s
+name: %s
+mergePatch: |
+  {"data":{"%s":"%s"}}
+`, namespace, name, newField, newValue)))
+				if err != nil {
+					return err
+				}
+				return patcher.ExecuteOperations(operations)
+			},
+			shouldAdd,
 			shouldNotBeError,
 		},
 		{
@@ -307,6 +361,25 @@ jsonPatch:
 				return patcher.ExecuteOperations(operations)
 			},
 			shouldNotAdd,
+			shouldNotBeError,
+		},
+		{
+			"json patch via stringified JSON in YAML spec",
+			func(patcher *ObjectPatcher) error {
+				operations, err := ParseOperations([]byte(fmt.Sprintf(`
+operation: JSONPatch
+kind: ConfigMap
+namespace: %s
+name: %s
+jsonPatch: |
+  [{"op":"add", "path":"/data/%s", "value":"%s"}]
+`, namespace, name, newField, newValue)))
+				if err != nil {
+					return err
+				}
+				return patcher.ExecuteOperations(operations)
+			},
+			shouldAdd,
 			shouldNotBeError,
 		},
 		{
@@ -634,6 +707,67 @@ object:
 				}
 				return patcher.ExecuteOperations(operations)
 
+			},
+			shouldCreateNew,
+			shouldNotBeError,
+		},
+		{
+			"create new object via string in YAML spec",
+			func(patcher *ObjectPatcher) error {
+				operations, err := ParseOperations([]byte(fmt.Sprintf(`
+operation: Create
+object: |
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    namespace: %s
+    name: %s
+  data:
+    foo: bar
+`, namespace, newName)))
+				if err != nil {
+					return err
+				}
+				return patcher.ExecuteOperations(operations)
+
+			},
+			shouldCreateNew,
+			shouldNotBeError,
+		},
+		{
+			"create new object via stringified JSON in YAML spec",
+			func(patcher *ObjectPatcher) error {
+				operations, err := ParseOperations([]byte(fmt.Sprintf(`
+operation: Create
+object: |
+  {"apiVersion":"v1", "kind":"ConfigMap", "metadata": {
+    "namespace":"%s", "name":"%s"},
+  "data":{"foo":"bar"}}
+`, namespace, newName)))
+				if err != nil {
+					return err
+				}
+				return patcher.ExecuteOperations(operations)
+
+			},
+			shouldCreateNew,
+			shouldNotBeError,
+		},
+		{
+			"create new object via stringified JSON in JSON spec",
+			func(patcher *ObjectPatcher) error {
+				operations, err := ParseOperations([]byte(fmt.Sprintf(`
+{"operation": "Create",
+"object": "{
+  \"apiVersion\":\"v1\", \"kind\":\"ConfigMap\",
+  \"metadata\": {\"namespace\":\"%s\", \"name\":\"%s\"},
+  \"data\":{\"foo\":\"bar\"}}
+"}
+`, namespace, newName)))
+				if err != nil {
+					return err
+				}
+				return patcher.ExecuteOperations(operations)
 			},
 			shouldCreateNew,
 			shouldNotBeError,

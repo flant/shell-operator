@@ -18,7 +18,7 @@ The path to the file is found in the `$KUBERNETES_PATCH_PATH` environment variab
     * `Create` — will fail if an object already exists
     * `CreateIfNotExists` — create an object if such an object does not already
       exist by namespace/name.
-* `object` — full object specification including "apiVersion", "kind" and all necessary metadata.
+* `object` — full object specification including "apiVersion", "kind" and all necessary metadata. Can be a normal JSON or YAML object or a stringified JSON or YAML object.
 
 #### Example
 
@@ -74,6 +74,25 @@ The path to the file is found in the `$KUBERNETES_PATCH_PATH` environment variab
     }
   }
 }
+```
+
+```yaml
+operation: Create
+object:
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    namespace: default
+    name: testcm
+  data: ...
+```
+
+```yaml
+operation: Create
+object: |
+  {"apiVersion":"v1", "kind":"ConfigMap",
+   "metadata":{"namespace":"default","name":"testcm"},
+   "data":{"foo": "bar"}}
 ```
 
 ### Delete
@@ -141,8 +160,9 @@ More info [here](https://github.com/kubernetes/community/blob/master/contributor
 * `kind` — object's Kind.
 * `namespace` — object's Namespace. If empty, implies operation on a Cluster-level resource.
 * `name` — object's name.
-* `mergePatch` — describes transformations to perform on an object.
+* `mergePatch` — describes transformations to perform on an object. Can be a normal JSON or YAML object or a stringified JSON or YAML object.
 * `subresource` — e.g., `status`.
+* `ignoreMissingObject` — set to true to ignore error when patching non existent object.
 
 ##### Example
 
@@ -160,6 +180,17 @@ More info [here](https://github.com/kubernetes/community/blob/master/contributor
 }
 ```
 
+```yaml
+operation: MergePatch
+kind: Deployment
+namespace: default
+name: nginx
+ignoreMissingObject: true
+mergePatch: |
+  spec:
+    replicas: 1
+```
+
 #### JSONPatch
 
 * `operation` — specifies an operation's type.
@@ -168,8 +199,9 @@ More info [here](https://github.com/kubernetes/community/blob/master/contributor
 * `kind` — object's Kind.
 * `namespace` — object's Namespace. If empty, implies operation on a Cluster-level resource.
 * `name` — object's name.
-* `jsonPatch` — describes transformations to perform on an object.
+* `jsonPatch` — describes transformations to perform on an object. Can be a normal JSON or YAML array or a stringified JSON or YAML array.
 * `subresource` — a subresource name if subresource is to be transformed. For example, `status`.
+* `ignoreMissingObject` — set to true to ignore error when patching non existent object.
 
 ##### Example
 
@@ -184,3 +216,16 @@ More info [here](https://github.com/kubernetes/community/blob/master/contributor
   ]
 }
 ```
+
+```json
+{
+  "operation": "JSONPatch",
+  "kind": "Deployment",
+  "namespace": "default",
+  "name": "nginx",
+  "jsonPatch": "[
+    {\"op\": \"replace\", \"path\":  \"/spec/replicas\", \"value\":  1}
+  ]"
+}
+```
+

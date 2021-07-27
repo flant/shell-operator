@@ -89,24 +89,24 @@ func (u *updateIfExists) applyToCreate(operation *createOperation) {
 }
 
 type deletePropogation struct {
-	propogation metav1.DeletionPropagation
+	propagation metav1.DeletionPropagation
 }
 
 func (d *deletePropogation) applyToDelete(operation *deleteOperation) {
-	operation.deletionPropagation = d.propogation
+	operation.deletionPropagation = d.propagation
 }
 
 // InForeground is a default propagation option for Delete
 func InForeground() DeleteOption {
-	return &deletePropogation{propogation: metav1.DeletePropagationForeground}
+	return &deletePropogation{propagation: metav1.DeletePropagationForeground}
 }
 
 // InBackground is a propagation option for Delete
 func InBackground() DeleteOption {
-	return &deletePropogation{propogation: metav1.DeletePropagationBackground}
+	return &deletePropogation{propagation: metav1.DeletePropagationBackground}
 }
 
 // NonCascading is a propagation option for Delete
 func NonCascading() DeleteOption {
-	return &deletePropogation{propogation: metav1.DeletePropagationOrphan}
+	return &deletePropogation{propagation: metav1.DeletePropagationOrphan}
 }
