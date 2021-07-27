@@ -4,13 +4,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type patchCollector struct {
+type PatchCollector struct {
 	patchOperations []Operation
 }
 
 // NewPatchCollector creates Operation collector to use within Go hooks.
-func NewPatchCollector() *patchCollector {
-	return &patchCollector{
+func NewPatchCollector() *PatchCollector {
+	return &PatchCollector{
 		patchOperations: make([]Operation, 0),
 	}
 }
@@ -21,7 +21,7 @@ func NewPatchCollector() *patchCollector {
 //   - WithSubresource - create a specified subresource
 //   - IgnoreIfExists - do not return error if the specified object exists
 //   - UpdateIfExists - call Update if the specified object exists
-func (dop *patchCollector) Create(object interface{}, options ...CreateOption) {
+func (dop *PatchCollector) Create(object interface{}, options ...CreateOption) {
 	dop.add(NewCreateOperation(object, options...))
 }
 
@@ -34,7 +34,7 @@ func (dop *patchCollector) Create(object interface{}, options ...CreateOption) {
 //   - NonCascading - remove object, dependants become orphan
 //
 // Missing object is ignored by default.
-func (dop *patchCollector) Delete(apiVersion, kind, namespace, name string, options ...DeleteOption) {
+func (dop *PatchCollector) Delete(apiVersion, kind, namespace, name string, options ...DeleteOption) {
 	dop.add(NewDeleteOperation(apiVersion, kind, namespace, name, options...))
 }
 
@@ -43,7 +43,7 @@ func (dop *patchCollector) Delete(apiVersion, kind, namespace, name string, opti
 // Options:
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
-func (dop *patchCollector) MergePatch(mergePatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) {
+func (dop *PatchCollector) MergePatch(mergePatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) {
 	dop.add(NewMergePatchOperation(mergePatch, apiVersion, kind, namespace, name, options...))
 }
 
@@ -52,7 +52,7 @@ func (dop *patchCollector) MergePatch(mergePatch interface{}, apiVersion, kind, 
 // Options:
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
-func (dop *patchCollector) JSONPatch(jsonPatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) {
+func (dop *PatchCollector) JSONPatch(jsonPatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) {
 	dop.add(NewJSONPatchOperation(jsonPatch, apiVersion, kind, namespace, name, options...))
 }
 
@@ -62,7 +62,7 @@ func (dop *patchCollector) JSONPatch(jsonPatch interface{}, apiVersion, kind, na
 // Options:
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
-func (dop *patchCollector) Filter(
+func (dop *PatchCollector) Filter(
 	filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error),
 	apiVersion, kind, namespace, name string, options ...FilterOption,
 ) {
@@ -70,10 +70,10 @@ func (dop *patchCollector) Filter(
 }
 
 // Operations returns all collected operations
-func (dop *patchCollector) Operations() []Operation {
+func (dop *PatchCollector) Operations() []Operation {
 	return dop.patchOperations
 }
 
-func (dop *patchCollector) add(operation Operation) {
+func (dop *PatchCollector) add(operation Operation) {
 	dop.patchOperations = append(dop.patchOperations, operation)
 }
