@@ -2,90 +2,111 @@ package object_patch
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/types"
 )
 
-type OperationOption func(operation *Operation)
+type CreateOption interface {
+	applyToCreate(operation *createOperation)
+}
+
+type DeleteOption interface {
+	applyToDelete(operation *deleteOperation)
+}
+
+type PatchOption interface {
+	applyToPatch(operation *patchOperation)
+}
+
+type FilterOption interface {
+	applyToFilter(operation *filterOperation)
+}
+
+type subresourceHolder struct {
+	subresource string
+}
 
 // WithSubresource options specifies a subresource to operate on.
-func WithSubresource(subresource string) OperationOption {
-	return func(operation *Operation) {
-		operation.subresource = subresource
-	}
+func WithSubresource(s string) *subresourceHolder {
+	return &subresourceHolder{subresource: s}
+}
+func (s *subresourceHolder) applyToCreate(operation *createOperation) {
+	operation.subresource = s.subresource
+}
+func (s *subresourceHolder) applyToDelete(operation *deleteOperation) {
+	operation.subresource = s.subresource
+}
+func (s *subresourceHolder) applyToPatch(operation *patchOperation) {
+	operation.subresource = s.subresource
+}
+func (s *subresourceHolder) applyToFilter(operation *filterOperation) {
+	operation.subresource = s.subresource
 }
 
-func UseFilterFunc(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error)) OperationOption {
-	return func(operation *Operation) {
-		operation.filterFunc = filterFunc
-	}
+type ignoreMissingObject struct {
+	ignore bool
 }
 
-func UseJQPatch(jqPatch string) OperationOption {
-	return func(operation *Operation) {
-		operation.filterFunc = func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-			return applyJQPatch(jqPatch, obj)
-		}
-	}
+// IgnoreMissingObject do not return error if object exists for Patch and Filter operations.
+func IgnoreMissingObject() *ignoreMissingObject {
+	return WithIgnoreMissingObject(true)
 }
 
-func UseMergePatch(patch []byte) OperationOption {
-	return func(operation *Operation) {
-		operation.patch = patch
-		operation.patchType = types.MergePatchType
-	}
+func WithIgnoreMissingObject(ignore bool) *ignoreMissingObject {
+	return &ignoreMissingObject{ignore: ignore}
 }
 
-func UseJSONPatch(patch []byte) OperationOption {
-	return func(operation *Operation) {
-		operation.patch = patch
-		operation.patchType = types.JSONPatchType
-	}
+func (i *ignoreMissingObject) applyToPatch(operation *patchOperation) {
+	operation.ignoreMissingObject = i.ignore
 }
 
-func IgnoreMissingObject() OperationOption {
-	return func(operation *Operation) {
-		operation.ignoreMissingObject = true
-	}
+func (i *ignoreMissingObject) applyToFilter(operation *filterOperation) {
+	operation.ignoreMissingObject = i.ignore
 }
 
-func WithIgnoreMissingObject(ignore bool) OperationOption {
-	return func(operation *Operation) {
-		operation.ignoreMissingObject = ignore
-	}
+type ignoreIfExists struct {
+	ignore bool
 }
 
 // IgnoreIfExists is an option for Create to not return error if object is already exists.
-func IgnoreIfExists() OperationOption {
-	return func(operation *Operation) {
-		operation.ignoreIfExists = true
-	}
+func IgnoreIfExists() CreateOption {
+	return &ignoreIfExists{ignore: true}
+}
+
+func (i *ignoreIfExists) applyToCreate(operation *createOperation) {
+	operation.ignoreIfExists = i.ignore
+}
+
+type updateIfExists struct {
+	update bool
 }
 
 // UpdateIfExists is an option for Create to update object if it already exists.
-func UpdateIfExists() OperationOption {
-	return func(operation *Operation) {
-		operation.updateIfExists = true
-	}
+func UpdateIfExists() CreateOption {
+	return &updateIfExists{update: true}
+}
+
+func (u *updateIfExists) applyToCreate(operation *createOperation) {
+	operation.updateIfExists = u.update
+}
+
+type deletePropogation struct {
+	propogation metav1.DeletionPropagation
+}
+
+func (d *deletePropogation) applyToDelete(operation *deleteOperation) {
+	operation.deletionPropagation = d.propogation
 }
 
 // InForeground is a default propagation option for Delete
-func InForeground() OperationOption {
-	return func(operation *Operation) {
-		operation.deletionPropagation = metav1.DeletePropagationForeground
-	}
+func InForeground() DeleteOption {
+	return &deletePropogation{propogation: metav1.DeletePropagationForeground}
 }
 
 // InBackground is a propagation option for Delete
-func InBackground() OperationOption {
-	return func(operation *Operation) {
-		operation.deletionPropagation = metav1.DeletePropagationBackground
-	}
+func InBackground() DeleteOption {
+	return &deletePropogation{propogation: metav1.DeletePropagationBackground}
 }
 
 // NonCascading is a propagation option for Delete
-func NonCascading() OperationOption {
-	return func(operation *Operation) {
-		operation.deletionPropagation = metav1.DeletePropagationOrphan
-	}
+func NonCascading() DeleteOption {
+	return &deletePropogation{propogation: metav1.DeletePropagationOrphan}
 }

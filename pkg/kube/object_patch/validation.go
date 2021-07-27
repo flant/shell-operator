@@ -87,21 +87,30 @@ oneOf:
   - "$ref": "#/definitions/delete"
 - allOf:
   - oneOf:
-    - properties:
+    - required:
+      - operation
+      - jqFilter
+      properties:
         operation:
           type: string
           enum: ["JQPatch"]
         jqFilter:
           type: string
           minimum: 1
-    - properties:
+    - required:
+      - operation
+      - mergePatch
+      properties:
         operation:
           type: string
           enum: ["MergePatch"]
         mergePatch:
           type: object
           minProperties: 1
-    - properties:
+    - required:
+      - operation
+      - jsonPatch
+      properties:
         operation:
           type: string
           enum: ["JSONPatch"]

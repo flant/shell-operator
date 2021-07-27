@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -40,7 +39,7 @@ func NewObjectPatcher(kubeClient KubeClient) *ObjectPatcher {
 	}
 }
 
-func (o *ObjectPatcher) ExecuteOperations(ops []*Operation) error {
+func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
 	log.Debug("Starting execute operations process")
 	defer log.Debug("Finished execute operations process")
 
@@ -48,7 +47,7 @@ func (o *ObjectPatcher) ExecuteOperations(ops []*Operation) error {
 	for _, op := range ops {
 		log.Debugf("Applying operation: %s", op.Description())
 
-		// TODO remove after test in deckhouse-oss
+		// TODO remove after successful tests in deckhouse-oss
 		//if spec.Kind != "" && spec.ApiVersion == "" {
 		//	res, err := o.kubeClient.APIResource(spec.ApiVersion, spec.Kind)
 		//	if err != nil {
@@ -67,20 +66,20 @@ func (o *ObjectPatcher) ExecuteOperations(ops []*Operation) error {
 	return applyErrors.ErrorOrNil()
 }
 
-func (o *ObjectPatcher) ExecuteOperation(operation *Operation) error {
+func (o *ObjectPatcher) ExecuteOperation(operation Operation) error {
 	if operation == nil {
 		return nil
 	}
 
-	switch true {
-	case operation.isCreate():
-		return o.executeCreateOperation(operation)
-	case operation.isDelete():
-		return o.executeDeleteOperation(operation)
-	case operation.isPatch():
-		return o.executePatchOperation(operation)
-	case operation.isDelete():
-		return o.executeFilterOperation(operation)
+	switch v := operation.(type) {
+	case *createOperation:
+		return o.executeCreateOperation(v)
+	case *deleteOperation:
+		return o.executeDeleteOperation(v)
+	case *patchOperation:
+		return o.executePatchOperation(v)
+	case *filterOperation:
+		return o.executeFilterOperation(v)
 	}
 
 	return nil
@@ -95,132 +94,17 @@ func (o *ObjectPatcher) ExecuteOperation(operation *Operation) error {
 // - NonCascading - remove object, dependants become orphan
 //
 // Missing object is ignored by default.
-//func (o *ObjectPatcher) Delete(apiVersion, kind, namespace, name string, options ... PatcherOption) error {
-//	log.Debug("Started Delete")
-//	defer log.Debug("Finished Delete")
-//
-//	action := &patcherAction{
-//		apiVersion: apiVersion,
-//		kind: kind,
-//		namespace: namespace,
-//		name: name,
-//		deletionPropagation: metav1.DeletePropagationForeground,
-//	}
-//
-//	for _, option := range options {
-//		option(action)
-//	}
-//
-//	return o.deleteObject(action)
-//}
 
-//func (o *ObjectPatcher) CreateObject(object *unstructured.Unstructured, subresource string, options ... PatcherOption) error {
-//	log.Debug("Started Create")
-//	defer log.Debug("Finished Create")
-//
-//	if object == nil {
-//		return fmt.Errorf("cannot create empty object")
-//	}
-//
-//	apiVersion := object.GetAPIVersion()
-//	kind := object.GetKind()
-//
-//	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
-//	if err != nil {
-//		return err
-//	}
-//
-//	log.Debug("Started Create API call")
-//	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(subresource)...)
-//	log.Debug("Finished Create API call")
-//
-//	return err
-//}
-//
-//func (o *ObjectPatcher) CreateObjectIfNotExists(object *unstructured.Unstructured, subresource string) error {
-//	log.Debug("Started CreateObjectIfNotExists")
-//	defer log.Debug("Finished CreateObjectIfNotExists")
-//
-//	if object == nil {
-//		return fmt.Errorf("cannot create empty object")
-//	}
-//
-//	apiVersion := object.GetAPIVersion()
-//	kind := object.GetKind()
-//
-//	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
-//	if err != nil {
-//		return err
-//	}
-//
-//	log.Debug("Started Create API call")
-//	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(subresource)...)
-//	log.Debug("Finished Create API call")
-//
-//	if errors.IsAlreadyExists(err) {
-//		log.Debug("resource already exists, exiting without error")
-//		return nil
-//	}
-//
-//	return err
-//}
-//
-//func (o *ObjectPatcher) CreateOrUpdateObject(object *unstructured.Unstructured, subresource string) error {
-//	log.Debug("Started CreateOrUpdate")
-//	defer log.Debug("Finished CreateOrUpdate")
-//
-//	if object == nil {
-//		return fmt.Errorf("cannot create empty object")
-//	}
-//
-//	apiVersion := object.GetAPIVersion()
-//	kind := object.GetKind()
-//
-//	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
-//	if err != nil {
-//		return err
-//	}
-//
-//	log.Debug("Started Create API call")
-//	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(subresource)...)
-//	log.Debug("Finished Create API call")
-//
-//	if errors.IsAlreadyExists(err) {
-//		log.Debug("Object already exists, attempting to Update it with optimistic lock")
-//
-//		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-//			log.Debug("Started Get API call")
-//			existingObj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Get(context.TODO(), object.GetName(), metav1.GetOptions{}, generateSubresources(subresource)...)
-//			log.Debug("Finished Get API call")
-//			if err != nil {
-//				return err
-//			}
-//
-//			objCopy := object.DeepCopy()
-//			objCopy.SetResourceVersion(existingObj.GetResourceVersion())
-//
-//			log.Debug("Started Update API call")
-//			_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(objCopy.GetNamespace()).Update(context.TODO(), objCopy, metav1.UpdateOptions{}, generateSubresources(subresource)...)
-//			log.Debug("Finished Update API call")
-//			return err
-//		})
-//	}
-//
-//	return err
-//}
-
-func (o *ObjectPatcher) executeCreateOperation(op *Operation) error {
+func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 	if op.object == nil {
 		return fmt.Errorf("cannot create empty object")
 	}
 
 	// Convert object from interface{}.
-
-	objectContent, err := runtime.DefaultUnstructuredConverter.ToUnstructured(op.object)
+	object, err := toUnstructured(op.object)
 	if err != nil {
-		return fmt.Errorf("convert to unstructured: %v", err)
+		return err
 	}
-	object := &unstructured.Unstructured{Object: objectContent}
 
 	apiVersion := object.GetAPIVersion()
 	kind := object.GetKind()
@@ -269,34 +153,6 @@ func (o *ObjectPatcher) executeCreateOperation(op *Operation) error {
 	return nil
 }
 
-//// FilterObject
-//// Deprecated: use Patch with options.
-//func (o *ObjectPatcher) FilterObject(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error),
-//	apiVersion, kind, namespace, name, subresource string) error {
-//
-//	log.Debug("Started FilterObject")
-//	defer log.Debug("Finished FilterObject")
-//
-//	return o.executeFilterOperation(NewFilterPatchOperation(filterFunc, apiVersion, kind, namespace, name,
-//		WithSubresource(subresource),
-//	))
-//}
-
-//// JQPatchObject
-//// Deprecated: use Patch with options.
-//func (o *ObjectPatcher) JQPatchObject(jqPatch, apiVersion, kind, namespace, name, subresource string) error {
-//	log.Debug("Started JQPatchObject")
-//	defer log.Debug("Finished JQPatchObject")
-//
-//	return o.Patch(apiVersion, kind, namespace, name,
-//		WithSubresource(subresource),
-//		UseJQPatch(jqPatch),
-//	)
-//}
-
-// - UseJQPatch(jqFilter) — use Get and Update API calls to modify object with the jq expression.
-// - UseFilterFunc(func) — use Get and Update API calls to modify object with the custom function.
-
 // executePatchOperation applies a patch to the specified object using API call Patch.
 //
 // There 2 types of patches:
@@ -306,7 +162,7 @@ func (o *ObjectPatcher) executeCreateOperation(op *Operation) error {
 // Other options:
 // - WithSubresource — a subresource argument for Patch or Update API call.
 // - IgnoreMissingObject — do not return error if the specified object is missing.
-func (o *ObjectPatcher) executePatchOperation(op *Operation) error {
+func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 	if op.patchType == types.MergePatchType {
 		log.Debug("Started MergePatchObject")
 		defer log.Debug("Finished MergePatchObject")
@@ -354,7 +210,7 @@ func (o *ObjectPatcher) executePatchOperation(op *Operation) error {
 
 // executeFilterOperation retrieves a specified object, modified it with
 // filterFunc and calls update.
-func (o *ObjectPatcher) executeFilterOperation(op *Operation) error {
+func (o *ObjectPatcher) executeFilterOperation(op *filterOperation) error {
 	var err error
 
 	if op.filterFunc == nil {
@@ -407,39 +263,7 @@ func (o *ObjectPatcher) executeFilterOperation(op *Operation) error {
 	return err
 }
 
-//// DeleteObject
-//// Deprecated: use DeleteObject with options.
-//func (o *ObjectPatcher) DeleteObject(apiVersion, kind, namespace, name, subresource string) error {
-//	log.Debug("Started DeleteObject")
-//	defer log.Debug("Finished DeleteObject")
-//
-//	return o.Delete(apiVersion, kind, namespace, name,
-//		WithSubresource(subresource))
-//}
-//
-//// DeleteObjectInBackground
-//// Deprecated: use DeleteObject with options.
-//func (o *ObjectPatcher) DeleteObjectInBackground(apiVersion, kind, namespace, name, subresource string) error {
-//	log.Debug("Started DeleteObjectInBackground")
-//	defer log.Debug("Finished DeleteObjectInBackground")
-//
-//	return o.Delete(apiVersion, kind, namespace, name,
-//		WithSubresource(subresource),
-//		InBackground())
-//}
-//
-//// DeleteObjectNonCascading
-//// Deprecated: use DeleteObject with options.
-//func (o *ObjectPatcher) DeleteObjectNonCascading(apiVersion, kind, namespace, name, subresource string) error {
-//	log.Debug("Started DeleteObjectNonCascading")
-//	defer log.Debug("Finished DeleteObjectNonCascading")
-//
-//	return o.Delete(apiVersion, kind, namespace, name,
-//		WithSubresource(subresource),
-//		NonCascading())
-//}
-
-func (o *ObjectPatcher) executeDeleteOperation(op *Operation) error {
+func (o *ObjectPatcher) executeDeleteOperation(op *deleteOperation) error {
 	gvk, err := o.kubeClient.GroupVersionResource(op.apiVersion, op.kind)
 	if err != nil {
 		return err

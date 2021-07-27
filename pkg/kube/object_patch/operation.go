@@ -43,7 +43,7 @@ const (
 	JSONPatch  OperationType = "JSONPatch"
 )
 
-func ParseOperations(specBytes []byte) ([]*Operation, error) {
+func ParseOperations(specBytes []byte) ([]Operation, error) {
 	log.Debugf("parsing patcher operations:\n%s", specBytes)
 
 	specs, err := unmarshalFromJSONOrYAML(specBytes)
@@ -52,7 +52,7 @@ func ParseOperations(specBytes []byte) ([]*Operation, error) {
 	}
 
 	var validationErrors = &multierror.Error{}
-	var ops = make([]*Operation, 0)
+	var ops = make([]Operation, 0)
 	for _, spec := range specs {
 		err = ValidateOperationSpec(spec, GetSchema("v0"), "")
 		if err != nil {
@@ -65,12 +65,44 @@ func ParseOperations(specBytes []byte) ([]*Operation, error) {
 	return ops, validationErrors.ErrorOrNil()
 }
 
-// operation is a command for ObjectPatcher. There are 4 types of command:
-// - create(update) object. object field must be set.
-// - delete object. deletionPropagation should be set.
-// - patch object with API call Patch. patchType should be set.
-// - filter object. filterFunc should be set.
-type Operation struct {
+// Operation is a command for ObjectPatcher. There are 4 types of command:
+// - createOperation to create or update object via Create and Update API calls. Unstructured, map[string]interface{} or runtime.Object is required.
+// - deleteOperation to delete object via Delete API call. deletionPropagation should be set, default is Foregound.
+// - patchOperation to modify object via Patch API call. patchType should be set. patch can be string, []byte or map[string]interface{}
+// - filterOperation to modify object via Get-filter-Update process. filterFunc should be set.
+type Operation interface {
+	Description() string
+}
+
+type createOperation struct {
+	object      interface{}
+	subresource string
+
+	ignoreIfExists bool
+	updateIfExists bool
+}
+
+func (op *createOperation) Description() string {
+	return "Create object"
+}
+
+type deleteOperation struct {
+	// Object coordinates.
+	apiVersion  string
+	kind        string
+	namespace   string
+	name        string
+	subresource string
+
+	// Delete options.
+	deletionPropagation metav1.DeletionPropagation
+}
+
+func (op *deleteOperation) Description() string {
+	return fmt.Sprintf("Delete object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
+}
+
+type patchOperation struct {
 	// Object coordinates for patch and delete.
 	apiVersion  string
 	kind        string
@@ -78,62 +110,34 @@ type Operation struct {
 	name        string
 	subresource string
 
-	// Create options.
-	object         interface{}
-	ignoreIfExists bool
-	updateIfExists bool
-
 	// Patch options.
-	filterFunc          func(*unstructured.Unstructured) (*unstructured.Unstructured, error)
 	patchType           types.PatchType
 	patch               interface{}
 	ignoreMissingObject bool
-
-	// Delete options.
-	deletionPropagation metav1.DeletionPropagation
 }
 
-func (op *Operation) applyOptions(options ...OperationOption) {
-	for _, option := range options {
-		option(op)
-	}
+func (op *patchOperation) Description() string {
+	return fmt.Sprintf("Patch object %s/%s/%s/%s using %s patch", op.apiVersion, op.kind, op.namespace, op.name, op.patchType)
 }
 
-func (op *Operation) isCreate() bool {
-	return op.object != nil
+type filterOperation struct {
+	// Object coordinates for patch and delete.
+	apiVersion  string
+	kind        string
+	namespace   string
+	name        string
+	subresource string
+
+	// Patch options.
+	filterFunc          func(*unstructured.Unstructured) (*unstructured.Unstructured, error)
+	ignoreMissingObject bool
 }
 
-func (op *Operation) isDelete() bool {
-	return op.deletionPropagation != ""
+func (op *filterOperation) Description() string {
+	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
 }
 
-func (op *Operation) isPatch() bool {
-	return op.patchType != ""
-}
-
-func (op *Operation) isFilter() bool {
-	return op.filterFunc != nil
-}
-
-func (op *Operation) Description() string {
-	if op.isCreate() {
-		return "Create object"
-	}
-	if op.isDelete() {
-		return fmt.Sprintf("Delete object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
-	}
-	if op.isPatch() {
-		return fmt.Sprintf("Patch object %s/%s/%s/%s using %s patch", op.apiVersion, op.kind, op.namespace, op.name, op.patchType)
-	}
-	if op.isFilter() {
-		return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
-	}
-	return "Unknown operation"
-}
-
-//		operationError = o.Create(&unstructured.Unstructured{Object: spec.Object},
-
-func NewFromOperationSpec(spec OperationSpec) *Operation {
+func NewFromOperationSpec(spec OperationSpec) Operation {
 	switch spec.Operation {
 	case Create:
 		return NewCreateOperation(spec.Object,
@@ -158,9 +162,10 @@ func NewFromOperationSpec(spec OperationSpec) *Operation {
 			WithSubresource(spec.Subresource),
 			NonCascading())
 	case JQPatch:
-		return NewFilterPatchOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-			return applyJQPatch(spec.JQFilter, u)
-		},
+		return NewFilterPatchOperation(
+			func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+				return applyJQPatch(spec.JQFilter, u)
+			},
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
 			WithIgnoreMissingObject(spec.IgnoreMissingObject),
@@ -171,51 +176,44 @@ func NewFromOperationSpec(spec OperationSpec) *Operation {
 			WithSubresource(spec.Subresource),
 			WithIgnoreMissingObject(spec.IgnoreMissingObject),
 		)
-		//mergePatch, err := json.Marshal(spec.MergePatch)
-		//if err != nil {
-		//	applyErrors = multierror.Append(applyErrors, err)
-		//	continue
-		//}
-		//operationError = o.Patch(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-		//	WithSubresource(spec.Subresource),
-		//	UseMergePatch(mergePatch),
-		//	WithIgnoreMissingObject(spec.IgnoreMissingObject),
-		//)
 	case JSONPatch:
 		return NewJSONPatchOperation(spec.JSONPatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
 			WithIgnoreMissingObject(spec.IgnoreMissingObject),
 		)
-		//jsonPatch, err := json.Marshal(spec.JSONPatch)
 	}
 
 	// Should not be reached!
 	return nil
 }
 
-func NewCreateOperation(obj interface{}, options ...OperationOption) *Operation {
-	op := &Operation{
+func NewCreateOperation(obj interface{}, options ...CreateOption) Operation {
+	op := &createOperation{
 		object: obj,
 	}
-	op.applyOptions(options...)
+	for _, option := range options {
+		option.applyToCreate(op)
+	}
 	return op
 }
 
-func NewDeleteOperation(apiVersion, kind, namespace, name string, options ...OperationOption) *Operation {
-	op := &Operation{
+func NewDeleteOperation(apiVersion, kind, namespace, name string, options ...DeleteOption) Operation {
+	op := &deleteOperation{
 		apiVersion:          apiVersion,
 		kind:                kind,
 		namespace:           namespace,
 		name:                name,
 		deletionPropagation: metav1.DeletePropagationForeground,
 	}
-	op.applyOptions(options...)
+	for _, option := range options {
+		option.applyToDelete(op)
+	}
 	return op
 }
 
-func NewMergePatchOperation(mergePatch interface{}, apiVersion, kind, namespace, name string, options ...OperationOption) *Operation {
-	op := &Operation{
+func NewMergePatchOperation(mergePatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) Operation {
+	op := &patchOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
 		namespace:  namespace,
@@ -223,12 +221,14 @@ func NewMergePatchOperation(mergePatch interface{}, apiVersion, kind, namespace,
 		patch:      mergePatch,
 		patchType:  types.MergePatchType,
 	}
-	op.applyOptions(options...)
+	for _, option := range options {
+		option.applyToPatch(op)
+	}
 	return op
 }
 
-func NewJSONPatchOperation(jsonPatch interface{}, apiVersion, kind, namespace, name string, options ...OperationOption) *Operation {
-	op := &Operation{
+func NewJSONPatchOperation(jsonPatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) Operation {
+	op := &patchOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
 		namespace:  namespace,
@@ -236,18 +236,22 @@ func NewJSONPatchOperation(jsonPatch interface{}, apiVersion, kind, namespace, n
 		patch:      jsonPatch,
 		patchType:  types.JSONPatchType,
 	}
-	op.applyOptions(options...)
+	for _, option := range options {
+		option.applyToPatch(op)
+	}
 	return op
 }
 
-func NewFilterPatchOperation(filter func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, options ...OperationOption) *Operation {
-	op := &Operation{
+func NewFilterPatchOperation(filter func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, options ...FilterOption) Operation {
+	op := &filterOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
 		namespace:  namespace,
 		name:       name,
 		filterFunc: filter,
 	}
-	op.applyOptions(options...)
+	for _, option := range options {
+		option.applyToFilter(op)
+	}
 	return op
 }

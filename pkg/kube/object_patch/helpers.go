@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/flant/kube-client/manifest"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/jq"
@@ -89,4 +91,29 @@ func generateSubresources(subresource string) (ret []string) {
 	}
 
 	return
+}
+
+func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
+	switch v := obj.(type) {
+	case []byte:
+		mft, err := manifest.NewFromYAML(string(v))
+		if err != nil {
+			return nil, err
+		}
+		return mft.Unstructured(), nil
+	case string:
+		mft, err := manifest.NewFromYAML(v)
+		if err != nil {
+			return nil, err
+		}
+		return mft.Unstructured(), nil
+	case map[string]interface{}:
+		return &unstructured.Unstructured{Object: v}, nil
+	default:
+		objectContent, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+		if err != nil {
+			return nil, fmt.Errorf("convert to unstructured: %v", err)
+		}
+		return &unstructured.Unstructured{Object: objectContent}, nil
+	}
 }
