@@ -523,7 +523,7 @@ configVersion: v1
 schedule:
 - name: periodic-checking
   crontab: "0 */3 * * *"
-  includeSnapshotsFrom: ["monitor-pods", "cm"]
+  includeSnapshotsFrom: ["monitor-pods", "configmap-content"]
 kubernetes:
 - name: configmap-content
   kind: ConfigMap
@@ -534,7 +534,7 @@ kubernetes:
 - name: monitor-pods
   kind: Pod
   jqFilter: '.metadata.labels'
-  includeSnapshotsFrom: ["cm"]
+  includeSnapshotsFrom: ["configmap-content"]
 ```
 
 This hook will not be executed for events related to the binding "configmap-content". `executeHookOnSynchronization: false` accompanied by `executeHookOnEvent: []` defines a "snapshot-only" binding. This is one of the techniques to reduce the number of `kubectl` invocations.
