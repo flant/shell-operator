@@ -95,3 +95,11 @@ jobs:
               --platform $BUILDX_PLATFORMS \
               --build-arg appVersion=$APP_VERSION \
               --tag $FINAL_IMAGE_NAME .
+
+      - name: Inspect binaries
+        run: |
+          while read digest platform ; do
+            echo "Inspect image for platform=${platform}"
+            docker run --rm --platform ${platform} --entrypoint sh $FINAL_IMAGE_NAME@${digest} -c \
+              'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'
+          done <<< $(docker buildx imagetools inspect $FINAL_IMAGE_NAME --raw | jq '.manifests[] | .digest + " " + .platform.os +"/"+.platform.architecture' -r)
