@@ -449,7 +449,13 @@ func (ei *resourceInformer) Start() {
 		close(stopCh)
 	}()
 
-	ei.SharedInformer.Run(stopCh)
+	go ei.SharedInformer.Run(stopCh)
+
+	if ok := cache.WaitForCacheSync(stopCh, ei.SharedInformer.HasSynced); !ok {
+		ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
+	}
+
+	log.Debugf("%s: informer is ready", ei.Monitor.Metadata.DebugName)
 }
 
 func (ei *resourceInformer) Stop() {

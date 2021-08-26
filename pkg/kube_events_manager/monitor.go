@@ -149,7 +149,7 @@ func (m *monitor) CreateInformers() error {
 
 				for _, informer := range m.VaryingInformers[nsName] {
 					informer.WithContext(ctx)
-					go informer.Start()
+					informer.Start()
 				}
 			},
 			func(nsName string) {
@@ -268,7 +268,7 @@ func (m *monitor) Start(parentCtx context.Context) {
 
 	for _, informer := range m.ResourceInformers {
 		informer.WithContext(m.ctx)
-		go informer.Start()
+		informer.Start()
 	}
 
 	for nsName := range m.VaryingInformers {
@@ -276,13 +276,13 @@ func (m *monitor) Start(parentCtx context.Context) {
 		ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
 		for _, informer := range m.VaryingInformers[nsName] {
 			informer.WithContext(ctx)
-			go informer.Start()
+			informer.Start()
 		}
 	}
 
 	if m.NamespaceInformer != nil {
 		m.NamespaceInformer.WithContext(m.ctx)
-		go m.NamespaceInformer.Start()
+		m.NamespaceInformer.Start()
 	}
 }
 
