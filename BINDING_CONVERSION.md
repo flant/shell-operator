@@ -161,6 +161,8 @@ Error from server: conversion webhook for unstable.crontab.io/v1beta1, Kind=Cron
 
 Empty or invalid $CONVERSION_RESPONSE_PATH file is considered as a fail with a short message about the problem and a more verbose error in the log.
 
+> Note: kube-apiserver applies OpenAPI spec to the object returned by webhook. It can cause removing unknown fields without notifying a user.
+
 ## HTTP server and Kubernetes configuration
 
 Shell-operator should create an HTTP endpoint with TLS support and register an endpoint in the CustomResourceDefinition resource.
