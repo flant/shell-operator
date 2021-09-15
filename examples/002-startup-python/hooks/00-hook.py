@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 
 if __name__ == "__main__":
     if len(sys.argv)>1 and sys.argv[1] == "--config":
-        print '{"configVersion":"v1", "onStartup": 10}'
+        print('{"configVersion":"v1", "onStartup": 10}')
     else:
-        print "OnStartup Python powered hook"
+        print("OnStartup Python powered hook")
