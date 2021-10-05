@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.event.label.id == 1838578615 # ':robot: run e2e matrix' label
     steps:
-      - uses: actions/github-script@v4.1
+      - uses: actions/github-script@v5
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
