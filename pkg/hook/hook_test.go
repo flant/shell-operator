@@ -52,7 +52,7 @@ func Test_Hook_WithConfig(t *testing.T) {
 			`{"configVersion":"v1", "onStartup": "10"}`,
 			func() {
 				g.Expect(err).Should(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("onStartup must be of type integer: \"string\""))
+				g.Expect(err.Error()).To(MatchRegexp("onStartup .*must be of type integer: \"string\""))
 
 				//t.Logf("expected validation error was: %v", err)
 			},

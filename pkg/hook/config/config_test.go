@@ -948,7 +948,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
             }`,
 			func() {
 				g.Expect(err).Should(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("kubernetes.watchEvent must be of type array: \"string\""))
+				g.Expect(err.Error()).To(MatchRegexp("kubernetes.watchEvent .*must be of type array: \"string\""))
 			},
 		},
 		{
@@ -967,7 +967,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
             }`,
 			func() {
 				g.Expect(err).Should(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("kubernetes.nameSelector.matchNames must be of type string: \"number\""))
+				g.Expect(err.Error()).To(MatchRegexp("kubernetes.nameSelector.matchNames .*must be of type string: \"number\""))
 			},
 		},
 		{

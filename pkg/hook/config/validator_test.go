@@ -37,9 +37,9 @@ func Test_Validate_V1_With_Error(t *testing.T) {
 				g.Expect(err).Should(HaveOccurred())
 				g.Expect(err).To(BeAssignableToTypeOf(&multierror.Error{}))
 				g.Expect(err.(*multierror.Error).Error()).Should(And(
-					ContainSubstring("configVrsion is a forbidden property"),
-					ContainSubstring("qwdqwd is a forbidden property"),
-					ContainSubstring("schedule must be of type array"),
+					MatchRegexp("configVrsion .*is a forbidden property"),
+					MatchRegexp("qwdqwd .*is a forbidden property"),
+					MatchRegexp("schedule .*must be of type array"),
 				))
 			},
 		},

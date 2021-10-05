@@ -8,14 +8,11 @@ jobs:
   run_linter:
     name: Run linter
     runs-on: ubuntu-latest
-    env:
-      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
-      - name: Set up Go 1.15
+      - name: Set up Go 1.16
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15
-        id: go
+          go-version: 1.16
 
       - name: Check out shell-operator code
         uses: actions/checkout@v2.3.4
@@ -75,15 +72,15 @@ jobs:
 
       - name: Prepare environment
         run: |
-          echo ::set-env name=CGO_ENABLED::1
+          echo "CGO_ENABLED=1" >> "${GITHUB_ENV}"
 
           CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
-          echo ::set-env name=CGO_CFLAGS::${CGO_CFLAGS}
+          echo "CGO_CFLAGS=${CGO_CFLAGS}" >> "${GITHUB_ENV}"
 
           CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
-          echo ::set-env name=CGO_LDFLAGS::${CGO_LDFLAGS}
+          echo "CGO_LDFLAGS=${CGO_LDFLAGS}" >> "${GITHUB_ENV}"
 
-          echo ::set-env name=GOOS::linux
+          echo "GOOS=linux" >> "${GITHUB_ENV}"
 
       - name: Run golangci-lint
         run: |
