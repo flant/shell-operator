@@ -23,24 +23,16 @@ jobs:
     steps:
       - uses: actions/github-script@v5
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
-            const eventLabelName = '${{github.event.label.name}}'
-            const response = await github.issues.listLabelsOnIssue({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number
-            })
-            for (const label of response.data) {
-              if (label.name === eventLabelName) {
-                github.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  name: eventLabelName
-                })
-                break
-              }
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: context.payload.label.name,
+              });
+            } catch (e) {
+              console.log(`Error occured while remove label. Possibly label is already removed. Ignore '${typeof e}' error.`);
             }
 
   build_dev_image:
