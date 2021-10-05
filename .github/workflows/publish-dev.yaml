@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev image: multiarch' label
     steps:
-      - uses: actions/github-script@v5.0.0
+      - uses: actions/github-script@v5
         with:
           script: |
             try {
