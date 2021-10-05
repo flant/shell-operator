@@ -62,6 +62,9 @@ func (dop *PatchCollector) JSONPatch(jsonPatch interface{}, apiVersion, kind, na
 // Options:
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
+//
+// Note: do not modify and return argument in filterFunc,
+// use FromUnstructured to instantiate a concrete type or modify after DeepCopy.
 func (dop *PatchCollector) Filter(
 	filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error),
 	apiVersion, kind, namespace, name string, options ...FilterOption,
