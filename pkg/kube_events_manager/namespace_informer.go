@@ -143,7 +143,12 @@ func (ni *namespaceInformer) Start() {
 		close(stopCh)
 	}()
 
-	ni.SharedInformer.Run(stopCh)
+	go ni.SharedInformer.Run(stopCh)
+	if ok := cache.WaitForCacheSync(stopCh, ni.SharedInformer.HasSynced); !ok {
+		ni.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ni.Monitor.Metadata.DebugName)
+	}
+
+	log.Debugf("%s: informer is ready", ni.Monitor.Metadata.DebugName)
 }
 
 func (ni *namespaceInformer) Stop() {

@@ -56,7 +56,7 @@ metadata:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
 	// Object added
-	contexts, err = c.ChangeState(`
+	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
 ---
 apiVersion: v1
 kind: Pod
@@ -82,7 +82,7 @@ spec:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
 	// Object modified
-	contexts, err = c.ChangeState(`
+	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
 ---
 apiVersion: v1
 kind: Pod
@@ -109,7 +109,7 @@ spec:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
 	// Object deleted
-	contexts, err = c.ChangeState(`
+	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
 ---
 apiVersion: v1
 kind: Pod
@@ -162,7 +162,7 @@ kubernetes:
 	g.Expect(bindingContexts.Rendered).To(ContainSubstring("Synchronization"))
 
 	// Event phase
-	bindingContexts, err = c.ChangeState(`
+	bindingContexts, err = c.ChangeStateAndWaitForBindingContexts(2, `
 apiVersion: my.crd.io/v1alpha1
 kind: MyResource
 metadata:
@@ -399,7 +399,7 @@ metadata:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
 	// Object added
-	contexts, err = c.ChangeState(`
+	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
 ---
 apiVersion: v1
 kind: Pod
@@ -425,7 +425,7 @@ spec:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
 	// Object modified
-	contexts, err = c.ChangeState(`
+	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
 ---
 apiVersion: v1
 kind: Pod
@@ -452,7 +452,7 @@ spec:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
 	// Object deleted
-	contexts, err = c.ChangeState(`
+	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
 ---
 apiVersion: v1
 kind: Pod
