@@ -32,7 +32,7 @@ jobs:
                 name: context.payload.label.name,
               });
             } catch (e) {
-              console.log(`Error occured while remove label. Possibly label is already removed. Ignore '${typeof e}' error.`);
+              console.log(`Error occurred while remove label. Possibly label is already removed. Ignore '${typeof e}' error.`);
             }
 
   build_dev_image:
