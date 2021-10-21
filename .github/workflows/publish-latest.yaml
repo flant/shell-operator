@@ -18,7 +18,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.3.5
 
       - name: Prepare environment
         run: |
