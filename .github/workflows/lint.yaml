@@ -84,6 +84,5 @@ jobs:
 
       - name: Run golangci-lint
         run: |
-          # Use 1.31.0 compiled with go 1.15
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.31.0
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.42.1
           ./golangci-lint run --sort-results --timeout 5m --build-tags integration,test
