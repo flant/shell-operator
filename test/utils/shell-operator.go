@@ -21,8 +21,8 @@ type ShellOperatorOptions struct {
 	KubeConfig string
 }
 
-func DefaultShellOperatorOptions(currentDir string, configPath string) ShellOperatorOptions {
-	return ShellOperatorOptions{
+func DefaultShellOperatorOptions(currentDir string, configPath string) *ShellOperatorOptions {
+	return &ShellOperatorOptions{
 		CurrentDir: currentDir,
 		BinPath:    GetShellOperatorPath(),
 		Args:       []string{"start"},
@@ -31,7 +31,7 @@ func DefaultShellOperatorOptions(currentDir string, configPath string) ShellOper
 	}
 }
 
-func (o ShellOperatorOptions) Merge(opts ShellOperatorOptions) ShellOperatorOptions {
+func (o *ShellOperatorOptions) Merge(opts *ShellOperatorOptions) *ShellOperatorOptions {
 	res := o
 	if opts.CurrentDir != "" {
 		o.CurrentDir = opts.CurrentDir
@@ -57,7 +57,7 @@ func (o ShellOperatorOptions) Merge(opts ShellOperatorOptions) ShellOperatorOpti
 	return res
 }
 
-func ExecShellOperator(operatorOpts ShellOperatorOptions, opts CommandOptions) error {
+func ExecShellOperator(operatorOpts *ShellOperatorOptions, opts CommandOptions) error {
 	if operatorOpts.BinPath == "" {
 		operatorOpts.BinPath = GetShellOperatorPath()
 	}
