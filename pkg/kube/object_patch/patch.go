@@ -46,17 +46,6 @@ func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
 	for _, op := range ops {
 		log.Debugf("Applying operation: %s", op.Description())
 
-		// TODO remove after successful tests in deckhouse-oss
-		//if spec.Kind != "" && spec.ApiVersion == "" {
-		//	res, err := o.kubeClient.APIResource(spec.ApiVersion, spec.Kind)
-		//	if err != nil {
-		//		return err
-		//	}
-		//	spec.ApiVersion = res.Group+"/"+res.Version
-		//	spec.Kind = res.Kind
-		//	log.Debugf("Applying spec resolve apiVersion: %s kind: %s", spec.ApiVersion, spec.Kind)
-		//}
-
 		if err := o.ExecuteOperation(op); err != nil {
 			applyErrors = multierror.Append(applyErrors, err)
 		}
@@ -107,10 +96,6 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(op.subresource)...)
 	log.Debug("Finished Create API call")
 
-	if !op.ignoreIfExists && !op.updateIfExists {
-		return err
-	}
-
 	objectExists := errors.IsAlreadyExists(err)
 
 	if objectExists && op.ignoreIfExists {
@@ -139,7 +124,8 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 		})
 	}
 
-	return nil
+	// Simply return result of a Create call if no ignore options are in play.
+	return err
 }
 
 // executePatchOperation applies a patch to the specified object using API call Patch.
