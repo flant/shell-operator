@@ -47,7 +47,7 @@ func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
 	for _, op := range ops {
 		log.Debugf("Applying operation: %s", op.Description())
 		if err := o.ExecuteOperation(op); err != nil {
-			err = gerror.Wrap(err, op.Description())
+			err = gerror.WithMessage(err, op.Description())
 			applyErrors = multierror.Append(applyErrors, err)
 		}
 	}
@@ -90,7 +90,7 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 
 	wrapErr := func(e error) error {
 		objectID := fmt.Sprintf("%s/%s/%s/%s", apiVersion, kind, object.GetNamespace(), object.GetName())
-		return gerror.Wrap(e, objectID)
+		return gerror.WithMessage(e, objectID)
 	}
 
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
