@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	gerror "github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -45,8 +46,8 @@ func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
 	var applyErrors = &multierror.Error{}
 	for _, op := range ops {
 		log.Debugf("Applying operation: %s", op.Description())
-
 		if err := o.ExecuteOperation(op); err != nil {
+			err = gerror.Wrap(err, op.Description())
 			applyErrors = multierror.Append(applyErrors, err)
 		}
 	}
@@ -87,13 +88,21 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 	apiVersion := object.GetAPIVersion()
 	kind := object.GetKind()
 
+	wrapErr := func(e error) error {
+		objectID := fmt.Sprintf("%s/%s/%s/%s", apiVersion, kind, object.GetNamespace(), object.GetName())
+		return gerror.Wrap(e, objectID)
+	}
+
 	gvk, err := o.kubeClient.GroupVersionResource(apiVersion, kind)
 	if err != nil {
-		return err
+		return wrapErr(err)
 	}
 
 	log.Debug("Started Create API call")
-	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(op.subresource)...)
+	_, err = o.kubeClient.Dynamic().
+		Resource(gvk).
+		Namespace(object.GetNamespace()).
+		Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(op.subresource)...)
 	log.Debug("Finished Create API call")
 
 	objectExists := errors.IsAlreadyExists(err)
@@ -108,24 +117,30 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 
 		return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			log.Debug("Started Get API call")
-			existingObj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(object.GetNamespace()).Get(context.TODO(), object.GetName(), metav1.GetOptions{}, generateSubresources(op.subresource)...)
+			existingObj, err := o.kubeClient.Dynamic().
+				Resource(gvk).
+				Namespace(object.GetNamespace()).
+				Get(context.TODO(), object.GetName(), metav1.GetOptions{}, generateSubresources(op.subresource)...)
 			log.Debug("Finished Get API call")
 			if err != nil {
-				return err
+				return wrapErr(err)
 			}
 
 			objCopy := object.DeepCopy()
 			objCopy.SetResourceVersion(existingObj.GetResourceVersion())
 
 			log.Debug("Started Update API call")
-			_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(objCopy.GetNamespace()).Update(context.TODO(), objCopy, metav1.UpdateOptions{}, generateSubresources(op.subresource)...)
+			_, err = o.kubeClient.Dynamic().
+				Resource(gvk).
+				Namespace(objCopy.GetNamespace()).
+				Update(context.TODO(), objCopy, metav1.UpdateOptions{}, generateSubresources(op.subresource)...)
 			log.Debug("Finished Update API call")
-			return err
+			return wrapErr(err)
 		})
 	}
 
 	// Simply return result of a Create call if no ignore options are in play.
-	return err
+	return wrapErr(err)
 }
 
 // executePatchOperation applies a patch to the specified object using API call Patch.
@@ -145,7 +160,6 @@ func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 	if op.patchType == types.JSONPatchType {
 		log.Debug("Started JSONPatchObject")
 		defer log.Debug("Finished JSONPatchObject")
-
 	}
 
 	patchBytes, err := convertPatchToBytes(op.patch)
@@ -162,7 +176,10 @@ func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 	}
 
 	log.Debug("Started Patch API call")
-	_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(op.namespace).Patch(context.TODO(), op.name, op.patchType, patchBytes, metav1.PatchOptions{}, generateSubresources(op.subresource)...)
+	_, err = o.kubeClient.Dynamic().
+		Resource(gvk).
+		Namespace(op.namespace).
+		Patch(context.TODO(), op.name, op.patchType, patchBytes, metav1.PatchOptions{}, generateSubresources(op.subresource)...)
 	log.Debug("Finished Patch API call")
 
 	if op.ignoreMissingObject && errors.IsNotFound(err) {
@@ -187,7 +204,10 @@ func (o *ObjectPatcher) executeFilterOperation(op *filterOperation) error {
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		log.Debug("Started Get API call")
-		obj, err := o.kubeClient.Dynamic().Resource(gvk).Namespace(op.namespace).Get(context.TODO(), op.name, metav1.GetOptions{})
+		obj, err := o.kubeClient.Dynamic().
+			Resource(gvk).
+			Namespace(op.namespace).
+			Get(context.TODO(), op.name, metav1.GetOptions{})
 		log.Debug("Finished Get API call")
 		if op.ignoreMissingObject && errors.IsNotFound(err) {
 			return nil
@@ -214,7 +234,10 @@ func (o *ObjectPatcher) executeFilterOperation(op *filterOperation) error {
 		}
 
 		log.Debug("Started Update API call")
-		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(op.namespace).Update(context.TODO(), filteredObj, metav1.UpdateOptions{}, generateSubresources(op.subresource)...)
+		_, err = o.kubeClient.Dynamic().
+			Resource(gvk).
+			Namespace(op.namespace).
+			Update(context.TODO(), filteredObj, metav1.UpdateOptions{}, generateSubresources(op.subresource)...)
 		log.Debug("Finished Update API call")
 		if err != nil {
 			return err
@@ -233,11 +256,16 @@ func (o *ObjectPatcher) executeDeleteOperation(op *deleteOperation) error {
 	}
 
 	log.Debug("Started Delete API call")
-	err = o.kubeClient.Dynamic().Resource(gvk).Namespace(op.namespace).Delete(context.TODO(), op.name, metav1.DeleteOptions{PropagationPolicy: &op.deletionPropagation}, op.subresource)
+	err = o.kubeClient.Dynamic().
+		Resource(gvk).
+		Namespace(op.namespace).
+		Delete(context.TODO(), op.name, metav1.DeleteOptions{PropagationPolicy: &op.deletionPropagation}, op.subresource)
+
 	log.Debug("Finished Delete API call")
 	if errors.IsNotFound(err) {
 		return nil
 	}
+
 	if err != nil {
 		return err
 	}
@@ -249,7 +277,11 @@ func (o *ObjectPatcher) executeDeleteOperation(op *deleteOperation) error {
 	log.Debug("Waiting for object deletion")
 	err = wait.Poll(time.Second, 20*time.Second, func() (done bool, err error) {
 		log.Debug("Started Get API call")
-		_, err = o.kubeClient.Dynamic().Resource(gvk).Namespace(op.namespace).Get(context.TODO(), op.name, metav1.GetOptions{})
+		_, err = o.kubeClient.Dynamic().
+			Resource(gvk).
+			Namespace(op.namespace).
+			Get(context.TODO(), op.name, metav1.GetOptions{})
+
 		log.Debug("Finished Get API call")
 		if errors.IsNotFound(err) {
 			return true, nil

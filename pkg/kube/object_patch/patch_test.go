@@ -637,7 +637,6 @@ object:
 					return err
 				}
 				return patcher.ExecuteOperations(operations)
-
 			},
 			shouldCreateNew,
 			shouldNotBeError,
@@ -706,7 +705,6 @@ object:
 					return err
 				}
 				return patcher.ExecuteOperations(operations)
-
 			},
 			shouldCreateNew,
 			shouldNotBeError,
@@ -859,7 +857,6 @@ name: %s
 					return err
 				}
 				return patcher.ExecuteOperations(operations)
-
 			},
 			shouldDelete,
 			shouldNotBeError,
@@ -877,7 +874,6 @@ name: %s
 					return err
 				}
 				return patcher.ExecuteOperations(operations)
-
 			},
 			shouldNotDelete,
 			shouldNotBeError,

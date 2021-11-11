@@ -5,6 +5,7 @@ go 1.12
 require (
 	github.com/flant/kube-client v0.0.6
 	github.com/flant/libjq-go v1.6.2-0.20200616114952-907039e8a02a // branch: master
+	github.com/pkg/errors v0.9.1
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-openapi/spec v0.19.8
 	github.com/go-openapi/strfmt v0.19.5
