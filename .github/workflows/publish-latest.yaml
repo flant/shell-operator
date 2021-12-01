@@ -13,8 +13,8 @@ jobs:
     steps:
       - name: Check branch
         run: |
-          if [[ ${GITHUB_REF} != "refs/heads/master" ]] ; then
-            echo "::error Publish latest available only on master branch"
+          if [[ ${GITHUB_REF} != "refs/heads/main" ]] ; then
+            echo "::error Publish latest available only for main branch"
             exit 1
           fi
 

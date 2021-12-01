@@ -1,5 +1,5 @@
 # every push to a branch : run unit tests.
-# push to master or label: run all tests and upload a coverage report.
+# push to default branch or label a pull request: run all tests and upload a coverage report.
 name: Tests
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
 
   build_and_run_unit_tests:
     name: Build and unit tests
-    if: github.event_name == 'push' && github.event.ref != 'refs/heads/master'
+    if: github.event_name == 'push' && github.event.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go 1.16
@@ -120,7 +120,7 @@ jobs:
 
   prepare_build_dependencies:
     name: Download modules and build libjq
-    if: (github.event_name == 'push' && github.event.ref == 'refs/heads/master') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
+    if: (github.event_name == 'push' && github.event.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go 1.16
@@ -154,7 +154,7 @@ jobs:
         shell: bash
 
       - name: Upload Go modules artifact
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v2
         with:
           name: go_modules
           path: gomod/go_modules.tar.gz
@@ -194,7 +194,7 @@ jobs:
 
   unit_tests:
     name: Unit tests
-    if: (github.event_name == 'push' && github.event.ref == 'refs/heads/master') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
+    if: (github.event_name == 'push' && github.event.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
     needs: prepare_build_dependencies
     runs-on: ubuntu-latest
     steps:
@@ -207,7 +207,7 @@ jobs:
           go-version: 1.16
 
       - name: Download go modules artifact
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v2
         with:
           name: go_modules
           path: .
@@ -248,7 +248,7 @@ jobs:
             github.com/flant/shell-operator/... -- -tags test -v
 
       - name: Upload coverage artifact
-        #if: (github.event_name == 'push' && github.event.ref == "refs/heads/master") || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
+        #if: (github.event_name == 'push' && github.event.ref == "refs/heads/main") || (github.event_name == 'pull_request' && github.event.label.id == 1838578615)
         uses: actions/upload-artifact@v2
         with:
           name: coverage_reports
@@ -257,7 +257,7 @@ jobs:
 
   integration_tests:
     name: Integration tests
-    if: (github.event_name == 'push' && github.event.ref == 'refs/heads/master') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615) # push master or ':robot: run e2e matrix' label
+    if: (github.event_name == 'push' && github.event.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.label.id == 1838578615) # push main or ':robot: run e2e matrix' label
     needs: prepare_build_dependencies
     strategy:
       fail-fast: true
@@ -283,7 +283,7 @@ jobs:
           go-version: 1.16
 
       - name: Download go modules artifact
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v2
         with:
           name: go_modules
           path: .
@@ -293,7 +293,7 @@ jobs:
         shell: bash
 
       - name: Download libjq artifact
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v2
         with:
           name: libjq
           path: libjq
