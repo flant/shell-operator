@@ -3,8 +3,9 @@
 # - go fmt
 name: Code checks
 on:
-  push:
-    branches:
+  pull_request:
+    types: [synchronize]
+
 jobs:
   code_style:
     name: Go code style

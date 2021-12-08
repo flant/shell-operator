@@ -1,0 +1,114 @@
+# Run integration tests.
+# Start when pull request is labeled with 'run/tests' label.
+name: Tests
+on:
+  pull_request:
+    types: [labeled]
+jobs:
+  check:
+    name: Check and remove label
+    runs-on: ubuntu-latest
+    outputs:
+      run_tests: ${{ steps.check.outputs.run_tests }}
+      build_multi_arch: ${{ steps.check.outputs.build_multi_arch }}
+    steps:
+      - uses: actions/github-script@v5
+        id: check
+        with:
+          script: |
+            const RUN_TESTS_LABEL = 'run/tests';
+            const labelName = context.payload.label.name;
+
+            if (!labelName !== RUN_TESTS_LABEL) {
+              return console.log(`Not a 'run tests' label: '${labelName}'. Skip tests.`);
+            }
+
+            console.log(`Detect 'run tests' label '${labelName}'. Remove label and run tests.`);
+            core.setOutput('run_tests', 'true');
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: labelName,
+              });
+            } catch (e) {
+              console.log(`Error occurred while remove label. Possibly label is already removed. Ignore '${typeof e}' error.`);
+            }
+
+  integration_tests:
+    name: Integration tests
+    needs:
+      - check
+    if: needs.check.outputs.run_tests == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+        - k8s_version: "1.16"
+          kind_node_image: "kindest/node:v1.16.15"
+          cluster_name: "kube-1-16"
+        - k8s_version: "1.19"
+          kind_node_image: "kindest/node:v1.19.7"
+          cluster_name: "kube-1-19"
+        - k8s_version: "1.20"
+          kind_node_image: "kindest/node:v1.20.2"
+          cluster_name: "kube-1-20"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+
+      - name: Checkout code
+        uses: actions/checkout@v2.4.0
+
+      - name: Restore Go modules
+        id: go-modules-cache
+        uses: actions/cache@v2.1.7
+        with:
+          path: |
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-gomod-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-gomod-
+
+      - name: Download Go modules
+        if: steps.go-modules-cache.outputs.cache-hit != 'true'
+        run: |
+          go mod download
+          echo -n "Go modules unpacked size is: " && du -sh $HOME/go/pkg/mod
+
+      - name: Download prebuilt libjq static libraries
+        run: |
+          curl -sSfL https://github.com/flant/libjq-go/releases/download/jq-b6be13d5-0/libjq-glibc-amd64.tgz | tar zxf -
+
+      - name: Install ginkgo
+        run: |
+          go build github.com/onsi/ginkgo/ginkgo
+          ./ginkgo version
+
+      - name: Start kind cluster
+        uses: engineerd/setup-kind@v0.5.0
+        with:
+          version: "v0.11.1"
+          image: ${{ matrix.kind_node_image }}
+          name: ${{ matrix.cluster_name }}
+
+      - name: Run integration tests
+        env:
+          CLUSTER_NAME: ${{ matrix.cluster_name }}
+        run: |
+          export CGO_ENABLED=1
+          export CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
+          export CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
+          export GOOS=linux
+
+          ./ginkgo \
+            --tags 'integration test'  \
+            --vet off \
+            --race \
+            -p \
+            -r test/integration

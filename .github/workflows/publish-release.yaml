@@ -1,39 +1,104 @@
+# Publish flant/addon-operator image on hub.docker.com.
+# Build 'latest' tag for default branch.
+# Build v*.*.* tag on tag push.
 name: Publish release image
 on:
+  workflow_dispatch:
+  pull_request:
+    - closed
   push:
     tags:
       - 'v*'
-      # debug release build tag
-      - 'z-*'
 env:
-  GO111MODULE: on
   QEMU_PLATFORMS: arm64,arm
   BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/arm/v7"
   IMAGE_REPO: flant/shell-operator
 
 jobs:
-  publish_release_images:
-    name: Release
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    outputs:
+      run_publish: ${{ steps.check.outputs.run_publish }}
+      image_tag: ${{ steps.check.outputs.image_tag }}
+    steps:
+      - uses: actions/github-script@v5
+        id: check
+        with:
+          script: |
+            const SKIP_LATEST_LABEL_NAME = 'publish//latest/skip';
+            const event = context.payload;
+            const eventName = context.eventName;
+            let runPublish = false;
+            let imageTag = '';
+
+            // Check ref name for manual running.
+            if (eventName === 'workflow_dispatch') {
+              if (event.ref !== 'refs/heads/main') {
+                return core.setFailed(`Detect manual execution for '${event.ref}'. Use only default branch. Skip 'publish latest image'.`);
+              }
+              console.log(`Detect manual execution for default branch. Run 'publish latest image'.`);
+              runPublish = true;
+              imageTag = 'latest';
+            }
+
+            // Check for 'skip/latest/on/merge' label on pull request.
+            if (eventName == 'pull_request' && event.action == 'closed') {
+              if (!event.merged) {
+                return console.log(`PR ${event.number} not merged. Skip 'publish latest image'.`);
+              }
+              const hasSkipLabel = event.pull_request.labels.some(l => l.name === SKIP_LATEST_LABEL_NAME);
+              if (hasSkipLabel) {
+                return console.log(`Detect skip label '${SKIP_LATEST_LABEL_NAME}' on merged PR ${event.number}. Skip 'publish latest image'.`);
+              }
+              console.log(`No skip labels on merged PR ${event.number}. Run 'publish latest image'.`);
+              runPublish = true;
+              imageTag = 'latest';
+            }
+
+            // Check if tag is pushed.
+            if (eventName == 'push') {
+              if (!event.ref.startsWith('refs/tags/')) {
+                return console.log(`Detect non-release ref: ${event.ref}. Skip 'publish latest image'.`);
+              }
+              runPublish = true;
+              imageTag = context.ref.replace('refs/tags/', '');
+            }
+
+            console.log(`Outputs: run_publish=${runPublish} image_tag=${imageTag}`);
+            if (!runPublish) {
+              console.log(`DEBUG: eventName=${eventName} action=${event.action} ref=${event.ref} merged=${event.merged} prLabels=${JSON.stringify(event.pull_request && event.pull_request.labels)}`)
+              return console.log(`Skip 'publish latest image'.`);
+            }
+            core.setOutput('run_publish', 'true');
+            core.setOutput('image_tag', imageTag);
+
+  publish_image:
+    name: Build and publish
     runs-on: [ubuntu-latest]
+    needs:
+      - check
+    if: needs.check.outputs.run_publish == 'true'
     steps:
       - uses: actions/checkout@v2.4.0
 
       - name: Prepare environment
+        env:
+          IMAGE_TAG: ${{ needs.check.outputs.image_tag }}
         run: |
-          : Setup imageTag, appVersion and dockerFile envs and build image
-          imageTag=${GITHUB_REF#refs/tags/}
-          APP_VERSION=${imageTag}
-          FINAL_IMAGE_NAME="${IMAGE_REPO}:${imageTag}"
-          LATEST_IMAGE_NAME="${IMAGE_REPO}:latest"
+          : Setup FINAL_IMAGE_NAME and APP_VERSION for image build
+          APP_VERSION=${IMAGE_TAG}
+          if [[ $APP_VERSION == "latest" ]] ; then
+            APP_VERSION=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
+          fi
+          FINAL_IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
 
           echo "APP_VERSION=${APP_VERSION}" >> ${GITHUB_ENV}
           echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
-          echo "LATEST_IMAGE_NAME=${LATEST_IMAGE_NAME}" >> ${GITHUB_ENV}
 
           echo "========================================="
           echo "APP_VERSION        = $APP_VERSION"
           echo "FINAL_IMAGE_NAME   = $FINAL_IMAGE_NAME"
-          echo "LATEST_IMAGE_NAME  = $LATEST_IMAGE_NAME"
           echo "========================================="
 
       - name: Set up QEMU
@@ -59,5 +124,17 @@ jobs:
           docker buildx build --push \
               --platform $BUILDX_PLATFORMS \
               --build-arg appVersion=$APP_VERSION \
-              --tag $FINAL_IMAGE_NAME \
-              --tag $LATEST_IMAGE_NAME .
+              --tag $FINAL_IMAGE_NAME .
+
+      - name: Inspect binaries
+        run: |
+          # Image with multiple manifests has digest in each manifest.
+          docker buildx imagetools inspect $FINAL_IMAGE_NAME --raw \
+          | jq -r '.manifests[] | .digest + " " + .platform.os + "/" + .platform.architecture' \
+          | while read digest platform ; do
+            echo "====================================="
+            echo "Inspect image for platform ${platform}"
+            echo "====================================="
+            docker run --rm --platform ${platform} --entrypoint sh $FINAL_IMAGE_NAME@${digest} -c \
+              'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'
+          done
