@@ -1,4 +1,4 @@
-# Publish flant/addon-operator image on hub.docker.com.
+# Publish flant/shell-operator image on hub.docker.com.
 # Build 'latest' tag for default branch.
 # Build v*.*.* tag on tag push.
 name: Publish release image
@@ -26,7 +26,7 @@ jobs:
         id: check
         with:
           script: |
-            const SKIP_LATEST_LABEL_NAME = 'publish//latest/skip';
+            const SKIP_LATEST_LABEL_NAME = 'skip/image/latest';
             const event = context.payload;
             const eventName = context.eventName;
             let runPublish = false;
@@ -42,7 +42,7 @@ jobs:
               imageTag = 'latest';
             }
 
-            // Check for 'skip/latest/on/merge' label on pull request.
+            // Check for 'skip' label on pull request merge.
             if (eventName == 'pull_request' && event.action == 'closed') {
               if (!event.merged) {
                 return console.log(`PR ${event.number} not merged. Skip 'publish latest image'.`);

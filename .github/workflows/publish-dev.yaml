@@ -1,4 +1,4 @@
-# Publish flant/addon-operator-dev image to hub.docker.com.
+# Publish flant/shell-operator-dev image to hub.docker.com.
 # Start when PR is labeled with 'publish/image/dev' or 'publish/image/dev/amd64'.
 name: Publish dev image
 on:
@@ -8,7 +8,7 @@ env:
   QEMU_PLATFORMS: arm64,arm
   BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/arm/v7"
   BUILDX_PLATFORMS_AMD64: "linux/amd64"
-  IMAGE_REPO: flant/addon-operator-dev
+  IMAGE_REPO: flant/shell-operator-dev
 
 jobs:
   check:
@@ -110,7 +110,7 @@ jobs:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASS }}
 
-      - name: Build and push multi-arch image
+      - name: Build and push using buildx
         run: |
           echo "Build $FINAL_IMAGE_NAME with version '$APP_VERSION'"
           docker buildx build --push \

@@ -19,7 +19,7 @@ jobs:
             const RUN_TESTS_LABEL = 'run/tests';
             const labelName = context.payload.label.name;
 
-            if (!labelName !== RUN_TESTS_LABEL) {
+            if (labelName !== RUN_TESTS_LABEL) {
               return console.log(`Not a 'run tests' label: '${labelName}'. Skip tests.`);
             }
 
