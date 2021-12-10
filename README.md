@@ -1,5 +1,5 @@
 <p align="center">
-<img width="485" src="docs/shell-operator-logo.png" alt="Shell-operator logo" />
+<img src="docs/shell-operator-small-logo.png" alt="shell-operator logo" />
 </p>
 
 <p align="center">
