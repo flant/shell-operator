@@ -5,7 +5,7 @@ name: Publish release image
 on:
   workflow_dispatch:
   pull_request:
-    - closed
+    types: [closed]
   push:
     tags:
       - 'v*'
