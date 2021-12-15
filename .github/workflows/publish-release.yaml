@@ -46,7 +46,7 @@ jobs:
 
             // Check for 'skip' label on pull request merge.
             if (eventName == 'pull_request' && event.action == 'closed') {
-              if (!event.merged) {
+              if (!event.pull_request.merged) {
                 return console.log(`PR ${event.number} not merged. Skip 'publish latest image'.`);
               }
               const hasSkipLabel = event.pull_request.labels.some(l => l.name === SKIP_LATEST_LABEL_NAME);
@@ -69,7 +69,7 @@ jobs:
 
             console.log(`Outputs: run_publish=${runPublish} image_tag=${imageTag}`);
             if (!runPublish) {
-              console.log(`DEBUG: eventName=${eventName} action=${event.action} ref=${event.ref} merged=${event.merged} prLabels=${JSON.stringify(event.pull_request && event.pull_request.labels)}`)
+              console.log(`DEBUG: eventName=${eventName} action=${event.action} ref=${event.ref} merged=${event.pull_request && event.pull_request.merged} prLabels=${JSON.stringify(event.pull_request && event.pull_request.labels)}`)
               return console.log(`Skip 'publish latest image'.`);
             }
             core.setOutput('run_publish', 'true');
