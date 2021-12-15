@@ -1,3 +1,5 @@
+# Publish flant/shell-operator-dev image to hub.docker.com.
+# Start when PR is labeled with 'publish/image/dev' or 'publish/image/dev/amd64'.
 name: Publish dev image
 on:
   pull_request:
@@ -5,72 +7,100 @@ on:
 env:
   QEMU_PLATFORMS: arm64,arm
   BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/arm/v7"
+  BUILDX_PLATFORMS_AMD64: "linux/amd64"
   IMAGE_REPO: flant/shell-operator-dev
 
 jobs:
-  stub:
-    name: Empty job to prevent workflow fail
+  check:
+    name: Check and remove label
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.label.id != 1838515600 # not ':robot: build dev image: multiarch' label
-    steps:
-      - name: stub action
-        run: ": This job is used to prevent the workflow to fail when all other jobs are skipped."
-
-  unlabel:
-    name: Unlabel
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev image: multiarch' label
+    outputs:
+      run_publish: ${{ steps.check.outputs.run_publish }}
+      build_multi_arch: ${{ steps.check.outputs.build_multi_arch }}
     steps:
       - uses: actions/github-script@v5
+        id: check
         with:
           script: |
+            const PUBLISH_DEV_LABEL = 'publish/image/dev';
+            const PUBLISH_AMD64_LABEL = 'publish/image/dev/amd64';
+            const labelName = context.payload.label.name;
+
+            let runPublish = false;
+            let buildMultiArch = false;
+            if (labelName === PUBLISH_DEV_LABEL) {
+              runPublish = true;
+              buildMultiArch = true;
+            }
+            if (labelName === PUBLISH_AMD64_LABEL) {
+              runPublish = true;
+            }
+
+            if (!runPublish) {
+              return console.log(`Not a 'publish' label: '${labelName}'. Skip 'publish dev image'.`);
+            }
+
+            if (buildMultiArch) {
+              console.log(`Detect 'publish' label '${labelName}'. Remove label and run 'publish dev image' for all architectures.`);
+            } else {
+              console.log(`Detect 'publish' label '${labelName}'. Remove label and run 'publish dev image' for amd64 arch only.`);
+            }
+            core.setOutput('run_publish', 'true');
+            core.setOutput('build_multi_arch', buildMultiArch.toString());
+
             try {
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                name: context.payload.label.name,
+                name: labelName,
               });
             } catch (e) {
               console.log(`Error occurred while remove label. Possibly label is already removed. Ignore '${typeof e}' error.`);
             }
 
-  build_dev_image:
-    name: Dev image
+  publish_dev_image:
+    name: Build and publish
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.label.id == 1838515600 # ':robot: build dev images' label
+    needs:
+      - check
+    if: needs.check.outputs.run_publish == 'true'
     steps:
       - uses: actions/checkout@v2.4.0
 
       - name: Prepare environment
+        env:
+          BUILD_MULTI_ARCH: ${{ needs.check.outputs.build_multi_arch }}
         run: |
-          : Setup imageTag, appVersion and dockerFile envs and build image
-          imageTag=${GITHUB_REF#refs/tags/}
-          APP_VERSION=${imageTag}
-          FINAL_IMAGE_NAME="${IMAGE_REPO}:${imageTag}"
-
-          : Override image name and version for dev image
-          # dev-feat_branch-371e2d3b-2020.02.06_18:37:42
-          APP_VERSION=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
+          : Image name and version for dev image
+          # Example: dev-feat_branch-371e2d3b-2020.02.06_18:37:42
+          APP_VERSION=dev-${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
           FINAL_IMAGE_NAME="${IMAGE_REPO}:pr${{ github.event.pull_request.number }}"
-          : end override
 
-          echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
           echo "APP_VERSION=${APP_VERSION}" >> ${GITHUB_ENV}
+          echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
 
           echo "========================================="
           echo "APP_VERSION        = $APP_VERSION"
           echo "FINAL_IMAGE_NAME   = $FINAL_IMAGE_NAME"
           echo "========================================="
 
+          if [[ ${BUILD_MULTI_ARCH} == "false" ]] ; then
+            echo "BUILDX_PLATFORMS=${BUILDX_PLATFORMS_AMD64}" >> ${GITHUB_ENV}
+          fi
+          echo "BUILD_MULTI_ARCH   = ${BUILD_MULTI_ARCH}"
+          echo "BUILDX_PLATFORMS   = ${BUILDX_PLATFORMS}"
+          echo "========================================="
+
       - name: Set up QEMU
+        if: needs.check.outputs.build_multi_arch == 'true'
         uses: docker/setup-qemu-action@v1.2.0
         with:
           platforms: "${{ env.QEMU_PLATFORMS }}"
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1.6.0
+        uses: docker/setup-buildx-action@v1
         with:
           version: latest
 
@@ -80,7 +110,7 @@ jobs:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASS }}
 
-      - name: Build and push multi-arch image
+      - name: Build and push using buildx
         run: |
           echo "Build $FINAL_IMAGE_NAME with version '$APP_VERSION'"
           docker buildx build --push \
@@ -89,9 +119,23 @@ jobs:
               --tag $FINAL_IMAGE_NAME .
 
       - name: Inspect binaries
+        if: needs.check.outputs.build_multi_arch == 'true'
         run: |
-          while read digest platform ; do
-            echo "Inspect image for platform=${platform}"
-            docker run --rm --platform ${platform} --entrypoint sh $FINAL_IMAGE_NAME@${digest} -c \
-              'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'
-          done <<< $(docker buildx imagetools inspect $FINAL_IMAGE_NAME --raw | jq '.manifests[] | .digest + " " + .platform.os +"/"+.platform.architecture' -r)
+          # Image for one arhitecture has digest in config field.
+          # Image with multiple manifests has digest in each manifest.
+          manifests=$(docker buildx imagetools inspect "${FINAL_IMAGE_NAME}" --raw)
+          if grep manifests <<<"${manifests}" 2>&1 >/dev/null ; then
+            jq -r '.manifests[]? | .digest + " " + .platform.os + "/" + .platform.architecture' <<<"${manifests}" \
+            | while read digest platform ; do
+              image=$FINAL_IMAGE_NAME@${digest}
+              echo "====================================="
+              echo "Inspect image for platform ${platform}"
+              echo "  ${image}"
+              echo "====================================="
+              docker run --rm --platform ${platform} --entrypoint sh ${image} -c \
+                'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'
+            done
+          else
+            echo Not a multiarhitecture image.
+            #echo $(echo -n "${manifests}" | openssl dgst -sha256) ' linux/amd64'
+          fi
