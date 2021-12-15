@@ -18,6 +18,26 @@ func Test_ValidatingResponseFromFile_Allowed(t *testing.T) {
 	}
 }
 
+func Test_ValidatingResponseFromFile_AllowedWithWarnings(t *testing.T) {
+	r, err := ValidatingResponseFromFile("testdata/response/good_allow_warnings.json")
+
+	if err != nil {
+		t.Fatalf("ValidatingResponse should be loaded from file: %v", err)
+	}
+
+	if r == nil {
+		t.Fatalf("ValidatingResponse should not be nil")
+	}
+
+	if !r.Allowed {
+		t.Fatalf("ValidatingResponse should have allowed=true: %#v", r)
+	}
+
+	if len(r.Warnings) != 2 {
+		t.Fatalf("ValidatingResponse should have warnings: %#v", r)
+	}
+}
+
 func Test_ValidatingResponseFromFile_NotAllowed_WithMessage(t *testing.T) {
 	r, err := ValidatingResponseFromFile("testdata/response/good_deny.json")
 

@@ -188,6 +188,13 @@ cat <<EOF > $VALIDATING_RESPONSE_PATH
 EOF
 ```
 
+With warnings:
+```
+cat <<EOF > $VALIDATING_RESPONSE_PATH
+{"allowed": true, "warnings":["It might be risky because it is Tuesday", "It might be risky because your name starts with A"]}
+EOF
+```
+
 Deny object creation and explain why:
 ```
 cat <<EOF > $VALIDATING_RESPONSE_PATH

@@ -11,8 +11,9 @@ import (
 )
 
 type ValidatingResponse struct {
-	Allowed bool   `json:"allowed"`
-	Message string `json:"message,omitempty"`
+	Allowed  bool     `json:"allowed"`
+	Message  string   `json:"message,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 func ValidatingResponseFromFile(filePath string) (*ValidatingResponse, error) {
@@ -52,6 +53,10 @@ func (r *ValidatingResponse) Dump() string {
 	if r.Message != "" {
 		b.WriteString(",")
 		b.WriteString(r.Message)
+	}
+	for _, warning := range r.Warnings {
+		b.WriteString(",")
+		b.WriteString(warning)
 	}
 	b.WriteString(")")
 	return b.String()
