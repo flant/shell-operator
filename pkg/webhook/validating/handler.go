@@ -110,6 +110,10 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 		return response, nil
 	}
 
+	if len(validatingResponse.Warnings) > 0 {
+		response.Response.Warnings = validatingResponse.Warnings
+	}
+
 	if !validatingResponse.Allowed {
 		response.Response.Allowed = false
 		response.Response.Result = &metav1.Status{
