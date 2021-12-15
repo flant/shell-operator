@@ -1,6 +1,7 @@
 # Publish flant/shell-operator image on hub.docker.com.
-# Build 'latest' tag for default branch.
-# Build v*.*.* tag on tag push.
+# Build 'latest' tag if started manually on default branch.
+# Build 'latest' tag when PR is merged into the default branch.
+# Build 'v*.*.*' and 'latest' tags on push released tag.
 name: Publish release image
 
 on:
@@ -23,6 +24,7 @@ jobs:
     outputs:
       run_publish: ${{ steps.check.outputs.run_publish }}
       image_tag: ${{ steps.check.outputs.image_tag }}
+      additional_tag: ${{ steps.check.outputs.additional_tag }}
     steps:
       - uses: actions/github-script@v5
         id: check
@@ -33,6 +35,7 @@ jobs:
             const eventName = context.eventName;
             let runPublish = false;
             let imageTag = '';
+            let additionalTag = ''; // Also push additional tag when building a released tag.
 
             // Check ref name for manual running.
             if (eventName === 'workflow_dispatch') {
@@ -65,15 +68,17 @@ jobs:
               }
               runPublish = true;
               imageTag = context.ref.replace('refs/tags/', '');
+              additionalTag = 'latest';
             }
 
-            console.log(`Outputs: run_publish=${runPublish} image_tag=${imageTag}`);
+            console.log(`Outputs: run_publish=${runPublish} image_tag=${imageTag} additional_tag=${additionalTag}`);
             if (!runPublish) {
               console.log(`DEBUG: eventName=${eventName} action=${event.action} ref=${event.ref} merged=${event.pull_request && event.pull_request.merged} prLabels=${JSON.stringify(event.pull_request && event.pull_request.labels)}`)
               return console.log(`Skip 'publish latest image'.`);
             }
-            core.setOutput('run_publish', 'true');
+            core.setOutput('run_publish', runPublish.toString());
             core.setOutput('image_tag', imageTag);
+            core.setOutput('additional_tag', additionalTag);
 
   publish_image:
     name: Build and publish
@@ -86,6 +91,7 @@ jobs:
 
       - name: Prepare environment
         env:
+          ADDITIONAL_TAG: ${{ needs.check.outputs.additional_tag }}
           IMAGE_TAG: ${{ needs.check.outputs.image_tag }}
         run: |
           : Setup FINAL_IMAGE_NAME and APP_VERSION for image build
@@ -93,14 +99,22 @@ jobs:
           if [[ $APP_VERSION == "latest" ]] ; then
             APP_VERSION=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
           fi
+
           FINAL_IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
+
+          if [[ -n $ADDITIONAL_TAG ]] ; then
+            ADDITIONAL_IMAGE_NAME="${IMAGE_REPO}:${ADDITIONAL_TAG}"
+          fi
 
           echo "APP_VERSION=${APP_VERSION}" >> ${GITHUB_ENV}
           echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "ADDITIONAL_IMAGE_NAME=${ADDITIONAL_IMAGE_NAME}" >> ${GITHUB_ENV}
 
           echo "========================================="
-          echo "APP_VERSION        = $APP_VERSION"
-          echo "FINAL_IMAGE_NAME   = $FINAL_IMAGE_NAME"
+          echo "APP_VERSION            = $APP_VERSION"
+          echo "FINAL_IMAGE_NAME       = $FINAL_IMAGE_NAME"
+          [ -n $ADDITIONAL_IMAGE_NAME ] && \
+          echo "ADDITIONAL_IMAGE_NAME  = $ADDITIONAL_IMAGE_NAME"
           echo "========================================="
 
       - name: Set up QEMU
@@ -122,11 +136,16 @@ jobs:
 
       - name: Build and push multi-arch image
         run: |
-          echo "Build $FINAL_IMAGE_NAME with version '$APP_VERSION'"
-          docker buildx build --push \
-              --platform $BUILDX_PLATFORMS \
-              --build-arg appVersion=$APP_VERSION \
-              --tag $FINAL_IMAGE_NAME .
+          echo "Build and push $FINAL_IMAGE_NAME with version '$APP_VERSION'."
+          [ -n "$ADDITIONAL_IMAGE_NAME" ] && echo "Also push $ADDITIONAL_IMAGE_NAME."
+          echo
+          docker buildx build \
+            --platform $BUILDX_PLATFORMS \
+            --build-arg appVersion=$APP_VERSION \
+            $( [ -n "$ADDITIONAL_IMAGE_NAME" ] && echo "--tag $ADDITIONAL_IMAGE_NAME" ) \
+            --tag $FINAL_IMAGE_NAME \
+            --push \
+            .
 
       - name: Inspect binaries
         run: |
