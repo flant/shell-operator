@@ -188,7 +188,7 @@ cat <<EOF > $VALIDATING_RESPONSE_PATH
 EOF
 ```
 
-With warnings:
+Allow with warnings (Kubernetes 1.19+):
 ```
 cat <<EOF > $VALIDATING_RESPONSE_PATH
 {"allowed": true, "warnings":["It might be risky because it is Tuesday", "It might be risky because your name starts with A"]}
