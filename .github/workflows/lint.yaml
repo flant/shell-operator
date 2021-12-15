@@ -3,7 +3,7 @@
 name: Lint
 on:
   pull_request:
-    types: [synchronize]
+    types: [opened, synchronize]
 
 jobs:
   run_linter:

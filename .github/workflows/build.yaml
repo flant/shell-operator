@@ -2,7 +2,7 @@
 name: Build
 on:
   pull_request:
-    types: [synchronize]
+    types: [opened, synchronize]
 jobs:
   build_binary:
     name: Build shell-operator binary

@@ -1,12 +1,9 @@
 # Run unit tests.
 # Start for pull requests and on push to default branch.
-name: Tests
+name: Unit tests
 on:
   pull_request:
-    types: [synchronize]
-  push:
-    branches:
-      - 'main'
+    types: [opened, synchronize]
 jobs:
   run_unit_tests:
     name: Run unit tests

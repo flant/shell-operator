@@ -119,22 +119,23 @@ jobs:
               --tag $FINAL_IMAGE_NAME .
 
       - name: Inspect binaries
+        if: needs.check.outputs.build_multi_arch == 'true'
         run: |
           # Image for one arhitecture has digest in config field.
           # Image with multiple manifests has digest in each manifest.
           manifests=$(docker buildx imagetools inspect "${FINAL_IMAGE_NAME}" --raw)
           if grep manifests <<<"${manifests}" 2>&1 >/dev/null ; then
-            jq -r '.manifests[]? | .digest + " " + .platform.os + "/" + .platform.architecture' <<<"${manifests}"
+            jq -r '.manifests[]? | .digest + " " + .platform.os + "/" + .platform.architecture' <<<"${manifests}" \
+            | while read digest platform ; do
+              image=$FINAL_IMAGE_NAME@${digest}
+              echo "====================================="
+              echo "Inspect image for platform ${platform}"
+              echo "  ${image}"
+              echo "====================================="
+              docker run --rm --platform ${platform} --entrypoint sh ${image} -c \
+                'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'
+            done
           else
-            echo $(echo -n "${manifests}" | openssl dgst -sha256) ' linux/amd64'
-          fi \
-          | while read digest platform ; do
-            image=$FINAL_IMAGE_NAME@${digest}
-            echo "====================================="
-            echo "Inspect image for platform ${platform}"
-            echo "  ${image}"
-            echo "====================================="
-            docker run --rm --platform ${platform} --entrypoint sh ${image} -c \
-              'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'
-          done
-
+            echo Not a multiarhitecture image.
+            #echo $(echo -n "${manifests}" | openssl dgst -sha256) ' linux/amd64'
+          fi
