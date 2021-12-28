@@ -36,6 +36,7 @@ type KubernetesBindingsController interface {
 	SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult
 	SnapshotsFor(bindingName string) []ObjectAndFilterResult
 	Snapshots() map[string][]ObjectAndFilterResult
+	SnapshotsInfo() []string
 }
 
 // kubernetesHooksController is a main implementation of KubernetesHooksController
@@ -276,6 +277,20 @@ func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map
 
 func (c *kubernetesBindingsController) Snapshots() map[string][]ObjectAndFilterResult {
 	return c.SnapshotsFrom(c.BindingNames()...)
+}
+
+func (c *kubernetesBindingsController) SnapshotsInfo() []string {
+	infos := make([]string, 0)
+	for _, binding := range c.KubernetesBindings {
+		monitorID := binding.Monitor.Metadata.MonitorId
+		if c.kubeEventsManager.HasMonitor(monitorID) {
+			snapInfo := c.kubeEventsManager.GetMonitor(monitorID).SnapshotInfo()
+			info := fmt.Sprintf("%s: %s", binding.BindingName, snapInfo)
+			infos = append(infos, info)
+		}
+	}
+
+	return infos
 }
 
 func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, link *KubernetesBindingToMonitorLink) []BindingContext {

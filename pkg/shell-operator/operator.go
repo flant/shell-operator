@@ -18,7 +18,6 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 
 	klient "github.com/flant/kube-client/client"
@@ -740,6 +739,10 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 }
 
 func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMeta HookMetadata, taskLogEntry *log.Entry, hookLogLabels map[string]string, metricLabels map[string]string) error {
+	for _, info := range taskHook.HookController.SnapshotsInfo() {
+		taskLogEntry.Infof("snapshot info: %s", info)
+	}
+
 	result, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
 	if err != nil {
 		return err
@@ -1013,14 +1016,22 @@ func (op *ShellOperator) RunMetrics() {
 }
 
 func (op *ShellOperator) SetupDebugServerHandles() {
-	op.DebugServer.Router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = fmt.Fprintf(writer, "%s control endpoint is alive", app.AppName)
+	op.DebugServer.Route("/", func(_ *http.Request) (interface{}, error) {
+		return fmt.Sprintf("%s control endpoint is alive", app.AppName), nil
 	})
 
-	op.DebugServer.Router.Get("/queue/list.{format:(json|yaml|text)}", func(writer http.ResponseWriter, request *http.Request) {
-		format := chi.URLParam(request, "format")
-		structured_logger.GetLogEntry(request).Debugf("queue list using format %s", format)
-		_, _ = writer.Write([]byte(dump.TaskQueueSetToText(op.TaskQueues)))
+	op.DebugServer.Route("/queue/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
+		return dump.TaskQueueSetToText(op.TaskQueues), nil
+	})
+
+	op.DebugServer.Route("/hook/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
+		return op.HookManager.GetHookNames(), nil
+	})
+
+	op.DebugServer.Route("/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
+		hookName := chi.URLParam(r, "name")
+		h := op.HookManager.GetHook(hookName)
+		return h.HookController.KubernetesSnapshots(), nil
 	})
 }
 

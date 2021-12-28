@@ -35,6 +35,8 @@ type ResourceInformer interface {
 	Start()
 	Stop()
 	PauseHandleEvents()
+	CachedObjectsInfo() CachedObjectsInfo
+	CachedObjectsInfoIncrement() CachedObjectsInfo
 }
 
 type resourceInformer struct {
@@ -53,6 +55,11 @@ type resourceInformer struct {
 	// A cache of objects and filterResults. It is a part of the Monitor's snapshot.
 	cachedObjects map[string]*ObjectAndFilterResult
 	cacheLock     sync.RWMutex
+
+	// Cached objects operations since start
+	cachedObjectsInfo *CachedObjectsInfo
+	// Cached objects operations since last access
+	cachedObjectsIncrement *CachedObjectsInfo
 
 	// Events buffer for "Synchronization" mode: it stores events between CachedObjects call and EnableKubeEventCb call
 	// to replay them when "Synchronization" hook is done.
@@ -78,10 +85,12 @@ var _ ResourceInformer = &resourceInformer{}
 
 var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 	informer := &resourceInformer{
-		Monitor:       monitor,
-		cachedObjects: make(map[string]*ObjectAndFilterResult),
-		cacheLock:     sync.RWMutex{},
-		eventBufLock:  sync.Mutex{},
+		Monitor:                monitor,
+		cachedObjects:          make(map[string]*ObjectAndFilterResult),
+		cacheLock:              sync.RWMutex{},
+		eventBufLock:           sync.Mutex{},
+		cachedObjectsInfo:      &CachedObjectsInfo{},
+		cachedObjectsIncrement: &CachedObjectsInfo{},
 	}
 	return informer
 }
@@ -267,6 +276,7 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 		ei.cachedObjects[k] = v
 	}
 
+	ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
 	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.cachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 
@@ -349,6 +359,16 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			skipEvent = true
 		}
 		ei.cachedObjects[resourceId] = objFilterRes
+		// Update cached objects info.
+		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
+		if eventType == WatchEventAdded {
+			ei.cachedObjectsInfo.Added++
+			ei.cachedObjectsIncrement.Added++
+		} else {
+			ei.cachedObjectsInfo.Modified++
+			ei.cachedObjectsIncrement.Modified++
+		}
+		// Update metrics.
 		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.cachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
@@ -359,6 +379,15 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 	case WatchEventDeleted:
 		ei.cacheLock.Lock()
 		delete(ei.cachedObjects, resourceId)
+		// Update cached objects info.
+		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
+		if ei.cachedObjectsInfo.Count == 0 {
+			ei.cachedObjectsInfo.Cleaned++
+			ei.cachedObjectsIncrement.Cleaned++
+		}
+		ei.cachedObjectsInfo.Deleted++
+		ei.cachedObjectsIncrement.Deleted++
+		// Update metrics.
 		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.cachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
@@ -469,4 +498,20 @@ func (ei *resourceInformer) Stop() {
 func (ei *resourceInformer) PauseHandleEvents() {
 	log.Debugf("%s: PAUSE resource informer", ei.Monitor.Metadata.DebugName)
 	ei.stopped = true
+}
+
+// CachedObjectsInfo returns info accumulated from start.
+func (ei *resourceInformer) CachedObjectsInfo() CachedObjectsInfo {
+	ei.cacheLock.RLock()
+	defer ei.cacheLock.RUnlock()
+	return *ei.cachedObjectsInfo
+}
+
+// CachedObjectsInfoIncrement returns info accumulated from last call and clean it.
+func (ei *resourceInformer) CachedObjectsInfoIncrement() CachedObjectsInfo {
+	ei.cacheLock.Lock()
+	defer ei.cacheLock.Unlock()
+	info := *ei.cachedObjectsIncrement
+	ei.cachedObjectsIncrement = &CachedObjectsInfo{}
+	return info
 }

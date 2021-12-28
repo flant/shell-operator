@@ -67,6 +67,7 @@ type HookController interface {
 
 	KubernetesSnapshots() map[string][]ObjectAndFilterResult
 	UpdateSnapshots([]BindingContext) []BindingContext
+	SnapshotsInfo() []string
 }
 
 var _ HookController = &hookController{}
@@ -336,4 +337,12 @@ func (hc *hookController) UpdateSnapshots(context []BindingContext) []BindingCon
 	}
 
 	return newContext
+}
+
+func (hc *hookController) SnapshotsInfo() []string {
+	if hc.KubernetesController == nil {
+		return []string{"no kubernetes bindings for hook"}
+	}
+
+	return hc.KubernetesController.SnapshotsInfo()
 }

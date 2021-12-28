@@ -42,6 +42,37 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 	app.DefineDebugUnixSocketFlag(rawCommand)
 }
 
+func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
+	// Get hook names
+	hookCmd := app.CommandWithDefaultUsageTemplate(kpApp, "hook", "Actions for hooks")
+	hookListCmd := hookCmd.Command("list", "List all hooks.").
+		Action(func(c *kingpin.ParseContext) error {
+			outBytes, err := Hook(DefaultClient()).List(OutputFormat)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(outBytes))
+			return nil
+		})
+	AddOutputJsonYamlTextFlag(hookListCmd)
+	app.DefineDebugUnixSocketFlag(hookListCmd)
+
+	// Get hook snapshots
+	var hookName string
+	hookSnapshotCmd := hookCmd.Command("snapshot", "Dump hook snapshots.").
+		Action(func(c *kingpin.ParseContext) error {
+			outBytes, err := Hook(DefaultClient()).Name(hookName).Snapshots(OutputFormat)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(outBytes))
+			return nil
+		})
+	hookSnapshotCmd.Arg("hook_name", "").Required().StringVar(&hookName)
+	AddOutputJsonYamlTextFlag(hookSnapshotCmd)
+	app.DefineDebugUnixSocketFlag(hookSnapshotCmd)
+}
+
 func AddOutputJsonYamlTextFlag(cmd *kingpin.CmdClause) {
 	cmd.Flag("output", "Output format: json|yaml|text.").Short('o').
 		Default("text").
@@ -61,4 +92,28 @@ func Queue(client *Client) *QueueRequest {
 func (qr *QueueRequest) Dump(format string) ([]byte, error) {
 	url := fmt.Sprintf("http://unix/queue/list.%s", format)
 	return qr.client.Get(url)
+}
+
+type HookRequest struct {
+	client *Client
+	name   string
+}
+
+func Hook(client *Client) *HookRequest {
+	return &HookRequest{client: client}
+}
+
+func (r *HookRequest) Name(name string) *HookRequest {
+	r.name = name
+	return r
+}
+
+func (r *HookRequest) List(format string) ([]byte, error) {
+	url := fmt.Sprintf("http://unix/hook/list.%s", format)
+	return r.client.Get(url)
+}
+
+func (r *HookRequest) Snapshots(format string) ([]byte, error) {
+	url := fmt.Sprintf("http://unix/hook/%s/snapshots.%s", r.name, format)
+	return r.client.Get(url)
 }

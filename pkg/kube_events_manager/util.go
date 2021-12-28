@@ -63,3 +63,19 @@ func RandomizedResyncPeriod() time.Duration {
 
 	return ResyncPeriodMedian - (ResyncPeriodSpread / 2) + rndSpreadDelta + rndJitterDelta
 }
+
+type CachedObjectsInfo struct {
+	Count    uint64
+	Added    uint64
+	Deleted  uint64
+	Modified uint64
+	Cleaned  uint64
+}
+
+func (c *CachedObjectsInfo) Add(in CachedObjectsInfo) {
+	c.Count += in.Count
+	c.Added += in.Added
+	c.Deleted += in.Deleted
+	c.Modified += in.Modified
+	c.Cleaned += in.Cleaned
+}

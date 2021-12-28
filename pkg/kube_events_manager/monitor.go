@@ -26,6 +26,7 @@ type Monitor interface {
 	Snapshot() []ObjectAndFilterResult
 	EnableKubeEventCb()
 	GetConfig() *MonitorConfig
+	SnapshotInfo() string
 }
 
 // Monitor holds informers for resources and a namespace informer
@@ -217,8 +218,8 @@ func (m *monitor) Snapshot() []ObjectAndFilterResult {
 	return objects
 }
 
-// EnableKubeEventCb turns on event callback for each informer. This also calls
-// eventCb for events saved during "Synchronization" hook execution.
+// EnableKubeEventCb allows execution of event callback for all informers.
+// Also executes eventCb for events accumulated during "Synchronization" phase.
 func (m *monitor) EnableKubeEventCb() {
 	for _, informer := range m.ResourceInformers {
 		informer.EnableKubeEventCb()
@@ -311,4 +312,32 @@ func (m *monitor) PauseHandleEvents() {
 		m.NamespaceInformer.PauseHandleEvents()
 	}
 
+}
+
+func (m *monitor) SnapshotInfo() string {
+	absInfo := &CachedObjectsInfo{}
+	incInfo := &CachedObjectsInfo{}
+
+	for _, informer := range m.ResourceInformers {
+		absInfo.Add(informer.CachedObjectsInfo())
+		incInfo.Add(informer.CachedObjectsInfoIncrement())
+	}
+
+	for nsName := range m.VaryingInformers {
+		for _, informer := range m.VaryingInformers[nsName] {
+			absInfo.Add(informer.CachedObjectsInfo())
+			incInfo.Add(informer.CachedObjectsInfoIncrement())
+		}
+	}
+	return fmt.Sprintf("count: %d, abs a/m/d/c: %d/%d/%d/%d, delta a/m/d/c: %d/%d/%d/%d",
+		absInfo.Count,
+		absInfo.Added,
+		absInfo.Modified,
+		absInfo.Deleted,
+		absInfo.Cleaned,
+		incInfo.Added,
+		incInfo.Modified,
+		incInfo.Deleted,
+		incInfo.Cleaned,
+	)
 }
