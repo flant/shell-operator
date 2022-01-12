@@ -29,7 +29,7 @@ ARG TARGETPLATFORM
 RUN apk --no-cache add ca-certificates bash sed tini && \
     kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
     echo "Download kubectl for ${kubectlArch}" && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.19.11/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
+    wget https://storage.googleapis.com/kubernetes-release/release/v1.21.8/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 ADD frameworks/shell /frameworks/shell
