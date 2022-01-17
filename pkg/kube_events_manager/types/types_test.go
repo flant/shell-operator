@@ -57,7 +57,7 @@ func Test_ObjectAndFilterResult_ToJson_NullFilterResult(t *testing.T) {
 	assert.Contains(t, jsonStr, `"filterResult":null`)
 }
 
-func Test_ObjectAndFilterResult_ToJson_NoFilterResult(t *testing.T) {
+func Test_ObjectAndFilterResult_ToJson_Empty_JQFilter_Has_FilterResult(t *testing.T) {
 	obj := newObj("Pod", "default", "pod-qwe", `{"spec":"asd"}`)
 	obj.Metadata.JqFilter = ""
 
@@ -65,7 +65,7 @@ func Test_ObjectAndFilterResult_ToJson_NoFilterResult(t *testing.T) {
 	assert.NoError(t, err)
 	jsonStr := string(data)
 	//fmt.Printf("%s\n", jsonStr)
-	assert.NotContains(t, jsonStr, "filterResult")
+	assert.Contains(t, jsonStr, "filterResult")
 }
 
 func Test_Sort_ByNamespaceAndName(t *testing.T) {

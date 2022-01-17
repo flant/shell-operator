@@ -104,7 +104,6 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				}
 				bc.Metadata.BindingType = OnKubernetesEvent
 
-				// object without jqfilter should not have filterResult field
 				obj := ObjectAndFilterResult{
 					Object: &unstructured.Unstructured{
 						Object: map[string]interface{}{
@@ -115,7 +114,6 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 							"kind": "Pod",
 						},
 					},
-					FilterResult: "asd",
 				}
 				obj.Metadata.JqFilter = ""
 				bc.Objects = append(bc.Objects, obj)
@@ -188,7 +186,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				bc.Metadata.BindingType = OnKubernetesEvent
 				bc.Metadata.Group = "pods"
 				bc.Metadata.IncludeSnapshots = []string{"monitor_pods"}
-				// object without jqfilter should not have filterResult field
+
 				obj := ObjectAndFilterResult{
 					Object: &unstructured.Unstructured{
 						Object: map[string]interface{}{
@@ -199,7 +197,6 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 							"kind": "Pod",
 						},
 					},
-					FilterResult: "asd",
 				}
 				bc.Objects = append(bc.Objects, obj)
 				bc.Snapshots["monitor_pods"] = append(bc.Snapshots["monitor_pods"], obj)
@@ -212,7 +209,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 					Objects:    []ObjectAndFilterResult{},
 				}
 				bc.Metadata.BindingType = OnKubernetesEvent
-				// object without jqfilter should not have filterResult field
+
 				obj = ObjectAndFilterResult{
 					Object: &unstructured.Unstructured{
 						Object: map[string]interface{}{
@@ -223,7 +220,6 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 							"kind": "Pod",
 						},
 					},
-					FilterResult: "asd",
 				}
 				bc.Objects = append(bc.Objects, obj)
 

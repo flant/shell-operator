@@ -33,7 +33,7 @@ func TaskQueueMainToText(tqs *queue.TaskQueueSet) string {
 
 	q := tqs.GetMain()
 	if q == nil {
-		buf.WriteString(fmt.Sprintf("Queue 'main' is not created\n"))
+		buf.WriteString("Queue 'main' is not created\n")
 	} else {
 		buf.WriteString(TaskQueueToText(q))
 	}
