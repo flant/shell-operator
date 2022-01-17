@@ -37,6 +37,7 @@ type KubernetesBindingsController interface {
 	SnapshotsFor(bindingName string) []ObjectAndFilterResult
 	Snapshots() map[string][]ObjectAndFilterResult
 	SnapshotsInfo() []string
+	SnapshotsDump() map[string]interface{}
 }
 
 // kubernetesHooksController is a main implementation of KubernetesHooksController
@@ -284,13 +285,43 @@ func (c *kubernetesBindingsController) SnapshotsInfo() []string {
 	for _, binding := range c.KubernetesBindings {
 		monitorID := binding.Monitor.Metadata.MonitorId
 		if c.kubeEventsManager.HasMonitor(monitorID) {
-			snapInfo := c.kubeEventsManager.GetMonitor(monitorID).SnapshotInfo()
-			info := fmt.Sprintf("%s: %s", binding.BindingName, snapInfo)
+			total, last := c.kubeEventsManager.GetMonitor(monitorID).SnapshotOperations()
+
+			info := fmt.Sprintf("%s: size=%d, operations since last execution: add=%d, mod=%d, del=%d, clear=%d, operations since start: add=%d, mod=%d, del=%d",
+				binding.BindingName,
+				total.Count,
+				last.Added,
+				last.Modified,
+				last.Deleted,
+				last.Cleaned,
+				total.Added,
+				total.Modified,
+				total.Deleted,
+			)
 			infos = append(infos, info)
 		}
 	}
 
 	return infos
+}
+
+func (c *kubernetesBindingsController) SnapshotsDump() map[string]interface{} {
+	dumps := make(map[string]interface{})
+	for _, binding := range c.KubernetesBindings {
+		monitorID := binding.Monitor.Metadata.MonitorId
+		if c.kubeEventsManager.HasMonitor(monitorID) {
+			total, last := c.kubeEventsManager.GetMonitor(monitorID).SnapshotOperations()
+			dumps[binding.BindingName] = map[string]interface{}{
+				"snapshot": c.kubeEventsManager.GetMonitor(monitorID).Snapshot(),
+				"operations": map[string]interface{}{
+					"sinceStart":         total,
+					"sinceLastExecution": last,
+				},
+			}
+		}
+	}
+
+	return dumps
 }
 
 func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, link *KubernetesBindingToMonitorLink) []BindingContext {

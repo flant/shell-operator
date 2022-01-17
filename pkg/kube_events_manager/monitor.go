@@ -26,7 +26,7 @@ type Monitor interface {
 	Snapshot() []ObjectAndFilterResult
 	EnableKubeEventCb()
 	GetConfig() *MonitorConfig
-	SnapshotInfo() string
+	SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo)
 }
 
 // Monitor holds informers for resources and a namespace informer
@@ -314,30 +314,21 @@ func (m *monitor) PauseHandleEvents() {
 
 }
 
-func (m *monitor) SnapshotInfo() string {
-	absInfo := &CachedObjectsInfo{}
-	incInfo := &CachedObjectsInfo{}
+func (m *monitor) SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo) {
+	total = &CachedObjectsInfo{}
+	last = &CachedObjectsInfo{}
 
 	for _, informer := range m.ResourceInformers {
-		absInfo.Add(informer.CachedObjectsInfo())
-		incInfo.Add(informer.CachedObjectsInfoIncrement())
+		total.Add(informer.CachedObjectsInfo())
+		last.Add(informer.CachedObjectsInfoIncrement())
 	}
 
 	for nsName := range m.VaryingInformers {
 		for _, informer := range m.VaryingInformers[nsName] {
-			absInfo.Add(informer.CachedObjectsInfo())
-			incInfo.Add(informer.CachedObjectsInfoIncrement())
+			total.Add(informer.CachedObjectsInfo())
+			last.Add(informer.CachedObjectsInfoIncrement())
 		}
 	}
-	return fmt.Sprintf("count: %d, abs a/m/d/c: %d/%d/%d/%d, delta a/m/d/c: %d/%d/%d/%d",
-		absInfo.Count,
-		absInfo.Added,
-		absInfo.Modified,
-		absInfo.Deleted,
-		absInfo.Cleaned,
-		incInfo.Added,
-		incInfo.Modified,
-		incInfo.Deleted,
-		incInfo.Cleaned,
-	)
+
+	return total, last
 }

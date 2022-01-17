@@ -47,6 +47,7 @@ type ObjectAndFilterResult struct {
 	ObjectSize       int
 }
 
+// Map constructs a map suitable for use in binding context.
 func (o ObjectAndFilterResult) Map() map[string]interface{} {
 	m := map[string]interface{}{}
 
@@ -54,29 +55,38 @@ func (o ObjectAndFilterResult) Map() map[string]interface{} {
 		m["object"] = o.Object
 	}
 
-	if o.Metadata.JqFilter == "" {
-		return m
-	}
-	// Add filterResult field only if it was requested
-	filterResString, ok := o.FilterResult.(string)
-	if !ok || filterResString == "" {
-		m["filterResult"] = nil
+	if o.Metadata.JqFilter == "" && o.FilterResult == nil {
+		// No jqFilter, no filterResult -> filterResult field should not be in a map.
 		return m
 	}
 
-	if filterResString == "" {
-		m["filterResult"] = nil
-		return m
+	var filterResultValue interface{}
+	if o.Metadata.JqFilter != "" {
+		// jqFilter is set, so filterResult field should be in a map.
+		// FilterResult is a jq output and should be a string.
+		filterResString, ok := o.FilterResult.(string)
+		if !ok || filterResString == "" {
+			m["filterResult"] = nil
+			return m
+		}
+
+		if filterResString == "" {
+			m["filterResult"] = nil
+			return m
+		}
+
+		// Convert string with jq output into Go object.
+		err := json.Unmarshal([]byte(filterResString), &filterResultValue)
+		if err != nil {
+			log.Errorf("Possible bug!!! Cannot unmarshal jq filter '%s' result: %s", o.Metadata.JqFilter, err)
+			m["filterResult"] = nil
+			return m
+		}
+	} else {
+		filterResultValue = o.FilterResult
 	}
 
-	var res interface{}
-	err := json.Unmarshal([]byte(filterResString), &res)
-	if err != nil {
-		log.Errorf("Possible bug!!! Cannot unmarshal jq filter '%s' result: %s", o.Metadata.JqFilter, err)
-		m["filterResult"] = nil
-		return m
-	}
-	m["filterResult"] = res
+	m["filterResult"] = filterResultValue
 
 	return m
 }

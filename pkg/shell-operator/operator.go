@@ -1020,6 +1020,10 @@ func (op *ShellOperator) SetupDebugServerHandles() {
 		return fmt.Sprintf("%s control endpoint is alive", app.AppName), nil
 	})
 
+	op.DebugServer.Route("/queue/main.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
+		return dump.TaskQueueMainToText(op.TaskQueues), nil
+	})
+
 	op.DebugServer.Route("/queue/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		return dump.TaskQueueSetToText(op.TaskQueues), nil
 	})
@@ -1031,7 +1035,7 @@ func (op *ShellOperator) SetupDebugServerHandles() {
 	op.DebugServer.Route("/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
 		hookName := chi.URLParam(r, "name")
 		h := op.HookManager.GetHook(hookName)
-		return h.HookController.KubernetesSnapshots(), nil
+		return h.HookController.SnapshotsDump(), nil
 	})
 }
 

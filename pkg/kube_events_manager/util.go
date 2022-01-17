@@ -64,12 +64,13 @@ func RandomizedResyncPeriod() time.Duration {
 	return ResyncPeriodMedian - (ResyncPeriodSpread / 2) + rndSpreadDelta + rndJitterDelta
 }
 
+// CachedObjectsInfo stores counters of operations over resources in Monitors and Informers.
 type CachedObjectsInfo struct {
-	Count    uint64
-	Added    uint64
-	Deleted  uint64
-	Modified uint64
-	Cleaned  uint64
+	Count    uint64 `json:"count"`
+	Added    uint64 `json:"added"`
+	Deleted  uint64 `json:"deleted"`
+	Modified uint64 `json:"modified"`
+	Cleaned  uint64 `json:"cleaned"`
 }
 
 func (c *CachedObjectsInfo) Add(in CachedObjectsInfo) {

@@ -11,20 +11,32 @@ import (
 var OutputFormat = "text"
 
 func DefineDebugCommands(kpApp *kingpin.Application) {
-	// Queue mamanging commands
-	queueCmd := app.CommandWithDefaultUsageTemplate(kpApp, "queue", "Manage queues.")
+	// Queue dump commands.
+	queueCmd := app.CommandWithDefaultUsageTemplate(kpApp, "queue", "Dump queues.")
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(c *kingpin.ParseContext) error {
-			queueDump, err := Queue(DefaultClient()).Dump(OutputFormat)
+			out, err := Queue(DefaultClient()).List(OutputFormat)
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(queueDump))
+			fmt.Println(string(out))
 			return nil
 		})
 	AddOutputJsonYamlTextFlag(queueListCmd)
 	app.DefineDebugUnixSocketFlag(queueListCmd)
+
+	queueMainCmd := queueCmd.Command("main", "Dump tasks in the main queue.").
+		Action(func(c *kingpin.ParseContext) error {
+			out, err := Queue(DefaultClient()).Main(OutputFormat)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(out))
+			return nil
+		})
+	AddOutputJsonYamlTextFlag(queueMainCmd)
+	app.DefineDebugUnixSocketFlag(queueMainCmd)
 
 	// Raw request command
 	var rawUrl string
@@ -89,8 +101,13 @@ func Queue(client *Client) *QueueRequest {
 	}
 }
 
-func (qr *QueueRequest) Dump(format string) ([]byte, error) {
+func (qr *QueueRequest) List(format string) ([]byte, error) {
 	url := fmt.Sprintf("http://unix/queue/list.%s", format)
+	return qr.client.Get(url)
+}
+
+func (qr *QueueRequest) Main(format string) ([]byte, error) {
+	url := fmt.Sprintf("http://unix/queue/main.%s", format)
 	return qr.client.Get(url)
 }
 
