@@ -28,6 +28,19 @@ func (a AsQueueNames) Less(i, j int) bool {
 	return p < q
 }
 
+func TaskQueueMainToText(tqs *queue.TaskQueueSet) string {
+	var buf strings.Builder
+
+	q := tqs.GetMain()
+	if q == nil {
+		buf.WriteString("Queue 'main' is not created\n")
+	} else {
+		buf.WriteString(TaskQueueToText(q))
+	}
+
+	return buf.String()
+}
+
 func TaskQueueSetToText(tqs *queue.TaskQueueSet) string {
 	var buf strings.Builder
 

@@ -11,20 +11,32 @@ import (
 var OutputFormat = "text"
 
 func DefineDebugCommands(kpApp *kingpin.Application) {
-	// Queue mamanging commands
-	queueCmd := app.CommandWithDefaultUsageTemplate(kpApp, "queue", "Manage queues.")
+	// Queue dump commands.
+	queueCmd := app.CommandWithDefaultUsageTemplate(kpApp, "queue", "Dump queues.")
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(c *kingpin.ParseContext) error {
-			queueDump, err := Queue(DefaultClient()).Dump(OutputFormat)
+			out, err := Queue(DefaultClient()).List(OutputFormat)
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(queueDump))
+			fmt.Println(string(out))
 			return nil
 		})
 	AddOutputJsonYamlTextFlag(queueListCmd)
 	app.DefineDebugUnixSocketFlag(queueListCmd)
+
+	queueMainCmd := queueCmd.Command("main", "Dump tasks in the main queue.").
+		Action(func(c *kingpin.ParseContext) error {
+			out, err := Queue(DefaultClient()).Main(OutputFormat)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(out))
+			return nil
+		})
+	AddOutputJsonYamlTextFlag(queueMainCmd)
+	app.DefineDebugUnixSocketFlag(queueMainCmd)
 
 	// Raw request command
 	var rawUrl string
@@ -40,6 +52,37 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 		})
 	rawCommand.Arg("urlpath", "An url to send to debug endpoint. Example: /queue/list.json").StringVar(&rawUrl)
 	app.DefineDebugUnixSocketFlag(rawCommand)
+}
+
+func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
+	// Get hook names
+	hookCmd := app.CommandWithDefaultUsageTemplate(kpApp, "hook", "Actions for hooks")
+	hookListCmd := hookCmd.Command("list", "List all hooks.").
+		Action(func(c *kingpin.ParseContext) error {
+			outBytes, err := Hook(DefaultClient()).List(OutputFormat)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(outBytes))
+			return nil
+		})
+	AddOutputJsonYamlTextFlag(hookListCmd)
+	app.DefineDebugUnixSocketFlag(hookListCmd)
+
+	// Get hook snapshots
+	var hookName string
+	hookSnapshotCmd := hookCmd.Command("snapshot", "Dump hook snapshots.").
+		Action(func(c *kingpin.ParseContext) error {
+			outBytes, err := Hook(DefaultClient()).Name(hookName).Snapshots(OutputFormat)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(outBytes))
+			return nil
+		})
+	hookSnapshotCmd.Arg("hook_name", "").Required().StringVar(&hookName)
+	AddOutputJsonYamlTextFlag(hookSnapshotCmd)
+	app.DefineDebugUnixSocketFlag(hookSnapshotCmd)
 }
 
 func AddOutputJsonYamlTextFlag(cmd *kingpin.CmdClause) {
@@ -58,7 +101,36 @@ func Queue(client *Client) *QueueRequest {
 	}
 }
 
-func (qr *QueueRequest) Dump(format string) ([]byte, error) {
+func (qr *QueueRequest) List(format string) ([]byte, error) {
 	url := fmt.Sprintf("http://unix/queue/list.%s", format)
 	return qr.client.Get(url)
+}
+
+func (qr *QueueRequest) Main(format string) ([]byte, error) {
+	url := fmt.Sprintf("http://unix/queue/main.%s", format)
+	return qr.client.Get(url)
+}
+
+type HookRequest struct {
+	client *Client
+	name   string
+}
+
+func Hook(client *Client) *HookRequest {
+	return &HookRequest{client: client}
+}
+
+func (r *HookRequest) Name(name string) *HookRequest {
+	r.name = name
+	return r
+}
+
+func (r *HookRequest) List(format string) ([]byte, error) {
+	url := fmt.Sprintf("http://unix/hook/list.%s", format)
+	return r.client.Get(url)
+}
+
+func (r *HookRequest) Snapshots(format string) ([]byte, error) {
+	url := fmt.Sprintf("http://unix/hook/%s/snapshots.%s", r.name, format)
+	return r.client.Get(url)
 }

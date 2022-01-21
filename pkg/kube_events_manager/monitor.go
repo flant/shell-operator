@@ -26,6 +26,7 @@ type Monitor interface {
 	Snapshot() []ObjectAndFilterResult
 	EnableKubeEventCb()
 	GetConfig() *MonitorConfig
+	SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo)
 }
 
 // Monitor holds informers for resources and a namespace informer
@@ -217,8 +218,8 @@ func (m *monitor) Snapshot() []ObjectAndFilterResult {
 	return objects
 }
 
-// EnableKubeEventCb turns on event callback for each informer. This also calls
-// eventCb for events saved during "Synchronization" hook execution.
+// EnableKubeEventCb allows execution of event callback for all informers.
+// Also executes eventCb for events accumulated during "Synchronization" phase.
 func (m *monitor) EnableKubeEventCb() {
 	for _, informer := range m.ResourceInformers {
 		informer.EnableKubeEventCb()
@@ -311,4 +312,23 @@ func (m *monitor) PauseHandleEvents() {
 		m.NamespaceInformer.PauseHandleEvents()
 	}
 
+}
+
+func (m *monitor) SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo) {
+	total = &CachedObjectsInfo{}
+	last = &CachedObjectsInfo{}
+
+	for _, informer := range m.ResourceInformers {
+		total.Add(informer.CachedObjectsInfo())
+		last.Add(informer.CachedObjectsInfoIncrement())
+	}
+
+	for nsName := range m.VaryingInformers {
+		for _, informer := range m.VaryingInformers[nsName] {
+			total.Add(informer.CachedObjectsInfo())
+			last.Add(informer.CachedObjectsInfoIncrement())
+		}
+	}
+
+	return total, last
 }

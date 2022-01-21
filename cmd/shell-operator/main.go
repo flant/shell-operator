@@ -62,6 +62,7 @@ func main() {
 	app.DefineStartCommandFlags(kpApp, startCmd)
 
 	debug.DefineDebugCommands(kpApp)
+	debug.DefineDebugCommandsSelf(kpApp)
 
 	kingpin.MustParse(kpApp.Parse(os.Args[1:]))
 }
