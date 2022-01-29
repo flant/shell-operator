@@ -4,6 +4,7 @@ import (
 	"context"
 
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/robfig/cron.v2"
 )
@@ -55,20 +56,11 @@ func (sm *scheduleManager) Stop() {
 // Crontab string should be validated with cron.Parse
 // function before pass to Add.
 func (sm *scheduleManager) Add(newEntry ScheduleEntry) {
-	logEntry := log.WithField("operator.component", "scheduleManager")
-
 	cronEntry, hasCronEntry := sm.Entries[newEntry.Crontab]
 
 	// If no entry, then add new scheduled function and save CronEntry.
 	if !hasCronEntry {
-		// The error can occur in case of bad format of crontab string.
-		// All crontab strings should be validated before add.
-		entryId, _ := sm.cron.AddFunc(newEntry.Crontab, func() {
-			logEntry.Debugf("fire schedule event for entry '%s'", newEntry.Crontab)
-			sm.ScheduleCh <- newEntry.Crontab
-		})
-
-		logEntry.Debugf("entry '%s' added", newEntry.Crontab)
+		entryId, _ := scheduleJob(sm.cron, newEntry, sm.ScheduleCh)
 
 		sm.Entries[newEntry.Crontab] = CronEntry{
 			EntryID: entryId,
