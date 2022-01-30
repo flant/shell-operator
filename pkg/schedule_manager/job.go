@@ -11,7 +11,7 @@ import (
 
 // Schedule describes a job's duty cycle.
 type scheduleWithInitDelay struct {
-	initDelay     time.Duration
+	firstRunDelay time.Duration
 	firstSchedule bool
 	scheduler     cron.Schedule
 }
@@ -19,7 +19,7 @@ type scheduleWithInitDelay struct {
 func (s *scheduleWithInitDelay) Next(cur time.Time) time.Time {
 	next := s.scheduler.Next(cur)
 	if !s.firstSchedule {
-		next = next.Add(s.initDelay)
+		next = next.Add(s.firstRunDelay)
 		s.firstSchedule = true
 	}
 
@@ -44,8 +44,8 @@ func scheduleJob(cronManager *cron.Cron, entry ScheduleEntry, scheduleCh chan st
 	specSchedule, _ := cron.Parse(entry.Crontab)
 
 	schedule := &scheduleWithInitDelay{
-		initDelay: entry.InitialDelay,
-		scheduler: specSchedule,
+		firstRunDelay: entry.FirstRunDelay,
+		scheduler:     specSchedule,
 	}
 
 	j := &job{
@@ -54,7 +54,7 @@ func scheduleJob(cronManager *cron.Cron, entry ScheduleEntry, scheduleCh chan st
 		logEntry:   logEntry,
 	}
 
-	logEntry.Debugf("entry '%s' added", entry.Crontab)
+	logEntry.Debugf("entry '%s' added with first run delay %s", entry.Crontab, entry.FirstRunDelay.String())
 
 	return cronManager.Schedule(schedule, j), nil
 }

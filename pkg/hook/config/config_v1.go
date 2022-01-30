@@ -33,12 +33,13 @@ type HookConfigV1 struct {
 
 // Schedule configuration
 type ScheduleConfigV1 struct {
-	Name                 string   `json:"name"`
-	Crontab              string   `json:"crontab"`
-	AllowFailure         bool     `json:"allowFailure"`
-	IncludeSnapshotsFrom []string `json:"includeSnapshotsFrom"`
-	Queue                string   `json:"queue"`
-	Group                string   `json:"group,omitempty"`
+	Name                 string        `json:"name"`
+	Crontab              string        `json:"crontab"`
+	FirstRunDelay        time.Duration `json:"firstRunDelay,omitempty"`
+	AllowFailure         bool          `json:"allowFailure"`
+	IncludeSnapshotsFrom []string      `json:"includeSnapshotsFrom"`
+	Queue                string        `json:"queue"`
+	Group                string        `json:"group,omitempty"`
 }
 
 // version 1 of kubernetes event configuration
@@ -305,8 +306,9 @@ func (cv1 *HookConfigV1) ConvertSchedule(schV1 ScheduleConfigV1) (ScheduleConfig
 
 	res.AllowFailure = schV1.AllowFailure
 	res.ScheduleEntry = ScheduleEntry{
-		Crontab: schV1.Crontab,
-		Id:      ScheduleID(),
+		Crontab:       schV1.Crontab,
+		Id:            ScheduleID(),
+		FirstRunDelay: schV1.FirstRunDelay,
 	}
 	res.IncludeSnapshotsFrom = schV1.IncludeSnapshotsFrom
 

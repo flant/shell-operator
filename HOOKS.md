@@ -124,6 +124,12 @@ schedule:
   crontab: "* * * * *"
   allowFailure: true|false
   group: "pods"
+
+- name: "every minute with first run delay"
+  crontab: "* * * * *"
+  allowFailure: true|false
+  group: "pods"
+  firstRunDelay: "5m"
   ...
 ```
 
@@ -132,6 +138,8 @@ schedule:
 - `name` — is an optional identifier. It is used to distinguish between multiple schedules during runtime. For more information see [binding context](#binding-context).
 
 - `crontab` – is a mandatory schedule with a regular crontab syntax with 5 fields. 6 fields style crontab also supported, for more information see [documentation on robfig/cron.v2 library](https://godoc.org/gopkg.in/robfig/cron.v2).
+- 
+- `firstRunDelay` – pause before first run hook. In golang time.Duration format (`1s`, `5m`, `1h`).
 
 - `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
