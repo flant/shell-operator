@@ -35,7 +35,7 @@ func SetupLogging() {
 	case "text":
 		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true})
 	case "color":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true})
+		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true, FullTimestamp: true})
 	default:
 		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
 	}
