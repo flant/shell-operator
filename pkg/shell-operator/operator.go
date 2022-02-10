@@ -9,23 +9,22 @@ import (
 	"path/filepath"
 	"time"
 
+	klient "github.com/flant/kube-client/client"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	uuid "gopkg.in/satori/go.uuid.v1"
 
+	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/config"
+	"github.com/flant/shell-operator/pkg/debug"
+	"github.com/flant/shell-operator/pkg/hook"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	"github.com/flant/shell-operator/pkg/hook/controller"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
-
-	klient "github.com/flant/kube-client/client"
-	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/debug"
-	"github.com/flant/shell-operator/pkg/hook"
-	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric_storage"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
@@ -36,6 +35,7 @@ import (
 	"github.com/flant/shell-operator/pkg/utils/measure"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/validating"
+	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 )
 
 var WaitQueuesTimeout = time.Second * 10
@@ -70,6 +70,8 @@ type ShellOperator struct {
 	ConversionWebhookManager *conversion.WebhookManager
 
 	DebugServer *debug.Server
+
+	RuntimeConfig *config.Config
 }
 
 func NewShellOperator() *ShellOperator {
@@ -101,6 +103,10 @@ func (op *ShellOperator) WithKubernetesClient(klient klient.Client) {
 
 func (op *ShellOperator) WithMetricStorage(metricStorage *metric_storage.MetricStorage) {
 	op.MetricStorage = metricStorage
+}
+
+func (op *ShellOperator) WithRuntimeConfig(runtimeConfig *config.Config) {
+	op.RuntimeConfig = runtimeConfig
 }
 
 // InitMetricStorage creates default MetricStorage object if not set earlier.
@@ -141,6 +147,7 @@ func (op *ShellOperator) InitHookMetricStorage() {
 //   - hook manager
 //   - kubernetes events manager
 //   - schedule manager
+//   - runtime config
 func (op *ShellOperator) Init() (err error) {
 	log.Debug("MAIN Init")
 
@@ -1036,6 +1043,45 @@ func (op *ShellOperator) SetupDebugServerHandles() {
 		hookName := chi.URLParam(r, "name")
 		h := op.HookManager.GetHook(hookName)
 		return h.HookController.SnapshotsDump(), nil
+	})
+
+	op.DebugServer.Route("/config/list.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
+		format := debug.FormatFromRequest(r)
+		if format == "text" {
+			return op.RuntimeConfig.String(), nil
+		}
+		return op.RuntimeConfig.List(), nil
+	})
+
+	op.DebugServer.RoutePOST("/config/set", func(r *http.Request) (interface{}, error) {
+		name := r.PostForm.Get("name")
+		if name == "" {
+			return nil, fmt.Errorf("'name' parameter is required")
+		}
+		if !op.RuntimeConfig.Has(name) {
+			return nil, fmt.Errorf("unknown runtime parameter '%s'", name)
+		}
+
+		value := r.PostForm.Get("value")
+		if name == "" {
+			return nil, fmt.Errorf("'value' parameter is required")
+		}
+
+		var duration time.Duration
+		var err error
+		durationStr := r.PostForm.Get("duration")
+		if durationStr != "" {
+			duration, err = time.ParseDuration(durationStr)
+			if err != nil {
+				return nil, fmt.Errorf("parse duration: %v", err)
+			}
+		}
+		if duration == 0 {
+			op.RuntimeConfig.Set(name, value)
+		} else {
+			op.RuntimeConfig.SetTemporarily(name, value, duration)
+		}
+		return nil, op.RuntimeConfig.LastError(name)
 	})
 }
 

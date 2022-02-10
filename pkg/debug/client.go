@@ -1,9 +1,10 @@
 package debug
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 
@@ -59,5 +60,30 @@ func (c *Client) Get(url string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	return ioutil.ReadAll(resp.Body)
+	bodyBuf := new(bytes.Buffer)
+	_, err = io.Copy(bodyBuf, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return bodyBuf.Bytes(), nil
+}
+
+func (c *Client) Post(targetUrl string, data map[string][]string) ([]byte, error) {
+	httpc, err := c.newHttpClient()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := httpc.PostForm(targetUrl, data)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBuf := new(bytes.Buffer)
+	_, err = io.Copy(bodyBuf, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return bodyBuf.Bytes(), nil
 }

@@ -2,6 +2,7 @@ package debug
 
 import (
 	"fmt"
+	"time"
 
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -37,6 +38,38 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 		})
 	AddOutputJsonYamlTextFlag(queueMainCmd)
 	app.DefineDebugUnixSocketFlag(queueMainCmd)
+
+	// Runtime config command.
+	configCmd := app.CommandWithDefaultUsageTemplate(kpApp, "config", "Manage runtime parameters.")
+
+	configListCmd := configCmd.Command("list", "List available runtime parameters.").
+		Action(func(c *kingpin.ParseContext) error {
+			out, err := Config(DefaultClient()).List(OutputFormat)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(out))
+			return nil
+		})
+	AddOutputJsonYamlTextFlag(configListCmd)
+	app.DefineDebugUnixSocketFlag(configListCmd)
+
+	var paramName string
+	var paramValue string
+	var paramDuration time.Duration
+	configSetCmd := configCmd.Command("set", "Set runtime parameter.").
+		Action(func(c *kingpin.ParseContext) error {
+			out, err := Config(DefaultClient()).Set(paramName, paramValue, paramDuration)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(out))
+			return nil
+		})
+	configSetCmd.Arg("name", "A name of runtime parameter").Required().StringVar(&paramName)
+	configSetCmd.Arg("value", "A new value for the runtime parameter").Required().StringVar(&paramValue)
+	configSetCmd.Arg("duration", "Set value for a period of time, then return a previous value. Use Go notation: 10s, 15m30s, etc.").DurationVar(&paramDuration)
+	app.DefineDebugUnixSocketFlag(configSetCmd)
 
 	// Raw request command
 	var rawUrl string
@@ -133,4 +166,30 @@ func (r *HookRequest) List(format string) ([]byte, error) {
 func (r *HookRequest) Snapshots(format string) ([]byte, error) {
 	url := fmt.Sprintf("http://unix/hook/%s/snapshots.%s", r.name, format)
 	return r.client.Get(url)
+}
+
+type ConfigRequest struct {
+	client *Client
+}
+
+func Config(client *Client) *ConfigRequest {
+	return &ConfigRequest{
+		client: client,
+	}
+}
+
+func (cr *ConfigRequest) List(format string) ([]byte, error) {
+	url := fmt.Sprintf("http://unix/config/list.%s", format)
+	return cr.client.Get(url)
+}
+
+func (cr *ConfigRequest) Set(name string, value string, duration time.Duration) ([]byte, error) {
+	data := map[string][]string{
+		"name":  {name},
+		"value": {value},
+	}
+	if duration != 0 {
+		data["duration"] = []string{duration.String()}
+	}
+	return cr.client.Post("http://unix/config/set", data)
 }

@@ -5,6 +5,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
+
+	"github.com/flant/shell-operator/pkg/config"
 )
 
 // Use info level with timestamps and a text output by default
@@ -12,7 +14,7 @@ var LogLevel = "info"
 var LogNoTime = false
 var LogType = "text"
 
-// SetupLoggingSettings init global flags for logging
+// DefineLoggingFlags defines flags for logger settings.
 func DefineLoggingFlags(cmd *kingpin.CmdClause) {
 	cmd.Flag("log-level", "Logging level: debug, info, error. Default is info. Can be set with $LOG_LEVEL.").
 		Envar("LOG_LEVEL").
@@ -27,9 +29,9 @@ func DefineLoggingFlags(cmd *kingpin.CmdClause) {
 		BoolVar(&LogNoTime)
 }
 
-// SetupLogging sets logging output
-func SetupLogging() {
-	switch LogType {
+// SetupLogging sets logger formatter and level.
+func SetupLogging(runtimeConfig *config.Config) {
+	switch strings.ToLower(LogType) {
 	case "json":
 		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
 	case "text":
@@ -40,7 +42,17 @@ func SetupLogging() {
 		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
 	}
 
-	switch strings.ToLower(LogLevel) {
+	setLogLevel(LogLevel)
+
+	runtimeConfig.Register("log.level", "Global log level", strings.ToLower(LogLevel), func(name string, oldValue string, newValue string) error {
+		log.Infof("Set log level to '%s'", newValue)
+		setLogLevel(newValue)
+		return nil
+	})
+}
+
+func setLogLevel(logLevel string) {
+	switch strings.ToLower(logLevel) {
 	case "debug":
 		log.SetLevel(log.DebugLevel)
 	case "error":
