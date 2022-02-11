@@ -12,7 +12,7 @@ jobs:
       run_tests: ${{ steps.check.outputs.run_tests }}
       build_multi_arch: ${{ steps.check.outputs.build_multi_arch }}
     steps:
-      - uses: actions/github-script@v5
+      - uses: actions/github-script@v6
         id: check
         with:
           script: |
