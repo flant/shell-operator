@@ -1,9 +1,9 @@
 Binding Context Generator
 =========================
-Binding Context Generator allows to generate binding context values for hook testing purpose.
+Binding Context Generator provides the ability to generate binding contexts for hooks testing purposes.
 
 Usage example:
-1. Declare the hook config
+1. Hook Config
 ```go
 config := `
 configVersion: v1
@@ -25,7 +25,7 @@ kubernetes:
       matchNames:
       - default`
 ```
-2. Declare initial state of kubernetes objects
+2. Initial objects state
 ```go
 initialState := `
 ---
@@ -40,7 +40,7 @@ metadata:
   name: pod-1
 `
 ```
-3. Declare new state (one of pods are deleted)
+3. New state
 ```go
 newState := `
 ---
@@ -52,12 +52,9 @@ metadata:
 ```
 4. Create new binding context controller
 ```go
-c, err := context.NewBindingContextController(config, initialState)
-if err != nil {
-  return err
-}
+c := context.NewBindingContextController(config, initialState)
 ```
-5. Register CRD (if you use some in tests) in format [Group, Version, Kind, isNamespaced]:
+5. Register CRDs (if it is necessary) in format [Group, Version, Kind, isNamespaced]:
 ```go
 c.RegisterCRD("example.com", "v1", "Example", true)
 c.RegisterCRD("example.com", "v1", "ClusterExample", false)
@@ -70,7 +67,7 @@ if err != nil {
 }
 testContexts(contexts)
 ```
-7. Change state to new get binding contexts
+7. Change state to get new binding contexts
 ```go
 contexts, err = c.ChangeState(newState)
 if err != nil {
@@ -78,7 +75,7 @@ if err != nil {
 }
 testNewContexts(contexts)
 ```
-8. Run schedule to get binding contexts
+8. Run schedule to get binding contexts for a cron task
 ```go
 contexts, err = c.RunSchedule("* * * * *")
 if err != nil {

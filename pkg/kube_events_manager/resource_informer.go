@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 
@@ -28,6 +29,7 @@ type ResourceInformer interface {
 	WithNamespace(string)
 	WithName(string)
 	WithKubeEventCb(eventCb func(KubeEvent))
+	WithSyncPeriod(time.Duration)
 	CreateSharedInformer() error
 	CachedObjects() []ObjectAndFilterResult
 	CachedObjectsBytes() int64
@@ -51,6 +53,7 @@ type resourceInformer struct {
 	SharedInformer       cache.SharedInformer
 	GroupVersionResource schema.GroupVersionResource
 	ListOptions          metav1.ListOptions
+	informerSyncTime     time.Duration
 
 	// A cache of objects and filterResults. It is a part of the Monitor's snapshot.
 	cachedObjects map[string]*ObjectAndFilterResult
@@ -91,6 +94,7 @@ var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 		eventBufLock:           sync.Mutex{},
 		cachedObjectsInfo:      &CachedObjectsInfo{},
 		cachedObjectsIncrement: &CachedObjectsInfo{},
+		informerSyncTime:       100 * time.Millisecond,
 	}
 	return informer
 }
@@ -113,6 +117,10 @@ func (ei *resourceInformer) WithNamespace(ns string) {
 
 func (ei *resourceInformer) WithName(name string) {
 	ei.Name = name
+}
+
+func (ei *resourceInformer) WithSyncPeriod(period time.Duration) {
+	ei.informerSyncTime = period
 }
 
 func (ei *resourceInformer) WithKubeEventCb(eventCb func(KubeEvent)) {
@@ -480,7 +488,9 @@ func (ei *resourceInformer) Start() {
 
 	go ei.SharedInformer.Run(stopCh)
 
-	if ok := cache.WaitForCacheSync(stopCh, ei.SharedInformer.HasSynced); !ok {
+	if err := wait.PollImmediateUntil(ei.informerSyncTime, func() (bool, error) {
+		return ei.SharedInformer.HasSynced(), nil
+	}, stopCh); err != nil {
 		ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
 	}
 

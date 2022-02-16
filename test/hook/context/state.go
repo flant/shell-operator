@@ -3,28 +3,35 @@ package context
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 // if we use default, then we are not able to emulate global resources due to fake cluster limitations
 // that's why an empty namespace is used here, specify namespace in a resource by your own if needed
-var defaultNamespace = ""
+var defaultNamespace = "" //nolint:gochecknoglobals
 
 // StateController holds objects state for FakeCluster
 type StateController struct {
 	CurrentState map[string]manifest.Manifest
+	fakeCluster  *fake.Cluster
 
-	fakeCluster *fake.Cluster
+	stopCh chan<- types.KubeEvent
 }
 
 // NewStateController creates controller to apply state changes
-func NewStateController(fc *fake.Cluster) *StateController {
-	return &StateController{
+func NewStateController(fc *fake.Cluster, ev kubeeventsmanager.KubeEventsManager) *StateController {
+	c := &StateController{
 		CurrentState: make(map[string]manifest.Manifest),
 		fakeCluster:  fc,
+		stopCh:       ev.Ch(),
 	}
+
+	return c
 }
 
 func (c *StateController) SetInitialState(initialState string) error {
@@ -44,20 +51,18 @@ func (c *StateController) SetInitialState(initialState string) error {
 	}
 
 	c.CurrentState = newState
-
 	return nil
 }
 
 // ChangeState apply changes to current objects state
-func (c *StateController) ChangeState(newRawState string) (int, error) {
+func (c *StateController) ChangeState(newRawState string) error {
 	newManifests, err := manifest.ListFromYamlDocs(newRawState)
 	if err != nil {
-		return 0, fmt.Errorf("error while changing state: %v", err)
+		return fmt.Errorf("error while changing state: %v", err)
 	}
 
 	var newState = make(map[string]manifest.Manifest)
 
-	generatedEvents := 0
 	// Create new objects in FakeCluster
 	for _, m := range newManifests {
 		// save manifest to new State
@@ -66,36 +71,33 @@ func (c *StateController) ChangeState(newRawState string) (int, error) {
 		currM, ok := c.CurrentState[m.Id()]
 		if !ok {
 			// Create object if not exist
-			err = c.fakeCluster.Create(m.Namespace(defaultNamespace), m)
-			//err := createObject(newStateObject, newUnstructuredObject)
-			if err != nil {
-				return generatedEvents, err
+			if err := c.fakeCluster.Create(m.Namespace(defaultNamespace), m); err != nil {
+				return err
 			}
 			c.CurrentState[m.Id()] = m
-			generatedEvents++
-		} else {
-			// Update object if changed
-			if !reflect.DeepEqual(currM, m) {
-				err := c.fakeCluster.Update(m.Namespace(defaultNamespace), m)
-				if err != nil {
-					return generatedEvents, err
-				}
-				c.CurrentState[m.Id()] = m
-				generatedEvents++
+		} else if !reflect.DeepEqual(currM, m) {
+			// Update object
+			if err := c.fakeCluster.Update(m.Namespace(defaultNamespace), m); err != nil {
+				return err
 			}
+			c.CurrentState[m.Id()] = m
 		}
 	}
 	// Remove obsolete objects
-	for currId, currM := range c.CurrentState {
-		if _, ok := newState[currId]; !ok {
+	for currID, currM := range c.CurrentState {
+		if _, ok := newState[currID]; !ok {
 			// Delete object
-			err := c.fakeCluster.Delete(currM.Namespace(defaultNamespace), currM)
-			if err != nil {
-				return generatedEvents, err
+			if err := c.fakeCluster.Delete(currM.Namespace(defaultNamespace), currM); err != nil {
+				return err
 			}
-			delete(c.CurrentState, currId)
-			generatedEvents++
+			delete(c.CurrentState, currID)
 		}
 	}
-	return generatedEvents, nil
+
+	go func() {
+		defer func() { c.stopCh <- types.KubeEvent{MonitorId: "STOP_EVENTS"} }()
+		time.Sleep(20 * time.Millisecond)
+	}()
+
+	return nil
 }
