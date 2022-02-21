@@ -29,6 +29,8 @@ type TemporalValue struct {
 	expire time.Time
 }
 
+const CheckExpiredTemporalValuesPeriod = 15 * time.Second
+
 // Config is a storage for all runtime parameters.
 type Config struct {
 	m      sync.Mutex
@@ -199,7 +201,7 @@ func (c *Config) SetTemporarily(name string, value string, duration time.Duratio
 	newValue := c.value(name)
 	// Start go routine to expire temporal values.
 	if c.expireTicker == nil {
-		c.expireTicker = time.NewTicker(5 * time.Second)
+		c.expireTicker = time.NewTicker(CheckExpiredTemporalValuesPeriod)
 		go func() {
 			for {
 				<-c.expireTicker.C
