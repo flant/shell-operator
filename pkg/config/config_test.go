@@ -11,7 +11,7 @@ import (
 func TestConfig_Register(t *testing.T) {
 	c := NewConfig()
 
-	c.Register("log.level", "", "info", nil)
+	c.Register("log.level", "", "info", nil, nil)
 
 	logLevel := c.Value("log.level")
 	assert.Equal(t, "info", logLevel)
@@ -35,10 +35,10 @@ func TestConfig_OnChange(t *testing.T) {
 	c := NewConfig()
 
 	newValue := ""
-	c.Register("log.level", "", "info", func(name string, oldValue string, n string) error {
+	c.Register("log.level", "", "info", func(oldValue string, n string) error {
 		newValue = n
 		return nil
-	})
+	}, nil)
 
 	c.Set("log.level", "debug")
 	assert.Equal(t, "debug", newValue, "onChange not called for Set")
@@ -69,12 +69,12 @@ func TestConfig_Errors(t *testing.T) {
 	var err error
 	c := NewConfig()
 
-	c.Register("log.level", "", "info", func(name string, oldValue string, n string) error {
+	c.Register("log.level", "", "info", func(oldValue string, n string) error {
 		if n == "debug" {
 			return nil
 		}
 		return fmt.Errorf("unknown value")
-	})
+	}, nil)
 
 	c.Set("log.level", "bad-value")
 	err = c.LastError("log.level")
