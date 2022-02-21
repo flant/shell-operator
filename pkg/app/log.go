@@ -1,7 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -13,6 +15,9 @@ import (
 var LogLevel = "info"
 var LogNoTime = false
 var LogType = "text"
+
+// ForcedDurationForDebugLevel - force expiration for debug level.
+const ForcedDurationForDebugLevel = 30 * time.Minute
 
 // DefineLoggingFlags defines flags for logger settings.
 func DefineLoggingFlags(cmd *kingpin.CmdClause) {
@@ -44,11 +49,19 @@ func SetupLogging(runtimeConfig *config.Config) {
 
 	setLogLevel(LogLevel)
 
-	runtimeConfig.Register("log.level", "Global log level", strings.ToLower(LogLevel), func(name string, oldValue string, newValue string) error {
-		log.Infof("Set log level to '%s'", newValue)
-		setLogLevel(newValue)
-		return nil
-	})
+	runtimeConfig.Register("log.level",
+		fmt.Sprintf("Global log level. Default duration for debug level is %s", ForcedDurationForDebugLevel),
+		strings.ToLower(LogLevel),
+		func(oldValue string, newValue string) error {
+			log.Infof("Set log level to '%s'", newValue)
+			setLogLevel(newValue)
+			return nil
+		}, func(oldValue string, newValue string) time.Duration {
+			if strings.ToLower(newValue) == "debug" {
+				return ForcedDurationForDebugLevel
+			}
+			return 0
+		})
 }
 
 func setLogLevel(logLevel string) {

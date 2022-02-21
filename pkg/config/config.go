@@ -14,18 +14,22 @@ import (
  * Runtime configuration parameters. This is a simple flat KV storage.
  */
 
+// Parameter is a runtime configuration parameter.
 type Parameter struct {
-	name         string
-	defaultValue string
-	description  string
-	onChange     func(name string, oldValue string, newValue string) error
+	name          string
+	description   string
+	defaultValue  string
+	onChange      func(oldValue string, newValue string) error
+	forceDuration func(oldValue string, newValue string) time.Duration
 }
 
+// TemporalValue is a value for parameter that will expire in the future.
 type TemporalValue struct {
 	value  string
 	expire time.Time
 }
 
+// Config is a storage for all runtime parameters.
 type Config struct {
 	m      sync.Mutex
 	params map[string]*Parameter
@@ -49,7 +53,7 @@ func NewConfig() *Config {
 	}
 }
 
-func (c *Config) Register(name string, description string, defaultValue string, onChange func(name string, oldValue string, newValue string) error) {
+func (c *Config) Register(name string, description string, defaultValue string, onChange func(oldValue string, newValue string) error, forceDuration func(oldValue string, newValue string) time.Duration) {
 	if c == nil {
 		return
 	}
@@ -60,10 +64,11 @@ func (c *Config) Register(name string, description string, defaultValue string, 
 		return
 	}
 	c.params[name] = &Parameter{
-		name:         name,
-		defaultValue: defaultValue,
-		description:  description,
-		onChange:     onChange,
+		name:          name,
+		defaultValue:  defaultValue,
+		description:   description,
+		onChange:      onChange,
+		forceDuration: forceDuration,
 	}
 }
 
@@ -132,9 +137,15 @@ func (c *Config) LastError(name string) error {
 	return err
 }
 
-// Set updates a value of the paramater by its name.
+// Set updates a value of the parameter by its name.
 // Deletes a temporal value if set.
 func (c *Config) Set(name string, value string) {
+	forceDuration := c.callForceDuration(name, value)
+	if forceDuration > 0 {
+		c.SetTemporarily(name, value, forceDuration)
+		return
+	}
+
 	c.m.Lock()
 	oldValue := c.value(name)
 	delete(c.temporalValues, name)
@@ -234,7 +245,7 @@ func (c *Config) callOnChange(name string, oldValue string, newValue string) {
 	if c.params[name].onChange == nil {
 		return
 	}
-	err := c.params[name].onChange(name, oldValue, newValue)
+	err := c.params[name].onChange(oldValue, newValue)
 	if err != nil {
 		c.logEntry.Errorf("OnChange handler failed for '%s' during value change from '%s' to '%s': %v",
 			name, oldValue, newValue, err)
@@ -243,4 +254,19 @@ func (c *Config) callOnChange(name string, oldValue string, newValue string) {
 	delete(c.errors, name)
 	c.errors[name] = err
 	c.m.Unlock()
+}
+
+func (c *Config) callForceDuration(name string, newValue string) time.Duration {
+	c.m.Lock()
+	defer c.m.Unlock()
+	param, has := c.params[name]
+	if !has {
+		return 0
+	}
+	if param.forceDuration == nil {
+		return 0
+	}
+
+	oldValue := c.value(name)
+	return param.forceDuration(oldValue, newValue)
 }
