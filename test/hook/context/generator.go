@@ -3,6 +3,7 @@ package context
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/flant/kube-client/fake"
@@ -31,28 +32,40 @@ type BindingContextController struct {
 	KubeEventsManager kubeeventsmanager.KubeEventsManager
 	ScheduleManager   schedulemanager.ScheduleManager
 
-	UpdateTimeout time.Duration
-
 	fakeCluster *fake.Cluster
+
+	mu      sync.Mutex
+	started bool
 }
 
-func NewBindingContextController(config string, version ...fake.ClusterVersion) (*BindingContextController, error) {
+func NewBindingContextController(config string, version ...fake.ClusterVersion) *BindingContextController {
 	logrus.SetLevel(logrus.ErrorLevel)
 
 	k8sVersion := fake.ClusterVersionV119
 	if len(version) > 0 {
 		k8sVersion = version[0]
 	}
+
 	fc := fake.NewFakeCluster(k8sVersion)
-	return &BindingContextController{
-		HookMap:    make(map[string]string),
-		HookConfig: config,
+	ctx := context.Background()
 
-		Controller:    NewStateController(fc),
-		UpdateTimeout: 1500 * time.Millisecond,
-
+	b := &BindingContextController{
+		HookMap:     make(map[string]string),
+		HookConfig:  config,
 		fakeCluster: fc,
-	}, nil
+	}
+
+	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
+	b.KubeEventsManager.WithContext(ctx)
+	b.KubeEventsManager.WithKubeClient(b.fakeCluster.Client)
+	b.KubeEventsManager.WithSyncPeriod(time.Microsecond)
+
+	b.ScheduleManager = schedulemanager.NewScheduleManager()
+	b.ScheduleManager.WithContext(ctx)
+
+	b.Controller = NewStateController(fc, b.KubeEventsManager)
+
+	return b
 }
 
 func (b *BindingContextController) WithHook(h *hook.Hook) {
@@ -69,18 +82,18 @@ func (b *BindingContextController) RegisterCRD(group, version, kind string, name
 	b.fakeCluster.RegisterCRD(group, version, kind, namespaced)
 }
 
-// BindingContextsGenerator generates binding contexts for hook tests
+// Run generates binding contexts for hook tests
 func (b *BindingContextController) Run(initialState string) (GeneratedBindingContexts, error) {
-	ctx := context.Background()
+	// fmt.Println("Run start")
+	// defer func() { fmt.Println("Run end") }()
 
-	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
-	b.KubeEventsManager.WithContext(ctx)
-	b.KubeEventsManager.WithKubeClient(b.fakeCluster.Client)
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-	b.ScheduleManager = schedulemanager.NewScheduleManager()
-	b.ScheduleManager.WithContext(ctx)
+	if b.started {
+		return GeneratedBindingContexts{}, fmt.Errorf("attempt to runner started runner, it cannot be started twice")
+	}
 
-	// Use StateController to apply changes
 	err := b.Controller.SetInitialState(initialState)
 	if err != nil {
 		return GeneratedBindingContexts{}, err
@@ -113,65 +126,50 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	b.HookCtrl.UnlockKubernetesEvents()
+	b.started = true
 
 	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
-func (b *BindingContextController) ChangeState(newState ...string) (GeneratedBindingContexts, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), b.UpdateTimeout)
+func (b *BindingContextController) ChangeState(newState string) (GeneratedBindingContexts, error) {
+	// fmt.Println("Change state start")
+	// defer func() { fmt.Println("Change state end") }()
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
 	cc := NewContextCombiner()
 
-	for _, state := range newState {
-		_, err := b.Controller.ChangeState(state)
-		if err != nil {
-			return GeneratedBindingContexts{}, fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
-		}
-
-	outer:
-		for {
-			select {
-			case ev := <-b.KubeEventsManager.Ch():
-				b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
-					cc.AddBindingContext(types.OnKubernetesEvent, info)
-				})
-				continue
-			case <-ctx.Done():
-				break outer
-			}
-		}
-	}
-	return cc.CombinedAndUpdated(b.HookCtrl)
-}
-
-func (b *BindingContextController) ChangeStateAndWaitForBindingContexts(desiredQuantity int, newState string) (GeneratedBindingContexts, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cc := NewContextCombiner()
-
-	_, err := b.Controller.ChangeState(newState)
-	if err != nil {
+	if err := b.Controller.ChangeState(newState); err != nil {
 		return GeneratedBindingContexts{}, fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
 	}
 
-	for cc.QueueLen() != desiredQuantity {
+outer:
+	for {
 		select {
 		case ev := <-b.KubeEventsManager.Ch():
-			b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
-				cc.AddBindingContext(types.OnKubernetesEvent, info)
-			})
-			continue
+			switch ev.MonitorId {
+			case "STOP_EVENTS":
+				break outer
+			default:
+				b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
+					cc.AddBindingContext(types.OnKubernetesEvent, info)
+				})
+			}
 		case <-ctx.Done():
 			return GeneratedBindingContexts{}, fmt.Errorf("timeout occurred while waiting for binding contexts")
 		}
 	}
-
 	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
 func (b *BindingContextController) RunSchedule(crontab string) (GeneratedBindingContexts, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	cc := NewContextCombiner()
 	b.HookCtrl.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
 		cc.AddBindingContext(types.Schedule, info)
@@ -180,6 +178,9 @@ func (b *BindingContextController) RunSchedule(crontab string) (GeneratedBinding
 }
 
 func (b *BindingContextController) RunBindingWithAllSnapshots(binding types.BindingType) (GeneratedBindingContexts, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	bc := BindingContext{
 		Binding:   string(binding),
 		Snapshots: b.HookCtrl.KubernetesSnapshots(),

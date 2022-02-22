@@ -18,7 +18,7 @@ func parseContexts(contexts string) []BindingContext {
 func Test_BindingContextGenerator(t *testing.T) {
 	g := NewWithT(t)
 
-	c, err := NewBindingContextController(`
+	c := NewBindingContextController(`
 configVersion: v1
 kubernetes:
 - apiVersion: v1
@@ -32,7 +32,6 @@ schedule:
   includeSnapshotsFrom:
   - selected_pods
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
 
 	// Synchronization contexts
 	contexts, err := c.Run(`
@@ -56,7 +55,7 @@ metadata:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
 	// Object added
-	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
@@ -82,7 +81,7 @@ spec:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
 	// Object modified
-	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
@@ -109,7 +108,7 @@ spec:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
 	// Object deleted
-	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
@@ -137,7 +136,7 @@ metadata:
 func Test_RegisterCRD(t *testing.T) {
 	g := NewWithT(t)
 
-	c, err := NewBindingContextController(`configVersion: v1
+	c := NewBindingContextController(`configVersion: v1
 kubernetes:
 - apiVersion: my.crd.io/v1alpha1
   includeSnapshotsFrom:
@@ -145,8 +144,6 @@ kubernetes:
   kind: MyResource
   name: selected_crds
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
 	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
 
 	gvr, err := c.fakeCluster.FindGVR("my.crd.io/v1alpha1", "MyResource")
@@ -162,7 +159,7 @@ kubernetes:
 	g.Expect(bindingContexts.Rendered).To(ContainSubstring("Synchronization"))
 
 	// Event phase
-	bindingContexts, err = c.ChangeStateAndWaitForBindingContexts(2, `
+	bindingContexts, err = c.ChangeState(`
 apiVersion: my.crd.io/v1alpha1
 kind: MyResource
 metadata:
@@ -185,7 +182,7 @@ spec:
 func Test_PreferredGVR(t *testing.T) {
 	g := NewWithT(t)
 
-	c, err := NewBindingContextController(`configVersion: v1
+	c := NewBindingContextController(`configVersion: v1
 kubernetes:
 - apiVersion: apps/v1
   includeSnapshotsFrom:
@@ -193,8 +190,6 @@ kubernetes:
   kind: Deployment
   name: deployment
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
 	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
@@ -213,7 +208,7 @@ metadata:
 func Test_Synchronization(t *testing.T) {
 	g := NewWithT(t)
 
-	c, err := NewBindingContextController(`
+	c := NewBindingContextController(`
 configVersion: v1
 kubernetes:
 - apiVersion: apps/v1
@@ -244,8 +239,6 @@ kubernetes:
   name: pods-grouped
   group: group1
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
 	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
@@ -278,7 +271,7 @@ metadata:
 func Test_Groups(t *testing.T) {
 	g := NewWithT(t)
 
-	c, err := NewBindingContextController(`configVersion: v1
+	c := NewBindingContextController(`configVersion: v1
 kubernetes:
 - apiVersion: apps/v1
   group: main
@@ -289,8 +282,6 @@ kubernetes:
   kind: Secret
   name: secret
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
 	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
@@ -316,7 +307,7 @@ metadata:
 func Test_ExecuteOnSynchronization_false(t *testing.T) {
 	g := NewWithT(t)
 
-	c, err := NewBindingContextController(`
+	c := NewBindingContextController(`
 configVersion: v1
 kubernetes:
 - apiVersion: v1
@@ -331,8 +322,6 @@ kubernetes:
   name: selected_pods_nosync
   executeHookOnSynchronization: false
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
 	// Synchronization contexts
 	contexts, err := c.Run(`
 ---
@@ -361,7 +350,7 @@ metadata:
 func Test_RunSchedule(t *testing.T) {
 	g := NewWithT(t)
 
-	c, err := NewBindingContextController(`
+	c := NewBindingContextController(`
 configVersion: v1
 kubernetes:
 - apiVersion: v1
@@ -375,8 +364,6 @@ schedule:
   includeSnapshotsFrom:
   - selected_pods
 `)
-	g.Expect(err).ShouldNot(HaveOccurred())
-
 	// Synchronization contexts
 	contexts, err := c.Run(`
 ---
@@ -399,7 +386,7 @@ metadata:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
 	// Object added
-	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
@@ -425,7 +412,7 @@ spec:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
 	// Object modified
-	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
@@ -452,7 +439,7 @@ spec:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(3))
 
 	// Object deleted
-	contexts, err = c.ChangeStateAndWaitForBindingContexts(1, `
+	contexts, err = c.ChangeState(`
 ---
 apiVersion: v1
 kind: Pod
