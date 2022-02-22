@@ -95,8 +95,8 @@ func (c *StateController) ChangeState(newRawState string) error {
 	}
 
 	go func() {
-		defer func() { c.stopCh <- types.KubeEvent{MonitorId: "STOP_EVENTS"} }()
 		time.Sleep(20 * time.Millisecond)
+		c.stopCh <- types.KubeEvent{MonitorId: "STOP_EVENTS"}
 	}()
 
 	return nil
