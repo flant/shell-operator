@@ -5,8 +5,10 @@ package kube_events_manager
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +22,7 @@ type NamespaceInformer interface {
 	WithContext(ctx context.Context)
 	WithKubeClient(client klient.Client)
 	CreateSharedInformer(addFn func(string), delFn func(string)) error
+	WithSyncPeriod(time.Duration)
 	GetExistedObjects() map[string]bool
 	Start()
 	Stop()
@@ -31,9 +34,10 @@ type namespaceInformer struct {
 	cancel  context.CancelFunc
 	stopped bool
 
-	KubeClient     klient.Client
-	Monitor        *MonitorConfig
-	SharedInformer cache.SharedInformer
+	KubeClient       klient.Client
+	Monitor          *MonitorConfig
+	SharedInformer   cache.SharedInformer
+	informerSyncTime time.Duration
 
 	ExistedObjects map[string]bool
 
@@ -58,6 +62,10 @@ func (ni *namespaceInformer) WithContext(ctx context.Context) {
 
 func (ni *namespaceInformer) WithKubeClient(client klient.Client) {
 	ni.KubeClient = client
+}
+
+func (ni *namespaceInformer) WithSyncPeriod(period time.Duration) {
+	ni.informerSyncTime = period
 }
 
 func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(string)) error {
@@ -144,7 +152,9 @@ func (ni *namespaceInformer) Start() {
 	}()
 
 	go ni.SharedInformer.Run(stopCh)
-	if ok := cache.WaitForCacheSync(stopCh, ni.SharedInformer.HasSynced); !ok {
+	if err := wait.PollImmediateUntil(ni.informerSyncTime, func() (bool, error) {
+		return ni.SharedInformer.HasSynced(), nil
+	}, stopCh); err != nil {
 		ni.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ni.Monitor.Metadata.DebugName)
 	}
 

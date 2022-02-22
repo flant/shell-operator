@@ -293,6 +293,7 @@ func (m *monitor) Start(parentCtx context.Context) {
 
 	if m.NamespaceInformer != nil {
 		m.NamespaceInformer.WithContext(m.ctx)
+		m.NamespaceInformer.WithSyncPeriod(m.informerSyncTime)
 		m.NamespaceInformer.Start()
 	}
 }
