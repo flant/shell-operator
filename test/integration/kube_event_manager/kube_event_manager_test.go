@@ -68,7 +68,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 
 		When("Pod is Added", func() {
 			JustBeforeEach(func() {
-				app.SetupLogging()
+				app.SetupLogging(nil)
 
 				// Unlock KubeEvent emitting.
 				m := KubeEventsManager.GetMonitor(monitorConfig.Metadata.MonitorId)

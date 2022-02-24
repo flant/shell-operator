@@ -88,30 +88,49 @@ func (s *Server) Route(pattern string, handler func(request *http.Request) (inte
 		return
 	}
 	s.Router.Get(pattern, func(writer http.ResponseWriter, request *http.Request) {
-		out, err := handler(request)
+		HandleFormattedOutput(writer, request, handler)
+	})
+}
 
+func (s *Server) RoutePOST(pattern string, handler func(request *http.Request) (interface{}, error)) {
+	// Should not happen.
+	if handler == nil {
+		return
+	}
+	s.Router.Post(pattern, func(writer http.ResponseWriter, request *http.Request) {
+		//
+		err := request.ParseForm()
 		if err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			_, _ = fmt.Fprintf(writer, "Error: %s", err)
 			return
 		}
 
-		format := chi.URLParam(request, "format")
-		if format == "" {
-			format = "text"
-		}
-		structured_logger.GetLogEntry(request).Debugf("use format '%s'", format)
-
-		outBytes, err := TransformUsingFormat(out, format)
-
-		if err != nil {
-			writer.WriteHeader(http.StatusInternalServerError)
-			_, _ = fmt.Fprintf(writer, "Error '%s' transform: %s", format, err)
-			return
-		}
-
-		_, _ = writer.Write(outBytes)
+		HandleFormattedOutput(writer, request, handler)
 	})
+}
+
+func HandleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
+	out, err := handler(request)
+
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		_, _ = fmt.Fprintf(writer, "Error: %s", err)
+		return
+	}
+
+	format := FormatFromRequest(request)
+	structured_logger.GetLogEntry(request).Debugf("use format '%s'", format)
+
+	outBytes, err := TransformUsingFormat(out, format)
+
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		_, _ = fmt.Fprintf(writer, "Error '%s' transform: %s", format, err)
+		return
+	}
+
+	_, _ = writer.Write(outBytes)
 }
 
 func TransformUsingFormat(val interface{}, format string) ([]byte, error) {
@@ -141,4 +160,12 @@ func TransformUsingFormat(val interface{}, format string) ([]byte, error) {
 	}
 
 	return outBytes, err
+}
+
+func FormatFromRequest(request *http.Request) string {
+	format := chi.URLParam(request, "format")
+	if format == "" {
+		format = "text"
+	}
+	return format
 }

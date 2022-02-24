@@ -6,13 +6,13 @@ import (
 	"os"
 	"time"
 
+	"github.com/flant/kube-client/klogtologrus"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/flant/kube-client/klogtologrus"
-	"github.com/flant/shell-operator/pkg/debug"
-
 	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/config"
+	"github.com/flant/shell-operator/pkg/debug"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
@@ -39,13 +39,15 @@ func main() {
 	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
 		Action(func(c *kingpin.ParseContext) error {
+			runtimeConfig := config.NewConfig()
 			// Init logging subsystem.
-			app.SetupLogging()
+			app.SetupLogging(runtimeConfig)
 			log.Infof("%s %s", app.AppName, app.Version)
 			// Init rand generator.
 			rand.Seed(time.Now().UnixNano())
 
 			defaultOperator := shell_operator.DefaultOperator()
+			defaultOperator.WithRuntimeConfig(runtimeConfig)
 			err := shell_operator.InitAndStart(defaultOperator)
 			if err != nil {
 				os.Exit(1)
