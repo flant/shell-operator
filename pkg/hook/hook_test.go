@@ -57,16 +57,16 @@ func Test_CreateLimiter(t *testing.T) {
 		},
 
 		{
-			title: "Burst is zero limit is none zero: should return limiter with zero burst and converted interval",
+			title: "Burst is zero, limit is non-zero: should return limiter with zero burst and converted interval",
 			limit: rate.Limit(1 / 20.0),
-			burst: 0,
+			burst: defaultBurst,
 			settings: &Settings{
 				ExecutionMinInterval: 20 * time.Second,
 			},
 		},
 
 		{
-			title: "Burst is none zero limit is zero: should return limiter with default limiter and passed burst",
+			title: "Burst is non-zero, limit is zero: should return limiter with default limiter and passed burst",
 			limit: defaultLimit,
 			burst: 3,
 			settings: &Settings{
@@ -75,7 +75,7 @@ func Test_CreateLimiter(t *testing.T) {
 		},
 
 		{
-			title: "All settings passed: should run limiter with all passed burst and converted interval",
+			title: "Burst and limit are passed: should run limiter with passed burst and converted interval",
 			limit: rate.Limit(1.0 / 30),
 			burst: 3,
 			settings: &Settings{
@@ -93,8 +93,8 @@ func Test_CreateLimiter(t *testing.T) {
 
 			l := CreateRateLimiter(cfg)
 
-			g.Expect(l.Burst(), c.burst)
-			g.Expect(l.Limit(), c.limit)
+			g.Expect(l.Burst()).To(Equal(c.burst))
+			g.Expect(l.Limit()).To(Equal(c.limit))
 		})
 	}
 }

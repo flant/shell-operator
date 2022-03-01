@@ -292,8 +292,12 @@ func CreateRateLimiter(cfg *config.HookConfig) *rate.Limiter {
 	limit := rate.Inf // no rate limit by default
 	burst := 1        // no more then 1 event at time
 	if cfg.Settings != nil {
-		limit = rate.Every(cfg.Settings.ExecutionMinInterval)
-		burst = cfg.Settings.ExecutionBurst
+		if cfg.Settings.ExecutionMinInterval != 0 {
+			limit = rate.Every(cfg.Settings.ExecutionMinInterval)
+		}
+		if cfg.Settings.ExecutionBurst != 0 {
+			burst = cfg.Settings.ExecutionBurst
+		}
 	}
 	return rate.NewLimiter(limit, burst)
 }
