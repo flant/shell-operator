@@ -87,7 +87,7 @@ jobs:
       - check
     if: needs.check.outputs.run_publish == 'true'
     steps:
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
 
       - name: Prepare environment
         env:

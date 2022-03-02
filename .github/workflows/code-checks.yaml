@@ -17,7 +17,7 @@ jobs:
           go-version: 1.16
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: Ensure code is gofmted
         run: |
@@ -37,7 +37,7 @@ jobs:
           python-version: 3.8
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: codespell
         run: |
