@@ -747,7 +747,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 
 func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMeta HookMetadata, taskLogEntry *log.Entry, hookLogLabels map[string]string, metricLabels map[string]string) error {
 	for _, info := range taskHook.HookController.SnapshotsInfo() {
-		taskLogEntry.Infof("snapshot info: %s", info)
+		taskLogEntry.Debugf("snapshot info: %s", info)
 	}
 
 	result, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
@@ -756,7 +756,7 @@ func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 	}
 
 	if result != nil && result.Usage != nil {
-		taskLogEntry.Infof("Usage: %+v", result.Usage)
+		taskLogEntry.Debugf("Usage: %+v", result.Usage)
 		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", result.Usage.Sys.Seconds(), metricLabels, nil)
 		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", result.Usage.User.Seconds(), metricLabels, nil)
 		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(result.Usage.MaxRss)*1024, metricLabels)
