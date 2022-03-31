@@ -15,6 +15,7 @@ import (
 var LogLevel = "info"
 var LogNoTime = false
 var LogType = "text"
+var LogProxyHookJSON = false
 
 // ForcedDurationForDebugLevel - force expiration for debug level.
 const ForcedDurationForDebugLevel = 30 * time.Minute
@@ -32,6 +33,9 @@ func DefineLoggingFlags(cmd *kingpin.CmdClause) {
 	cmd.Flag("log-no-time", "Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps. Can be set with $LOG_NO_TIME.").
 		Envar("LOG_NO_TIME").
 		BoolVar(&LogNoTime)
+	cmd.Flag("log-proxy-hook-json", "Delegate hook stdout/ stderr JSON logging to the hooks and act as a proxy that adds some extra fields before just printing the output").
+		Envar("LOG_PROXY_HOOK_JSON").
+		BoolVar(&LogProxyHookJSON)
 }
 
 // SetupLogging sets logger formatter and level.
