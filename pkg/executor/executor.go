@@ -131,7 +131,7 @@ func proxyJSONLogs(r io.ReadCloser, logEntry *log.Entry) {
 			continue
 		}
 		// Just write the line to the writer configured on the logger
-		fmt.Fprintln(logEntry.Logger.Out, logLine)
+		fmt.Fprintln(logEntry.Logger.Out, string(logLine))
 	}
 }
 
