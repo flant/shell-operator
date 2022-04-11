@@ -2,17 +2,14 @@ package shell_operator
 
 import (
 	"context"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
-	"github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type ManagerEventsHandler struct {
@@ -89,11 +86,7 @@ func (m *ManagerEventsHandler) Start() {
 					if q == nil {
 						log.Errorf("Possible bug!!! Got task for queue '%s' but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
 					} else {
-						resTask.WithQueuedAt(time.Now())
 						q.AddLast(resTask)
-						logEntry.WithFields(utils.LabelsToLogFields(resTask.GetLogLabels())).
-							WithField("queue", q.Name).
-							Infof("queue task %s", resTask.GetDescription())
 					}
 				}
 			})

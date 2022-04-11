@@ -13,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 
-	"github.com/flant/shell-operator/pkg/app"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
@@ -38,7 +37,7 @@ func (s *Server) WithPrefix(prefix string) {
 }
 
 func (s *Server) Init() (err error) {
-	address := app.DebugUnixSocket
+	address := s.SocketPath
 
 	err = os.MkdirAll(path.Dir(address), 0700)
 	if err != nil {

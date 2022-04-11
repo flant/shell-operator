@@ -1,8 +1,6 @@
 package hook
 
 import (
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,34 +9,32 @@ import (
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook/controller"
+	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/validating"
 	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 )
 
-func newHookManager(t *testing.T, testdataDir string) (*hookManager, func()) {
-	var err error
+func newHookManager(t *testing.T, testdataDir string) *hookManager {
 	hm := NewHookManager()
-	tmpDir, err := ioutil.TempDir("", "hook_manager")
-	if err != nil {
-		t.Fatalf("Make tmpdir should not fail: %v", err)
-	}
+
 	hooksDir, _ := filepath.Abs(testdataDir)
-	hm.WithDirectories(hooksDir, tmpDir)
+	hm.WithDirectories(hooksDir, t.TempDir())
+
 	conversionManager := conversion.NewWebhookManager()
 	conversionManager.Settings = app.ConversionWebhookSettings
 	hm.WithConversionWebhookManager(conversionManager)
+
 	validatingManager := validating.NewWebhookManager()
 	validatingManager.Settings = app.ValidatingWebhookSettings
 	hm.WithValidatingWebhookManager(validatingManager)
 
-	return hm, func() { os.RemoveAll(tmpDir) }
+	return hm
 }
 
 func Test_HookManager_Init(t *testing.T) {
 	hooksDir := "testdata/hook_manager"
-	hm, rmFn := newHookManager(t, hooksDir)
-	defer rmFn()
+	hm := newHookManager(t, hooksDir)
 
 	if !strings.HasSuffix(hm.WorkingDir(), hooksDir) {
 		t.Fatalf("Hook manager should has working dir '%s', got: '%s'", hooksDir, hm.WorkingDir())
@@ -51,8 +47,7 @@ func Test_HookManager_Init(t *testing.T) {
 }
 
 func Test_HookManager_GetHookNames(t *testing.T) {
-	hm, rmFn := newHookManager(t, "testdata/hook_manager")
-	defer rmFn()
+	hm := newHookManager(t, "testdata/hook_manager")
 
 	err := hm.Init()
 	if err != nil {
@@ -85,8 +80,7 @@ func Test_HookManager_GetHookNames(t *testing.T) {
 func TestHookController_HandleValidatingEvent(t *testing.T) {
 	g := NewWithT(t)
 
-	hm, rmFn := newHookManager(t, "testdata/hook_manager_validating")
-	defer rmFn()
+	hm := newHookManager(t, "testdata/hook_manager_validating")
 
 	err := hm.Init()
 	if err != nil {
@@ -118,8 +112,7 @@ func TestHookController_HandleValidatingEvent(t *testing.T) {
 func Test_HookManager_conversion_chains(t *testing.T) {
 	g := NewWithT(t)
 
-	hm, rmFn := newHookManager(t, "testdata/hook_manager_conversion_chains")
-	defer rmFn()
+	hm := newHookManager(t, "testdata/hook_manager_conversion_chains")
 
 	err := hm.Init()
 	g.Expect(err).ShouldNot(HaveOccurred(), "Hook manager Init should not fail: %v", err)
@@ -215,8 +208,7 @@ func Test_HookManager_conversion_chains(t *testing.T) {
 func Test_HookManager_conversion_chains_full(t *testing.T) {
 	g := NewWithT(t)
 
-	hm, rmFn := newHookManager(t, "testdata/hook_manager_conversion_chains_full")
-	defer rmFn()
+	hm := newHookManager(t, "testdata/hook_manager_conversion_chains_full")
 
 	err := hm.Init()
 	g.Expect(err).ShouldNot(HaveOccurred(), "Hook manager Init should not fail: %v", err)
@@ -355,4 +347,36 @@ func Test_HookManager_conversion_chains_full(t *testing.T) {
 	})
 	g.Expect(convPath).Should(HaveLen(1))
 	g.Expect(convPath[0].String()).Should(Equal("alpha.example.com/v1beta1->alpha.example.io/v1beta1"))
+}
+
+func Test_HookManager_onstartup_order(t *testing.T) {
+	g := NewWithT(t)
+
+	hm := newHookManager(t, "testdata/hook_manager_onstartup_order")
+
+	err := hm.Init()
+	g.Expect(err).ShouldNot(HaveOccurred(), "Hook manager Init should not fail: %v", err)
+
+	hooks, err := hm.GetHooksInOrder(types.OnStartup)
+	g.Expect(err).ShouldNot(HaveOccurred(), "Hook manager should return hooks for OnStartup: %v", err)
+
+	// Ensure sort by ascending order.
+	expectNames := []string{
+		"hook04_startup_1.sh",
+		"hook02_startup_10.sh",
+		"hook03_startup_15.sh",
+		"hook01_startup_20.sh",
+	}
+	g.Expect(hooks).Should(HaveLen(len(expectNames)))
+
+	prevOrder := 0.0
+	for i, hookName := range hooks {
+		currOrder := hm.GetHook(hookName).Config.OnStartup.Order
+		if i == 0 {
+			prevOrder = currOrder
+			continue
+		}
+		g.Expect(currOrder >= prevOrder).To(BeTrue(), "previous hook should not have greater order")
+		g.Expect(hookName).To(Equal(expectNames[i]))
+	}
 }
