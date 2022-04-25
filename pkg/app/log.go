@@ -19,6 +19,7 @@ var LogProxyHookJSON = false
 
 // ForcedDurationForDebugLevel - force expiration for debug level.
 const ForcedDurationForDebugLevel = 30 * time.Minute
+const ProxyJsonLogKey = "proxyJsonLog"
 
 // DefineLoggingFlags defines flags for logger settings.
 func DefineLoggingFlags(cmd *kingpin.CmdClause) {
@@ -40,15 +41,22 @@ func DefineLoggingFlags(cmd *kingpin.CmdClause) {
 
 // SetupLogging sets logger formatter and level.
 func SetupLogging(runtimeConfig *config.Config) {
+	jsonFormatter := log.JSONFormatter{DisableTimestamp: LogNoTime}
+	textFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true}
+	colorFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true, FullTimestamp: true}
 	switch strings.ToLower(LogType) {
 	case "json":
-		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
+		log.SetFormatter(&jsonFormatter)
 	case "text":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true})
+		log.SetFormatter(&textFormatter)
 	case "color":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true, FullTimestamp: true})
+		log.SetFormatter(&colorFormatter)
 	default:
-		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
+		log.SetFormatter(&jsonFormatter)
+	}
+	if LogProxyHookJSON {
+		formatter := log.StandardLogger().Formatter
+		log.SetFormatter(&ProxyJsonWrapperFormatter{WrappedFormatter: formatter})
 	}
 
 	setLogLevel(LogLevel)
@@ -79,4 +87,19 @@ func setLogLevel(logLevel string) {
 	default:
 		log.SetLevel(log.InfoLevel)
 	}
+}
+
+type ProxyJsonWrapperFormatter struct {
+	WrappedFormatter log.Formatter
+}
+
+func (f *ProxyJsonWrapperFormatter) Format(entry *log.Entry) ([]byte, error) {
+	// if proxying the json message is intended, just return the bytes
+	// TODO: Find a more elegant way to carry this info
+	if entry.Data[ProxyJsonLogKey] == true {
+		return []byte(entry.Message), nil
+	}
+
+	// otherwise, use the wrapped formatter
+	return f.WrappedFormatter.Format(entry)
 }

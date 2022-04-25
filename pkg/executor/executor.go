@@ -3,7 +3,6 @@ package executor
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"github.com/flant/shell-operator/pkg/app"
 	"io"
 	"os/exec"
@@ -130,8 +129,10 @@ func proxyJSONLogs(r io.ReadCloser, logEntry *log.Entry) {
 			logEntry.Info(scanner.Text())
 			continue
 		}
-		// Just write the line to the writer configured on the logger
-		fmt.Fprintln(logEntry.Logger.Out, string(logLine))
+		// Mark this log entry as one that is json that needs to be proxied
+		logEntry := logEntry.WithField(app.ProxyJsonLogKey, true)
+		// Log the line via the same centralized logger; the formatter should make sure it's "proxied"
+		logEntry.Log(log.FatalLevel, string(logLine))
 	}
 }
 
