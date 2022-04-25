@@ -63,6 +63,13 @@ You can configure the operator with the following environment variables and cli 
 |  --conversion-webhook-ca | CONVERSION_WEBHOOK_CA | `"/conversion-certs/ca.crt"` | A path to a ca certificate for clientConfig in CRD.                                                                                                                                                                                                   |
 |  --conversion-webhook-client-ca | CONVERSION_WEBHOOK_CLIENT_CA | [] | A path to a server certificate for CRD.spec.conversion.webhook.                                                                                                                                                                                       |
 
+
+### Notes on JSON log proxying
+* JSON log proxying (see above `--log-proxy-hook-json`) gives a lot of control to the hooks, which might want to use their own logger or different fields or log level
+* It is incompatible with the other log flags in regard to filtering or configuring logging for the hooks. `shell-operator` will always expect valid json lines and output them regardless of the other flags
+* The log lines from the hooks will be enhanced with these top-level fields, from `shell-operator` before being printed: 'hook', 'binding', 'event', 'task', 'queue'
+* Configure hooks to use the `msg`, `time` and `level` fields for consistency with the logs coming from `shell-operator`. This, however, is not enforced.
+
 ## Debug
 
 The following tools for debugging and fine-tuning of Shell-operator and hooks are available:
