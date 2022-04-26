@@ -97,7 +97,9 @@ func (f *ProxyJsonWrapperFormatter) Format(entry *log.Entry) ([]byte, error) {
 	// if proxying the json message is intended, just return the bytes
 	// TODO: Find a more elegant way to carry this info
 	if entry.Data[ProxyJsonLogKey] == true {
-		return []byte(entry.Message), nil
+		b := bytes.NewBufferString(entry.Message)
+		b.WriteString("\n")
+		return b.Bytes(), nil
 	}
 
 	// otherwise, use the wrapped formatter
