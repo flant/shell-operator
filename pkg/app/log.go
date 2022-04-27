@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"time"
@@ -15,9 +16,11 @@ import (
 var LogLevel = "info"
 var LogNoTime = false
 var LogType = "text"
+var LogProxyHookJSON = false
 
 // ForcedDurationForDebugLevel - force expiration for debug level.
 const ForcedDurationForDebugLevel = 30 * time.Minute
+const ProxyJsonLogKey = "proxyJsonLog"
 
 // DefineLoggingFlags defines flags for logger settings.
 func DefineLoggingFlags(cmd *kingpin.CmdClause) {
@@ -32,19 +35,29 @@ func DefineLoggingFlags(cmd *kingpin.CmdClause) {
 	cmd.Flag("log-no-time", "Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps. Can be set with $LOG_NO_TIME.").
 		Envar("LOG_NO_TIME").
 		BoolVar(&LogNoTime)
+	cmd.Flag("log-proxy-hook-json", "Delegate hook stdout/ stderr JSON logging to the hooks and act as a proxy that adds some extra fields before just printing the output").
+		Envar("LOG_PROXY_HOOK_JSON").
+		BoolVar(&LogProxyHookJSON)
 }
 
 // SetupLogging sets logger formatter and level.
 func SetupLogging(runtimeConfig *config.Config) {
+	jsonFormatter := log.JSONFormatter{DisableTimestamp: LogNoTime}
+	textFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true}
+	colorFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true, FullTimestamp: true}
 	switch strings.ToLower(LogType) {
 	case "json":
-		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
+		log.SetFormatter(&jsonFormatter)
 	case "text":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true})
+		log.SetFormatter(&textFormatter)
 	case "color":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true, FullTimestamp: true})
+		log.SetFormatter(&colorFormatter)
 	default:
-		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: LogNoTime})
+		log.SetFormatter(&jsonFormatter)
+	}
+	if LogProxyHookJSON {
+		formatter := log.StandardLogger().Formatter
+		log.SetFormatter(&ProxyJsonWrapperFormatter{WrappedFormatter: formatter})
 	}
 
 	setLogLevel(LogLevel)
@@ -75,4 +88,21 @@ func setLogLevel(logLevel string) {
 	default:
 		log.SetLevel(log.InfoLevel)
 	}
+}
+
+type ProxyJsonWrapperFormatter struct {
+	WrappedFormatter log.Formatter
+}
+
+func (f *ProxyJsonWrapperFormatter) Format(entry *log.Entry) ([]byte, error) {
+	// if proxying the json message is intended, just return the bytes
+	// TODO: Find a more elegant way to carry this info
+	if entry.Data[ProxyJsonLogKey] == true {
+		b := bytes.NewBufferString(entry.Message)
+		b.WriteString("\n")
+		return b.Bytes(), nil
+	}
+
+	// otherwise, use the wrapped formatter
+	return f.WrappedFormatter.Format(entry)
 }
