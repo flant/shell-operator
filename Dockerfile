@@ -24,7 +24,7 @@ RUN CGO_ENABLED=1 \
              ./cmd/shell-operator
 
 # Final image
-FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.15
+FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.15.4
 ARG TARGETPLATFORM
 RUN apk --no-cache add ca-certificates bash sed tini && \
     kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
