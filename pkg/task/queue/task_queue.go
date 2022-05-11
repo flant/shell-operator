@@ -28,9 +28,10 @@ config parameter.
 */
 
 var (
-	DelayOnQueueIsEmpty = 250 * time.Millisecond
-	DelayOnFailedTask   = 5 * time.Second
-	DelayOnRepeat       = 25 * time.Millisecond
+	WaitLoopCheckInterval = 125 * time.Millisecond
+	DelayOnQueueIsEmpty   = 250 * time.Millisecond
+	DelayOnFailedTask     = 5 * time.Second
+	DelayOnRepeat         = 25 * time.Millisecond
 )
 
 type TaskStatus string
@@ -58,7 +59,10 @@ type TaskQueue struct {
 	metricStorage *metric_storage.MetricStorage
 	ctx           context.Context
 	cancel        context.CancelFunc
-	stopTaskDelay chan struct{}
+
+	waitMu         sync.Mutex
+	waitInProgress bool
+	cancelDelay    bool
 
 	items   []task.Task
 	started bool // a flag to ignore multiple starts
@@ -76,9 +80,7 @@ type TaskQueue struct {
 
 func NewTasksQueue() *TaskQueue {
 	return &TaskQueue{
-		m:             sync.RWMutex{},
-		stopTaskDelay: make(chan struct{}, 1),
-		items:         make([]task.Task, 0),
+		items: make([]task.Task, 0),
 	}
 }
 
@@ -452,64 +454,90 @@ func (q *TaskQueue) Start() {
 
 // waitForTask returns a task that can be processed or a nil if context is canceled.
 // sleepDelay is used to sleep before check a task, e.g. in case of failed previous task.
-// If queue is empty, than it will be checked every DelayOnQueueIsEmpty.
+// If queue is empty, then it will be checked every DelayOnQueueIsEmpty.
 func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
-	// Check Done channel to be able to stop queue
+	// Check Done channel.
 	select {
 	case <-q.ctx.Done():
 		return nil
 	default:
 	}
 
-	// Wait for non-empty queue or closed Done channel.
-	origStatus := q.Status
-	waitBegin := time.Now()
-	for {
-		// Return the first task if queue is not empty and delay is not required.
-		if !q.IsEmpty() && sleepDelay == 0 {
-			return q.GetFirst()
-		}
+	// Shortcut: return the first task if the queue is not empty and delay is not required.
+	if !q.IsEmpty() && sleepDelay == 0 {
+		return q.GetFirst()
+	}
 
-		// Sleep for sleepDelay in case of failure and then sleep for DelayOnQueueIsEmpty until queue is empty.
-		newDelay := DelayOnQueueIsEmpty
-		if sleepDelay != 0 {
-			newDelay = sleepDelay
-		}
-		delayTicker := time.NewTicker(newDelay)
-		secondTicker := time.NewTicker(time.Second)
-		var stop = false
-		for {
-			select {
-			case <-delayTicker.C:
-				// Reset sleepDelay.
-				sleepDelay = 0
-				stop = true
-			case <-q.stopTaskDelay:
-				// Forced sleepDelay reset.
-				sleepDelay = 0
-				stop = true
-			case <-q.ctx.Done():
-				// Queue is stopped.
-				return nil
-			case <-secondTicker.C:
-				waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
-				if sleepDelay == 0 {
-					q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
-				} else {
-					q.Status = fmt.Sprintf("%s (elapsed %s)", origStatus, waitSeconds)
-				}
+	// Initialize wait settings.
+	waitBegin := time.Now()
+	waitUntil := DelayOnQueueIsEmpty
+	if sleepDelay != 0 {
+		waitUntil = sleepDelay
+	}
+
+	checkTicker := time.NewTicker(WaitLoopCheckInterval)
+	q.waitMu.Lock()
+	q.waitInProgress = true
+	q.cancelDelay = false
+	q.waitMu.Unlock()
+
+	defer func() {
+		checkTicker.Stop()
+		q.waitMu.Lock()
+		q.waitInProgress = false
+		q.cancelDelay = false
+		q.waitMu.Unlock()
+	}()
+
+	// Wait for the queued task with some delay.
+	// Every tick increases the 'elapsed' counter until it outgrows the waitUntil value.
+	// Or, delay can be canceled to handle new head task immediately.
+	origStatus := q.Status
+	for {
+		select {
+		case <-q.ctx.Done():
+			// Queue is stopped.
+			return nil
+		case <-checkTicker.C:
+			// Check and update waitUntil.
+			elapsed := time.Since(waitBegin)
+
+			cancelDelay := false
+			q.waitMu.Lock()
+			if q.cancelDelay {
+				cancelDelay = true
 			}
-			if stop {
+			q.waitMu.Unlock()
+
+			// Wait loop is done or canceled: break select to check for the head task.
+			if elapsed >= waitUntil || cancelDelay {
+				// Increase waitUntil to wait on the next iteration.
+				waitUntil += DelayOnQueueIsEmpty
 				break
 			}
+
+			// Wait loop still in progress: update queue status.
+			waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
+			if sleepDelay == 0 {
+				q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
+			} else {
+				delay := sleepDelay.Truncate(time.Second).String()
+				q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, waitSeconds, delay)
+			}
 		}
-		delayTicker.Stop()
-		secondTicker.Stop()
+		if !q.IsEmpty() {
+			return q.GetFirst()
+		}
 	}
 }
 
+// CancelTaskDelay breaks wait loop. Useful to break the possible maximum sleep delay.
 func (q *TaskQueue) CancelTaskDelay() {
-	q.stopTaskDelay <- struct{}{}
+	q.waitMu.Lock()
+	if q.waitInProgress {
+		q.cancelDelay = true
+	}
+	q.waitMu.Unlock()
 }
 
 // Iterate run doFn for every task.
