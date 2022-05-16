@@ -33,7 +33,4 @@ require (
 // Remove 'in body' from errors, fix for Go 1.16 (https://github.com/go-openapi/validate/pull/138).
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.12-flant.0
 
-require (
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
-	golang.org/x/text v0.3.7 // indirect
-)
+require golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
