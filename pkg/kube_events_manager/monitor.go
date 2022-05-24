@@ -136,8 +136,6 @@ func (m *monitor) CreateInformers() error {
 		err := m.NamespaceInformer.CreateSharedInformer(
 			func(nsName string) {
 				// add function — check, create and run informers for Ns
-				logEntry.Infof("got ns/%s, create dynamic ResourceInformers", nsName)
-
 				// ignore event if namespace is already has static ResourceInformers
 				if _, ok := m.staticNamespaces[nsName]; ok {
 					return
@@ -147,6 +145,8 @@ func (m *monitor) CreateInformers() error {
 				if ok {
 					return
 				}
+
+				logEntry.Infof("got ns/%s, create dynamic ResourceInformers", nsName)
 
 				var err error
 				m.VaryingInformers[nsName], err = m.CreateInformersForNamespace(nsName)
@@ -160,6 +160,7 @@ func (m *monitor) CreateInformers() error {
 				for _, informer := range m.VaryingInformers[nsName] {
 					informer.WithContext(ctx)
 					informer.Start()
+					informer.EnableKubeEventCb()
 				}
 			},
 			func(nsName string) {
