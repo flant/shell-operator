@@ -13,7 +13,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.16.0
+	github.com/onsi/gomega v1.19.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
@@ -33,7 +33,4 @@ require (
 // Remove 'in body' from errors, fix for Go 1.16 (https://github.com/go-openapi/validate/pull/138).
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.12-flant.0
 
-require (
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
-	golang.org/x/text v0.3.7 // indirect
-)
+require golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect

@@ -3,20 +3,12 @@ package shell_operator
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	klient "github.com/flant/kube-client/client"
-	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	uuid "gopkg.in/satori/go.uuid.v1"
 
-	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/config"
-	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/hook"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
@@ -28,9 +20,7 @@ import (
 	"github.com/flant/shell-operator/pkg/metric_storage"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
-	"github.com/flant/shell-operator/pkg/task/dump"
 	"github.com/flant/shell-operator/pkg/task/queue"
-	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
@@ -44,18 +34,11 @@ type ShellOperator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	HooksDir string
-	TempDir  string
-
 	MetricStorage *metric_storage.MetricStorage
 	// separate metric storage for hook metrics if separate listen port is configured
 	HookMetricStorage *metric_storage.MetricStorage
 	KubeClient        klient.Client
 	ObjectPatcher     *object_patch.ObjectPatcher
-
-	// Labels for kube clients
-	MainKubeClientMetricLabels          map[string]string
-	ObjectPatcherKubeClientMetricLabels map[string]string
 
 	ScheduleManager   schedule_manager.ScheduleManager
 	KubeEventsManager kube_events_manager.KubeEventsManager
@@ -68,22 +51,10 @@ type ShellOperator struct {
 
 	ValidatingWebhookManager *validating.WebhookManager
 	ConversionWebhookManager *conversion.WebhookManager
-
-	DebugServer *debug.Server
-
-	RuntimeConfig *config.Config
 }
 
 func NewShellOperator() *ShellOperator {
 	return &ShellOperator{}
-}
-
-func (op *ShellOperator) WithHooksDir(dir string) {
-	op.HooksDir = dir
-}
-
-func (op *ShellOperator) WithTempDir(dir string) {
-	op.TempDir = dir
 }
 
 func (op *ShellOperator) WithContext(ctx context.Context) *ShellOperator {
@@ -105,138 +76,11 @@ func (op *ShellOperator) WithMetricStorage(metricStorage *metric_storage.MetricS
 	op.MetricStorage = metricStorage
 }
 
-func (op *ShellOperator) WithRuntimeConfig(runtimeConfig *config.Config) {
-	op.RuntimeConfig = runtimeConfig
-}
-
-// InitMetricStorage creates default MetricStorage object if not set earlier.
-func (op *ShellOperator) InitMetricStorage() {
-	if op.MetricStorage != nil {
-		return
-	}
-	metricStorage := metric_storage.NewMetricStorage()
-	metricStorage.WithContext(op.ctx)
-	metricStorage.WithPrefix(app.PrometheusMetricsPrefix)
-	metricStorage.Start()
-	RegisterShellOperatorMetrics(metricStorage)
-	op.MetricStorage = metricStorage
-}
-
-// InitHookMetricStorage creates MetricStorage object
-// with new registry to scrape hook metrics on separate port.
-func (op *ShellOperator) InitHookMetricStorage() {
-	if op.HookMetricStorage != nil {
-		return
-	}
-	metricStorage := metric_storage.NewMetricStorage()
-	metricStorage.WithContext(op.ctx)
-	metricStorage.WithPrefix(app.PrometheusMetricsPrefix)
-	metricStorage.WithNewRegistry()
-	metricStorage.Start()
-	op.HookMetricStorage = metricStorage
-}
-
-// Init does some basic checks and instantiate dependencies
-//
-// - check directories
-// - start debug server
-// - initialize dependencies:
-//   - metric storage
-//   - kubernetes client config
-//   - empty set of task queues
-//   - hook manager
-//   - kubernetes events manager
-//   - schedule manager
-//   - runtime config
-func (op *ShellOperator) Init() (err error) {
-	log.Debug("MAIN Init")
-
-	if op.HooksDir == "" {
-		op.HooksDir, err = filepath.Abs(app.HooksDir)
-		if err != nil {
-			log.Errorf("MAIN Fatal: Cannot determine a current dir: %s", err)
-			return err
-		}
-		if exists, _ := utils_file.DirExists(op.HooksDir); !exists {
-			log.Errorf("MAIN Fatal: working dir '%s' is not exists", op.HooksDir)
-			return fmt.Errorf("no working dir")
-		}
-	}
-	log.Infof("Hooks dir: %s", op.HooksDir)
-
-	if op.TempDir == "" {
-		op.TempDir = app.TempDir
-		if exists, _ := utils_file.DirExists(op.TempDir); !exists {
-			err = os.Mkdir(op.TempDir, os.FileMode(0777))
-			if err != nil {
-				log.Errorf("MAIN Fatal: Cannot create a temporary dir: %s", err)
-				return err
-			}
-		}
-	}
-	log.Infof("Use temporary dir: %s", op.TempDir)
-
-	op.DebugServer = debug.NewServer()
-	op.DebugServer.WithPrefix("/debug")
-	op.DebugServer.WithSocketPath(app.DebugUnixSocket)
-	err = op.DebugServer.Init()
-	if err != nil {
-		log.Errorf("MAIN Fatal: Cannot create Debug server: %s", err)
-		return err
-	}
-
-	if op.KubeClient == nil {
-		//nolint:staticcheck
-		klient.RegisterKubernetesClientMetrics(op.MetricStorage, op.GetMainKubeClientMetricLabels())
-		op.KubeClient, err = op.InitMainKubeClient()
-		if err != nil {
-			log.Errorf("MAIN Fatal: initialize 'main' Kubernetes client: %s\n", err)
-			return err
-		}
-	}
-
-	// Initialize ObjectPatcher with its own Kubernetes client.
-	patcherKubeClient, err := op.InitObjectPatcherKubeClient()
-	if err != nil {
-		log.Errorf("MAIN Fatal: initialize 'object_patcher' Kubernetes client: %s\n", err)
-		return err
-	}
-	op.ObjectPatcher = object_patch.NewObjectPatcher(patcherKubeClient)
-
-	// Initialize the task queues set with the "main" queue.
-	op.TaskQueues = queue.NewTaskQueueSet()
-	op.TaskQueues.WithContext(op.ctx)
-	op.TaskQueues.WithMetricStorage(op.MetricStorage)
-
-	// Initialize schedule manager.
-	op.ScheduleManager = schedule_manager.NewScheduleManager()
-	op.ScheduleManager.WithContext(op.ctx)
-
-	// Initialize kubernetes events manager.
-	op.KubeEventsManager = kube_events_manager.NewKubeEventsManager()
-	op.KubeEventsManager.WithKubeClient(op.KubeClient)
-	op.KubeEventsManager.WithContext(op.ctx)
-	op.KubeEventsManager.WithMetricStorage(op.MetricStorage)
-
-	// Initialize events handler that emit tasks to run hooks
-	op.ManagerEventsHandler = NewManagerEventsHandler()
-	op.ManagerEventsHandler.WithContext(op.ctx)
-	op.ManagerEventsHandler.WithTaskQueueSet(op.TaskQueues)
-	op.ManagerEventsHandler.WithScheduleManager(op.ScheduleManager)
-	op.ManagerEventsHandler.WithKubeEventsManager(op.KubeEventsManager)
-
-	return nil
-}
-
 // InitHookManager load hooks from HooksDir and defines event handlers that emit tasks.
 func (op *ShellOperator) InitHookManager() (err error) {
-	// Initialize hook manager (load hooks from HooksDir)
-	op.HookManager = hook.NewHookManager()
-	op.HookManager.WithDirectories(op.HooksDir, op.TempDir)
-	op.HookManager.WithKubeEventManager(op.KubeEventsManager)
-	op.HookManager.WithScheduleManager(op.ScheduleManager)
-	op.HookManager.WithValidatingWebhookManager(op.ValidatingWebhookManager)
-	op.HookManager.WithConversionWebhookManager(op.ConversionWebhookManager)
+	if op.HookManager == nil {
+		return
+	}
 	// Search hooks and load their configurations
 	err = op.HookManager.Init()
 	if err != nil {
@@ -266,7 +110,10 @@ func (op *ShellOperator) InitHookManager() (err error) {
 				}).
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
-			tasks = append(tasks, newTask)
+			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
+
+			logEntry.WithField("queue", info.QueueName).
+				Infof("queue task %s", newTask.GetDescription())
 		})
 
 		return tasks
@@ -292,7 +139,10 @@ func (op *ShellOperator) InitHookManager() (err error) {
 				}).
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
-			tasks = append(tasks, newTask)
+			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
+
+			logEntry.WithField("queue", info.QueueName).
+				Infof("queue task %s", newTask.GetDescription())
 		})
 
 		return tasks
@@ -301,19 +151,17 @@ func (op *ShellOperator) InitHookManager() (err error) {
 	return nil
 }
 
-// InitWebhookManagers adds kubernetesValidating hooks
+// InitValidatingWebhookManager adds kubernetesValidating hooks
 // to a WebhookManager and set a validating event handler.
 func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
+	if op.HookManager == nil || op.ValidatingWebhookManager == nil {
+		return
+	}
 	// Do not init ValidatingWebhook if there are no KubernetesValidating hooks.
 	hookNames, _ := op.HookManager.GetHooksInOrder(KubernetesValidating)
 	if len(hookNames) == 0 {
 		return
 	}
-
-	// Initialize validating webhooks manager
-	op.ValidatingWebhookManager.WithKubeClient(op.KubeClient)
-	op.ValidatingWebhookManager.Settings = app.ValidatingWebhookSettings
-	op.ValidatingWebhookManager.Namespace = app.Namespace
 
 	err = op.ValidatingWebhookManager.Init()
 	if err != nil {
@@ -385,18 +233,18 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 	return err
 }
 
-// InitConversionWebhookManager sets a conversions webhook manager.
+// InitConversionWebhookManager creates and starts a conversion webhook manager.
 func (op *ShellOperator) InitConversionWebhookManager() (err error) {
+	if op.HookManager == nil || op.ConversionWebhookManager == nil {
+		return
+	}
+
 	// Do not init ConversionWebhook if there are no KubernetesConversion hooks.
 	hookNames, _ := op.HookManager.GetHooksInOrder(KubernetesConversion)
 	if len(hookNames) == 0 {
 		return
 	}
 
-	// Initialize validating webhooks manager
-	op.ConversionWebhookManager.KubeClient = op.KubeClient
-	op.ConversionWebhookManager.Settings = app.ConversionWebhookSettings
-	op.ConversionWebhookManager.Namespace = app.Namespace
 	// This handler is called when Kubernetes requests a conversion.
 	op.ConversionWebhookManager.EventHandlerFn = op.ConversionEventHandler
 
@@ -519,8 +367,8 @@ func (op *ShellOperator) Start() {
 	// Start emit "live" metrics
 	op.RunMetrics()
 
-	// Prepopulate main queue with onStartup tasks and enable kubernetes bindings tasks.
-	op.PrepopulateMainQueue(op.TaskQueues)
+	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
+	op.BootstrapMainQueue(op.TaskQueues)
 	// Start main task queue handler
 	op.TaskQueues.StartMain()
 	op.InitAndStartHookQueues()
@@ -689,7 +537,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 			}
 		}
 		if shouldCombine {
-			combineResult := op.CombineBindingContextForHook(op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
+			combineResult := CombineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
 			if combineResult != nil {
 				hookMeta.BindingContext = combineResult.BindingContexts
 				// Extra monitor IDs can be returned if several Synchronization for Group are combined.
@@ -795,11 +643,6 @@ func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 	}
 
 	return nil
-}
-
-type CombineResult struct {
-	BindingContexts []BindingContext
-	MonitorIDs      []string
 }
 
 // CombineBindingContextForHook combines binding contexts from a sequence of task with similar
@@ -913,9 +756,9 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	return res
 }
 
-// PrepopulateMainQueue adds tasks to run hooks with OnStartup bindings
+// BootstrapMainQueue adds tasks to run hooks with OnStartup bindings
 // and tasks to enable kubernetes bindings.
-func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
+func (op *ShellOperator) BootstrapMainQueue(tqs *queue.TaskQueueSet) {
 	logEntry := log.WithField("operator.component", "initMainQueue")
 
 	// Prepopulate main queue with 'onStartup' tasks and 'enable kubernetes bindings' tasks.
@@ -974,9 +817,10 @@ func (op *ShellOperator) PrepopulateMainQueue(tqs *queue.TaskQueueSet) {
 			logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
 		}
 	}
+
 }
 
-// CreateQueues create all queues defined in hooks
+// InitAndStartHookQueues create all queues defined in hooks
 func (op *ShellOperator) InitAndStartHookQueues() {
 	schHooks, _ := op.HookManager.GetHooksInOrder(Schedule)
 	for _, hookName := range schHooks {
@@ -1002,6 +846,10 @@ func (op *ShellOperator) InitAndStartHookQueues() {
 }
 
 func (op *ShellOperator) RunMetrics() {
+	if op.MetricStorage == nil {
+		return
+	}
+
 	// live ticks.
 	go func() {
 		for {
@@ -1022,184 +870,27 @@ func (op *ShellOperator) RunMetrics() {
 	}()
 }
 
-func (op *ShellOperator) SetupDebugServerHandles() {
-	op.DebugServer.Route("/", func(_ *http.Request) (interface{}, error) {
-		return fmt.Sprintf("%s control endpoint is alive", app.AppName), nil
-	})
-
-	op.DebugServer.Route("/queue/main.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
-		return dump.TaskQueueMainToText(op.TaskQueues), nil
-	})
-
-	op.DebugServer.Route("/queue/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
-		return dump.TaskQueueSetToText(op.TaskQueues), nil
-	})
-
-	op.DebugServer.Route("/hook/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
-		return op.HookManager.GetHookNames(), nil
-	})
-
-	op.DebugServer.Route("/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
-		hookName := chi.URLParam(r, "name")
-		h := op.HookManager.GetHook(hookName)
-		return h.HookController.SnapshotsDump(), nil
-	})
-
-	op.DebugServer.Route("/config/list.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
-		format := debug.FormatFromRequest(r)
-		if format == "text" {
-			return op.RuntimeConfig.String(), nil
-		}
-		return op.RuntimeConfig.List(), nil
-	})
-
-	op.DebugServer.RoutePOST("/config/set", func(r *http.Request) (interface{}, error) {
-		name := r.PostForm.Get("name")
-		if name == "" {
-			return nil, fmt.Errorf("'name' parameter is required")
-		}
-		if !op.RuntimeConfig.Has(name) {
-			return nil, fmt.Errorf("unknown runtime parameter '%s'", name)
-		}
-
-		value := r.PostForm.Get("value")
-		if name == "" {
-			return nil, fmt.Errorf("'value' parameter is required")
-		}
-
-		var duration time.Duration
-		var err error
-		durationStr := r.PostForm.Get("duration")
-		if durationStr != "" {
-			duration, err = time.ParseDuration(durationStr)
-			if err != nil {
-				return nil, fmt.Errorf("parse duration: %v", err)
-			}
-		}
-		if duration == 0 {
-			op.RuntimeConfig.Set(name, value)
-		} else {
-			op.RuntimeConfig.SetTemporarily(name, value, duration)
-		}
-		return nil, op.RuntimeConfig.LastError(name)
-	})
-}
-
-func (op *ShellOperator) SetupHttpServerHandles() {
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = fmt.Fprintf(writer, `<html>
-    <head><title>Shell operator</title></head>
-    <body>
-    <h1>Shell operator</h1>
-    <pre>go tool pprof goprofex http://&lt;SHELL_OPERATOR_IP&gt;:%s/debug/pprof/profile</pre>
-    </body>
-    </html>`, app.ListenPort)
-	})
-
-	http.Handle("/metrics", op.MetricStorage.Handler())
-}
-
-func (op *ShellOperator) StartHttpServer(ip string, port string, mux *http.ServeMux) error {
-	address := fmt.Sprintf("%s:%s", ip, port)
-
-	// Check if port is available
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Errorf("Fail to listen on '%s': %v", address, err)
-		return err
-	}
-
-	log.Infof("Listen on %s", address)
-
-	go func() {
-		if err := http.Serve(listener, mux); err != nil {
-			log.Errorf("Error starting HTTP server: %s", err)
-			os.Exit(1)
-		}
-	}()
-
-	return nil
-}
-
-func (op *ShellOperator) SetupHookMetricStorageAndServer() error {
-	if op.HookMetricStorage != nil {
-		return nil
-	}
-	if app.HookMetricsListenPort == "" || app.HookMetricsListenPort == app.ListenPort {
-		// register default prom handler in DefaultServeMux
-		op.HookMetricStorage = op.MetricStorage
-	} else {
-		// create new metric storage for hooks
-		op.InitHookMetricStorage()
-		// Create new ServeMux, serve on custom port
-		mux := http.NewServeMux()
-		err := op.StartHttpServer(app.ListenAddress, app.HookMetricsListenPort, mux)
-		if err != nil {
-			return err
-		}
-		// register scrape handler
-		mux.Handle("/metrics", op.HookMetricStorage.Handler())
-	}
-	return nil
-}
-
-func DefaultOperator() *ShellOperator {
-	operator := NewShellOperator()
-	operator.WithContext(context.Background())
-	return operator
-}
-
-func InitAndStart(operator *ShellOperator) error {
-	err := operator.StartHttpServer(app.ListenAddress, app.ListenPort, http.DefaultServeMux)
-	if err != nil {
-		log.Errorf("HTTP SERVER start failed: %v", err)
-		return err
-	}
-	operator.InitMetricStorage()
-	operator.SetupHttpServerHandles()
-
-	err = operator.SetupHookMetricStorageAndServer()
-	if err != nil {
-		log.Errorf("HTTP SERVER for hook metrics start failed: %v", err)
-		return err
-	}
-
-	err = operator.Init()
-	if err != nil {
-		log.Errorf("INIT failed: %s", err)
-		return err
-	}
-
-	operator.SetupDebugServerHandles()
-
-	// Create webhookManagers before hook loading to set them on HookControllers.
-	operator.ValidatingWebhookManager = validating.NewWebhookManager()
-	operator.ConversionWebhookManager = conversion.NewWebhookManager()
-
-	err = operator.InitHookManager()
-	if err != nil {
-		log.Errorf("INIT HookManager failed: %s", err)
-		return err
-	}
-
-	// Setup validating configs from hooks.
-	err = operator.InitValidatingWebhookManager()
-	if err != nil {
-		log.Errorf("INIT ValidatingWebhookManager failed: %s", err)
-		return err
-	}
-
-	// Setup conversion configs from hooks.
-	err = operator.InitConversionWebhookManager()
-	if err != nil {
-		log.Errorf("INIT ConversionWebhookManager failed: %s", err)
-		return err
-	}
-
-	operator.Start()
-
-	return nil
-}
+//func (op *ShellOperator) SetupHookMetricStorageAndServer() error {
+//	if op.HookMetricStorage != nil {
+//		return nil
+//	}
+//	if app.HookMetricsListenPort == "" || app.HookMetricsListenPort == app.ListenPort {
+//		// register default prom handler in DefaultServeMux
+//		op.HookMetricStorage = op.MetricStorage
+//	} else {
+//		// create new metric storage for hooks
+//		op.InitHookMetricStorage()
+//		// Create new ServeMux, serve on custom port
+//		mux := http.NewServeMux()
+//		err := op.StartHttpServer(app.ListenAddress, app.HookMetricsListenPort, mux)
+//		if err != nil {
+//			return err
+//		}
+//		// register scrape handler
+//		mux.Handle("/metrics", op.HookMetricStorage.Handler())
+//	}
+//	return nil
+//}
 
 // Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
 func (op *ShellOperator) Shutdown() {

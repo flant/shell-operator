@@ -8,10 +8,11 @@ import (
 
 var AppName = "shell-operator"
 var AppDescription = "Run your custom cluster-wide scripts in reaction to Kubernetes events or on schedule."
+var AppStartMessage = "shell-operator"
 
 var Version = "dev"
 
-var HooksDir = ""
+var HooksDir = "hooks"
 var TempDir = "/tmp/shell-operator"
 
 var Namespace = ""

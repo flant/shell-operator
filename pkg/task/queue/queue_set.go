@@ -9,6 +9,8 @@ import (
 	"github.com/flant/shell-operator/pkg/task"
 )
 
+const MainQueueName = "main"
+
 // TaskQueueSet is a manager for a set of named queues
 type TaskQueueSet struct {
 	Queues   map[string]*TaskQueue
@@ -23,8 +25,9 @@ type TaskQueueSet struct {
 
 func NewTaskQueueSet() *TaskQueueSet {
 	return &TaskQueueSet{
-		Queues: make(map[string]*TaskQueue),
-		m:      sync.Mutex{},
+		Queues:   make(map[string]*TaskQueue),
+		m:        sync.Mutex{},
+		MainName: MainQueueName,
 	}
 }
 

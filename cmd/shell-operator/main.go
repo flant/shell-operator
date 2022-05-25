@@ -7,11 +7,9 @@ import (
 	"time"
 
 	"github.com/flant/kube-client/klogtologrus"
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
@@ -39,23 +37,21 @@ func main() {
 	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
 		Action(func(c *kingpin.ParseContext) error {
-			runtimeConfig := config.NewConfig()
-			// Init logging subsystem.
-			app.SetupLogging(runtimeConfig)
-			log.Infof("%s %s", app.AppName, app.Version)
+			app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
+
 			// Init rand generator.
 			rand.Seed(time.Now().UnixNano())
 
-			defaultOperator := shell_operator.DefaultOperator()
-			defaultOperator.WithRuntimeConfig(runtimeConfig)
-			err := shell_operator.InitAndStart(defaultOperator)
+			// Init logging and initialize a ShellOperator instance.
+			operator, err := shell_operator.Init()
 			if err != nil {
 				os.Exit(1)
 			}
+			operator.Start()
 
 			// Block action by waiting signals from OS.
 			utils_signal.WaitForProcessInterruption(func() {
-				defaultOperator.Shutdown()
+				operator.Shutdown()
 				os.Exit(1)
 			})
 

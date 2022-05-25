@@ -1,7 +1,21 @@
 package shell_operator
 
-import "github.com/flant/shell-operator/pkg/metric_storage"
+import (
+	"context"
 
+	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/metric_storage"
+)
+
+func DefaultMetricStorage(ctx context.Context) *metric_storage.MetricStorage {
+	metricStorage := metric_storage.NewMetricStorage()
+	metricStorage.WithContext(ctx)
+	metricStorage.WithPrefix(app.PrometheusMetricsPrefix)
+	metricStorage.Start()
+	return metricStorage
+}
+
+// RegisterShellOperatorMetrics register all metrics needed for the ShellOperator.
 func RegisterShellOperatorMetrics(metricStorage *metric_storage.MetricStorage) {
 	RegisterCommonMetrics(metricStorage)
 	RegisterTaskQueueMetrics(metricStorage)
@@ -68,7 +82,7 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 	)
 }
 
-// Shell-operator specific metrics
+// Shell-operator specific metrics for HookManager
 func RegisterHookMetrics(metricStorage *metric_storage.MetricStorage) {
 	// Metrics for enable kubernetes bindings.
 	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", map[string]string{"hook": ""})

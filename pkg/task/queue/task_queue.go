@@ -28,13 +28,23 @@ config parameter.
 */
 
 var (
-	DelayOnQueueIsEmpty = 250 * time.Millisecond
-	DelayOnFailedTask   = 5 * time.Second
-	DelayOnRepeat       = 25 * time.Millisecond
+	WaitLoopCheckInterval = 125 * time.Millisecond
+	DelayOnQueueIsEmpty   = 250 * time.Millisecond
+	DelayOnFailedTask     = 5 * time.Second
+	DelayOnRepeat         = 25 * time.Millisecond
+)
+
+type TaskStatus string
+
+const (
+	Success TaskStatus = "Success"
+	Fail    TaskStatus = "Fail"
+	Repeat  TaskStatus = "Repeat"
+	Keep    TaskStatus = "Keep"
 )
 
 type TaskResult struct {
-	Status     string
+	Status     TaskStatus
 	HeadTasks  []task.Task
 	TailTasks  []task.Task
 	AfterTasks []task.Task
@@ -50,27 +60,27 @@ type TaskQueue struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 
+	waitMu         sync.Mutex
+	waitInProgress bool
+	cancelDelay    bool
+
 	items   []task.Task
 	started bool // a flag to ignore multiple starts
 
-	Name     string
-	Handler  func(task.Task) TaskResult
-	HeadLock sync.Mutex
-	Status   string
+	// Log debug messages if true.
+	debug bool
+
+	Name    string
+	Handler func(task.Task) TaskResult
+	Status  string
 
 	measureActionFn     func()
 	measureActionFnOnce sync.Once
-	addHandler          func(task.Task)
-	removeHandler       func(task.Task)
 }
 
 func NewTasksQueue() *TaskQueue {
 	return &TaskQueue{
-		m:             sync.RWMutex{},
-		items:         make([]task.Task, 0),
-		HeadLock:      sync.Mutex{},
-		addHandler:    func(_ task.Task) {},
-		removeHandler: func(_ task.Task) {},
+		items: make([]task.Task, 0),
 	}
 }
 
@@ -89,16 +99,6 @@ func (tq *TaskQueue) WithName(name string) *TaskQueue {
 
 func (tq *TaskQueue) WithHandler(fn func(task.Task) TaskResult) *TaskQueue {
 	tq.Handler = fn
-	return tq
-}
-
-func (tq *TaskQueue) WithAddHandler(fn func(task.Task)) *TaskQueue {
-	tq.addHandler = fn
-	return tq
-}
-
-func (tq *TaskQueue) WithRemoveHandler(fn func(task.Task)) *TaskQueue {
-	tq.removeHandler = fn
 	return tq
 }
 
@@ -137,25 +137,33 @@ func (q *TaskQueue) Length() int {
 // AddFirst adds new head element.
 func (q *TaskQueue) AddFirst(t task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
-	q.addHandler(t)
-	q.m.Lock()
+	q.withLock(func() {
+		q.addFirst(t)
+	})
+}
+
+// addFirst adds new head element.
+func (q *TaskQueue) addFirst(t task.Task) {
 	q.items = append([]task.Task{t}, q.items...)
-	q.m.Unlock()
 }
 
 // RemoveFirst deletes a head element, so head is moved.
 func (q *TaskQueue) RemoveFirst() (t task.Task) {
 	defer q.MeasureActionTime("RemoveFirst")()
-	q.m.Lock()
+	q.withLock(func() {
+		t = q.removeFirst()
+	})
+	return t
+}
+
+// removeFirst deletes a head element, so head is moved.
+func (q *TaskQueue) removeFirst() (t task.Task) {
 	if q.isEmpty() {
-		q.m.Unlock()
 		return
 	}
 	t = q.items[0]
 	q.items = q.items[1:]
-	q.m.Unlock()
-	q.removeHandler(t)
-	return t
+	return
 }
 
 // GetFirst returns a head element.
@@ -172,19 +180,29 @@ func (q *TaskQueue) GetFirst() task.Task {
 // AddFirst adds new tail element.
 func (q *TaskQueue) AddLast(t task.Task) {
 	defer q.MeasureActionTime("AddLast")()
-	q.addHandler(t)
-	q.m.Lock()
+	q.withLock(func() {
+		q.addLast(t)
+	})
+}
+
+// addFirst adds new tail element.
+func (q *TaskQueue) addLast(t task.Task) {
 	q.items = append(q.items, t)
-	q.m.Unlock()
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
 func (q *TaskQueue) RemoveLast() (t task.Task) {
 	defer q.MeasureActionTime("RemoveLast")()
-	q.m.Lock()
+	q.withLock(func() {
+		t = q.removeLast()
+	})
+	return t
+}
+
+// RemoveLast deletes a tail element, so tail is moved.
+func (q *TaskQueue) removeLast() (t task.Task) {
 	if q.isEmpty() {
-		q.m.Unlock()
-		return
+		return nil
 	}
 	t = q.items[len(q.items)-1]
 	if len(q.items) == 1 {
@@ -192,16 +210,20 @@ func (q *TaskQueue) RemoveLast() (t task.Task) {
 	} else {
 		q.items = q.items[:len(q.items)-1]
 	}
-	q.m.Unlock()
-	q.removeHandler(t)
 	return t
 }
 
 // GetLast returns a tail element.
-func (q *TaskQueue) GetLast() task.Task {
+func (q *TaskQueue) GetLast() (t task.Task) {
 	defer q.MeasureActionTime("GetLast")()
-	q.m.RLock()
-	defer q.m.RUnlock()
+	q.withRLock(func() {
+		t = q.getLast()
+	})
+	return t
+}
+
+// GetLast returns a tail element.
+func (q *TaskQueue) getLast() (t task.Task) {
 	if q.isEmpty() {
 		return nil
 	}
@@ -209,10 +231,16 @@ func (q *TaskQueue) GetLast() task.Task {
 }
 
 // Get returns a task by id.
-func (q *TaskQueue) Get(id string) task.Task {
+func (q *TaskQueue) Get(id string) (t task.Task) {
 	defer q.MeasureActionTime("Get")()
-	q.m.RLock()
-	defer q.m.RUnlock()
+	q.withRLock(func() {
+		t = q.get(id)
+	})
+	return t
+}
+
+// Get returns a task by id.
+func (q *TaskQueue) get(id string) (t task.Task) {
 	for _, t := range q.items {
 		if t.GetId() == id {
 			return t
@@ -224,8 +252,13 @@ func (q *TaskQueue) Get(id string) task.Task {
 // AddAfter inserts a task after the task with specified id.
 func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
-	q.addHandler(newTask)
+	q.withLock(func() {
+		q.addAfter(id, newTask)
+	})
+}
 
+// addAfter inserts a task after the task with specified id.
+func (q *TaskQueue) addAfter(id string, newTask task.Task) {
 	newItems := make([]task.Task, len(q.items)+1)
 
 	idFound := false
@@ -250,8 +283,13 @@ func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 // AddBefore inserts a task before the task with specified id.
 func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddBefore")()
-	q.addHandler(newTask)
+	q.withLock(func() {
+		q.addBefore(id, newTask)
+	})
+}
 
+// addBefore inserts a task before the task with specified id.
+func (q *TaskQueue) addBefore(id string, newTask task.Task) {
 	newItems := make([]task.Task, len(q.items)+1)
 
 	idFound := false
@@ -280,8 +318,16 @@ func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 func (q *TaskQueue) Remove(id string) (t task.Task) {
 	defer q.MeasureActionTime("Remove")()
 
-	q.m.Lock()
-	defer q.m.Unlock()
+	q.withLock(func() {
+		t = q.remove(id)
+	})
+	if t == nil {
+		return
+	}
+	return t
+}
+
+func (q *TaskQueue) remove(id string) (t task.Task) {
 	delId := -1
 	for i, item := range q.items {
 		if item.GetId() == id {
@@ -294,17 +340,18 @@ func (q *TaskQueue) Remove(id string) (t task.Task) {
 	}
 	t = q.items[delId]
 	q.items = append(q.items[:delId], q.items[delId+1:]...)
-	q.removeHandler(t)
 	return t
 }
 
-func (q *TaskQueue) DoWithHeadLock(fn func(tasksQueue *TaskQueue)) {
-	defer q.MeasureActionTime("DoWithHeadLock")()
-	q.HeadLock.Lock()
-	defer q.HeadLock.Unlock()
-	if fn != nil {
-		fn(q)
+func (q *TaskQueue) SetDebug(debug bool) {
+	q.debug = debug
+}
+
+func (q *TaskQueue) debugf(format string, args ...interface{}) {
+	if !q.debug {
+		return
 	}
+	log.Debugf(format, args...)
 }
 
 func (q *TaskQueue) Stop() {
@@ -317,11 +364,18 @@ func (q *TaskQueue) Start() {
 	if q.started {
 		return
 	}
+
+	if q.Handler == nil {
+		log.Errorf("queue %s: should set handler before start", q.Name)
+		q.Status = "no handler set"
+		return
+	}
+
 	go func() {
 		q.Status = ""
 		var sleepDelay time.Duration
 		for {
-			log.Debugf("queue %s: wait for task, delay %d", q.Name, sleepDelay)
+			q.debugf("queue %s: wait for task, delay %d", q.Name, sleepDelay)
 			var t = q.waitForTask(sleepDelay)
 			if t == nil {
 				q.Status = "stop"
@@ -330,13 +384,10 @@ func (q *TaskQueue) Start() {
 			}
 
 			// dump task and a whole queue
-			log.Debugf("queue %s: get task %s", q.Name, t.GetType())
-			log.Debugf("queue %s: tasks after wait %s", q.Name, q.String())
+			q.debugf("queue %s: tasks after wait %s", q.Name, q.String())
+			q.debugf("queue %s: task to handle '%s'", q.Name, t.GetType())
 
 			// Now the task can be handled!
-			if q.Handler == nil {
-				continue
-			}
 			var nextSleepDelay time.Duration
 			q.Status = "run first task"
 			taskRes := q.Handler(t)
@@ -351,32 +402,34 @@ func (q *TaskQueue) Start() {
 			}
 
 			switch taskRes.Status {
-			case "Fail":
+			case Fail:
 				// Exponential backoff delay before retry.
 				nextSleepDelay = exponential_backoff.CalculateDelay(DelayOnFailedTask, t.GetFailureCount())
 				t.IncrementFailureCount()
 				q.Status = fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String())
-			case "Success":
+			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
-				for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
-					q.AddAfter(t.GetId(), taskRes.AfterTasks[i])
-				}
-				q.DoWithHeadLock(func(q *TaskQueue) {
-					// Current head task is handled, remove it.
-					q.Remove(t.GetId())
+				q.withLock(func() {
+					for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
+						q.addAfter(t.GetId(), taskRes.AfterTasks[i])
+					}
+					// Remove current task on success.
+					if taskRes.Status == Success {
+						q.remove(t.GetId())
+					}
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
 					// become the new first task in the queue.
 					for i := len(taskRes.HeadTasks) - 1; i >= 0; i-- {
-						q.AddFirst(taskRes.HeadTasks[i])
+						q.addFirst(taskRes.HeadTasks[i])
+					}
+					// Add tasks to the end of the queue
+					for _, newTask := range taskRes.TailTasks {
+						q.addLast(newTask)
 					}
 				})
-				// Add tasks to the end of the queue
-				for _, newTask := range taskRes.TailTasks {
-					q.AddLast(newTask)
-				}
 				q.Status = ""
-			case "Repeat":
+			case Repeat:
 				// repeat a current task after a small delay
 				nextSleepDelay = DelayOnRepeat
 				q.Status = "repeat head task"
@@ -393,8 +446,7 @@ func (q *TaskQueue) Start() {
 				taskRes.AfterHandle()
 			}
 
-			// dump queue
-			log.Debugf("queue %s: tasks after handle %s", q.Name, q.String())
+			q.debugf("queue %s: tasks after handle %s", q.Name, q.String())
 		}
 	}()
 	q.started = true
@@ -402,57 +454,90 @@ func (q *TaskQueue) Start() {
 
 // waitForTask returns a task that can be processed or a nil if context is canceled.
 // sleepDelay is used to sleep before check a task, e.g. in case of failed previous task.
-// If queue is empty, than it will be checked every DelayOnQueueIsEmpty.
+// If queue is empty, then it will be checked every DelayOnQueueIsEmpty.
 func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
-	// Check Done channel to be able to stop queue
+	// Check Done channel.
 	select {
 	case <-q.ctx.Done():
 		return nil
 	default:
 	}
 
-	// Wait for non empty queue or closed Done channel
-	origStatus := q.Status
+	// Shortcut: return the first task if the queue is not empty and delay is not required.
+	if !q.IsEmpty() && sleepDelay == 0 {
+		return q.GetFirst()
+	}
+
+	// Initialize wait settings.
 	waitBegin := time.Now()
+	waitUntil := DelayOnQueueIsEmpty
+	if sleepDelay != 0 {
+		waitUntil = sleepDelay
+	}
+
+	checkTicker := time.NewTicker(WaitLoopCheckInterval)
+	q.waitMu.Lock()
+	q.waitInProgress = true
+	q.cancelDelay = false
+	q.waitMu.Unlock()
+
+	defer func() {
+		checkTicker.Stop()
+		q.waitMu.Lock()
+		q.waitInProgress = false
+		q.cancelDelay = false
+		q.waitMu.Unlock()
+	}()
+
+	// Wait for the queued task with some delay.
+	// Every tick increases the 'elapsed' counter until it outgrows the waitUntil value.
+	// Or, delay can be canceled to handle new head task immediately.
+	origStatus := q.Status
 	for {
-		// Skip this loop if sleep is not needed and there is a task to process.
-		if !q.IsEmpty() && sleepDelay == 0 {
-			return q.GetFirst()
-			//break
-		}
-		//log.WithField("operator.component", "taskRunner").
-		//	Debug("Task queue is empty. Will sleep now.")
-		// Sleep for sleepDelay in case of failure and then sleep for DelayOnQueueIsEmpty until queue is empty.
-		newDelay := DelayOnQueueIsEmpty
-		if sleepDelay != 0 {
-			newDelay = sleepDelay
-		}
-		delayTicker := time.NewTicker(newDelay)
-		secondTicker := time.NewTicker(time.Second)
-		var stop = false
-		for {
-			select {
-			case <-delayTicker.C:
-				// reset sleepDelay
-				sleepDelay = 0
-				stop = true
-			case <-q.ctx.Done():
-				return nil
-			case <-secondTicker.C:
-				waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
-				if sleepDelay == 0 {
-					q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
-				} else {
-					q.Status = fmt.Sprintf("%s (elapsed %s)", origStatus, waitSeconds)
-				}
+		select {
+		case <-q.ctx.Done():
+			// Queue is stopped.
+			return nil
+		case <-checkTicker.C:
+			// Check and update waitUntil.
+			elapsed := time.Since(waitBegin)
+
+			cancelDelay := false
+			q.waitMu.Lock()
+			if q.cancelDelay {
+				cancelDelay = true
 			}
-			if stop {
+			q.waitMu.Unlock()
+
+			// Wait loop is done or canceled: break select to check for the head task.
+			if elapsed >= waitUntil || cancelDelay {
+				// Increase waitUntil to wait on the next iteration.
+				waitUntil += DelayOnQueueIsEmpty
 				break
 			}
+
+			// Wait loop still in progress: update queue status.
+			waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
+			if sleepDelay == 0 {
+				q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
+			} else {
+				delay := sleepDelay.Truncate(time.Second).String()
+				q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, waitSeconds, delay)
+			}
 		}
-		delayTicker.Stop()
-		secondTicker.Stop()
+		if !q.IsEmpty() {
+			return q.GetFirst()
+		}
 	}
+}
+
+// CancelTaskDelay breaks wait loop. Useful to break the possible maximum sleep delay.
+func (q *TaskQueue) CancelTaskDelay() {
+	q.waitMu.Lock()
+	if q.waitInProgress {
+		q.cancelDelay = true
+	}
+	q.waitMu.Unlock()
 }
 
 // Iterate run doFn for every task.
@@ -463,11 +548,11 @@ func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 
 	defer q.MeasureActionTime("Iterate")()
 
-	q.m.RLock()
-	defer q.m.RUnlock()
-	for _, t := range q.items {
-		doFn(t)
-	}
+	q.withRLock(func() {
+		for _, t := range q.items {
+			doFn(t)
+		}
+	})
 }
 
 // Filter run filterFn on every task and remove each with false result.
@@ -478,15 +563,15 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 
 	defer q.MeasureActionTime("Filter")()
 
-	q.m.Lock()
-	defer q.m.Unlock()
-	var newItems = make([]task.Task, 0)
-	for _, t := range q.items {
-		if filterFn(t) {
-			newItems = append(newItems, t)
+	q.withLock(func() {
+		var newItems = make([]task.Task, 0)
+		for _, t := range q.items {
+			if filterFn(t) {
+				newItems = append(newItems, t)
+			}
 		}
-	}
-	q.items = newItems
+		q.items = newItems
+	})
 }
 
 // TODO define mapping method with QueueAction to insert, modify and delete tasks.
@@ -506,4 +591,16 @@ func (q *TaskQueue) String() string {
 	})
 
 	return buf.String()
+}
+
+func (q *TaskQueue) withLock(fn func()) {
+	q.m.Lock()
+	fn()
+	q.m.Unlock()
+}
+
+func (q *TaskQueue) withRLock(fn func()) {
+	q.m.RLock()
+	fn()
+	q.m.RUnlock()
 }

@@ -12,7 +12,7 @@ var DebugKeepTmpFiles = "no"
 
 var DebugKubernetesAPI = false
 
-// SetupDebugSettings init global flags for debug
+// DefineDebugFlags init global command line flags for debug.
 func DefineDebugFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
 
 	DefineDebugUnixSocketFlag(cmd)
