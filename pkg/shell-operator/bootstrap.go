@@ -115,25 +115,25 @@ func AssembleCommonOperator(op *ShellOperator) (err error) {
 		return fmt.Errorf("start HTTP server: %s", err)
 	}
 
-	metricStorage := DefaultMetricStorage(op.ctx)
-	op.MetricStorage = metricStorage
+	op.MetricStorage = DefaultMetricStorage(op.ctx)
 
-	hookMetricStorage, err := SetupHookMetricStorageAndServer(op.ctx)
+	op.HookMetricStorage, err = SetupHookMetricStorageAndServer(op.ctx)
 	if err != nil {
 		return fmt.Errorf("start HTTP server for hook metrics: %s", err)
 	}
-	if hookMetricStorage == nil {
+	// Set to common metric storage if separate port is not set.
+	if op.HookMetricStorage == nil {
 		op.HookMetricStorage = op.MetricStorage
 	}
 
 	// 'main' Kubernetes client.
-	op.KubeClient, err = InitDefaultMainKubeClient(metricStorage)
+	op.KubeClient, err = InitDefaultMainKubeClient(op.MetricStorage)
 	if err != nil {
 		return err
 	}
 
 	// ObjectPatcher with a separate Kubernetes client.
-	op.ObjectPatcher, err = InitDefaultObjectPatcher(metricStorage)
+	op.ObjectPatcher, err = InitDefaultObjectPatcher(op.MetricStorage)
 	if err != nil {
 		return err
 	}
