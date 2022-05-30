@@ -870,28 +870,6 @@ func (op *ShellOperator) RunMetrics() {
 	}()
 }
 
-//func (op *ShellOperator) SetupHookMetricStorageAndServer() error {
-//	if op.HookMetricStorage != nil {
-//		return nil
-//	}
-//	if app.HookMetricsListenPort == "" || app.HookMetricsListenPort == app.ListenPort {
-//		// register default prom handler in DefaultServeMux
-//		op.HookMetricStorage = op.MetricStorage
-//	} else {
-//		// create new metric storage for hooks
-//		op.InitHookMetricStorage()
-//		// Create new ServeMux, serve on custom port
-//		mux := http.NewServeMux()
-//		err := op.StartHttpServer(app.ListenAddress, app.HookMetricsListenPort, mux)
-//		if err != nil {
-//			return err
-//		}
-//		// register scrape handler
-//		mux.Handle("/metrics", op.HookMetricStorage.Handler())
-//	}
-//	return nil
-//}
-
 // Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
 func (op *ShellOperator) Shutdown() {
 	op.ScheduleManager.Stop()
