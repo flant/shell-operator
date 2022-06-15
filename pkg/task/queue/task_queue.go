@@ -481,19 +481,22 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	q.cancelDelay = false
 	q.waitMu.Unlock()
 
+	origStatus := q.Status
+
 	defer func() {
 		checkTicker.Stop()
 		q.waitMu.Lock()
 		q.waitInProgress = false
 		q.cancelDelay = false
 		q.waitMu.Unlock()
+		q.Status = origStatus
 	}()
 
 	// Wait for the queued task with some delay.
 	// Every tick increases the 'elapsed' counter until it outgrows the waitUntil value.
 	// Or, delay can be canceled to handle new head task immediately.
-	origStatus := q.Status
 	for {
+		checkTask := false
 		select {
 		case <-q.ctx.Done():
 			// Queue is stopped.
@@ -511,22 +514,28 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 
 			// Wait loop is done or canceled: break select to check for the head task.
 			if elapsed >= waitUntil || cancelDelay {
-				// Increase waitUntil to wait on the next iteration.
-				waitUntil += DelayOnQueueIsEmpty
-				break
-			}
-
-			// Wait loop still in progress: update queue status.
-			waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
-			if sleepDelay == 0 {
-				q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
-			} else {
-				delay := sleepDelay.Truncate(time.Second).String()
-				q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, waitSeconds, delay)
+				// Increase waitUntil to wait on the next iteration and go check for the head task.
+				checkTask = true
 			}
 		}
-		if !q.IsEmpty() {
-			return q.GetFirst()
+
+		// Break the for-loop to see if the head task can be returned.
+		if checkTask {
+			if q.IsEmpty() {
+				// No task to return: increase wait time.
+				waitUntil += DelayOnQueueIsEmpty
+			} else {
+				return q.GetFirst()
+			}
+		}
+
+		// Wait loop still in progress: update queue status.
+		waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
+		if sleepDelay == 0 {
+			q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
+		} else {
+			delay := sleepDelay.Truncate(time.Second).String()
+			q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, waitSeconds, delay)
 		}
 	}
 }
