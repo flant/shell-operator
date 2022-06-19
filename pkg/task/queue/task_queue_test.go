@@ -136,7 +136,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 	prev := failureCounts[0]
 	for i := 1; i < len(failureCounts); i++ {
 		cur := failureCounts[i]
-		g.Expect(cur > prev).Should(BeTrue(), "TaskHandler should receive task wth growing FailureCount. Got %d after %d", cur, prev)
+		g.Expect(cur > prev).Should(BeTrue(), "TaskHandler should receive task with growing FailureCount. Got %d after %d", cur, prev)
 	}
 
 	// Expect mean delay is greater than mocked delay.

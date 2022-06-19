@@ -532,11 +532,6 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			}
 		}
 
-		// Emulate bug
-		if !q.IsEmpty() {
-			return q.GetFirst()
-		}
-
 		// Break the for-loop to see if the head task can be returned.
 		if checkTask {
 			if q.IsEmpty() {
