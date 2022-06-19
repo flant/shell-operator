@@ -134,7 +134,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 
 	// Expect mean delay is greater than mocked delay.
 	mean, _ := calculateMeanDelay(runsAt)
-	g.Expect(mean > mockExponentialDelay).Should(BeTrue(),
+	g.Expect(mean).Should(BeNumerically(">", mockExponentialDelay),
 		"mean delay of %d fails should be more than %s, got %s. Check exponential delaying not broken in Start or waitForTask.",
 		fails, mockExponentialDelay.String(), mean.Truncate(100*time.Microsecond).String())
 
@@ -224,10 +224,10 @@ func Test_CancelDelay(t *testing.T) {
 	elapsed := endedAt.Sub(startedAt).Truncate(100 * time.Microsecond)
 
 	// Expect elapsed is less than mocked delay.
-	g.Expect(elapsed > mockExponentialDelay).Should(BeTrue(),
+	g.Expect(elapsed).Should(BeNumerically(">", mockExponentialDelay),
 		"Should delay after failed task. Got delay of %s, expect more than %s. Check delay for failed task not broken in Start or waitForTask.",
 		elapsed.String(), mockExponentialDelay.String())
-	g.Expect(elapsed < 2*mockExponentialDelay).Should(BeTrue(),
+	g.Expect(elapsed).Should(BeNumerically("<", 2*mockExponentialDelay),
 		"Should stop delaying after CancelTaskDelay call. Got delay of %s, expect less than %s. Check cancel delay not broken in Start or waitForTask.",
 		elapsed.String(), (2 * mockExponentialDelay).String())
 }
