@@ -28,10 +28,10 @@ config parameter.
 */
 
 var (
-	WaitLoopCheckInterval = 125 * time.Millisecond
-	DelayOnQueueIsEmpty   = 250 * time.Millisecond
-	DelayOnFailedTask     = 5 * time.Second
-	DelayOnRepeat         = 25 * time.Millisecond
+	DefaultWaitLoopCheckInterval    = 125 * time.Millisecond
+	DefaultDelayOnQueueIsEmpty      = 250 * time.Millisecond
+	DefaultInitialDelayOnFailedTask = 5 * time.Second
+	DefaultDelayOnRepeat            = 25 * time.Millisecond
 )
 
 type TaskStatus string
@@ -76,11 +76,24 @@ type TaskQueue struct {
 
 	measureActionFn     func()
 	measureActionFnOnce sync.Once
+
+	// Timing settings.
+	WaitLoopCheckInterval time.Duration
+	DelayOnQueueIsEmpty   time.Duration
+	DelayOnRepeat         time.Duration
+	ExponentialBackoffFn  func(failureCount int) time.Duration
 }
 
 func NewTasksQueue() *TaskQueue {
 	return &TaskQueue{
 		items: make([]task.Task, 0),
+		// Default timings
+		WaitLoopCheckInterval: DefaultWaitLoopCheckInterval,
+		DelayOnQueueIsEmpty:   DefaultDelayOnQueueIsEmpty,
+		DelayOnRepeat:         DefaultDelayOnRepeat,
+		ExponentialBackoffFn: func(failureCount int) time.Duration {
+			return exponential_backoff.CalculateDelay(DefaultInitialDelayOnFailedTask, failureCount)
+		},
 	}
 }
 
@@ -404,7 +417,7 @@ func (q *TaskQueue) Start() {
 			switch taskRes.Status {
 			case Fail:
 				// Exponential backoff delay before retry.
-				nextSleepDelay = exponential_backoff.CalculateDelay(DelayOnFailedTask, t.GetFailureCount())
+				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
 				t.IncrementFailureCount()
 				q.Status = fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String())
 			case Success, Keep:
@@ -431,7 +444,7 @@ func (q *TaskQueue) Start() {
 				q.Status = ""
 			case Repeat:
 				// repeat a current task after a small delay
-				nextSleepDelay = DelayOnRepeat
+				nextSleepDelay = q.DelayOnRepeat
 				q.Status = "repeat head task"
 			}
 
@@ -470,16 +483,18 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 
 	// Initialize wait settings.
 	waitBegin := time.Now()
-	waitUntil := DelayOnQueueIsEmpty
+	waitUntil := q.DelayOnQueueIsEmpty
 	if sleepDelay != 0 {
 		waitUntil = sleepDelay
 	}
 
-	checkTicker := time.NewTicker(WaitLoopCheckInterval)
+	checkTicker := time.NewTicker(q.WaitLoopCheckInterval)
 	q.waitMu.Lock()
 	q.waitInProgress = true
 	q.cancelDelay = false
 	q.waitMu.Unlock()
+
+	origStatus := q.Status
 
 	defer func() {
 		checkTicker.Stop()
@@ -487,13 +502,14 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 		q.waitInProgress = false
 		q.cancelDelay = false
 		q.waitMu.Unlock()
+		q.Status = origStatus
 	}()
 
 	// Wait for the queued task with some delay.
 	// Every tick increases the 'elapsed' counter until it outgrows the waitUntil value.
 	// Or, delay can be canceled to handle new head task immediately.
-	origStatus := q.Status
 	for {
+		checkTask := false
 		select {
 		case <-q.ctx.Done():
 			// Queue is stopped.
@@ -502,36 +518,42 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			// Check and update waitUntil.
 			elapsed := time.Since(waitBegin)
 
-			cancelDelay := false
 			q.waitMu.Lock()
 			if q.cancelDelay {
-				cancelDelay = true
+				// Reset waitUntil to check task immediately.
+				waitUntil = elapsed
 			}
 			q.waitMu.Unlock()
 
 			// Wait loop is done or canceled: break select to check for the head task.
-			if elapsed >= waitUntil || cancelDelay {
-				// Increase waitUntil to wait on the next iteration.
-				waitUntil += DelayOnQueueIsEmpty
-				break
-			}
-
-			// Wait loop still in progress: update queue status.
-			waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
-			if sleepDelay == 0 {
-				q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
-			} else {
-				delay := sleepDelay.Truncate(time.Second).String()
-				q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, waitSeconds, delay)
+			if elapsed >= waitUntil {
+				// Increase waitUntil to wait on the next iteration and go check for the head task.
+				checkTask = true
 			}
 		}
-		if !q.IsEmpty() {
-			return q.GetFirst()
+
+		// Break the for-loop to see if the head task can be returned.
+		if checkTask {
+			if q.IsEmpty() {
+				// No task to return: increase wait time.
+				waitUntil += q.DelayOnQueueIsEmpty
+			} else {
+				return q.GetFirst()
+			}
+		}
+
+		// Wait loop still in progress: update queue status.
+		waitSeconds := time.Since(waitBegin).Truncate(time.Second).String()
+		if sleepDelay == 0 {
+			q.Status = fmt.Sprintf("waiting for task %s", waitSeconds)
+		} else {
+			delay := sleepDelay.Truncate(time.Second).String()
+			q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, waitSeconds, delay)
 		}
 	}
 }
 
-// CancelTaskDelay breaks wait loop. Useful to break the possible maximum sleep delay.
+// CancelTaskDelay breaks wait loop. Useful to break the possible long sleep delay.
 func (q *TaskQueue) CancelTaskDelay() {
 	q.waitMu.Lock()
 	if q.waitInProgress {
