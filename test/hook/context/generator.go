@@ -195,4 +195,5 @@ func (b *BindingContextController) Stop() {
 	if b.HookCtrl != nil {
 		b.HookCtrl.StopMonitors()
 	}
+	kubeeventsmanager.DefaultFactoryCache = kubeeventsmanager.NewFactoryCache()
 }

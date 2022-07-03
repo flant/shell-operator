@@ -146,9 +146,6 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	// define resyncPeriod for informer
 	resyncPeriod := RandomizedResyncPeriod()
 
-	// define indexers for informer
-	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
-
 	// define tweakListOptions for informer
 	fmtLabelSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
 	if err != nil {
@@ -173,8 +170,23 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	tweakListOptions(&ei.ListOptions)
 
 	// create informer with add, update, delete callbacks
-	informer := dynamicinformer.NewFilteredDynamicInformer(ei.KubeClient.Dynamic(), ei.GroupVersionResource, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
+	index := FactoryIndex{
+		GVR:           ei.GroupVersionResource,
+		Namespace:     ei.Namespace,
+		FieldSelector: fmtFieldSelector,
+		LabelSelector: fmtLabelSelector,
+	}
+
+	factory := DefaultFactoryCache.Get(index)
+	if factory == nil {
+		factory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(
+			ei.KubeClient.Dynamic(), resyncPeriod, ei.Namespace, tweakListOptions)
+		DefaultFactoryCache.Add(index, factory)
+	}
+
+	informer := factory.ForResource(ei.GroupVersionResource)
 	informer.Informer().AddEventHandler(ei)
+
 	ei.SharedInformer = informer.Informer()
 
 	err = ei.LoadExistedObjects()
@@ -486,15 +498,17 @@ func (ei *resourceInformer) Start() {
 		close(stopCh)
 	}()
 
-	go ei.SharedInformer.Run(stopCh)
+	if !ei.SharedInformer.HasSynced() {
+		go ei.SharedInformer.Run(stopCh)
 
-	if err := wait.PollImmediateUntil(ei.informerSyncTime, func() (bool, error) {
-		return ei.SharedInformer.HasSynced(), nil
-	}, stopCh); err != nil {
-		ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
+		if err := wait.PollImmediateUntil(ei.informerSyncTime, func() (bool, error) {
+			return ei.SharedInformer.HasSynced(), nil
+		}, stopCh); err != nil {
+			ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
+		}
+
+		log.Debugf("%s: informer is ready", ei.Monitor.Metadata.DebugName)
 	}
-
-	log.Debugf("%s: informer is ready", ei.Monitor.Metadata.DebugName)
 }
 
 func (ei *resourceInformer) Stop() {
