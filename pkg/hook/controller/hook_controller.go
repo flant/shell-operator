@@ -272,7 +272,8 @@ func (hc *hookController) EnableConversionBindings() {
 	}
 }
 
-// KubernetesSnapshots returns all exited objects for all registered kubernetes bindings.
+// KubernetesSnapshots returns a 'full snapshot': all snapshots for all registered kubernetes bindings.
+// Note: no caching as in UpdateSnapshots because KubernetesSnapshots used for non-combined binding contexts.
 func (hc *hookController) KubernetesSnapshots() map[string][]ObjectAndFilterResult {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.Snapshots()
@@ -280,60 +281,86 @@ func (hc *hookController) KubernetesSnapshots() map[string][]ObjectAndFilterResu
 	return map[string][]ObjectAndFilterResult{}
 }
 
-// KubernetesSnapshotsFor returns snapshots for schedule or kubernetes binding
-func (hc *hookController) KubernetesSnapshotsFor(bindingType BindingType, bindingName string) map[string][]ObjectAndFilterResult {
-	includeSnapshots := []string{}
+// getIncludeSnapshotsFrom returns binding names from 'includeSnapshotsFrom' field.
+func (hc *hookController) getIncludeSnapshotsFrom(bindingType BindingType, bindingName string) []string {
+	includeSnapshotsFrom := []string{}
 
 	switch bindingType {
 	case OnKubernetesEvent:
 		for _, binding := range hc.kubernetesBindings {
 			if bindingName == binding.BindingName {
-				includeSnapshots = binding.IncludeSnapshotsFrom
+				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
 				break
 			}
 		}
 	case Schedule:
 		for _, binding := range hc.scheduleBindings {
 			if bindingName == binding.BindingName {
-				includeSnapshots = binding.IncludeSnapshotsFrom
+				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
 				break
 			}
 		}
 	case KubernetesValidating:
 		for _, binding := range hc.validatingBindings {
 			if bindingName == binding.BindingName {
-				includeSnapshots = binding.IncludeSnapshotsFrom
+				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
 				break
 			}
 		}
 	case KubernetesConversion:
 		for _, binding := range hc.conversionBindings {
 			if bindingName == binding.BindingName {
-				includeSnapshots = binding.IncludeSnapshotsFrom
+				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
 				break
 			}
 		}
 	}
 
-	return hc.KubernetesController.SnapshotsFrom(includeSnapshots...)
+	return includeSnapshotsFrom
 }
 
+// UpdateSnapshots ensures fresh consistent snapshots for combined binding contexts.
+//
+// It uses caching to retrieve snapshot for particular binding name only once..
+// This caching is important for Synchronization and self-includes:
+// Combined "Synchronization" binging contexts or "Synchronization"
+// with self-inclusion may require several calls to Snapshot*() methods, but objects
+// may change between these calls.
 func (hc *hookController) UpdateSnapshots(context []BindingContext) []BindingContext {
 	if hc.KubernetesController == nil {
 		return context
 	}
 
-	// Turn on cached snapshots mode to retrieve snapshots only once. (Synchronization and self-include)
-	hc.KubernetesController.StartCachedSnapshotMode()
-	defer hc.KubernetesController.StopCachedSnapshotMode()
+	// Cache retrieved snapshots to make them consistent.
+	cache := make(map[string][]ObjectAndFilterResult)
 
 	newContext := []BindingContext{}
 	for _, bc := range context {
 		newBc := bc
-		newBc.Snapshots = hc.KubernetesSnapshotsFor(bc.Metadata.BindingType, bc.Binding)
-		if newBc.Metadata.BindingType == OnKubernetesEvent && newBc.Type == TypeSynchronization {
-			newBc.Objects = hc.KubernetesController.SnapshotsFor(bc.Binding)
+
+		// Update 'snapshots' field to fresh snapshot based on 'includeSnapshotsFrom' field.
+		// Note: it is a cache-enabled version of KubernetesController.SnapshotsFrom.
+		newBc.Snapshots = make(map[string][]ObjectAndFilterResult)
+		includeSnapshotsFrom := hc.getIncludeSnapshotsFrom(bc.Metadata.BindingType, bc.Binding)
+		for _, bindingName := range includeSnapshotsFrom {
+			// Initialize all keys with empty arrays.
+			newBc.Snapshots[bindingName] = make([]ObjectAndFilterResult, 0)
+			if _, has := cache[bindingName]; !has {
+				cache[bindingName] = hc.KubernetesController.SnapshotsFor(bindingName)
+			}
+			if cache[bindingName] != nil {
+				newBc.Snapshots[bindingName] = cache[bindingName]
+			}
 		}
+
+		// Also refresh 'objects' field for Kubernetes.Synchronization event.
+		if newBc.Metadata.BindingType == OnKubernetesEvent && newBc.Type == TypeSynchronization {
+			if _, has := cache[bc.Binding]; !has {
+				cache[bc.Binding] = hc.KubernetesController.SnapshotsFor(bc.Binding)
+			}
+			newBc.Objects = cache[bc.Binding]
+		}
+
 		newContext = append(newContext, newBc)
 	}
 
