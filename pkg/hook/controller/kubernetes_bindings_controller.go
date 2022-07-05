@@ -12,7 +12,7 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
-// A link between a binding config and a Monitor.
+// KubernetesBindingToMonitorLink is a link between a binding config and a Monitor.
 type KubernetesBindingToMonitorLink struct {
 	MonitorId     string
 	BindingConfig OnKubernetesEventConfig
@@ -24,8 +24,6 @@ type KubernetesBindingsController interface {
 	WithKubeEventsManager(kube_events_manager.KubeEventsManager)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
 	UpdateMonitor(monitorId string, kind, apiVersion string) error
-	StartCachedSnapshotMode()
-	StopCachedSnapshotMode()
 	UnlockEvents()
 	UnlockEventsFor(monitorID string)
 	StopMonitors()
@@ -50,10 +48,6 @@ type kubernetesBindingsController struct {
 
 	// dependencies
 	kubeEventsManager kube_events_manager.KubeEventsManager
-
-	// Snapshots cache for UpdateSnapshots
-	snapshotsCache      map[string][]ObjectAndFilterResult
-	cachedSnapshotsMode bool
 }
 
 // kubernetesHooksController should implement the KubernetesHooksController
@@ -116,9 +110,6 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 		return fmt.Errorf("stop monitor for binding '%s': %v", bindingName, err)
 	}
 
-	// Clean snapshots from cache for the stopped monitor.
-	delete(c.snapshotsCache, bindingName)
-
 	// Update monitor config if kind or apiVersion are changed.
 	if link.BindingConfig.Monitor.Kind != kind || link.BindingConfig.Monitor.ApiVersion != apiVersion {
 		link.BindingConfig.Monitor.Kind = kind
@@ -151,22 +142,6 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 	c.UnlockEventsFor(monitorId)
 
 	return nil
-}
-
-// StartSnapshotMode enables the cache for accessed snapshots.
-// This mode is used only for the "Synchronization" phase during a preparation of the
-// binding context. Combined "Synchronization" binging contexts or "Synchronization"
-// with self-inclusion may require several calls to Snapshot*() methods, but objects
-// may change between these calls. So the cache is introduced to ensure snapshot consistency.
-func (c *kubernetesBindingsController) StartCachedSnapshotMode() {
-	c.cachedSnapshotsMode = true
-	c.snapshotsCache = make(map[string][]ObjectAndFilterResult)
-}
-
-// StopSnapshotMode reset the cache for accessed snapshots.
-func (c *kubernetesBindingsController) StopCachedSnapshotMode() {
-	c.cachedSnapshotsMode = false
-	c.snapshotsCache = nil
 }
 
 // UnlockEvents turns on eventCb for all monitors to emit events after Synchronization.
@@ -234,23 +209,14 @@ func (c *kubernetesBindingsController) BindingNames() []string {
 	return names
 }
 
-// SnapshotsFor finds a monitorId for a binding name and get its Snapshot,
-// then returns an array of objects.
+// SnapshotsFor returns snapshot for single onKubernetes binding.
+// It finds a monitorId for a binding name and returns an array of objects.
 func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []ObjectAndFilterResult {
-	if c.cachedSnapshotsMode {
-		if snapshot, has := c.snapshotsCache[bindingName]; has {
-			return snapshot
-		}
-	}
 	for _, binding := range c.KubernetesBindings {
 		if bindingName == binding.BindingName {
 			monitorID := binding.Monitor.Metadata.MonitorId
 			if c.kubeEventsManager.HasMonitor(monitorID) {
-				snapshot := c.kubeEventsManager.GetMonitor(monitorID).Snapshot()
-				if c.cachedSnapshotsMode {
-					c.snapshotsCache[bindingName] = snapshot
-				}
-				return snapshot
+				return c.kubeEventsManager.GetMonitor(monitorID).Snapshot()
 			}
 		}
 	}
@@ -258,13 +224,14 @@ func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []Object
 	return nil
 }
 
-// SnapshotsFrom finds a monitorId for each binding name and get its Snapshot,
+// SnapshotsFrom returns snapshot for several binding names.
+// It finds a monitorId for each binding name and get its Snapshot,
 // then returns a map of object arrays for each binding name.
 func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult {
 	res := map[string][]ObjectAndFilterResult{}
 
 	for _, bindingName := range bindingNames {
-		// initialize all keys with empty arrays.
+		// Initialize all keys with empty arrays.
 		res[bindingName] = make([]ObjectAndFilterResult, 0)
 
 		snapshot := c.SnapshotsFor(bindingName)
