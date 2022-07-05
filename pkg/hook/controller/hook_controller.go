@@ -321,7 +321,7 @@ func (hc *hookController) getIncludeSnapshotsFrom(bindingType BindingType, bindi
 
 // UpdateSnapshots ensures fresh consistent snapshots for combined binding contexts.
 //
-// It uses caching to retrieve snapshot for particular binding name only once..
+// It uses caching to retrieve snapshots for a particular binding name only once.
 // This caching is important for Synchronization and self-includes:
 // Combined "Synchronization" binging contexts or "Synchronization"
 // with self-inclusion may require several calls to Snapshot*() methods, but objects
