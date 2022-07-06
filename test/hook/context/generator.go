@@ -17,6 +17,10 @@ import (
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
+func init() {
+	kubeeventsmanager.DefaultSyncTime = time.Microsecond
+}
+
 type GeneratedBindingContexts struct {
 	Rendered        string
 	BindingContexts []BindingContext
@@ -58,7 +62,6 @@ func NewBindingContextController(config string, version ...fake.ClusterVersion) 
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
 	b.KubeEventsManager.WithContext(ctx)
 	b.KubeEventsManager.WithKubeClient(b.fakeCluster.Client)
-	b.KubeEventsManager.WithSyncPeriod(time.Microsecond)
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager()
 	b.ScheduleManager.WithContext(ctx)
@@ -132,9 +135,6 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 }
 
 func (b *BindingContextController) ChangeState(newState string) (GeneratedBindingContexts, error) {
-	// fmt.Println("Change state start")
-	// defer func() { fmt.Println("Change state end") }()
-
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -195,5 +195,5 @@ func (b *BindingContextController) Stop() {
 	if b.HookCtrl != nil {
 		b.HookCtrl.StopMonitors()
 	}
-	kubeeventsmanager.DefaultFactoryCache = kubeeventsmanager.NewFactoryCache()
+	kubeeventsmanager.DefaultFactoryStore = kubeeventsmanager.NewFactoryStore()
 }

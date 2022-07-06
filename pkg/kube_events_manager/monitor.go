@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -20,7 +19,6 @@ type Monitor interface {
 	WithMetricStorage(mstor *metric_storage.MetricStorage)
 	WithConfig(config *MonitorConfig)
 	WithKubeEventCb(eventCb func(KubeEvent))
-	WithSyncPeriod(time.Duration)
 	CreateInformers() error
 	Start(context.Context)
 	Stop()
@@ -43,8 +41,6 @@ type monitor struct {
 	// map of dynamically starting informers
 	VaryingInformers map[string][]ResourceInformer
 
-	informerSyncTime time.Duration
-
 	eventCb       func(KubeEvent)
 	eventsEnabled bool
 	// Index of namespaces statically defined in monitor configuration
@@ -61,7 +57,6 @@ var NewMonitor = func() Monitor {
 	return &monitor{
 		ResourceInformers: make([]ResourceInformer, 0),
 		VaryingInformers:  make(map[string][]ResourceInformer),
-		informerSyncTime:  100 * time.Millisecond,
 		cancelForNs:       make(map[string]context.CancelFunc),
 		staticNamespaces:  make(map[string]bool),
 	}
@@ -89,10 +84,6 @@ func (m *monitor) GetConfig() *MonitorConfig {
 
 func (m *monitor) WithKubeEventCb(eventCb func(KubeEvent)) {
 	m.eventCb = eventCb
-}
-
-func (m *monitor) WithSyncPeriod(period time.Duration) {
-	m.informerSyncTime = period
 }
 
 // CreateInformers creates all informers and
@@ -261,13 +252,11 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []Res
 
 	for _, objName := range objNames {
 		informer := NewResourceInformer(m.Config)
-		informer.WithContext(m.ctx)
 		informer.WithKubeClient(m.KubeClient)
 		informer.WithMetricStorage(m.metricStorage)
 		informer.WithNamespace(namespace)
 		informer.WithName(objName)
 		informer.WithKubeEventCb(m.eventCb)
-		informer.WithSyncPeriod(m.informerSyncTime)
 
 		err := informer.CreateSharedInformer()
 		if err != nil {
@@ -299,7 +288,6 @@ func (m *monitor) Start(parentCtx context.Context) {
 
 	if m.NamespaceInformer != nil {
 		m.NamespaceInformer.WithContext(m.ctx)
-		m.NamespaceInformer.WithSyncPeriod(m.informerSyncTime)
 		m.NamespaceInformer.Start()
 	}
 }
