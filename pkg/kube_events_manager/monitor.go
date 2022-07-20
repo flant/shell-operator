@@ -160,10 +160,10 @@ func (m *monitor) CreateInformers() error {
 
 				for _, informer := range m.VaryingInformers[nsName] {
 					informer.WithContext(ctx)
-					informer.Start()
 					if m.eventsEnabled {
 						informer.EnableKubeEventCb()
 					}
+					informer.Start()
 				}
 			},
 			func(nsName string) {

@@ -40,17 +40,10 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	mon.WithKubeClient(fc.Client)
 	mon.WithConfig(monitorCfg)
 
-	// Catch KubeEvents from monitor.
-	type kubeEvent struct {
-		Type  KubeEventType
-		Count int
-	}
-	events := make([]kubeEvent, 0)
+	// Catch resource IDs from monitor events.
+	objsFromEvents := make([]string, 0)
 	mon.WithKubeEventCb(func(ev KubeEvent) {
-		events = append(events, kubeEvent{
-			Type:  ev.Type,
-			Count: len(ev.Objects),
-		})
+		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
 	})
 
 	// Start monitor.
@@ -59,64 +52,73 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	mon.Start(context.TODO())
 
 	// Get initial snapshot.
-	snap := mon.Snapshot()
-	g.Expect(snap).Should(HaveLen(1), "Should have only one ConfigMap on start")
-	g.Expect(events).Should(HaveLen(0), "Should not call KubeEventCb until EnableKubeEventsCb")
+	g.Expect(snapshotResourceIDs(mon.Snapshot())).Should(ContainElement("default/ConfigMap/default-cm-1"), "Should have only one ConfigMap on start")
+	g.Expect(objsFromEvents).Should(BeEmpty(), "Should not call KubeEventCb until EnableKubeEventsCb")
 
 	// Simulate object creation during Synchronization phase:
 	// create new ns with matching labels and then create new ConfigMap.
 	createNsWithLabels(fc, "test-ns-1", map[string]string{"test-label": ""})
 
-	// Wait until informer appears.
-	g.Eventually(func() bool {
-		monImpl := mon.(*monitor)
-		return len(monImpl.VaryingInformers) == 2
-	}, "5s", "10ms").Should(BeTrue(), "Should create informer for new Namespace")
+	// Wait until informers appears.
+	g.Eventually(mon.(*monitor).VaryingInformers, "5s", "10ms").
+		Should(HaveKey("test-ns-1"), "Should create informer for new namespace")
 
 	createCM(fc, "test-ns-1", testCM("cm-1"))
 
-	// Should update snapshot. Snapshot resets cached events.
-	g.Eventually(func() bool {
-		snap := mon.Snapshot()
-		return len(snap) == 2
-	}, "5s", "10ms").Should(BeTrue(), "Should not update snapshot until EnableKubeEventsCb")
+	// Should update snapshot with new objects.
+	g.Eventually(func() []string {
+		return snapshotResourceIDs(mon.Snapshot())
+	}, "5s", "10ms").Should(ContainElement("test-ns-1/ConfigMap/cm-1"), "Should update snapshot before EnableKubeEventsCb")
 
 	// Create more ConfigMaps to cache some events.
 	createCM(fc, "test-ns-1", testCM("cm-2"))
 	createCM(fc, "test-ns-1", testCM("cm-3"))
 
-	g.Expect(events).Should(HaveLen(0), "Should not fire KubeEvents until EnableKubeEventsCb")
+	g.Expect(objsFromEvents).Should(BeEmpty(), "Should not fire KubeEvents until EnableKubeEventsCb")
 
 	// Enable Kube events, should update snapshots now.
 	mon.EnableKubeEventCb()
 
 	// Should catch 2 events for cm-2 and cm-3.
-	g.Eventually(func() bool {
-		return len(events) == 2
-	}, "6s", "10ms").Should(BeTrue(), "Should fire cached KubeEvents after EnableKubeEventCb")
+	g.Eventually(func() []string { return objsFromEvents }, "6s", "10ms").
+		Should(SatisfyAll(
+			ContainElement("test-ns-1/ConfigMap/cm-2"),
+			ContainElement("test-ns-1/ConfigMap/cm-3"),
+		), "Should fire cached KubeEvents after EnableKubeEventCb")
 
-	// Now simulate NS creation and objects creation after Synchronization phase.
+	g.Expect(snapshotResourceIDs(mon.Snapshot())).
+		Should(SatisfyAll(
+			ContainElement("test-ns-1/ConfigMap/cm-2"),
+			ContainElement("test-ns-1/ConfigMap/cm-3"),
+		), "Snapshot should have cm-2 and cm-3")
+
+	// Simulate NS creation and objects creation after Synchronization phase.
 
 	// Create new ns with labels and cm there.
 	createNsWithLabels(fc, "test-ns-2", map[string]string{"test-label": ""})
 
-	// Wait until informer for new NS appears.
-	g.Eventually(func() bool {
-		monImpl := mon.(*monitor)
-		return len(monImpl.VaryingInformers) == 3
-	}, "5s", "10ms").Should(BeTrue(), "Should create informer for ns/test-ns-2")
+	// Monitor should create new configmap informer for new namespace.
+	g.Eventually(mon.(*monitor).VaryingInformers, "5s", "10ms").
+		Should(HaveKey("test-ns-2"), "Should create informer for ns/test-ns-2")
 
+	// Create new ConfigMap after Synchronization.
 	createCM(fc, "test-ns-2", testCM("cm-2-1"))
 
 	// Should update snapshot.
-	g.Eventually(func() bool {
-		return len(mon.Snapshot()) == 4
-	}, "5s", "10ms").Should(BeTrue(), "Should update snapshot after Synchronization")
+	g.Eventually(func() []string {
+		return snapshotResourceIDs(mon.Snapshot())
+	}, "5s", "10ms").Should(ContainElement("test-ns-2/ConfigMap/cm-2-1"), "Should update snapshot on new ConfigMap after Synchronization")
 
-	// Should catch event for cm/cm-2-1.
-	g.Eventually(func() bool {
-		return len(events) == 3
-	}, "5s", "10ms").Should(BeTrue(), "Should fire KubeEvent after Synchronization")
+	// Should catch event for cm-2-1.
+	g.Eventually(func() []string { return objsFromEvents }, "5s", "10ms").
+		Should(ContainElement("test-ns-2/ConfigMap/cm-2-1"), "Should fire KubeEvent for new ConfigMap after Synchronization", objsFromEvents)
+
+	// Add non-matched Namespace.
+	createNsWithLabels(fc, "test-ns-non-matched", map[string]string{"non-matched-label": ""})
+
+	// Monitor should create new configmap informer for new namespace.
+	g.Eventually(mon.(*monitor).VaryingInformers, "5s", "10ms").
+		ShouldNot(HaveKey("test-ns-non-matched"), "Should not create informer for non-mathed Namespace")
 }
 
 func createNsWithLabels(fc *fake.Cluster, name string, labels map[string]string) {
@@ -140,4 +142,12 @@ metadata:
 data:
   foo: "bar"
 `, name)
+}
+
+func snapshotResourceIDs(snap []ObjectAndFilterResult) []string {
+	ids := make([]string, 0)
+	for _, obj := range snap {
+		ids = append(ids, obj.Metadata.ResourceId)
+	}
+	return ids
 }
