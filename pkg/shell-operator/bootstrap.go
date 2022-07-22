@@ -221,7 +221,7 @@ func SetupHookManagers(op *ShellOperator, hooksDir string, tempDir string) {
 	op.ValidatingWebhookManager.Settings = app.ValidatingWebhookSettings
 	op.ValidatingWebhookManager.Namespace = app.Namespace
 
-	// Initialize validating webhooks manager
+	// Initialize conversion webhooks manager
 	op.ConversionWebhookManager = conversion.NewWebhookManager()
 	op.ConversionWebhookManager.KubeClient = op.KubeClient
 	op.ConversionWebhookManager.Settings = app.ConversionWebhookSettings

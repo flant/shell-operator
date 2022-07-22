@@ -15,3 +15,5 @@
 .idea
 *.iml
 *.proj
+
+vendor
