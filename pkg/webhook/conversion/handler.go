@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
