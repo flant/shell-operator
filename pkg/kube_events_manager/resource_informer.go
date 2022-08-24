@@ -462,12 +462,6 @@ func (ei *resourceInformer) ShouldFireEvent(checkEvent WatchEventType) bool {
 func (ei *resourceInformer) Start() {
 	log.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
 
-	go func() {
-		<-ei.ctx.Done()
-		ei.stopped = true
-		DefaultFactoryStore.Stop(ei.FactoryIndex)
-	}()
-
 	// TODO: separate handler and informer
 	err := DefaultFactoryStore.Start(ei.KubeClient.Dynamic(), ei.FactoryIndex, ei)
 	if err != nil {
