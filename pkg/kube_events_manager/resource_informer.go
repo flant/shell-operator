@@ -11,8 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
@@ -29,7 +27,6 @@ type ResourceInformer interface {
 	WithNamespace(string)
 	WithName(string)
 	WithKubeEventCb(eventCb func(KubeEvent))
-	WithSyncPeriod(time.Duration)
 	CreateSharedInformer() error
 	CachedObjects() []ObjectAndFilterResult
 	CachedObjectsBytes() int64
@@ -50,10 +47,9 @@ type resourceInformer struct {
 	Name string
 
 	// Kubernetes informer and its settings.
-	SharedInformer       cache.SharedInformer
+	FactoryIndex         FactoryIndex
 	GroupVersionResource schema.GroupVersionResource
 	ListOptions          metav1.ListOptions
-	informerSyncTime     time.Duration
 
 	// A cache of objects and filterResults. It is a part of the Monitor's snapshot.
 	cachedObjects map[string]*ObjectAndFilterResult
@@ -94,7 +90,6 @@ var NewResourceInformer = func(monitor *MonitorConfig) ResourceInformer {
 		eventBufLock:           sync.Mutex{},
 		cachedObjectsInfo:      &CachedObjectsInfo{},
 		cachedObjectsIncrement: &CachedObjectsInfo{},
-		informerSyncTime:       100 * time.Millisecond,
 	}
 	return informer
 }
@@ -119,10 +114,6 @@ func (ei *resourceInformer) WithName(name string) {
 	ei.Name = name
 }
 
-func (ei *resourceInformer) WithSyncPeriod(period time.Duration) {
-	ei.informerSyncTime = period
-}
-
 func (ei *resourceInformer) WithKubeEventCb(eventCb func(KubeEvent)) {
 	ei.eventCb = eventCb
 }
@@ -143,12 +134,6 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 	}
 	log.Debugf("%s: GVR for kind '%s' is '%s'", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.GroupVersionResource.String())
 
-	// define resyncPeriod for informer
-	resyncPeriod := RandomizedResyncPeriod()
-
-	// define indexers for informer
-	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
-
 	// define tweakListOptions for informer
 	fmtLabelSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
 	if err != nil {
@@ -161,21 +146,17 @@ func (ei *resourceInformer) CreateSharedInformer() (err error) {
 		return fmt.Errorf("format field selector '%+v': %s", fieldSelector, err)
 	}
 
-	tweakListOptions := func(options *metav1.ListOptions) {
-		if fmtFieldSelector != "" {
-			options.FieldSelector = fmtFieldSelector
-		}
-		if fmtLabelSelector != "" {
-			options.LabelSelector = fmtLabelSelector
-		}
+	ei.ListOptions = metav1.ListOptions{
+		FieldSelector: fmtFieldSelector,
+		LabelSelector: fmtLabelSelector,
 	}
-	ei.ListOptions = metav1.ListOptions{}
-	tweakListOptions(&ei.ListOptions)
 
-	// create informer with add, update, delete callbacks
-	informer := dynamicinformer.NewFilteredDynamicInformer(ei.KubeClient.Dynamic(), ei.GroupVersionResource, ei.Namespace, resyncPeriod, indexers, tweakListOptions)
-	informer.Informer().AddEventHandler(ei)
-	ei.SharedInformer = informer.Informer()
+	ei.FactoryIndex = FactoryIndex{
+		GVR:           ei.GroupVersionResource,
+		Namespace:     ei.Namespace,
+		FieldSelector: ei.ListOptions.FieldSelector,
+		LabelSelector: ei.ListOptions.LabelSelector,
+	}
 
 	err = ei.LoadExistedObjects()
 	if err != nil {
@@ -228,6 +209,7 @@ func (ei *resourceInformer) CachedObjectsBytes() int64 {
 // fills Checksum map with checksums of existing objects.
 func (ei *resourceInformer) LoadExistedObjects() error {
 	defer trace.StartRegion(context.Background(), "LoadExistedObjects").End()
+
 	objList, err := ei.KubeClient.Dynamic().
 		Resource(ei.GroupVersionResource).
 		Namespace(ei.Namespace).
@@ -479,19 +461,19 @@ func (ei *resourceInformer) ShouldFireEvent(checkEvent WatchEventType) bool {
 
 func (ei *resourceInformer) Start() {
 	log.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
-	stopCh := make(chan struct{}, 1)
+
 	go func() {
-		<-ei.ctx.Done()
-		ei.stopped = true
-		close(stopCh)
+		if ei.ctx != nil {
+			<-ei.ctx.Done()
+			DefaultFactoryStore.Stop(ei.FactoryIndex)
+		}
 	}()
 
-	go ei.SharedInformer.Run(stopCh)
-
-	if err := wait.PollImmediateUntil(ei.informerSyncTime, func() (bool, error) {
-		return ei.SharedInformer.HasSynced(), nil
-	}, stopCh); err != nil {
+	// TODO: separate handler and informer
+	err := DefaultFactoryStore.Start(ei.KubeClient.Dynamic(), ei.FactoryIndex, ei)
+	if err != nil {
 		ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
+		return
 	}
 
 	log.Debugf("%s: informer is ready", ei.Monitor.Metadata.DebugName)

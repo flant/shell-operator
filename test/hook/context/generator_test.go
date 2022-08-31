@@ -32,6 +32,7 @@ schedule:
   includeSnapshotsFrom:
   - selected_pods
 `)
+	defer c.Stop()
 
 	// Synchronization contexts
 	contexts, err := c.Run(`
@@ -145,6 +146,7 @@ kubernetes:
   name: selected_crds
 `)
 	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
+	defer c.Stop()
 
 	gvr, err := c.fakeCluster.FindGVR("my.crd.io/v1alpha1", "MyResource")
 	g.Expect(err).ShouldNot(HaveOccurred())
@@ -197,6 +199,8 @@ kind: Deployment
 metadata:
   name: my-res-obj-2
 `)
+	defer c.Stop()
+
 	g.Expect(err).ShouldNot(HaveOccurred())
 
 	bindingContexts := parseContexts(contexts.Rendered)
@@ -239,6 +243,8 @@ kubernetes:
   name: pods-grouped
   group: group1
 `)
+	defer c.Stop()
+
 	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
@@ -282,6 +288,8 @@ kubernetes:
   kind: Secret
   name: secret
 `)
+	defer c.Stop()
+
 	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
@@ -322,6 +330,8 @@ kubernetes:
   name: selected_pods_nosync
   executeHookOnSynchronization: false
 `)
+	defer c.Stop()
+
 	// Synchronization contexts
 	contexts, err := c.Run(`
 ---
@@ -364,6 +374,8 @@ schedule:
   includeSnapshotsFrom:
   - selected_pods
 `)
+	defer c.Stop()
+
 	// Synchronization contexts
 	contexts, err := c.Run(`
 ---

@@ -3,7 +3,6 @@ package kube_events_manager
 import (
 	"context"
 	"runtime/trace"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -16,7 +15,6 @@ type KubeEventsManager interface {
 	WithContext(ctx context.Context)
 	WithMetricStorage(mstor *metric_storage.MetricStorage)
 	WithKubeClient(client klient.Client)
-	WithSyncPeriod(time.Duration)
 	AddMonitor(monitorConfig *MonitorConfig) error
 	HasMonitor(monitorID string) bool
 	GetMonitor(monitorID string) Monitor
@@ -32,8 +30,7 @@ type kubeEventsManager struct {
 	// Array of monitors
 	Monitors map[string]Monitor
 	// channel to emit KubeEvent objects
-	KubeEventCh      chan KubeEvent
-	informerSyncTime time.Duration
+	KubeEventCh chan KubeEvent
 
 	KubeClient klient.Client
 
@@ -48,9 +45,8 @@ var _ KubeEventsManager = &kubeEventsManager{}
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
 var NewKubeEventsManager = func() *kubeEventsManager {
 	em := &kubeEventsManager{
-		Monitors:         make(map[string]Monitor),
-		KubeEventCh:      make(chan KubeEvent, 1),
-		informerSyncTime: 100 * time.Millisecond,
+		Monitors:    make(map[string]Monitor),
+		KubeEventCh: make(chan KubeEvent, 1),
 	}
 	return em
 }
@@ -67,10 +63,6 @@ func (mgr *kubeEventsManager) WithKubeClient(client klient.Client) {
 	mgr.KubeClient = client
 }
 
-func (mgr *kubeEventsManager) WithSyncPeriod(period time.Duration) {
-	mgr.informerSyncTime = period
-}
-
 // AddMonitor creates a monitor with informers and return a KubeEvent with existing objects.
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
@@ -81,7 +73,6 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	monitor.WithKubeClient(mgr.KubeClient)
 	monitor.WithMetricStorage(mgr.metricStorage)
 	monitor.WithConfig(monitorConfig)
-	monitor.WithSyncPeriod(mgr.informerSyncTime)
 	monitor.WithKubeEventCb(func(ev KubeEvent) {
 		defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
 		mgr.KubeEventCh <- ev
