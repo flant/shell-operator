@@ -5,7 +5,6 @@
 <p align="center">
 <a href="https://hub.docker.com/r/flant/shell-operator"><img src="https://img.shields.io/docker/pulls/flant/shell-operator.svg?logo=docker" alt="docker pull flant/shell-operator"/></a>
  <a href="https://github.com/flant/shell-operator/discussions"><img src="https://img.shields.io/badge/GitHub-discussions-brightgreen" alt="GH Discussions"/></a>
-<a href="https://t.me/kubeoperator"><img src="https://img.shields.io/badge/telegram-RU%20chat-179cde.svg?logo=telegram" alt="Telegram chat RU"/></a>
 </p>
 
 **Shell-operator** is a tool for running event-driven scripts in a Kubernetes cluster.
@@ -244,10 +243,10 @@ Shell-operator has been presented during KubeCon + CloudNativeCon Europe 2020 Vi
 * [slides](https://speakerdeck.com/flant/go-bash-meet-the-shell-operator).
 
 Official publications on shell-operator:
-* "[shell-operator v1.0.0: the long-awaited release of our tool to create Kubernetes operators](https://blog.flant.com/shell-operator-v1-release-for-kubernetes-operators/)" (Apr'21);
-* "[shell-operator & addon-operator news: hooks as admission webhooks, Helm 3, OpenAPI, Go hooks, and more!](https://blog.flant.com/shell-operator-addon-operator-v1-rc1-changes/)" (Feb'21);
-* "[Kubernetes operators made easy with shell-operator: project status & news](https://blog.flant.com/kubernetes-operators-made-easy-with-shell-operator-project-status-news/)" (Jul'20);
-* "[Announcing shell-operator to simplify creating of Kubernetes operators](https://blog.flant.com/announcing-shell-operator-to-simplify-creating-of-kubernetes-operators/)" (May'19).
+* "[shell-operator v1.0.0: the long-awaited release of our tool to create Kubernetes operators](https://blog.deckhouse.io/shell-operator-v1-0-0-the-long-awaited-release-of-our-tool-to-create-kubernetes-operators-b20fc0bbca9f?source=friends_link&sk=4d5f991eef62ad22222c5a725712ccdd)" (Apr'21);
+* "[shell-operator & addon-operator news: hooks as admission webhooks, Helm 3, OpenAPI, Go hooks, and more!](https://blog.deckhouse.io/shell-operator-addon-operator-news-hooks-as-admission-webhooks-helm-3-openapi-go-hooks-and-369df9b4af08?source=friends_link&sk=142aec38bdcdbca73868eb4cc0b85483)" (Feb'21);
+* "[Kubernetes operators made easy with shell-operator: project status & news](https://blog.deckhouse.io/shell-operator-for-kubernetes-update-2f1f9f9ebfb1)" (Jul'20);
+* "[Announcing shell-operator to simplify creating of Kubernetes operators](https://blog.deckhouse.io/kubernetes-shell-operator-76c596b42f23)" (May'19).
 
 Other languages:
 * Chinese: "[介绍一个不太小的工具：Shell Operator](https://blog.fleeto.us/post/shell-operator/)"; "[使用shell-operator实现Operator](https://cloud.tencent.com/developer/article/1701733)";
