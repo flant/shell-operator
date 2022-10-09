@@ -24,9 +24,7 @@ Shell-operator exports Prometheus metrics to the `/metrics` path. The default po
 
 * `shell_operator_kube_snapshot_objects{hook="", binding="", queue=""}` — a gauge with count of cached objects (the snapshot) for particular binding.
 
-* `shell_operator_kube_snapshot_bytes{hook="", binding="", queue=""}` — a gauge with size in bytes of cached objects for particular binding. Each cached object contains a Kubernetes object and/or result of jqFilter depending on the binding configuration. The size is a sum of the length of Kubernetes object in JSON format and the length of jqFilter‘s result in JSON format.
-
-* `shell_operator_kubernetes_client_request_result_total` — a counter of requests made by kubernetes/client-go library. 
+* `shell_operator_kubernetes_client_request_result_total` — a counter of requests made by kubernetes/client-go library.
 
 * `shell_operator_kubernetes_client_request_latency_seconds` — a histogram with latency of requests made by kubernetes/client-go library. 
 

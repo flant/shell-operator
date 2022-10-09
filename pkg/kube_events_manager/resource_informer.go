@@ -29,7 +29,6 @@ type ResourceInformer interface {
 	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateSharedInformer() error
 	CachedObjects() []ObjectAndFilterResult
-	CachedObjectsBytes() int64
 	EnableKubeEventCb() // Call it to use KubeEventCb to emit events.
 	Start()
 	Stop()
@@ -199,12 +198,6 @@ func (ei *resourceInformer) EnableKubeEventCb() {
 	ei.eventBuf = nil
 }
 
-func (ei *resourceInformer) CachedObjectsBytes() int64 {
-	ei.cacheLock.RLock()
-	defer ei.cacheLock.RUnlock()
-	return ObjectAndFilterResults(ei.cachedObjects).Bytes()
-}
-
 // LoadExistedObjects get a list of existed objects in namespace that match selectors and
 // fills Checksum map with checksums of existing objects.
 func (ei *resourceInformer) LoadExistedObjects() error {
@@ -268,7 +261,6 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 
 	ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
 	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
-	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.cachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 
 	return nil
 }
@@ -360,7 +352,6 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 		}
 		// Update metrics.
 		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.cachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 		if skipEvent {
 			return
@@ -379,7 +370,6 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 		ei.cachedObjectsIncrement.Deleted++
 		// Update metrics.
 		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_bytes", float64(ObjectAndFilterResults(ei.cachedObjects).Bytes()), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 	}
 

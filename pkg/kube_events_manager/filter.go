@@ -27,12 +27,6 @@ func ApplyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) 
 	res.Metadata.JqFilter = jqFilter
 	res.Metadata.ResourceId = ResourceId(obj)
 
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-	res.ObjectSize = len(data)
-
 	// If filterFn is passed, run it and return result.
 	if filterFn != nil {
 		filteredObj, err := filterFn(obj)
@@ -46,10 +40,15 @@ func ApplyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) 
 		}
 
 		res.FilterResult = filteredObj
-		res.FilterResultSize = len(filteredBytes)
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filteredBytes))
 
 		return res, nil
+	}
+
+	// Render obj to JSON text to apply jq filter.
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
 	}
 
 	if jqFilter == "" {
@@ -63,7 +62,6 @@ func ApplyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) 
 		}
 
 		res.FilterResult = filtered
-		res.FilterResultSize = len(filtered)
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(filtered)
 	}
 

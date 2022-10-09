@@ -54,8 +54,6 @@ func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorage, labels map[string]string) {
 	// Count of objects in snapshot for one kubernets bindings.
 	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
-	// Size of snapshot in JSON format.
-	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_bytes", labels)
 	// Duration of jqFilter applying.
 	metricStorage.RegisterHistogram(
 		"{PREFIX}kube_jq_filter_duration_seconds",

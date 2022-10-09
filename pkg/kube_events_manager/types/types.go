@@ -42,9 +42,6 @@ type ObjectAndFilterResult struct {
 	}
 	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
 	FilterResult interface{}
-	// since len() return int, there is no reason to use larger int
-	FilterResultSize int
-	ObjectSize       int
 }
 
 // Map constructs a map suitable for use in binding context.
@@ -97,20 +94,10 @@ func (o ObjectAndFilterResult) MarshalJSON() ([]byte, error) {
 
 func (o *ObjectAndFilterResult) RemoveFullObject() {
 	o.Object = nil
-	o.ObjectSize = 0
 	o.Metadata.RemoveObject = true
 }
 
 type ObjectAndFilterResults map[string]*ObjectAndFilterResult
-
-func (a ObjectAndFilterResults) Bytes() (size int64) {
-	for _, o := range a {
-		size += int64(o.FilterResultSize)
-		size += int64(o.ObjectSize)
-	}
-
-	return
-}
 
 // ByNamespaceAndName implements sort.Interface for []ObjectAndFilterResult
 // based on Namespace and Name of Object field.
