@@ -16,11 +16,10 @@ import (
 
 	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 
-	response "github.com/flant/shell-operator/pkg/webhook/admission/response"
 	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 )
 
-type AdmissionEventHandlerFn func(event AdmissionEvent) (*response.AdmissionResponse, error)
+type AdmissionEventHandlerFn func(event AdmissionEvent) (*AdmissionResponse, error)
 
 type WebhookHandler struct {
 	Router  chi.Router

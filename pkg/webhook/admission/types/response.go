@@ -1,4 +1,4 @@
-package admissionresponse
+package types
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ type AdmissionResponse struct {
 	Patch    []byte   `json:"patch,omitempty" protobuf:"bytes,4,opt,name=patch"`
 }
 
-func FromFile(filePath string) (*AdmissionResponse, error) {
+func AdmissionResponseFromFile(filePath string) (*AdmissionResponse, error) {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
@@ -27,10 +27,10 @@ func FromFile(filePath string) (*AdmissionResponse, error) {
 		return nil, nil
 	}
 
-	return FromBytes(data)
+	return AdmissionResponseFromBytes(data)
 }
 
-func FromBytes(data []byte) (*AdmissionResponse, error) {
+func AdmissionResponseFromBytes(data []byte) (*AdmissionResponse, error) {
 	return FromReader(bytes.NewReader(data))
 }
 
