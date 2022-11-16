@@ -18,8 +18,8 @@ import (
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 // Init initialize logging, ensures directories and creates
@@ -219,7 +219,7 @@ func SetupEventManagers(op *ShellOperator) {
 // SetupHookManagers instantiates different hook managers.
 func SetupHookManagers(op *ShellOperator, hooksDir string, tempDir string) {
 	// Initialize validating webhooks manager
-	op.ValidatingWebhookManager = validating.NewWebhookManager()
+	op.ValidatingWebhookManager = admission.NewWebhookManager()
 	op.ValidatingWebhookManager.WithKubeClient(op.KubeClient)
 	op.ValidatingWebhookManager.Settings = app.ValidatingWebhookSettings
 	op.ValidatingWebhookManager.Namespace = app.Namespace
