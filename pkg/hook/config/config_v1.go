@@ -16,6 +16,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/validating/validation"
 )
@@ -25,7 +26,8 @@ type HookConfigV1 struct {
 	OnStartup            interface{}                    `json:"onStartup"`
 	Schedule             []ScheduleConfigV1             `json:"schedule"`
 	OnKubernetesEvent    []OnKubernetesEventConfigV1    `json:"kubernetes"`
-	KubernetesValidating []KubernetesValidatingConfigV1 `json:"kubernetesValidating"`
+	KubernetesValidating []KubernetesAdmissionConfigV1  `json:"kubernetesValidating"`
+	KubernetesMutating   []KubernetesAdmissionConfigV1  `json:"kubernetesMutating"`
 	KubernetesConversion []KubernetesConversionConfigV1 `json:"kubernetesCustomResourceConversion"`
 	Settings             *SettingsV1                    `json:"settings"`
 }
@@ -69,8 +71,8 @@ type KubeFieldSelectorV1 FieldSelector
 
 type KubeNamespaceSelectorV1 NamespaceSelector
 
-// version 1 of kubernetes event configuration
-type KubernetesValidatingConfigV1 struct {
+// version 1 of kubernetes vali configuration
+type KubernetesAdmissionConfigV1 struct {
 	Name                 string                   `json:"name,omitempty"`
 	IncludeSnapshotsFrom []string                 `json:"includeSnapshotsFrom,omitempty"`
 	Group                string                   `json:"group,omitempty"`
@@ -228,31 +230,6 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 		return err
 	}
 
-	// Mutating webhooks
-	c.KubernetesMutating = []MutatingConfig{}
-	for i, rawMutating := range c.V1.KubernetesMutating {
-		err := cv1.CheckMutating(c.OnKubernetesEvents, rawMutating)
-		if err != nil {
-			return fmt.Errorf("invalid kubernetesMutating config [%d]: %v", i, err)
-		}
-		validating, err := cv1.ConvertMutating(rawMutating)
-		if err != nil {
-			return err
-		}
-		c.KubernetesMutating = append(c.KubernetesMutating, validating)
-	}
-	// Validate webhooks
-	mutatingWebhooks := []v1.MutatingWebhook{}
-	for _, cfg := range c.KubernetesMutating {
-		mutatingWebhooks = append(mutatingWebhooks, *cfg.Webhook.MutatingWebhook)
-	}
-	err = validation.ValidateMutatingWebhooks(&v1.MutatingWebhookConfiguration{
-		Webhooks: mutatingWebhooks,
-	})
-	if err != nil {
-		return err
-	}
-
 	// Conversion webhooks.
 	c.KubernetesConversion = []ConversionConfig{}
 	for i, rawConversion := range c.V1.KubernetesConversion {
@@ -396,7 +373,7 @@ func (сv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfig
 	return allErr
 }
 
-func (cv1 *HookConfigV1) CheckValidating(kubeConfigs []OnKubernetesEventConfig, cfgV1 KubernetesValidatingConfigV1) (allErr error) {
+func (cv1 *HookConfigV1) CheckValidating(kubeConfigs []OnKubernetesEventConfig, cfgV1 KubernetesAdmissionConfigV1) (allErr error) {
 	var err error
 
 	if len(cfgV1.IncludeSnapshotsFrom) > 0 {
@@ -423,7 +400,7 @@ func (cv1 *HookConfigV1) CheckValidating(kubeConfigs []OnKubernetesEventConfig, 
 	return allErr
 }
 
-func (cv1 *HookConfigV1) ConvertValidating(cfgV1 KubernetesValidatingConfigV1) (ValidatingConfig, error) {
+func (cv1 *HookConfigV1) ConvertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, error) {
 	cfg := ValidatingConfig{}
 
 	cfg.Group = cfgV1.Group
@@ -460,7 +437,7 @@ func (cv1 *HookConfigV1) ConvertValidating(cfgV1 KubernetesValidatingConfigV1) (
 		webhook.TimeoutSeconds = &DefaultTimeoutSeconds
 	}
 
-	cfg.Webhook = &validating.ValidatingWebhookConfig{
+	cfg.Webhook = &admission.ValidatingWebhookConfig{
 		ValidatingWebhook: webhook,
 	}
 	cfg.Webhook.Metadata.LogLabels = map[string]string{}
