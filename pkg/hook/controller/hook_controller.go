@@ -81,7 +81,7 @@ func NewHookController() HookController {
 type hookController struct {
 	KubernetesController KubernetesBindingsController
 	ScheduleController   ScheduleBindingsController
-	ValidatingController ValidatingBindingsController
+	AdmissionController  AdmissionBindingsController
 	ConversionController ConversionBindingsController
 	kubernetesBindings   []OnKubernetesEventConfig
 	scheduleBindings     []ScheduleConfig
@@ -121,7 +121,7 @@ func (hc *hookController) InitValidatingBindings(bindings []ValidatingConfig, we
 	bindingCtrl := NewValidatingBindingsController()
 	bindingCtrl.WithWebhookManager(webhookMgr)
 	bindingCtrl.WithValidatingBindings(bindings)
-	hc.ValidatingController = bindingCtrl
+	hc.AdmissionController = bindingCtrl
 	hc.validatingBindings = bindings
 }
 
@@ -156,8 +156,8 @@ func (hc *hookController) CanHandleScheduleEvent(crontab string) bool {
 }
 
 func (hc *hookController) CanHandleValidatingEvent(event AdmissionEvent) bool {
-	if hc.ValidatingController != nil {
-		return hc.ValidatingController.CanHandleEvent(event)
+	if hc.AdmissionController != nil {
+		return hc.AdmissionController.CanHandleEvent(event)
 	}
 	return false
 }
@@ -196,10 +196,10 @@ func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 }
 
 func (hc *hookController) HandleValidatingEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo)) {
-	if hc.ValidatingController == nil {
+	if hc.AdmissionController == nil {
 		return
 	}
-	execInfo := hc.ValidatingController.HandleEvent(event)
+	execInfo := hc.AdmissionController.HandleEvent(event)
 	if createTasksFn != nil {
 		createTasksFn(execInfo)
 	}
@@ -266,8 +266,8 @@ func (hc *hookController) DisableScheduleBindings() {
 }
 
 func (hc *hookController) EnableValidatingBindings() {
-	if hc.ValidatingController != nil {
-		hc.ValidatingController.EnableValidatingBindings()
+	if hc.AdmissionController != nil {
+		hc.AdmissionController.EnableValidatingBindings()
 	}
 }
 
