@@ -37,6 +37,7 @@ type validatingBindingsController struct {
 	ValidatingLinks map[string]*ValidatingBindingToWebhookLink
 
 	ValidatingBindings []ValidatingConfig
+	MutatingBindings   []MutatingConfig
 
 	webhookManager *admission.WebhookManager
 }
@@ -55,7 +56,7 @@ func (c *validatingBindingsController) WithValidatingBindings(bindings []Validat
 }
 
 func (c *validatingBindingsController) WithMutatingBindings(bindings []MutatingConfig) {
-	c.ValidatingBindings = bindings
+	c.MutatingBindings = bindings
 }
 
 func (c *validatingBindingsController) WithWebhookManager(mgr *admission.WebhookManager) {
