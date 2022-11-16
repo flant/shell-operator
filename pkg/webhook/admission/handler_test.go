@@ -1,4 +1,4 @@
-package validating
+package admission
 
 import "testing"
 
