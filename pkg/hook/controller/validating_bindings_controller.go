@@ -5,9 +5,9 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 
-	"github.com/flant/shell-operator/pkg/webhook/validating"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 )
 
 // A link between a hook and a kube monitor
@@ -23,11 +23,11 @@ type ValidatingBindingToWebhookLink struct {
 // ScheduleBindingsController handles schedule bindings for one hook.
 type ValidatingBindingsController interface {
 	WithValidatingBindings([]ValidatingConfig)
-	WithWebhookManager(*validating.WebhookManager)
+	WithWebhookManager(*admission.WebhookManager)
 	EnableValidatingBindings()
 	DisableValidatingBindings()
-	CanHandleEvent(event ValidatingEvent) bool
-	HandleEvent(event ValidatingEvent) BindingExecutionInfo
+	CanHandleEvent(event AdmissionEvent) bool
+	HandleEvent(event AdmissionEvent) BindingExecutionInfo
 }
 
 type validatingBindingsController struct {
@@ -38,7 +38,7 @@ type validatingBindingsController struct {
 
 	ValidatingBindings []ValidatingConfig
 
-	webhookManager *validating.WebhookManager
+	webhookManager *admission.WebhookManager
 }
 
 var _ ValidatingBindingsController = &validatingBindingsController{}
@@ -54,7 +54,7 @@ func (c *validatingBindingsController) WithValidatingBindings(bindings []Validat
 	c.ValidatingBindings = bindings
 }
 
-func (c *validatingBindingsController) WithWebhookManager(mgr *validating.WebhookManager) {
+func (c *validatingBindingsController) WithWebhookManager(mgr *admission.WebhookManager) {
 	c.webhookManager = mgr
 }
 
@@ -82,7 +82,7 @@ func (c *validatingBindingsController) EnableValidatingBindings() {
 			IncludeSnapshots: config.IncludeSnapshotsFrom,
 			Group:            config.Group,
 		}
-		c.webhookManager.AddWebhook(config.Webhook)
+		c.webhookManager.AddValidatingWebhook(config.Webhook)
 	}
 }
 
@@ -90,7 +90,7 @@ func (c *validatingBindingsController) DisableValidatingBindings() {
 	// TODO dynamic enable/disable validating webhooks.
 }
 
-func (c *validatingBindingsController) CanHandleEvent(event ValidatingEvent) bool {
+func (c *validatingBindingsController) CanHandleEvent(event AdmissionEvent) bool {
 	if c.ConfigurationId != event.ConfigurationId {
 		return false
 	}
@@ -98,7 +98,7 @@ func (c *validatingBindingsController) CanHandleEvent(event ValidatingEvent) boo
 	return has
 }
 
-func (c *validatingBindingsController) HandleEvent(event ValidatingEvent) BindingExecutionInfo {
+func (c *validatingBindingsController) HandleEvent(event AdmissionEvent) BindingExecutionInfo {
 	if c.ConfigurationId != event.ConfigurationId {
 		log.Errorf("Possible bug!!! Unknown validating event: no binding for configurationId '%s' (webhookId '%s')", event.ConfigurationId, event.WebhookId)
 		return BindingExecutionInfo{

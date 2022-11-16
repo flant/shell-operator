@@ -4,12 +4,12 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 type BindingExecutionInfo struct {
@@ -37,12 +37,12 @@ type BindingExecutionInfo struct {
 type HookController interface {
 	InitKubernetesBindings([]OnKubernetesEventConfig, kube_events_manager.KubeEventsManager)
 	InitScheduleBindings([]ScheduleConfig, schedule_manager.ScheduleManager)
-	InitValidatingBindings([]ValidatingConfig, *validating.WebhookManager)
+	InitValidatingBindings([]ValidatingConfig, *admission.WebhookManager)
 	InitConversionBindings([]ConversionConfig, *conversion.WebhookManager)
 
 	CanHandleKubeEvent(kubeEvent KubeEvent) bool
 	CanHandleScheduleEvent(crontab string) bool
-	CanHandleValidatingEvent(event ValidatingEvent) bool
+	CanHandleValidatingEvent(event AdmissionEvent) bool
 	CanHandleConversionEvent(event conversion.Event, rule conversion.Rule) bool
 
 	// These method should call an underlying *Binding*Controller to get binding context
@@ -50,7 +50,7 @@ type HookController interface {
 	HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error
 	HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo))
-	HandleValidatingEvent(event ValidatingEvent, createTasksFn func(BindingExecutionInfo))
+	HandleValidatingEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo))
 	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTasksFn func(BindingExecutionInfo))
 
 	UnlockKubernetesEvents()
@@ -112,7 +112,7 @@ func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, schedu
 	hc.scheduleBindings = bindings
 }
 
-func (hc *hookController) InitValidatingBindings(bindings []ValidatingConfig, webhookMgr *validating.WebhookManager) {
+func (hc *hookController) InitValidatingBindings(bindings []ValidatingConfig, webhookMgr *admission.WebhookManager) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -150,7 +150,7 @@ func (hc *hookController) CanHandleScheduleEvent(crontab string) bool {
 	return false
 }
 
-func (hc *hookController) CanHandleValidatingEvent(event ValidatingEvent) bool {
+func (hc *hookController) CanHandleValidatingEvent(event AdmissionEvent) bool {
 	if hc.ValidatingController != nil {
 		return hc.ValidatingController.CanHandleEvent(event)
 	}
@@ -190,7 +190,7 @@ func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 	}
 }
 
-func (hc *hookController) HandleValidatingEvent(event ValidatingEvent, createTasksFn func(BindingExecutionInfo)) {
+func (hc *hookController) HandleValidatingEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo)) {
 	if hc.ValidatingController == nil {
 		return
 	}
