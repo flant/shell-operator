@@ -11,7 +11,7 @@ import (
 )
 
 // A link between a hook and a kube monitor
-type ValidatingBindingToWebhookLink struct {
+type AdmissionBindingToWebhookLink struct {
 	BindingName     string
 	ConfigurationId string
 	WebhookId       string
@@ -21,7 +21,7 @@ type ValidatingBindingToWebhookLink struct {
 }
 
 // ScheduleBindingsController handles schedule bindings for one hook.
-type ValidatingBindingsController interface {
+type AdmissionBindingsController interface {
 	WithValidatingBindings([]ValidatingConfig)
 	WithWebhookManager(*admission.WebhookManager)
 	EnableValidatingBindings()
@@ -30,11 +30,11 @@ type ValidatingBindingsController interface {
 	HandleEvent(event AdmissionEvent) BindingExecutionInfo
 }
 
-type validatingBindingsController struct {
+type admissionBindingsController struct {
 	// Controller holds validating bindings from one hook. Hook always belongs to one configurationId.
 	ConfigurationId string
 	// WebhookId -> link
-	ValidatingLinks map[string]*ValidatingBindingToWebhookLink
+	ValidatingLinks map[string]*AdmissionBindingToWebhookLink
 
 	ValidatingBindings []ValidatingConfig
 	MutatingBindings   []MutatingConfig
@@ -42,28 +42,28 @@ type validatingBindingsController struct {
 	webhookManager *admission.WebhookManager
 }
 
-var _ ValidatingBindingsController = &validatingBindingsController{}
+var _ AdmissionBindingsController = &admissionBindingsController{}
 
 // NewKubernetesHooksController returns an implementation of KubernetesHooksController
-var NewValidatingBindingsController = func() *validatingBindingsController {
-	return &validatingBindingsController{
-		ValidatingLinks: make(map[string]*ValidatingBindingToWebhookLink),
+var NewValidatingBindingsController = func() *admissionBindingsController {
+	return &admissionBindingsController{
+		ValidatingLinks: make(map[string]*AdmissionBindingToWebhookLink),
 	}
 }
 
-func (c *validatingBindingsController) WithValidatingBindings(bindings []ValidatingConfig) {
+func (c *admissionBindingsController) WithValidatingBindings(bindings []ValidatingConfig) {
 	c.ValidatingBindings = bindings
 }
 
-func (c *validatingBindingsController) WithMutatingBindings(bindings []MutatingConfig) {
+func (c *admissionBindingsController) WithMutatingBindings(bindings []MutatingConfig) {
 	c.MutatingBindings = bindings
 }
 
-func (c *validatingBindingsController) WithWebhookManager(mgr *admission.WebhookManager) {
+func (c *admissionBindingsController) WithWebhookManager(mgr *admission.WebhookManager) {
 	c.webhookManager = mgr
 }
 
-func (c *validatingBindingsController) EnableValidatingBindings() {
+func (c *admissionBindingsController) EnableValidatingBindings() {
 	confId := ""
 	for _, config := range c.ValidatingBindings {
 		if config.Webhook.Metadata.ConfigurationId == "" && confId == "" {
@@ -80,7 +80,7 @@ func (c *validatingBindingsController) EnableValidatingBindings() {
 	c.ConfigurationId = confId
 
 	for _, config := range c.ValidatingBindings {
-		c.ValidatingLinks[config.Webhook.Metadata.WebhookId] = &ValidatingBindingToWebhookLink{
+		c.ValidatingLinks[config.Webhook.Metadata.WebhookId] = &AdmissionBindingToWebhookLink{
 			BindingName:      config.BindingName,
 			ConfigurationId:  c.ConfigurationId,
 			WebhookId:        config.Webhook.Metadata.WebhookId,
@@ -91,11 +91,11 @@ func (c *validatingBindingsController) EnableValidatingBindings() {
 	}
 }
 
-func (c *validatingBindingsController) DisableValidatingBindings() {
+func (c *admissionBindingsController) DisableValidatingBindings() {
 	// TODO dynamic enable/disable validating webhooks.
 }
 
-func (c *validatingBindingsController) CanHandleEvent(event AdmissionEvent) bool {
+func (c *admissionBindingsController) CanHandleEvent(event AdmissionEvent) bool {
 	if c.ConfigurationId != event.ConfigurationId {
 		return false
 	}
@@ -103,7 +103,7 @@ func (c *validatingBindingsController) CanHandleEvent(event AdmissionEvent) bool
 	return has
 }
 
-func (c *validatingBindingsController) HandleEvent(event AdmissionEvent) BindingExecutionInfo {
+func (c *admissionBindingsController) HandleEvent(event AdmissionEvent) BindingExecutionInfo {
 	if c.ConfigurationId != event.ConfigurationId {
 		log.Errorf("Possible bug!!! Unknown validating event: no binding for configurationId '%s' (webhookId '%s')", event.ConfigurationId, event.WebhookId)
 		return BindingExecutionInfo{
