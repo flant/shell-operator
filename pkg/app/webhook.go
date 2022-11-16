@@ -1,13 +1,13 @@
 package app
 
 import (
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/server"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-var ValidatingWebhookSettings = &validating.WebhookSettings{
+var ValidatingWebhookSettings = &admission.WebhookSettings{
 	Settings: server.Settings{
 		ServerCertPath: "/validating-certs/tls.crt",
 		ServerKeyPath:  "/validating-certs/tls.key",
