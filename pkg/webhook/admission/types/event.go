@@ -1,4 +1,4 @@
-package admission
+package types
 
 import (
 	v1 "k8s.io/api/admission/v1"
