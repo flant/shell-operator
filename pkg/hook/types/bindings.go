@@ -17,6 +17,7 @@ const (
 	OnKubernetesEvent    BindingType = "kubernetes"
 	KubernetesConversion BindingType = "kubernetesCustomResourceConversion"
 	KubernetesValidating BindingType = "kubernetesValidating"
+	KubernetesMutating   BindingType = "kubernetesMutating"
 )
 
 // Types for effective binding configs
