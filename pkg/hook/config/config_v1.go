@@ -17,7 +17,6 @@ import (
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
 	"github.com/flant/shell-operator/pkg/webhook/validating/validation"
 )
 
@@ -217,13 +216,38 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 		}
 		c.KubernetesValidating = append(c.KubernetesValidating, validating)
 	}
-	// Validate webhooks
-	webhooks := []v1.ValidatingWebhook{}
+	// Validate validatingWebhooks
+	validatingWebhooks := []v1.ValidatingWebhook{}
 	for _, cfg := range c.KubernetesValidating {
-		webhooks = append(webhooks, *cfg.Webhook.ValidatingWebhook)
+		validatingWebhooks = append(validatingWebhooks, *cfg.Webhook.ValidatingWebhook)
 	}
 	err = validation.ValidateValidatingWebhooks(&v1.ValidatingWebhookConfiguration{
-		Webhooks: webhooks,
+		Webhooks: validatingWebhooks,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Mutating webhooks
+	c.KubernetesMutating = []MutatingConfig{}
+	for i, rawMutating := range c.V1.KubernetesMutating {
+		err := cv1.CheckMutating(c.OnKubernetesEvents, rawMutating)
+		if err != nil {
+			return fmt.Errorf("invalid kubernetesMutating config [%d]: %v", i, err)
+		}
+		validating, err := cv1.ConvertMutating(rawMutating)
+		if err != nil {
+			return err
+		}
+		c.KubernetesMutating = append(c.KubernetesMutating, validating)
+	}
+	// Validate webhooks
+	mutatingWebhooks := []v1.MutatingWebhook{}
+	for _, cfg := range c.KubernetesMutating {
+		mutatingWebhooks = append(mutatingWebhooks, *cfg.Webhook.MutatingWebhook)
+	}
+	err = validation.ValidateMutatingWebhooks(&v1.MutatingWebhookConfiguration{
+		Webhooks: mutatingWebhooks,
 	})
 	if err != nil {
 		return err
