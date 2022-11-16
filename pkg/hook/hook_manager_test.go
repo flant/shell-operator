@@ -10,9 +10,9 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 )
 
 func newHookManager(t *testing.T, testdataDir string) *hookManager {
@@ -25,7 +25,7 @@ func newHookManager(t *testing.T, testdataDir string) *hookManager {
 	conversionManager.Settings = app.ConversionWebhookSettings
 	hm.WithConversionWebhookManager(conversionManager)
 
-	validatingManager := validating.NewWebhookManager()
+	validatingManager := admission.NewWebhookManager()
 	validatingManager.Settings = app.ValidatingWebhookSettings
 	hm.WithValidatingWebhookManager(validatingManager)
 
@@ -87,7 +87,7 @@ func TestHookController_HandleValidatingEvent(t *testing.T) {
 		t.Fatalf("Hook manager Init should not fail: %v", err)
 	}
 
-	ev := ValidatingEvent{
+	ev := AdmissionEvent{
 		WebhookId:       "test-policy-example-com",
 		ConfigurationId: "hooks",
 		Review:          nil,
