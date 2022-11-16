@@ -32,7 +32,7 @@ type ValidatingWebhookConfig struct {
 }
 
 func (wc *ValidatingWebhookConfig) GetMeta() Metadata  { return wc.Metadata }
-func (wc *ValidatingWebhookConfig) SetMeta(m Metadata) { wc.Metadata = wc.Metadata }
+func (wc *ValidatingWebhookConfig) SetMeta(m Metadata) { wc.Metadata = m }
 func (wc *ValidatingWebhookConfig) SetClientConfig(cc v1.WebhookClientConfig) {
 	equivalent := v1.Equivalent
 	wc.MatchPolicy = &equivalent
@@ -46,7 +46,7 @@ type MutatingWebhookConfig struct {
 }
 
 func (wc *MutatingWebhookConfig) GetMeta() Metadata  { return wc.Metadata }
-func (wc *MutatingWebhookConfig) SetMeta(m Metadata) { wc.Metadata = wc.Metadata }
+func (wc *MutatingWebhookConfig) SetMeta(m Metadata) { wc.Metadata = m }
 func (wc *MutatingWebhookConfig) SetClientConfig(cc v1.WebhookClientConfig) {
 	equivalent := v1.Equivalent
 	wc.MatchPolicy = &equivalent

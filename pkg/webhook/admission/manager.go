@@ -5,8 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
-
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
@@ -95,7 +93,28 @@ func (m *WebhookManager) AddValidatingWebhook(config *ValidatingWebhookConfig) {
 		)
 		m.ValidatingResources[confId] = r
 	}
-	r.AddWebhook(config)
+	r.Set(config)
+}
+
+func (m *WebhookManager) AddMutatingWebhook(config *MutatingWebhookConfig) {
+	confId := config.Metadata.ConfigurationId
+	if confId == "" {
+		confId = m.DefaultConfigurationId
+	}
+	r, ok := m.MutatingResources[confId]
+	if !ok {
+		r = NewMutatingWebhookResource(
+			WebhookResourceOptions{
+				m.KubeClient,
+				m.Namespace,
+				m.Settings.ConfigurationName + "-" + confId,
+				m.Settings.ServiceName,
+				m.Settings.CABundle,
+			},
+		)
+		m.MutatingResources[confId] = r
+	}
+	r.Set(config)
 }
 
 func (m *WebhookManager) Start() error {
@@ -105,7 +124,14 @@ func (m *WebhookManager) Start() error {
 	}
 
 	for _, r := range m.ValidatingResources {
-		err = r.CreateConfiguration()
+		err = r.Register()
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, r := range m.MutatingResources {
+		err = r.Register()
 		if err != nil {
 			return err
 		}

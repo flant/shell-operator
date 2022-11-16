@@ -15,8 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
-	response "github.com/flant/shell-operator/pkg/webhook/response"
 
+	response "github.com/flant/shell-operator/pkg/webhook/admission/response"
 	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 )
 
