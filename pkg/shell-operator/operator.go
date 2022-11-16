@@ -23,9 +23,9 @@ import (
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/flant/shell-operator/pkg/utils/measure"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 )
 
 var WaitQueuesTimeout = time.Second * 10
@@ -49,7 +49,7 @@ type ShellOperator struct {
 
 	HookManager hook.HookManager
 
-	ValidatingWebhookManager *validating.WebhookManager
+	ValidatingWebhookManager *admission.WebhookManager
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
@@ -175,7 +175,7 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 	}
 
 	// Define handler for ValidatingEvent
-	op.ValidatingWebhookManager.WithValidatingEventHandler(func(event ValidatingEvent) (*ValidatingResponse, error) {
+	op.ValidatingWebhookManager.WithValidatingEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
 			"binding":  string(KubernetesValidating),
@@ -211,14 +211,14 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 		res := op.TaskHandler(tasks[0])
 
 		if res.Status == "Fail" {
-			return &ValidatingResponse{
+			return &AdmissionResponse{
 				Allowed: false,
 				Message: "Hook failed",
 			}, nil
 		}
 
 		validatingProp := tasks[0].GetProp("validatingResponse")
-		validatingResponse, ok := validatingProp.(*ValidatingResponse)
+		validatingResponse, ok := validatingProp.(*AdmissionResponse)
 		if !ok {
 			logEntry.Errorf("'validatingResponse' task prop is not of type *ValidatingResponse: %T", validatingProp)
 			return nil, fmt.Errorf("hook task prop error")
