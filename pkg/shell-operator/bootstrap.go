@@ -235,6 +235,6 @@ func SetupHookManagers(op *ShellOperator, hooksDir string, tempDir string) {
 	op.HookManager.WithDirectories(hooksDir, tempDir)
 	op.HookManager.WithKubeEventManager(op.KubeEventsManager)
 	op.HookManager.WithScheduleManager(op.ScheduleManager)
-	op.HookManager.WithValidatingWebhookManager(op.ValidatingWebhookManager)
+	op.HookManager.WithAdmissionWebhookManager(op.ValidatingWebhookManager)
 	op.HookManager.WithConversionWebhookManager(op.ConversionWebhookManager)
 }

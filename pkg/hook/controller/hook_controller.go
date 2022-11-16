@@ -38,6 +38,7 @@ type HookController interface {
 	InitKubernetesBindings([]OnKubernetesEventConfig, kube_events_manager.KubeEventsManager)
 	InitScheduleBindings([]ScheduleConfig, schedule_manager.ScheduleManager)
 	InitValidatingBindings([]ValidatingConfig, *admission.WebhookManager)
+	InitMutatingBindings([]MutatingConfig, *admission.WebhookManager)
 	InitConversionBindings([]ConversionConfig, *conversion.WebhookManager)
 
 	CanHandleKubeEvent(kubeEvent KubeEvent) bool
@@ -122,6 +123,10 @@ func (hc *hookController) InitValidatingBindings(bindings []ValidatingConfig, we
 	bindingCtrl.WithValidatingBindings(bindings)
 	hc.ValidatingController = bindingCtrl
 	hc.validatingBindings = bindings
+}
+
+// TODO
+func (hc *hookController) InitMutatingBindings(bindings []MutatingConfig, webhookMgr *admission.WebhookManager) {
 }
 
 func (hc *hookController) InitConversionBindings(bindings []ConversionConfig, webhookMgr *conversion.WebhookManager) {

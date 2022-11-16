@@ -54,6 +54,10 @@ func (c *validatingBindingsController) WithValidatingBindings(bindings []Validat
 	c.ValidatingBindings = bindings
 }
 
+func (c *validatingBindingsController) WithMutatingBindings(bindings []MutatingConfig) {
+	c.ValidatingBindings = bindings
+}
+
 func (c *validatingBindingsController) WithWebhookManager(mgr *admission.WebhookManager) {
 	c.webhookManager = mgr
 }

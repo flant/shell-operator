@@ -30,7 +30,7 @@ type HookManager interface {
 	WithKubeEventManager(kube_events_manager.KubeEventsManager)
 	WithScheduleManager(schedule_manager.ScheduleManager)
 	WithConversionWebhookManager(*conversion.WebhookManager)
-	WithValidatingWebhookManager(*admission.WebhookManager)
+	WithAdmissionWebhookManager(*admission.WebhookManager)
 	WorkingDir() string
 	TempDir() string
 	GetHook(name string) *Hook
@@ -50,7 +50,7 @@ type hookManager struct {
 	kubeEventsManager        kube_events_manager.KubeEventsManager
 	scheduleManager          schedule_manager.ScheduleManager
 	conversionWebhookManager *conversion.WebhookManager
-	validatingWebhookManager *admission.WebhookManager
+	admissionWebhookManager  *admission.WebhookManager
 
 	// sorted hook names
 	hookNamesInOrder []string
@@ -89,8 +89,8 @@ func (hm *hookManager) WithScheduleManager(mgr schedule_manager.ScheduleManager)
 	hm.scheduleManager = mgr
 }
 
-func (hm *hookManager) WithValidatingWebhookManager(mgr *admission.WebhookManager) {
-	hm.validatingWebhookManager = mgr
+func (hm *hookManager) WithAdmissionWebhookManager(mgr *admission.WebhookManager) {
+	hm.admissionWebhookManager = mgr
 }
 
 func (hm *hookManager) WithConversionWebhookManager(mgr *conversion.WebhookManager) {
@@ -201,7 +201,9 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
 	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
 	hookCtrl.InitConversionBindings(hook.GetConfig().KubernetesConversion, hm.conversionWebhookManager)
-	hookCtrl.InitValidatingBindings(hook.GetConfig().KubernetesValidating, hm.validatingWebhookManager)
+	hookCtrl.InitValidatingBindings(hook.GetConfig().KubernetesValidating, hm.admissionWebhookManager)
+	// TODO
+	// hookCtrl.InitMutatingBindings(hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
 
 	hook.WithHookController(hookCtrl)
 	hook.WithTmpDir(hm.TempDir())

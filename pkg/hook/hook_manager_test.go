@@ -27,7 +27,7 @@ func newHookManager(t *testing.T, testdataDir string) *hookManager {
 
 	validatingManager := admission.NewWebhookManager()
 	validatingManager.Settings = app.ValidatingWebhookSettings
-	hm.WithValidatingWebhookManager(validatingManager)
+	hm.WithAdmissionWebhookManager(validatingManager)
 
 	return hm
 }
