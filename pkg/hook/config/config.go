@@ -8,6 +8,8 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/types"
 )
 
+var validBindingTypes = []BindingType{OnStartup, Schedule, OnKubernetesEvent, KubernetesValidating, KubernetesMutating, KubernetesConversion}
+
 // HookConfig is a structure with versioned hook configuration
 type HookConfig struct {
 	// effective version of config
@@ -92,7 +94,7 @@ func (c *HookConfig) ConvertAndCheck(data []byte) error {
 func (c *HookConfig) Bindings() []BindingType {
 	res := []BindingType{}
 
-	for _, binding := range []BindingType{OnStartup, Schedule, OnKubernetesEvent, KubernetesValidating, KubernetesConversion} {
+	for _, binding := range validBindingTypes {
 		if c.HasBinding(binding) {
 			res = append(res, binding)
 		}
