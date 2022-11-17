@@ -24,6 +24,7 @@ type HookConfig struct {
 	Schedules            []ScheduleConfig
 	OnKubernetesEvents   []OnKubernetesEventConfig
 	KubernetesValidating []ValidatingConfig
+	KubernetesMutating   []MutatingConfig
 	KubernetesConversion []ConversionConfig
 	Settings             *Settings
 }

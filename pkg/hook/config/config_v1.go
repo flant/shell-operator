@@ -208,7 +208,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	// Validating webhooks
 	c.KubernetesValidating = []ValidatingConfig{}
 	for i, rawValidating := range c.V1.KubernetesValidating {
-		err := cv1.CheckValidating(c.OnKubernetesEvents, rawValidating)
+		err := cv1.CheckAdmission(c.OnKubernetesEvents, rawValidating)
 		if err != nil {
 			return fmt.Errorf("invalid kubernetesValidating config [%d]: %v", i, err)
 		}
@@ -229,6 +229,20 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	if err != nil {
 		return err
 	}
+
+	c.KubernetesMutating = []MutatingConfig{}
+	for i, rawValidating := range c.V1.KubernetesMutating {
+		err := cv1.CheckAdmission(c.OnKubernetesEvents, rawValidating)
+		if err != nil {
+			return fmt.Errorf("invalid kubernetesValidating config [%d]: %v", i, err)
+		}
+		validating, err := cv1.ConvertValidating(rawValidating)
+		if err != nil {
+			return err
+		}
+		c.KubernetesValidating = append(c.KubernetesValidating, validating)
+	}
+	// TODO: Validate mutatingWebhooks
 
 	// Conversion webhooks.
 	c.KubernetesConversion = []ConversionConfig{}
@@ -373,7 +387,7 @@ func (сv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfig
 	return allErr
 }
 
-func (cv1 *HookConfigV1) CheckValidating(kubeConfigs []OnKubernetesEventConfig, cfgV1 KubernetesAdmissionConfigV1) (allErr error) {
+func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []OnKubernetesEventConfig, cfgV1 KubernetesAdmissionConfigV1) (allErr error) {
 	var err error
 
 	if len(cfgV1.IncludeSnapshotsFrom) > 0 {
