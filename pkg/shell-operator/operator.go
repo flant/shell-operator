@@ -175,7 +175,7 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 	}
 
 	// Define handler for ValidatingEvent
-	op.ValidatingWebhookManager.WithValidatingEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
+	op.ValidatingWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
 			"binding":  string(KubernetesValidating),

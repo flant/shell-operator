@@ -44,7 +44,7 @@ func (m *WebhookManager) WithKubeClient(kubeClient klient.Client) {
 	m.KubeClient = kubeClient
 }
 
-func (m *WebhookManager) WithValidatingEventHandler(handler AdmissionEventHandlerFn) {
+func (m *WebhookManager) WithAdmissionEventHandler(handler AdmissionEventHandlerFn) {
 	m.Handler = &WebhookHandler{
 		Handler: handler,
 	}
