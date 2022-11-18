@@ -115,6 +115,8 @@ func (c *HookConfig) HasBinding(binding BindingType) bool {
 		return len(c.OnKubernetesEvents) > 0
 	case KubernetesValidating:
 		return len(c.KubernetesValidating) > 0
+	case KubernetesMutating:
+		return len(c.KubernetesMutating) > 0
 	case KubernetesConversion:
 		return len(c.KubernetesConversion) > 0
 	}

@@ -212,7 +212,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 		if err != nil {
 			return fmt.Errorf("invalid kubernetesValidating config [%d]: %v", i, err)
 		}
-		validating, err := cv1.ConvertValidating(rawValidating)
+		validating, err := convertValidating(rawValidating)
 		if err != nil {
 			return err
 		}
@@ -231,16 +231,16 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	}
 
 	c.KubernetesMutating = []MutatingConfig{}
-	for i, rawValidating := range c.V1.KubernetesMutating {
-		err := cv1.CheckAdmission(c.OnKubernetesEvents, rawValidating)
+	for i, rawMutating := range c.V1.KubernetesMutating {
+		err := cv1.CheckAdmission(c.OnKubernetesEvents, rawMutating)
 		if err != nil {
-			return fmt.Errorf("invalid kubernetesValidating config [%d]: %v", i, err)
+			return fmt.Errorf("invalid kubernetesMutating config [%d]: %v", i, err)
 		}
-		validating, err := cv1.ConvertValidating(rawValidating)
+		mutating, err := convertMutating(rawMutating)
 		if err != nil {
 			return err
 		}
-		c.KubernetesValidating = append(c.KubernetesValidating, validating)
+		c.KubernetesMutating = append(c.KubernetesMutating, mutating)
 	}
 	// TODO: Validate mutatingWebhooks
 
@@ -414,7 +414,7 @@ func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []OnKubernetesEventConfig, c
 	return allErr
 }
 
-func (cv1 *HookConfigV1) ConvertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, error) {
+func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, error) {
 	cfg := ValidatingConfig{}
 
 	cfg.Group = cfgV1.Group
@@ -453,6 +453,52 @@ func (cv1 *HookConfigV1) ConvertValidating(cfgV1 KubernetesAdmissionConfigV1) (V
 
 	cfg.Webhook = &admission.ValidatingWebhookConfig{
 		ValidatingWebhook: webhook,
+	}
+	cfg.Webhook.Metadata.LogLabels = map[string]string{}
+	cfg.Webhook.Metadata.MetricLabels = map[string]string{}
+
+	return cfg, nil
+}
+
+func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (MutatingConfig, error) {
+	cfg := MutatingConfig{}
+
+	cfg.Group = cfgV1.Group
+	cfg.IncludeSnapshotsFrom = cfgV1.IncludeSnapshotsFrom
+	cfg.BindingName = cfgV1.Name
+
+	DefaultFailurePolicy := v1.Fail
+	DefaultSideEffects := v1.SideEffectClassNone
+	DefaultTimeoutSeconds := int32(10)
+
+	webhook := &v1.MutatingWebhook{
+		Name:  cfgV1.Name,
+		Rules: cfgV1.Rules,
+	}
+	if cfgV1.Namespace != nil {
+		webhook.NamespaceSelector = cfgV1.Namespace.LabelSelector
+	}
+	if cfgV1.LabelSelector != nil {
+		webhook.ObjectSelector = cfgV1.LabelSelector
+	}
+	if cfgV1.FailurePolicy != nil {
+		webhook.FailurePolicy = cfgV1.FailurePolicy
+	} else {
+		webhook.FailurePolicy = &DefaultFailurePolicy
+	}
+	if cfgV1.SideEffects != nil {
+		webhook.SideEffects = cfgV1.SideEffects
+	} else {
+		webhook.SideEffects = &DefaultSideEffects
+	}
+	if cfgV1.TimeoutSeconds != nil {
+		webhook.TimeoutSeconds = cfgV1.TimeoutSeconds
+	} else {
+		webhook.TimeoutSeconds = &DefaultTimeoutSeconds
+	}
+
+	cfg.Webhook = &admission.MutatingWebhookConfig{
+		MutatingWebhook: webhook,
 	}
 	cfg.Webhook.Metadata.LogLabels = map[string]string{}
 	cfg.Webhook.Metadata.MetricLabels = map[string]string{}
