@@ -49,7 +49,7 @@ type ShellOperator struct {
 
 	HookManager hook.HookManager
 
-	ValidatingWebhookManager *admission.WebhookManager
+	AdmissionWebhookManager  *admission.WebhookManager
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
@@ -154,16 +154,19 @@ func (op *ShellOperator) InitHookManager() (err error) {
 // InitValidatingWebhookManager adds kubernetesValidating hooks
 // to a WebhookManager and set a validating event handler.
 func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
-	if op.HookManager == nil || op.ValidatingWebhookManager == nil {
+	if op.HookManager == nil || op.AdmissionWebhookManager == nil {
 		return
 	}
 	// Do not init ValidatingWebhook if there are no KubernetesValidating hooks.
-	hookNames, _ := op.HookManager.GetHooksInOrder(KubernetesValidating)
+	hookNamesV, _ := op.HookManager.GetHooksInOrder(KubernetesValidating)
+	hookNamesM, _ := op.HookManager.GetHooksInOrder(KubernetesMutating)
+
+	hookNames := append(hookNamesV, hookNamesM...)
 	if len(hookNames) == 0 {
 		return
 	}
 
-	err = op.ValidatingWebhookManager.Init()
+	err = op.AdmissionWebhookManager.Init()
 	if err != nil {
 		log.Errorf("ValidatingWebhookManager init: %v", err)
 		return err
@@ -171,11 +174,11 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 
 	for _, hookName := range hookNames {
 		h := op.HookManager.GetHook(hookName)
-		h.HookController.EnableValidatingBindings()
+		h.HookController.EnableAdmissionBindings()
 	}
 
 	// Define handler for ValidatingEvent
-	op.ValidatingWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
+	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
 			"binding":  string(KubernetesValidating),
@@ -226,7 +229,7 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 		return validatingResponse, nil
 	})
 
-	err = op.ValidatingWebhookManager.Start()
+	err = op.AdmissionWebhookManager.Start()
 	if err != nil {
 		log.Errorf("ValidatingWebhookManager start: %v", err)
 	}

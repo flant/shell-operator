@@ -45,8 +45,12 @@ func (m *WebhookManager) WithKubeClient(kubeClient klient.Client) {
 }
 
 func (m *WebhookManager) WithAdmissionEventHandler(handler AdmissionEventHandlerFn) {
-	m.Handler = &WebhookHandler{
-		Handler: handler,
+	if m.Handler == nil {
+		m.Handler = &WebhookHandler{
+			Handler: handler,
+		}
+	} else {
+		m.Handler.Handler = handler
 	}
 }
 
