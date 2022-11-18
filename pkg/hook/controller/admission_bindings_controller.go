@@ -69,6 +69,10 @@ func (c *admissionBindingsController) WithWebhookManager(mgr *admission.WebhookM
 func (c *admissionBindingsController) EnableValidatingBindings() {
 	confId := ""
 
+	if len(c.ValidatingBindings) <= 0 {
+		return
+	}
+
 	for _, config := range c.ValidatingBindings {
 		if config.Webhook.Metadata.ConfigurationId == "" && confId == "" {
 			continue
@@ -97,6 +101,10 @@ func (c *admissionBindingsController) EnableValidatingBindings() {
 
 func (c *admissionBindingsController) EnableMutatingBindings() {
 	confId := ""
+
+	if len(c.MutatingBindings) <= 0 {
+		return
+	}
 
 	for _, config := range c.MutatingBindings {
 		if config.Webhook.Metadata.ConfigurationId == "" && confId == "" {
