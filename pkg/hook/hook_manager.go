@@ -38,7 +38,7 @@ type HookManager interface {
 	GetHooksInOrder(bindingType BindingType) ([]string, error)
 	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
-	HandleValidatingEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule
 }
@@ -311,12 +311,15 @@ func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Ho
 	}
 }
 
-func (hm *hookManager) HandleValidatingEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *hookManager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
-	for _, hookName := range vHooks {
+	mHooks, _ := hm.GetHooksInOrder(KubernetesMutating)
+	hooks := append(vHooks, mHooks...)
+
+	for _, hookName := range hooks {
 		h := hm.GetHook(hookName)
-		if h.HookController.CanHandleValidatingEvent(event) {
-			h.HookController.HandleValidatingEvent(event, func(info controller.BindingExecutionInfo) {
+		if h.HookController.CanHandleAdmissionEvent(event) {
+			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
 				}

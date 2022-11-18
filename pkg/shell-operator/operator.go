@@ -187,7 +187,7 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 		logEntry.Debugf("Handle '%s' event '%s' '%s'", string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
 
 		var tasks []task.Task
-		op.HookManager.HandleValidatingEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+		op.HookManager.HandleAdmissionEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
 					HookName:       hook.Name,

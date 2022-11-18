@@ -42,7 +42,7 @@ type HookController interface {
 
 	CanHandleKubeEvent(kubeEvent KubeEvent) bool
 	CanHandleScheduleEvent(crontab string) bool
-	CanHandleValidatingEvent(event AdmissionEvent) bool
+	CanHandleAdmissionEvent(event AdmissionEvent) bool
 	CanHandleConversionEvent(event conversion.Event, rule conversion.Rule) bool
 
 	// These method should call an underlying *Binding*Controller to get binding context
@@ -50,7 +50,7 @@ type HookController interface {
 	HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error
 	HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo))
-	HandleValidatingEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo))
+	HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo))
 	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTasksFn func(BindingExecutionInfo))
 
 	UnlockKubernetesEvents()
@@ -168,7 +168,7 @@ func (hc *hookController) CanHandleScheduleEvent(crontab string) bool {
 	return false
 }
 
-func (hc *hookController) CanHandleValidatingEvent(event AdmissionEvent) bool {
+func (hc *hookController) CanHandleAdmissionEvent(event AdmissionEvent) bool {
 	if hc.AdmissionController != nil {
 		return hc.AdmissionController.CanHandleEvent(event)
 	}
@@ -208,7 +208,7 @@ func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 	}
 }
 
-func (hc *hookController) HandleValidatingEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo)) {
+func (hc *hookController) HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo)) {
 	if hc.AdmissionController == nil {
 		return
 	}
