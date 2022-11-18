@@ -94,7 +94,7 @@ func TestHookController_HandleValidatingEvent(t *testing.T) {
 	}
 
 	h := hm.GetHook("hook.sh")
-	h.HookController.EnableValidatingBindings()
+	h.HookController.EnableAdmissionBindings()
 
 	canHandle := h.HookController.CanHandleValidatingEvent(ev)
 

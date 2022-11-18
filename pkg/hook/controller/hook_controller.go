@@ -37,8 +37,7 @@ type BindingExecutionInfo struct {
 type HookController interface {
 	InitKubernetesBindings([]OnKubernetesEventConfig, kube_events_manager.KubeEventsManager)
 	InitScheduleBindings([]ScheduleConfig, schedule_manager.ScheduleManager)
-	InitValidatingBindings([]ValidatingConfig, *admission.WebhookManager)
-	InitMutatingBindings([]MutatingConfig, *admission.WebhookManager)
+	InitAdmissionBindings([]ValidatingConfig, []MutatingConfig, *admission.WebhookManager)
 	InitConversionBindings([]ConversionConfig, *conversion.WebhookManager)
 
 	CanHandleKubeEvent(kubeEvent KubeEvent) bool
@@ -62,7 +61,7 @@ type HookController interface {
 	EnableScheduleBindings()
 	DisableScheduleBindings()
 
-	EnableValidatingBindings()
+	EnableAdmissionBindings()
 
 	EnableConversionBindings()
 
@@ -86,6 +85,7 @@ type hookController struct {
 	kubernetesBindings   []OnKubernetesEventConfig
 	scheduleBindings     []ScheduleConfig
 	validatingBindings   []ValidatingConfig
+	mutatingBindings     []MutatingConfig
 	conversionBindings   []ConversionConfig
 }
 
@@ -113,20 +113,33 @@ func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, schedu
 	hc.scheduleBindings = bindings
 }
 
-func (hc *hookController) InitValidatingBindings(bindings []ValidatingConfig, webhookMgr *admission.WebhookManager) {
+func (hc *hookController) InitAdmissionBindings(vbindings []ValidatingConfig, mbindings []MutatingConfig, webhookMgr *admission.WebhookManager) {
+
+	bindingCtrl := NewValidatingBindingsController()
+	bindingCtrl.WithWebhookManager(webhookMgr)
+	hc.AdmissionController = bindingCtrl
+
+	hc.initValidatingBindings(vbindings)
+	hc.initMutatingBindings(mbindings)
+
+}
+
+func (hc *hookController) initValidatingBindings(bindings []ValidatingConfig) {
 	if len(bindings) == 0 {
 		return
 	}
 
-	bindingCtrl := NewValidatingBindingsController()
-	bindingCtrl.WithWebhookManager(webhookMgr)
-	bindingCtrl.WithValidatingBindings(bindings)
-	hc.AdmissionController = bindingCtrl
+	hc.AdmissionController.WithValidatingBindings(bindings)
 	hc.validatingBindings = bindings
 }
 
-// TODO
-func (hc *hookController) InitMutatingBindings(bindings []MutatingConfig, webhookMgr *admission.WebhookManager) {
+func (hc *hookController) initMutatingBindings(bindings []MutatingConfig) {
+	if len(bindings) == 0 {
+		return
+	}
+
+	hc.AdmissionController.WithMutatingBindings(bindings)
+	hc.mutatingBindings = bindings
 }
 
 func (hc *hookController) InitConversionBindings(bindings []ConversionConfig, webhookMgr *conversion.WebhookManager) {
@@ -265,9 +278,10 @@ func (hc *hookController) DisableScheduleBindings() {
 	}
 }
 
-func (hc *hookController) EnableValidatingBindings() {
+func (hc *hookController) EnableAdmissionBindings() {
 	if hc.AdmissionController != nil {
 		hc.AdmissionController.EnableValidatingBindings()
+		hc.AdmissionController.EnableMutatingBindings()
 	}
 }
 

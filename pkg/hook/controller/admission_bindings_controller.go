@@ -23,9 +23,12 @@ type AdmissionBindingToWebhookLink struct {
 // ScheduleBindingsController handles schedule bindings for one hook.
 type AdmissionBindingsController interface {
 	WithValidatingBindings([]ValidatingConfig)
+	WithMutatingBindings([]MutatingConfig)
 	WithWebhookManager(*admission.WebhookManager)
 	EnableValidatingBindings()
+	EnableMutatingBindings()
 	DisableValidatingBindings()
+	DisableMutatingBindings()
 	CanHandleEvent(event AdmissionEvent) bool
 	HandleEvent(event AdmissionEvent) BindingExecutionInfo
 }
@@ -34,7 +37,7 @@ type admissionBindingsController struct {
 	// Controller holds validating bindings from one hook. Hook always belongs to one configurationId.
 	ConfigurationId string
 	// WebhookId -> link
-	ValidatingLinks map[string]*AdmissionBindingToWebhookLink
+	AdmissionLinks map[string]*AdmissionBindingToWebhookLink
 
 	ValidatingBindings []ValidatingConfig
 	MutatingBindings   []MutatingConfig
@@ -47,7 +50,7 @@ var _ AdmissionBindingsController = &admissionBindingsController{}
 // NewKubernetesHooksController returns an implementation of KubernetesHooksController
 var NewValidatingBindingsController = func() *admissionBindingsController {
 	return &admissionBindingsController{
-		ValidatingLinks: make(map[string]*AdmissionBindingToWebhookLink),
+		AdmissionLinks: make(map[string]*AdmissionBindingToWebhookLink),
 	}
 }
 
@@ -65,6 +68,7 @@ func (c *admissionBindingsController) WithWebhookManager(mgr *admission.WebhookM
 
 func (c *admissionBindingsController) EnableValidatingBindings() {
 	confId := ""
+
 	for _, config := range c.ValidatingBindings {
 		if config.Webhook.Metadata.ConfigurationId == "" && confId == "" {
 			continue
@@ -80,7 +84,7 @@ func (c *admissionBindingsController) EnableValidatingBindings() {
 	c.ConfigurationId = confId
 
 	for _, config := range c.ValidatingBindings {
-		c.ValidatingLinks[config.Webhook.Metadata.WebhookId] = &AdmissionBindingToWebhookLink{
+		c.AdmissionLinks[config.Webhook.Metadata.WebhookId] = &AdmissionBindingToWebhookLink{
 			BindingName:      config.BindingName,
 			ConfigurationId:  c.ConfigurationId,
 			WebhookId:        config.Webhook.Metadata.WebhookId,
@@ -91,15 +95,48 @@ func (c *admissionBindingsController) EnableValidatingBindings() {
 	}
 }
 
+func (c *admissionBindingsController) EnableMutatingBindings() {
+	confId := ""
+
+	for _, config := range c.MutatingBindings {
+		if config.Webhook.Metadata.ConfigurationId == "" && confId == "" {
+			continue
+		}
+		if config.Webhook.Metadata.ConfigurationId != "" && confId == "" {
+			confId = config.Webhook.Metadata.ConfigurationId
+			continue
+		}
+		if config.Webhook.Metadata.ConfigurationId != confId {
+			log.Errorf("Possible bug!!! kubernetesMutating has non-unique configurationIds: '%s' '%s'", config.Webhook.Metadata.ConfigurationId, confId)
+		}
+	}
+	c.ConfigurationId = confId
+
+	for _, config := range c.MutatingBindings {
+		c.AdmissionLinks[config.Webhook.Metadata.WebhookId] = &AdmissionBindingToWebhookLink{
+			BindingName:      config.BindingName,
+			ConfigurationId:  c.ConfigurationId,
+			WebhookId:        config.Webhook.Metadata.WebhookId,
+			IncludeSnapshots: config.IncludeSnapshotsFrom,
+			Group:            config.Group,
+		}
+		c.webhookManager.AddMutatingWebhook(config.Webhook)
+	}
+}
+
 func (c *admissionBindingsController) DisableValidatingBindings() {
 	// TODO dynamic enable/disable validating webhooks.
+}
+
+func (c *admissionBindingsController) DisableMutatingBindings() {
+	// TODO dynamic enable/disable mutating webhooks.
 }
 
 func (c *admissionBindingsController) CanHandleEvent(event AdmissionEvent) bool {
 	if c.ConfigurationId != event.ConfigurationId {
 		return false
 	}
-	_, has := c.ValidatingLinks[event.WebhookId]
+	_, has := c.AdmissionLinks[event.WebhookId]
 	return has
 }
 
@@ -112,7 +149,7 @@ func (c *admissionBindingsController) HandleEvent(event AdmissionEvent) BindingE
 		}
 	}
 
-	link, hasKey := c.ValidatingLinks[event.WebhookId]
+	link, hasKey := c.AdmissionLinks[event.WebhookId]
 	if !hasKey {
 		log.Errorf("Possible bug!!! Unknown validating event: no binding for configurationId '%s', webhookId '%s'", event.ConfigurationId, event.WebhookId)
 		return BindingExecutionInfo{

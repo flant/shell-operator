@@ -201,7 +201,7 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
 	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
 	hookCtrl.InitConversionBindings(hook.GetConfig().KubernetesConversion, hm.conversionWebhookManager)
-	hookCtrl.InitValidatingBindings(hook.GetConfig().KubernetesValidating, hm.admissionWebhookManager)
+	hookCtrl.InitAdmissionBindings(hook.GetConfig().KubernetesValidating, hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
 	// TODO
 	// hookCtrl.InitMutatingBindings(hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
 
