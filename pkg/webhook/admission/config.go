@@ -23,6 +23,7 @@ type IWebhookConfig interface {
 	GetMeta() Metadata
 	SetMeta(Metadata)
 	SetClientConfig(v1.WebhookClientConfig)
+	UpdateIds(string, string)
 }
 
 // ValidatingWebhookConfig
@@ -55,6 +56,14 @@ func (wc *MutatingWebhookConfig) SetClientConfig(cc v1.WebhookClientConfig) {
 
 // UpdateIds use confId and webhookId to set a ConfigurationId prefix and a WebhookId.
 func (c *ValidatingWebhookConfig) UpdateIds(confID, webhookID string) {
+	c.Metadata.ConfigurationId = confID
+	if confID == "" {
+		c.Metadata.ConfigurationId = DefaultConfigurationId
+	}
+	c.Metadata.WebhookId = string_helper.SafeURLString(webhookID)
+}
+
+func (c *MutatingWebhookConfig) UpdateIds(confID, webhookID string) {
 	c.Metadata.ConfigurationId = confID
 	if confID == "" {
 		c.Metadata.ConfigurationId = DefaultConfigurationId

@@ -188,6 +188,7 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 			"binding": conversionCfg.BindingName,
 		}
 	}
+
 	for _, validatingCfg := range hook.GetConfig().KubernetesValidating {
 		validatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
 		validatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
@@ -195,6 +196,14 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 			"binding": validatingCfg.BindingName,
 		}
 		validatingCfg.Webhook.UpdateIds("", validatingCfg.BindingName)
+	}
+	for _, mutatingCfg := range hook.GetConfig().KubernetesMutating {
+		mutatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
+		mutatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
+			"hook":    hook.Name,
+			"binding": mutatingCfg.BindingName,
+		}
+		mutatingCfg.Webhook.UpdateIds("", mutatingCfg.BindingName)
 	}
 
 	hookCtrl := controller.NewHookController()
