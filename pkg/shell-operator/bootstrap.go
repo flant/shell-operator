@@ -13,6 +13,7 @@ import (
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/hook"
+	"github.com/flant/shell-operator/pkg/jq"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
@@ -27,7 +28,9 @@ func Init() (*ShellOperator, error) {
 	runtimeConfig := config.NewConfig()
 	// Init logging subsystem.
 	app.SetupLogging(runtimeConfig)
+	// Log version and jq filtering implementation.
 	log.Infof(app.AppStartMessage)
+	log.Debug(jq.JqFilterInfo())
 
 	hooksDir, err := RequireExistingDirectory(app.HooksDir)
 	if err != nil {

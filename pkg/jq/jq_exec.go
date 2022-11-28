@@ -9,7 +9,8 @@ import (
 	"github.com/flant/shell-operator/pkg/executor"
 )
 
-func jqFilterExec(jqFilter string, jsonData []byte, libPath string) (result string, err error) {
+// jqExec is a subprocess implementation of the jq filtering.
+func jqExec(jqFilter string, jsonData []byte, libPath string) (result string, err error) {
 	var cmd *exec.Cmd
 	if libPath == "" {
 		cmd = exec.Command("/usr/bin/jq", jqFilter)
