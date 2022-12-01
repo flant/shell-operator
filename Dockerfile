@@ -20,6 +20,7 @@ RUN CGO_ENABLED=1 \
     CGO_LDFLAGS="-L/libjq/lib" \
     GOOS=linux \
     go build -ldflags="-linkmode external -extldflags '-static' -s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" \
+             -tags use_libjq \
              -o shell-operator \
              ./cmd/shell-operator
 
