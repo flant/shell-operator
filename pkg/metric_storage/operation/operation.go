@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -89,7 +89,7 @@ func MetricOperationsFromBytes(data []byte) ([]MetricOperation, error) {
 }
 
 func MetricOperationsFromFile(filePath string) ([]MetricOperation, error) {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
 	}

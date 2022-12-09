@@ -3,7 +3,7 @@ package object_patch
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/flant/kube-client/fake"
@@ -18,7 +18,7 @@ import (
 
 func mustReadFile(t *testing.T, filePath string) []byte {
 	t.Helper()
-	content, err := ioutil.ReadFile(filePath)
+	content, err := os.ReadFile(filePath)
 	require.NoError(t, err)
 	return content
 }

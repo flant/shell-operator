@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -48,7 +47,7 @@ func (s *WebhookServer) Start() error {
 		roots := x509.NewCertPool()
 
 		for _, caPath := range s.Settings.ClientCAPaths {
-			caBytes, err := ioutil.ReadFile(caPath)
+			caBytes, err := os.ReadFile(caPath)
 			if err != nil {
 				return fmt.Errorf("load client CA '%s': %v", caPath, err)
 			}
