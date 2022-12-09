@@ -1,0 +1,6 @@
+run:
+  timeout: 15m
+issues:
+  exclude:
+  - ST1005.*
+  - SA1019.* # "io/ioutil" has been deprecated since Go 1.16

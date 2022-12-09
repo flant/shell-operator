@@ -11,10 +11,10 @@ jobs:
     name: Go code style
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.16
+      - name: Set up Go 1.19
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: 1.19
 
       - name: Check out shell-operator code
         uses: actions/checkout@v3
@@ -27,10 +27,10 @@ jobs:
     name: codespell
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.16
+      - name: Set up Go 1.19
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: 1.19
 
       - uses: actions/setup-python@v4
         with:
