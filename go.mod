@@ -1,9 +1,9 @@
 module github.com/flant/shell-operator
 
-go 1.18
+go 1.19
 
 require (
-	github.com/flant/kube-client v0.0.7-0.20221207130940-42768d5a4e2c
+	github.com/flant/kube-client v0.25.0
 	github.com/flant/libjq-go v1.6.2-0.20200616114952-907039e8a02a // branch: master
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-openapi/spec v0.19.8
@@ -16,7 +16,7 @@ require (
 	github.com/onsi/gomega v1.20.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
