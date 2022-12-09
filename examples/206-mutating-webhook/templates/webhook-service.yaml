@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.shellOperator.webhookServiceName }}
+  labels:
+    heritage: example-206
+spec:
+#  type: LoadBalancer
+#  externalTrafficPolicy: Local
+  ports:
+    - name: webhook
+      port: 443
+      targetPort: 9680
+      protocol: TCP
+  selector:
+    app: shell-operator-example-206

@@ -1,0 +1,9 @@
+apiVersion: "stable.example.com/v1"
+kind: CronTab
+metadata:
+  name: crontab-valid
+  labels:
+    heritage: example-206
+spec:
+  cronSpec: "* * * * */5"
+  image: repo.example.com/my-awesome-cron-image:v1

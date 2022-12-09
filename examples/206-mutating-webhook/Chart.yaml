@@ -1,0 +1,4 @@
+apiVersion: v1
+name: 206-mutating-webhook
+version: 1.0.0
+description: Shell-operator mutating hook example
