@@ -14,7 +14,7 @@ type AdmissionResponse struct {
 	Allowed  bool     `json:"allowed"`
 	Message  string   `json:"message,omitempty"`
 	Warnings []string `json:"warnings,omitempty"`
-	Patch    []byte   `json:"patch,omitempty" protobuf:"bytes,4,opt,name=patch"`
+	Patch    []byte   `json:"patch,omitempty"`
 }
 
 func AdmissionResponseFromFile(filePath string) (*AdmissionResponse, error) {

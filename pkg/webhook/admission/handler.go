@@ -127,6 +127,18 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 	}
 
 	response.Response.Allowed = true
+
+	// When allowing a request, a mutating admission webhook may optionally modify the
+	// incoming object as well. This is done using the patch and patchType fields in the response.
+	// The only currently supported patchType is JSONPatch. See JSON patch documentation for
+	// more details. For patchType: JSONPatch, the patch field contains a base64-encoded
+	// array of JSON patch operations.
+	if len(validatingResponse.Patch) > 0 {
+		response.Response.Patch = validatingResponse.Patch
+		patchType := v1.PatchTypeJSONPatch
+		response.Response.PatchType = &patchType
+	}
+
 	return response, nil
 }
 
