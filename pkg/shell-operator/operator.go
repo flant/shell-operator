@@ -364,14 +364,14 @@ func (op *ShellOperator) ConversionEventHandler(event conversion.Event) (*conver
 func (op *ShellOperator) Start() {
 	log.Info("start shell-operator")
 
-	// Start emit "live" metrics
-	op.RunMetrics()
-
 	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
 	op.BootstrapMainQueue(op.TaskQueues)
 	// Start main task queue handler
 	op.TaskQueues.StartMain()
 	op.InitAndStartHookQueues()
+
+	// Start emit "live" metrics
+	op.RunMetrics()
 
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
