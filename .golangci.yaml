@@ -1,6 +1,11 @@
 run:
   timeout: 15m
+linters:
+  include:
+    - bodyclose
+    - asciicheck
+    - dogsled
+    - durationcheck
 issues:
-  exclude:
-  - ST1005.*
-  - SA1019.* # "io/ioutil" has been deprecated since Go 1.16
+  max-issues-per-linter: 0
+  max-same-issues: 0

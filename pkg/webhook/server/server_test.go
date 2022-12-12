@@ -2,7 +2,7 @@ package server
 
 import (
 	"crypto/x509"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -36,7 +36,7 @@ func Test_Client_CA(t *testing.T) {
 	}
 
 	for _, caPath := range s.ClientCAPaths {
-		caBytes, err := ioutil.ReadFile(caPath)
+		caBytes, err := os.ReadFile(caPath)
 		if err != nil {
 			t.Fatalf("ca '%s' should be read: %v", caPath, err)
 		}

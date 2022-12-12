@@ -3,7 +3,6 @@ package checksum
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,7 +18,7 @@ func CalculateChecksum(stringArr ...string) string {
 }
 
 func CalculateChecksumOfFile(path string) (string, error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}

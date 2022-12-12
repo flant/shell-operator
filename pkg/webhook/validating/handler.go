@@ -3,7 +3,7 @@ package validating
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -39,7 +39,7 @@ func NewWebhookHandler() *WebhookHandler {
 func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(r.Body)
+	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error reading request body"))
@@ -130,7 +130,7 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 // DetectConfigurationAndWebhook extracts configurationID and a webhookID from the url path.
 func DetectConfigurationAndWebhook(path string) (configurationID string, webhookID string) {
 	parts := strings.Split(path, "/")
-	webhookParts := []string{}
+	webhookParts := make([]string, 0)
 	for _, p := range parts {
 		if p == "" {
 			continue

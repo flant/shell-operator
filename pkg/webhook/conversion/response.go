@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
@@ -13,17 +13,22 @@ import (
 )
 
 /*
+Response is a holder of the conversion hook response.
 
-FailedMessage:
-Response is Success if empty string:
-"result": {
-  "status": "Success"
-},
+Unlike ConverionsResponse, only one filed (FailedMessage) is used to determine success or fail:
+
+Response is Success if FailedMessage is empty:
+
+	"result": {
+	  "status": "Success"
+	},
+
 Response is Failed:
-"result": {
-  "status": "Failed",
-  "message": FailedMessage
-}
+
+	"result": {
+	  "status": "Failed",
+	  "message": FailedMessage
+	}
 
 ConvertedObjects:
 # Objects must match the order of request.objects, and have apiVersion set to <request.desiredAPIVersion>.
@@ -37,7 +42,7 @@ type Response struct {
 }
 
 func ResponseFromFile(filePath string) (*Response, error) {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
 	}

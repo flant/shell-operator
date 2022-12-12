@@ -3,7 +3,6 @@ package hook
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -83,7 +82,7 @@ func (h *Hook) WithHookController(hookController controller.HookController) {
 	h.HookController = hookController
 }
 
-func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels map[string]string) (*HookResult, error) {
+func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string]string) (*HookResult, error) {
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
@@ -117,15 +116,15 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 	// remove tmp file on hook exit
 	defer func() {
 		if app.DebugKeepTmpFiles != "yes" {
-			os.Remove(contextPath)
-			os.Remove(metricsPath)
-			os.Remove(conversionPath)
-			os.Remove(validatingPath)
-			os.Remove(kubernetesPatchPath)
+			_ = os.Remove(contextPath)
+			_ = os.Remove(metricsPath)
+			_ = os.Remove(conversionPath)
+			_ = os.Remove(validatingPath)
+			_ = os.Remove(kubernetesPatchPath)
 		}
 	}()
 
-	envs := []string{}
+	envs := make([]string, 0)
 	envs = append(envs, os.Environ()...)
 	if contextPath != "" {
 		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
@@ -159,7 +158,7 @@ func (h *Hook) Run(bindingType BindingType, context []BindingContext, logLabels 
 		return result, fmt.Errorf("got bad conversion response: %s", err)
 	}
 
-	result.KubernetesPatchBytes, err = ioutil.ReadFile(kubernetesPatchPath)
+	result.KubernetesPatchBytes, err = os.ReadFile(kubernetesPatchPath)
 	if err != nil {
 		return result, fmt.Errorf("can't read object patch file: %s", err)
 	}
@@ -172,7 +171,7 @@ func (h *Hook) SafeName() string {
 }
 
 func (h *Hook) GetConfigDescription() string {
-	msgs := []string{}
+	msgs := make([]string, 0)
 	if h.Config.OnStartup != nil {
 		msgs = append(msgs, fmt.Sprintf("OnStartup:%d", int64(h.Config.OnStartup.Order)))
 	}
@@ -246,7 +245,7 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 
 	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err = ioutil.WriteFile(bindingContextPath, data, 0644)
+	err = os.WriteFile(bindingContextPath, data, 0644)
 	if err != nil {
 		return "", err
 	}
@@ -257,7 +256,7 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 func (h *Hook) prepareMetricsFile() (string, error) {
 	metricsPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-metrics-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err := ioutil.WriteFile(metricsPath, []byte{}, 0644)
+	err := os.WriteFile(metricsPath, []byte{}, 0644)
 	if err != nil {
 		return "", err
 	}
@@ -268,7 +267,7 @@ func (h *Hook) prepareMetricsFile() (string, error) {
 func (h *Hook) prepareValidatingResponseFile() (string, error) {
 	validatingPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-validating-response-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err := ioutil.WriteFile(validatingPath, []byte{}, 0644)
+	err := os.WriteFile(validatingPath, []byte{}, 0644)
 	if err != nil {
 		return "", err
 	}
@@ -279,7 +278,7 @@ func (h *Hook) prepareValidatingResponseFile() (string, error) {
 func (h *Hook) prepareConversionResponseFile() (string, error) {
 	conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err := ioutil.WriteFile(conversionPath, []byte{}, 0644)
+	err := os.WriteFile(conversionPath, []byte{}, 0644)
 	if err != nil {
 		return "", err
 	}
@@ -288,9 +287,9 @@ func (h *Hook) prepareConversionResponseFile() (string, error) {
 }
 
 func CreateRateLimiter(cfg *config.HookConfig) *rate.Limiter {
-	// Create rate limiter
-	limit := rate.Inf // no rate limit by default
-	burst := 1        // no more then 1 event at time
+	// Create rate limiter.
+	limit := rate.Inf // No rate limit by default.
+	burst := 1        // No more than 1 event at time.
 	if cfg.Settings != nil {
 		if cfg.Settings.ExecutionMinInterval != 0 {
 			limit = rate.Every(cfg.Settings.ExecutionMinInterval)
@@ -305,7 +304,7 @@ func CreateRateLimiter(cfg *config.HookConfig) *rate.Limiter {
 func (h *Hook) prepareObjectPatchFile() (string, error) {
 	objectPatchPath := filepath.Join(h.TmpDir, fmt.Sprintf("%s-object-patch-%s", h.SafeName(), uuid.NewV4().String()))
 
-	err := ioutil.WriteFile(objectPatchPath, []byte{}, 0644)
+	err := os.WriteFile(objectPatchPath, []byte{}, 0644)
 	if err != nil {
 		return "", err
 	}

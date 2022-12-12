@@ -1,7 +1,7 @@
 package validating
 
 import (
-	"io/ioutil"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -60,7 +60,7 @@ func (m *WebhookManager) Init() error {
 		m.DefaultConfigurationId = DefaultConfigurationId
 	}
 	// settings
-	caBundleBytes, err := ioutil.ReadFile(m.Settings.CAPath)
+	caBundleBytes, err := os.ReadFile(m.Settings.CAPath)
 	if err != nil {
 		return err
 	}

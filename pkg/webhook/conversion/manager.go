@@ -1,7 +1,7 @@
 package conversion
 
 import (
-	"io/ioutil"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -14,14 +14,15 @@ type EventHandlerFn func(event Event) (*Response, error)
 // WebhookManager is a public interface to be used from operator.go.
 //
 // No dynamic configuration for now. The steps are:
-//   - Init():
-//     - Create a router to distinguish conversion requests between CRDs
-//     - Create a handler to handle ConversionReview
-//     - Create a server that listens for Kubernetes requests
+// - Init():
+//   - Create a router to distinguish conversion requests between CRDs
+//   - Create a handler to handle ConversionReview
+//   - Create a server that listens for Kubernetes requests
 //   - Call AddWebhook() to register a CRD name in conversion bindings in hooks
-//   - Start():
-//     - Start server loop.
-//     - Update clientConfig in each registered CRD.
+//
+// - Start():
+//   - Start server loop.
+//   - Update clientConfig in each registered CRD.
 type WebhookManager struct {
 	KubeClient klient.Client
 
@@ -45,7 +46,7 @@ func (m *WebhookManager) Init() error {
 	log.Info("Initialize conversion webhooks manager. Load certificates.")
 
 	// settings
-	caBundleBytes, err := ioutil.ReadFile(m.Settings.CAPath)
+	caBundleBytes, err := os.ReadFile(m.Settings.CAPath)
 	if err != nil {
 		return err
 	}
