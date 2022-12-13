@@ -80,13 +80,15 @@ func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory
 	return c.data[index]
 }
 
-func (c *FactoryStore) Start(client dynamic.Interface, index FactoryIndex, handler cache.ResourceEventHandler) error {
+func (c *FactoryStore) Start(client dynamic.Interface, index FactoryIndex, handler cache.ResourceEventHandler, errorHandler *WatchErrorHandler) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	factory := c.get(client, index)
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
+	// Add error handler, ignore "already started" error.
+	_ = informer.SetWatchErrorHandler(errorHandler.Handler)
 	// TODO(nabokihms): think about what will happen if we stop and then start the monitor
 	informer.AddEventHandler(handler)
 
