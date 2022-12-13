@@ -78,6 +78,9 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 			1, 2, 5, 10, // 1,2,5,10 seconds
 		},
 	)
+
+	// Count of watch errors.
+	metricStorage.RegisterCounter("{PREFIX}kubernetes_client_watch_errors_total", map[string]string{"error_type": ""})
 }
 
 // Shell-operator specific metrics for HookManager

@@ -280,7 +280,7 @@ func (ei *resourceInformer) OnDelete(obj interface{}) {
 // HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
-//func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
+// func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType WatchEventType) {
 	// check if stop
 	if ei.stopped {
@@ -460,7 +460,8 @@ func (ei *resourceInformer) Start() {
 	}()
 
 	// TODO: separate handler and informer
-	err := DefaultFactoryStore.Start(ei.KubeClient.Dynamic(), ei.FactoryIndex, ei)
+	errorHandler := NewWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage)
+	err := DefaultFactoryStore.Start(ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
 		ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
 		return
