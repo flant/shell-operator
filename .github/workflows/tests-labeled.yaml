@@ -46,15 +46,21 @@ jobs:
       fail-fast: true
       matrix:
         include:
-        - k8s_version: "1.16"
-          kind_node_image: "kindest/node:v1.16.15"
-          cluster_name: "kube-1-16"
         - k8s_version: "1.19"
-          kind_node_image: "kindest/node:v1.19.7"
+          kind_node_image: "kindest/node:v1.19.16"
           cluster_name: "kube-1-19"
         - k8s_version: "1.20"
-          kind_node_image: "kindest/node:v1.20.2"
+          kind_node_image: "kindest/node:v1.20.15"
           cluster_name: "kube-1-20"
+        - k8s_version: "1.23"
+          kind_node_image: "kindest/node:v1.23.13"
+          cluster_name: "kube-1-23"
+        - k8s_version: "1.24"
+          kind_node_image: "kindest/node:v1.24.7"
+          cluster_name: "kube-1-24"
+        - k8s_version: "1.25"
+          kind_node_image: "kindest/node:v1.25.2"
+          cluster_name: "kube-1-25"
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go 1.19
@@ -87,13 +93,15 @@ jobs:
 
       - name: Install ginkgo
         run: |
-          go build github.com/onsi/ginkgo/ginkgo
-          ./ginkgo version
+          go install github.com/onsi/ginkgo/ginkgo
+          echo $PATH
+          ls -la $GOPATH/bin
+          ginkgo version
 
       - name: Start kind cluster
         uses: engineerd/setup-kind@v0.5.0
         with:
-          version: "v0.11.1"
+          version: "v0.17.0"
           image: ${{ matrix.kind_node_image }}
           name: ${{ matrix.cluster_name }}
 
@@ -106,7 +114,7 @@ jobs:
           export CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
           export GOOS=linux
 
-          ./ginkgo \
+          ginkgo \
             --tags 'integration test'  \
             --vet off \
             --race \
