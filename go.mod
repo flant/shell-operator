@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/flant/kube-client v0.25.0
 	github.com/flant/libjq-go v1.6.2-0.20200616114952-907039e8a02a // branch: master
-	github.com/go-chi/chi/v5 v5.0.7
+	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-openapi/spec v0.19.8
 	github.com/go-openapi/strfmt v0.19.5
 	github.com/go-openapi/swag v0.19.14
