@@ -20,7 +20,7 @@ jobs:
 
       - name: Restore Go modules
         id: go-modules-cache
-        uses: actions/cache@v3.2.1
+        uses: actions/cache@v3.2.2
         with:
           path: |
             ~/go/pkg/mod
