@@ -96,12 +96,12 @@ func TestHookController_HandleValidatingEvent(t *testing.T) {
 	h := hm.GetHook("hook.sh")
 	h.HookController.EnableAdmissionBindings()
 
-	canHandle := h.HookController.CanHandleValidatingEvent(ev)
+	canHandle := h.HookController.CanHandleAdmissionEvent(ev)
 
 	g.Expect(canHandle).To(BeTrue())
 
 	var infoList []controller.BindingExecutionInfo
-	h.HookController.HandleValidatingEvent(ev, func(info controller.BindingExecutionInfo) {
+	h.HookController.HandleAdmissionEvent(ev, func(info controller.BindingExecutionInfo) {
 		infoList = append(infoList, info)
 	})
 
