@@ -9,7 +9,7 @@ import (
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
-// DefaultConfigurationId is a ConfigurationId for ValidatingWebhookConfiguration
+// DefaultConfigurationId is a ConfigurationId for ValidatingWebhookConfiguration/MutatingWebhookConfiguration
 // without suffix.
 const DefaultConfigurationId = "hooks"
 
@@ -18,7 +18,7 @@ const DefaultConfigurationId = "hooks"
 // No dynamic configuration for now. The steps are:
 //   - Init manager
 //   - Call AddWEbhook for every binding in hooks
-//   - Start() to run server and create ValidatingWebhookConfiguration
+//   - Start() to run server and create ValidatingWebhookConfiguration/MutatingWebhookConfiguration
 type WebhookManager struct {
 	KubeClient klient.Client
 

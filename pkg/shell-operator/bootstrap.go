@@ -218,7 +218,7 @@ func SetupEventManagers(op *ShellOperator) {
 
 // SetupHookManagers instantiates different hook managers.
 func SetupHookManagers(op *ShellOperator, hooksDir string, tempDir string) {
-	// Initialize validating webhooks manager
+	// Initialize admission webhooks manager
 	op.AdmissionWebhookManager = admission.NewWebhookManager()
 	op.AdmissionWebhookManager.WithKubeClient(op.KubeClient)
 	op.AdmissionWebhookManager.Settings = app.ValidatingWebhookSettings

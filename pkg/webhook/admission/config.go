@@ -13,7 +13,7 @@ import (
 type Metadata struct {
 	Name            string
 	WebhookId       string
-	ConfigurationId string // A suffix to create different ValidatingWebhookConfiguration resources.
+	ConfigurationId string // A suffix to create different ValidatingWebhookConfiguration/MutatingWebhookConfiguration resources.
 	DebugName       string
 	LogLabels       map[string]string
 	MetricLabels    map[string]string
@@ -40,7 +40,7 @@ func (wc *ValidatingWebhookConfig) SetClientConfig(cc v1.WebhookClientConfig) {
 	wc.ClientConfig = cc
 }
 
-// ValidatingWebhookConfig
+// MutatingWebhookConfig
 type MutatingWebhookConfig struct {
 	*v1.MutatingWebhook
 	Metadata

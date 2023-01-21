@@ -34,7 +34,7 @@ type AdmissionBindingsController interface {
 }
 
 type admissionBindingsController struct {
-	// Controller holds validating bindings from one hook. Hook always belongs to one configurationId.
+	// Controller holds validating/mutating bindings from one hook. Hook always belongs to one configurationId.
 	ConfigurationId string
 	// WebhookId -> link
 	AdmissionLinks map[string]*AdmissionBindingToWebhookLink

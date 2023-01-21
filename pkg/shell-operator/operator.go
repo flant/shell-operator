@@ -177,7 +177,7 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 		h.HookController.EnableAdmissionBindings()
 	}
 
-	// Define handler for ValidatingEvent
+	// Define handler for AdmissionEvent
 	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
