@@ -322,11 +322,22 @@ func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Ho
 
 func (hm *hookManager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
-	mHooks, _ := hm.GetHooksInOrder(KubernetesMutating)
-	hooks := append(vHooks, mHooks...)
-
-	for _, hookName := range hooks {
+	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
+		event.Binding = string(KubernetesValidating)
+		if h.HookController.CanHandleAdmissionEvent(event) {
+			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
+				if createTaskFn != nil {
+					createTaskFn(h, info)
+				}
+			})
+		}
+	}
+
+	mHooks, _ := hm.GetHooksInOrder(KubernetesMutating)
+	for _, hookName := range mHooks {
+		h := hm.GetHook(hookName)
+		event.Binding = string(KubernetesMutating)
 		if h.HookController.CanHandleAdmissionEvent(event) {
 			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {

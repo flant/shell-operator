@@ -181,17 +181,17 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
-			"binding":  string(KubernetesValidating),
+			"binding":  string(BindingType(event.Binding)),
 		}
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
-		logEntry.Debugf("Handle '%s' event '%s' '%s'", string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
+		logEntry.Debugf("Handle '%s' event '%s' '%s'", BindingType(event.Binding), event.ConfigurationId, event.WebhookId)
 
 		var tasks []task.Task
 		op.HookManager.HandleAdmissionEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
 					HookName:       hook.Name,
-					BindingType:    KubernetesValidating,
+					BindingType:    BindingType(event.Binding),
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
 					Binding:        info.Binding,
