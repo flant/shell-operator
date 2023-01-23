@@ -13,9 +13,9 @@ import (
 func jqExec(jqFilter string, jsonData []byte, libPath string) (result string, err error) {
 	var cmd *exec.Cmd
 	if libPath == "" {
-		cmd = exec.Command("/usr/bin/jq", jqFilter)
+		cmd = exec.Command("jq", jqFilter)
 	} else {
-		cmd = exec.Command("/usr/bin/jq", "-L", libPath, jqFilter)
+		cmd = exec.Command("jq", "-L", libPath, jqFilter)
 	}
 
 	var stdinBuf bytes.Buffer
