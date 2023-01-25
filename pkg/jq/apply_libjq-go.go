@@ -1,3 +1,4 @@
+//go:build cgo && use_libjq
 // +build cgo,use_libjq
 
 package jq
@@ -29,7 +30,7 @@ func ApplyJqFilter(jqFilter string, jsonData []byte, libPath string) (string, er
 
 func JqFilterInfo() string {
 	if os.Getenv("JQ_EXEC") == "yes" {
-		return "JQ_EXEC is set, use jq binary for jqFilter"
+		return "jqFilter implementation: use jq binary from $PATH (JQ_EXEC=yes is set)"
 	}
-	return "Use libjq-go for jqFilter"
+	return "jqFilter implementation: use embedded libjq-go"
 }

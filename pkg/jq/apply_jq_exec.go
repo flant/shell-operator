@@ -1,3 +1,4 @@
+//go:build !cgo || (cgo && !use_libjq)
 // +build !cgo cgo,!use_libjq
 
 package jq
@@ -12,5 +13,5 @@ func ApplyJqFilter(jqFilter string, jsonData []byte, libPath string) (string, er
 }
 
 func JqFilterInfo() string {
-	return "Use jq binary for jqFilter"
+	return "jqFilter implementation: use jq binary from $PATH"
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/flant/kube-client/klogtologrus"
+	"github.com/flant/shell-operator/pkg/jq"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -30,6 +31,7 @@ func main() {
 	// print version
 	kpApp.Command("version", "Show version.").Action(func(c *kingpin.ParseContext) error {
 		fmt.Printf("%s %s\n", app.AppName, app.Version)
+		fmt.Println(jq.JqFilterInfo())
 		return nil
 	})
 
