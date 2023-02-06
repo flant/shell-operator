@@ -1,4 +1,4 @@
-package validating
+package admission
 
 import "github.com/flant/shell-operator/pkg/webhook/server"
 

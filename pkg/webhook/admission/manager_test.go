@@ -1,4 +1,4 @@
-package validating
+package admission
 
 import (
 	"testing"
@@ -45,15 +45,15 @@ func Test_Manager_AddWebhook(t *testing.T) {
 			TimeoutSeconds: &timeoutSeconds,
 		},
 	}
-	m.AddWebhook(cfg)
+	m.AddValidatingWebhook(cfg)
 
-	if len(m.Resources) != 1 {
-		t.Fatalf("WebhookManager should have resources: got length %d", len(m.Resources))
+	if len(m.ValidatingResources) != 1 {
+		t.Fatalf("WebhookManager should have resources: got length %d", len(m.ValidatingResources))
 	}
 
-	for k, v := range m.Resources {
-		if len(v.Webhooks) != 1 {
-			t.Fatalf("Resource '%s' should have Webhooks: got length %d", k, len(m.Resources))
+	for k, v := range m.ValidatingResources {
+		if len(v.hooks) != 1 {
+			t.Fatalf("Resource '%s' should have Webhooks: got length %d", k, len(m.ValidatingResources))
 		}
 	}
 }

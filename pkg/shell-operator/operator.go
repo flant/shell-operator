@@ -23,9 +23,9 @@ import (
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/flant/shell-operator/pkg/utils/measure"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
 )
 
 var WaitQueuesTimeout = time.Second * 10
@@ -49,7 +49,7 @@ type ShellOperator struct {
 
 	HookManager hook.HookManager
 
-	ValidatingWebhookManager *validating.WebhookManager
+	AdmissionWebhookManager  *admission.WebhookManager
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
@@ -154,16 +154,19 @@ func (op *ShellOperator) InitHookManager() (err error) {
 // InitValidatingWebhookManager adds kubernetesValidating hooks
 // to a WebhookManager and set a validating event handler.
 func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
-	if op.HookManager == nil || op.ValidatingWebhookManager == nil {
+	if op.HookManager == nil || op.AdmissionWebhookManager == nil {
 		return
 	}
 	// Do not init ValidatingWebhook if there are no KubernetesValidating hooks.
-	hookNames, _ := op.HookManager.GetHooksInOrder(KubernetesValidating)
+	hookNamesV, _ := op.HookManager.GetHooksInOrder(KubernetesValidating)
+	hookNamesM, _ := op.HookManager.GetHooksInOrder(KubernetesMutating)
+
+	hookNames := append(hookNamesV, hookNamesM...)
 	if len(hookNames) == 0 {
 		return
 	}
 
-	err = op.ValidatingWebhookManager.Init()
+	err = op.AdmissionWebhookManager.Init()
 	if err != nil {
 		log.Errorf("ValidatingWebhookManager init: %v", err)
 		return err
@@ -171,24 +174,24 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 
 	for _, hookName := range hookNames {
 		h := op.HookManager.GetHook(hookName)
-		h.HookController.EnableValidatingBindings()
+		h.HookController.EnableAdmissionBindings()
 	}
 
-	// Define handler for ValidatingEvent
-	op.ValidatingWebhookManager.WithValidatingEventHandler(func(event ValidatingEvent) (*ValidatingResponse, error) {
+	// Define handler for AdmissionEvent
+	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
-			"binding":  string(KubernetesValidating),
+			"binding":  string(BindingType(event.Binding)),
 		}
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
-		logEntry.Debugf("Handle '%s' event '%s' '%s'", string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
+		logEntry.Debugf("Handle '%s' event '%s' '%s'", BindingType(event.Binding), event.ConfigurationId, event.WebhookId)
 
 		var tasks []task.Task
-		op.HookManager.HandleValidatingEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+		op.HookManager.HandleAdmissionEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
 					HookName:       hook.Name,
-					BindingType:    KubernetesValidating,
+					BindingType:    BindingType(event.Binding),
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
 					Binding:        info.Binding,
@@ -211,14 +214,14 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 		res := op.TaskHandler(tasks[0])
 
 		if res.Status == "Fail" {
-			return &ValidatingResponse{
+			return &AdmissionResponse{
 				Allowed: false,
 				Message: "Hook failed",
 			}, nil
 		}
 
 		validatingProp := tasks[0].GetProp("validatingResponse")
-		validatingResponse, ok := validatingProp.(*ValidatingResponse)
+		validatingResponse, ok := validatingProp.(*AdmissionResponse)
 		if !ok {
 			logEntry.Errorf("'validatingResponse' task prop is not of type *ValidatingResponse: %T", validatingProp)
 			return nil, fmt.Errorf("hook task prop error")
@@ -226,7 +229,7 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 		return validatingResponse, nil
 	})
 
-	err = op.ValidatingWebhookManager.Start()
+	err = op.AdmissionWebhookManager.Start()
 	if err != nil {
 		log.Errorf("ValidatingWebhookManager start: %v", err)
 	}

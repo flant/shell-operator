@@ -5,19 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
+	"io/ioutil"
 	"strconv"
 	"strings"
 )
 
-type ValidatingResponse struct {
+type AdmissionResponse struct {
 	Allowed  bool     `json:"allowed"`
 	Message  string   `json:"message,omitempty"`
 	Warnings []string `json:"warnings,omitempty"`
+	Patch    []byte   `json:"patch,omitempty"`
 }
 
-func ValidatingResponseFromFile(filePath string) (*ValidatingResponse, error) {
-	data, err := os.ReadFile(filePath)
+func AdmissionResponseFromFile(filePath string) (*AdmissionResponse, error) {
+	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
 	}
@@ -25,28 +26,26 @@ func ValidatingResponseFromFile(filePath string) (*ValidatingResponse, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
-	return ValidatingResponseFromBytes(data)
+
+	return AdmissionResponseFromBytes(data)
 }
 
-func ValidatingResponseFromBytes(data []byte) (*ValidatingResponse, error) {
-	return ValidatingResponseFromReader(bytes.NewReader(data))
+func AdmissionResponseFromBytes(data []byte) (*AdmissionResponse, error) {
+	return FromReader(bytes.NewReader(data))
 }
 
-func ValidatingResponseFromReader(r io.Reader) (*ValidatingResponse, error) {
-	response := new(ValidatingResponse)
+func FromReader(r io.Reader) (*AdmissionResponse, error) {
+	response := new(AdmissionResponse)
 
 	dec := json.NewDecoder(r)
-
-	err := dec.Decode(response)
-
-	if err != nil {
+	if err := dec.Decode(response); err != nil {
 		return nil, err
 	}
 
 	return response, nil
 }
 
-func (r *ValidatingResponse) Dump() string {
+func (r *AdmissionResponse) Dump() string {
 	b := new(strings.Builder)
 	b.WriteString("ValidatingResponse(allowed=")
 	b.WriteString(strconv.FormatBool(r.Allowed))

@@ -12,15 +12,15 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 type HookManager interface {
@@ -30,7 +30,7 @@ type HookManager interface {
 	WithKubeEventManager(kube_events_manager.KubeEventsManager)
 	WithScheduleManager(schedule_manager.ScheduleManager)
 	WithConversionWebhookManager(*conversion.WebhookManager)
-	WithValidatingWebhookManager(*validating.WebhookManager)
+	WithAdmissionWebhookManager(*admission.WebhookManager)
 	WorkingDir() string
 	TempDir() string
 	GetHook(name string) *Hook
@@ -38,7 +38,7 @@ type HookManager interface {
 	GetHooksInOrder(bindingType BindingType) ([]string, error)
 	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
-	HandleValidatingEvent(event ValidatingEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule
 }
@@ -50,7 +50,7 @@ type hookManager struct {
 	kubeEventsManager        kube_events_manager.KubeEventsManager
 	scheduleManager          schedule_manager.ScheduleManager
 	conversionWebhookManager *conversion.WebhookManager
-	validatingWebhookManager *validating.WebhookManager
+	admissionWebhookManager  *admission.WebhookManager
 
 	// sorted hook names
 	hookNamesInOrder []string
@@ -89,8 +89,8 @@ func (hm *hookManager) WithScheduleManager(mgr schedule_manager.ScheduleManager)
 	hm.scheduleManager = mgr
 }
 
-func (hm *hookManager) WithValidatingWebhookManager(mgr *validating.WebhookManager) {
-	hm.validatingWebhookManager = mgr
+func (hm *hookManager) WithAdmissionWebhookManager(mgr *admission.WebhookManager) {
+	hm.admissionWebhookManager = mgr
 }
 
 func (hm *hookManager) WithConversionWebhookManager(mgr *conversion.WebhookManager) {
@@ -188,6 +188,7 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 			"binding": conversionCfg.BindingName,
 		}
 	}
+
 	for _, validatingCfg := range hook.GetConfig().KubernetesValidating {
 		validatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
 		validatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
@@ -196,12 +197,22 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 		}
 		validatingCfg.Webhook.UpdateIds("", validatingCfg.BindingName)
 	}
+	for _, mutatingCfg := range hook.GetConfig().KubernetesMutating {
+		mutatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
+		mutatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
+			"hook":    hook.Name,
+			"binding": mutatingCfg.BindingName,
+		}
+		mutatingCfg.Webhook.UpdateIds("", mutatingCfg.BindingName)
+	}
 
 	hookCtrl := controller.NewHookController()
 	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
 	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
 	hookCtrl.InitConversionBindings(hook.GetConfig().KubernetesConversion, hm.conversionWebhookManager)
-	hookCtrl.InitValidatingBindings(hook.GetConfig().KubernetesValidating, hm.validatingWebhookManager)
+	hookCtrl.InitAdmissionBindings(hook.GetConfig().KubernetesValidating, hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
+	// TODO
+	// hookCtrl.InitMutatingBindings(hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
 
 	hook.WithHookController(hookCtrl)
 	hook.WithTmpDir(hm.TempDir())
@@ -309,12 +320,26 @@ func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Ho
 	}
 }
 
-func (hm *hookManager) HandleValidatingEvent(event ValidatingEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *hookManager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
-		if h.HookController.CanHandleValidatingEvent(event) {
-			h.HookController.HandleValidatingEvent(event, func(info controller.BindingExecutionInfo) {
+		event.Binding = string(KubernetesValidating)
+		if h.HookController.CanHandleAdmissionEvent(event) {
+			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
+				if createTaskFn != nil {
+					createTaskFn(h, info)
+				}
+			})
+		}
+	}
+
+	mHooks, _ := hm.GetHooksInOrder(KubernetesMutating)
+	for _, hookName := range mHooks {
+		h := hm.GetHook(hookName)
+		event.Binding = string(KubernetesMutating)
+		if h.HookController.CanHandleAdmissionEvent(event) {
+			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
 				}

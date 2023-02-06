@@ -14,7 +14,7 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
@@ -32,7 +32,7 @@ type HookResult struct {
 	Usage                *executor.CmdUsage
 	Metrics              []operation.MetricOperation
 	ConversionResponse   *conversion.Response
-	ValidatingResponse   *ValidatingResponse
+	ValidatingResponse   *AdmissionResponse
 	KubernetesPatchBytes []byte
 }
 
@@ -148,7 +148,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		return result, fmt.Errorf("got bad metrics: %s", err)
 	}
 
-	result.ValidatingResponse, err = ValidatingResponseFromFile(validatingPath)
+	result.ValidatingResponse, err = AdmissionResponseFromFile(validatingPath)
 	if err != nil {
 		return result, fmt.Errorf("got bad validating response: %s", err)
 	}

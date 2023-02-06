@@ -4,12 +4,12 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 type BindingExecutionInfo struct {
@@ -37,12 +37,12 @@ type BindingExecutionInfo struct {
 type HookController interface {
 	InitKubernetesBindings([]OnKubernetesEventConfig, kube_events_manager.KubeEventsManager)
 	InitScheduleBindings([]ScheduleConfig, schedule_manager.ScheduleManager)
-	InitValidatingBindings([]ValidatingConfig, *validating.WebhookManager)
+	InitAdmissionBindings([]ValidatingConfig, []MutatingConfig, *admission.WebhookManager)
 	InitConversionBindings([]ConversionConfig, *conversion.WebhookManager)
 
 	CanHandleKubeEvent(kubeEvent KubeEvent) bool
 	CanHandleScheduleEvent(crontab string) bool
-	CanHandleValidatingEvent(event ValidatingEvent) bool
+	CanHandleAdmissionEvent(event AdmissionEvent) bool
 	CanHandleConversionEvent(event conversion.Event, rule conversion.Rule) bool
 
 	// These method should call an underlying *Binding*Controller to get binding context
@@ -50,7 +50,7 @@ type HookController interface {
 	HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error
 	HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo))
-	HandleValidatingEvent(event ValidatingEvent, createTasksFn func(BindingExecutionInfo))
+	HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo))
 	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTasksFn func(BindingExecutionInfo))
 
 	UnlockKubernetesEvents()
@@ -61,7 +61,7 @@ type HookController interface {
 	EnableScheduleBindings()
 	DisableScheduleBindings()
 
-	EnableValidatingBindings()
+	EnableAdmissionBindings()
 
 	EnableConversionBindings()
 
@@ -80,11 +80,12 @@ func NewHookController() HookController {
 type hookController struct {
 	KubernetesController KubernetesBindingsController
 	ScheduleController   ScheduleBindingsController
-	ValidatingController ValidatingBindingsController
+	AdmissionController  AdmissionBindingsController
 	ConversionController ConversionBindingsController
 	kubernetesBindings   []OnKubernetesEventConfig
 	scheduleBindings     []ScheduleConfig
 	validatingBindings   []ValidatingConfig
+	mutatingBindings     []MutatingConfig
 	conversionBindings   []ConversionConfig
 }
 
@@ -112,16 +113,33 @@ func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, schedu
 	hc.scheduleBindings = bindings
 }
 
-func (hc *hookController) InitValidatingBindings(bindings []ValidatingConfig, webhookMgr *validating.WebhookManager) {
+func (hc *hookController) InitAdmissionBindings(vbindings []ValidatingConfig, mbindings []MutatingConfig, webhookMgr *admission.WebhookManager) {
+
+	bindingCtrl := NewValidatingBindingsController()
+	bindingCtrl.WithWebhookManager(webhookMgr)
+	hc.AdmissionController = bindingCtrl
+
+	hc.initValidatingBindings(vbindings)
+	hc.initMutatingBindings(mbindings)
+
+}
+
+func (hc *hookController) initValidatingBindings(bindings []ValidatingConfig) {
 	if len(bindings) == 0 {
 		return
 	}
 
-	bindingCtrl := NewValidatingBindingsController()
-	bindingCtrl.WithWebhookManager(webhookMgr)
-	bindingCtrl.WithValidatingBindings(bindings)
-	hc.ValidatingController = bindingCtrl
+	hc.AdmissionController.WithValidatingBindings(bindings)
 	hc.validatingBindings = bindings
+}
+
+func (hc *hookController) initMutatingBindings(bindings []MutatingConfig) {
+	if len(bindings) == 0 {
+		return
+	}
+
+	hc.AdmissionController.WithMutatingBindings(bindings)
+	hc.mutatingBindings = bindings
 }
 
 func (hc *hookController) InitConversionBindings(bindings []ConversionConfig, webhookMgr *conversion.WebhookManager) {
@@ -150,9 +168,9 @@ func (hc *hookController) CanHandleScheduleEvent(crontab string) bool {
 	return false
 }
 
-func (hc *hookController) CanHandleValidatingEvent(event ValidatingEvent) bool {
-	if hc.ValidatingController != nil {
-		return hc.ValidatingController.CanHandleEvent(event)
+func (hc *hookController) CanHandleAdmissionEvent(event AdmissionEvent) bool {
+	if hc.AdmissionController != nil {
+		return hc.AdmissionController.CanHandleEvent(event)
 	}
 	return false
 }
@@ -190,11 +208,11 @@ func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 	}
 }
 
-func (hc *hookController) HandleValidatingEvent(event ValidatingEvent, createTasksFn func(BindingExecutionInfo)) {
-	if hc.ValidatingController == nil {
+func (hc *hookController) HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo)) {
+	if hc.AdmissionController == nil {
 		return
 	}
-	execInfo := hc.ValidatingController.HandleEvent(event)
+	execInfo := hc.AdmissionController.HandleEvent(event)
 	if createTasksFn != nil {
 		createTasksFn(execInfo)
 	}
@@ -260,9 +278,10 @@ func (hc *hookController) DisableScheduleBindings() {
 	}
 }
 
-func (hc *hookController) EnableValidatingBindings() {
-	if hc.ValidatingController != nil {
-		hc.ValidatingController.EnableValidatingBindings()
+func (hc *hookController) EnableAdmissionBindings() {
+	if hc.AdmissionController != nil {
+		hc.AdmissionController.EnableValidatingBindings()
+		hc.AdmissionController.EnableMutatingBindings()
 	}
 }
 

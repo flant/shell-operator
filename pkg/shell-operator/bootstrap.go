@@ -18,8 +18,8 @@ import (
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 // Init initialize logging, ensures directories and creates
@@ -218,11 +218,11 @@ func SetupEventManagers(op *ShellOperator) {
 
 // SetupHookManagers instantiates different hook managers.
 func SetupHookManagers(op *ShellOperator, hooksDir string, tempDir string) {
-	// Initialize validating webhooks manager
-	op.ValidatingWebhookManager = validating.NewWebhookManager()
-	op.ValidatingWebhookManager.WithKubeClient(op.KubeClient)
-	op.ValidatingWebhookManager.Settings = app.ValidatingWebhookSettings
-	op.ValidatingWebhookManager.Namespace = app.Namespace
+	// Initialize admission webhooks manager
+	op.AdmissionWebhookManager = admission.NewWebhookManager()
+	op.AdmissionWebhookManager.WithKubeClient(op.KubeClient)
+	op.AdmissionWebhookManager.Settings = app.ValidatingWebhookSettings
+	op.AdmissionWebhookManager.Namespace = app.Namespace
 
 	// Initialize validating webhooks manager
 	op.ConversionWebhookManager = conversion.NewWebhookManager()
@@ -235,6 +235,6 @@ func SetupHookManagers(op *ShellOperator, hooksDir string, tempDir string) {
 	op.HookManager.WithDirectories(hooksDir, tempDir)
 	op.HookManager.WithKubeEventManager(op.KubeEventsManager)
 	op.HookManager.WithScheduleManager(op.ScheduleManager)
-	op.HookManager.WithValidatingWebhookManager(op.ValidatingWebhookManager)
+	op.HookManager.WithAdmissionWebhookManager(op.AdmissionWebhookManager)
 	op.HookManager.WithConversionWebhookManager(op.ConversionWebhookManager)
 }

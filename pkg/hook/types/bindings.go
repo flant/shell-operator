@@ -5,8 +5,8 @@ import (
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
-	"github.com/flant/shell-operator/pkg/webhook/validating"
 )
 
 type BindingType string
@@ -17,6 +17,7 @@ const (
 	OnKubernetesEvent    BindingType = "kubernetes"
 	KubernetesConversion BindingType = "kubernetesCustomResourceConversion"
 	KubernetesValidating BindingType = "kubernetesValidating"
+	KubernetesMutating   BindingType = "kubernetesMutating"
 )
 
 // Types for effective binding configs
@@ -60,7 +61,14 @@ type ValidatingConfig struct {
 	CommonBindingConfig
 	IncludeSnapshotsFrom []string
 	Group                string
-	Webhook              *validating.ValidatingWebhookConfig
+	Webhook              *admission.ValidatingWebhookConfig
+}
+
+type MutatingConfig struct {
+	CommonBindingConfig
+	IncludeSnapshotsFrom []string
+	Group                string
+	Webhook              *admission.MutatingWebhookConfig
 }
 
 type Settings struct {

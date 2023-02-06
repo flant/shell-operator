@@ -1,9 +1,9 @@
-package validating
+package admission
 
 import (
 	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -14,13 +14,16 @@ import (
 	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/flant/shell-operator/pkg/utils/structured-logger"
-	. "github.com/flant/shell-operator/pkg/webhook/validating/types"
+	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
+
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 )
 
+type AdmissionEventHandlerFn func(event AdmissionEvent) (*AdmissionResponse, error)
+
 type WebhookHandler struct {
-	Manager *WebhookManager
 	Router  chi.Router
+	Handler AdmissionEventHandlerFn
 }
 
 func NewWebhookHandler() *WebhookHandler {
@@ -39,7 +42,7 @@ func NewWebhookHandler() *WebhookHandler {
 func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	bodyBytes, err := io.ReadAll(r.Body)
+	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error reading request body"))
@@ -85,7 +88,7 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 		},
 	}
 
-	if h.Manager.ValidatingEventHandlerFn == nil {
+	if h.Handler == nil {
 		response.Response.Allowed = false
 		response.Response.Result = &metav1.Status{
 			Code:    500,
@@ -94,13 +97,13 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 		return response, nil
 	}
 
-	event := ValidatingEvent{
+	event := AdmissionEvent{
 		WebhookId:       webhookID,
 		ConfigurationId: configurationID,
 		Review:          &review,
 	}
 
-	validatingResponse, err := h.Manager.ValidatingEventHandlerFn(event)
+	validatingResponse, err := h.Handler(event)
 	if err != nil {
 		response.Response.Allowed = false
 		response.Response.Result = &metav1.Status{
@@ -124,13 +127,25 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 	}
 
 	response.Response.Allowed = true
+
+	// When allowing a request, a mutating admission webhook may optionally modify the
+	// incoming object as well. This is done using the patch and patchType fields in the response.
+	// The only currently supported patchType is JSONPatch. See JSON patch documentation for
+	// more details. For patchType: JSONPatch, the patch field contains a base64-encoded
+	// array of JSON patch operations.
+	if len(validatingResponse.Patch) > 0 {
+		response.Response.Patch = validatingResponse.Patch
+		patchType := v1.PatchTypeJSONPatch
+		response.Response.PatchType = &patchType
+	}
+
 	return response, nil
 }
 
 // DetectConfigurationAndWebhook extracts configurationID and a webhookID from the url path.
 func DetectConfigurationAndWebhook(path string) (configurationID string, webhookID string) {
 	parts := strings.Split(path, "/")
-	webhookParts := make([]string, 0)
+	webhookParts := []string{}
 	for _, p := range parts {
 		if p == "" {
 			continue
