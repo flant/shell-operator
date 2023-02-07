@@ -352,7 +352,7 @@ func (cv1 *HookConfigV1) CheckSchedule(kubeConfigs []OnKubernetesEventConfig, sc
 	return allErr
 }
 
-func (сv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV1, rootPath string) (allErr error) {
+func (cv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV1, rootPath string) (allErr error) {
 	if kubeCfg.ApiVersion != "" {
 		_, err := schema.ParseGroupVersion(kubeCfg.ApiVersion)
 		if err != nil {
