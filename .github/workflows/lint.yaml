@@ -37,7 +37,7 @@ jobs:
       - name: Run golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.50.1
-          ./golangci-lint run --sort-results 
+          ./golangci-lint run --sort-results --build-tags integration,test
 
 
   codespell:
