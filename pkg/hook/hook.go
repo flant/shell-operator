@@ -264,7 +264,7 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 
 	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err = os.WriteFile(bindingContextPath, data, 0644)
+	err = os.WriteFile(bindingContextPath, data, 0o644)
 	if err != nil {
 		return "", err
 	}
@@ -275,7 +275,7 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 func (h *Hook) prepareMetricsFile() (string, error) {
 	metricsPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-metrics-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err := os.WriteFile(metricsPath, []byte{}, 0644)
+	err := os.WriteFile(metricsPath, []byte{}, 0o644)
 	if err != nil {
 		return "", err
 	}
@@ -287,7 +287,7 @@ func (h *Hook) prepareMetricsFile() (string, error) {
 func (h *Hook) prepareAdmissionResponseFile() (string, error) {
 	filePath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-admission-response-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err := os.WriteFile(filePath, []byte{}, 0644)
+	err := os.WriteFile(filePath, []byte{}, 0o644)
 	if err != nil {
 		return "", err
 	}
@@ -298,7 +298,7 @@ func (h *Hook) prepareAdmissionResponseFile() (string, error) {
 func (h *Hook) prepareConversionResponseFile() (string, error) {
 	conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err := os.WriteFile(conversionPath, []byte{}, 0644)
+	err := os.WriteFile(conversionPath, []byte{}, 0o644)
 	if err != nil {
 		return "", err
 	}
@@ -324,7 +324,7 @@ func CreateRateLimiter(cfg *config.HookConfig) *rate.Limiter {
 func (h *Hook) prepareObjectPatchFile() (string, error) {
 	objectPatchPath := filepath.Join(h.TmpDir, fmt.Sprintf("%s-object-patch-%s", h.SafeName(), uuid.NewV4().String()))
 
-	err := os.WriteFile(objectPatchPath, []byte{}, 0644)
+	err := os.WriteFile(objectPatchPath, []byte{}, 0o644)
 	if err != nil {
 		return "", err
 	}

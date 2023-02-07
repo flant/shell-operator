@@ -74,7 +74,6 @@ func Test_HookManager_GetHookNames(t *testing.T) {
 			t.Fatalf("Hook manager should have hook '%s' at index %d, %s", expectedName, i, names[i])
 		}
 	}
-
 }
 
 func TestHookController_HandleValidatingEvent(t *testing.T) {
@@ -106,7 +105,6 @@ func TestHookController_HandleValidatingEvent(t *testing.T) {
 	})
 
 	g.Expect(infoList).Should(HaveLen(1))
-
 }
 
 func Test_HookManager_conversion_chains(t *testing.T) {

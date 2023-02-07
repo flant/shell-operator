@@ -98,5 +98,4 @@ metric2_total{lbl="val222"} 2
 `
 	err = promtest.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expect), "metric_total", "metric2_total")
 	g.Expect(err).ShouldNot(HaveOccurred())
-
 }

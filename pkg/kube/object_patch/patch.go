@@ -43,7 +43,7 @@ func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
 	log.Debug("Starting execute operations process")
 	defer log.Debug("Finished execute operations process")
 
-	var applyErrors = &multierror.Error{}
+	applyErrors := &multierror.Error{}
 	for _, op := range ops {
 		log.Debugf("Applying operation: %s", op.Description())
 		if err := o.ExecuteOperation(op); err != nil {

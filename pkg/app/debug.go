@@ -14,7 +14,6 @@ var DebugKubernetesAPI = false
 
 // DefineDebugFlags init global command line flags for debug.
 func DefineDebugFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
-
 	DefineDebugUnixSocketFlag(cmd)
 
 	cmd.Flag("debug-keep-tmp-files", "set to yes to disable cleanup of temporary files").

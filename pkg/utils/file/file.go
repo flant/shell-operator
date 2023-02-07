@@ -30,7 +30,7 @@ func DirExists(path string) (bool, error) {
 }
 
 func IsFileExecutable(f os.FileInfo) bool {
-	return f.Mode()&0111 != 0
+	return f.Mode()&0o111 != 0
 }
 
 // RecursiveGetExecutablePaths finds recursively all executable files
@@ -64,7 +64,6 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 		paths = append(paths, path)
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

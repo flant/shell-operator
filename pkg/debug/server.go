@@ -39,7 +39,7 @@ func (s *Server) WithPrefix(prefix string) {
 func (s *Server) Init() (err error) {
 	address := s.SocketPath
 
-	err = os.MkdirAll(path.Dir(address), 0700)
+	err = os.MkdirAll(path.Dir(address), 0o700)
 	if err != nil {
 		log.Errorf("Debug HTTP server fail to create socket '%s': %v", address, err)
 		return err
@@ -111,7 +111,6 @@ func (s *Server) RoutePOST(pattern string, handler func(request *http.Request) (
 
 func HandleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
 	out, err := handler(request)
-
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		_, _ = fmt.Fprintf(writer, "Error: %s", err)
@@ -122,7 +121,6 @@ func HandleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	structured_logger.GetLogEntry(request).Debugf("use format '%s'", format)
 
 	outBytes, err := TransformUsingFormat(out, format)
-
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		_, _ = fmt.Fprintf(writer, "Error '%s' transform: %s", format, err)

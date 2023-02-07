@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package kube_event_manager_test
@@ -14,7 +15,7 @@ import (
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	. "github.com/flant/shell-operator/test/integration/suite"
-	. "github.com/flant/shell-operator/test/utils"
+	testutils "github.com/flant/shell-operator/test/utils"
 )
 
 func Test(t *testing.T) {
@@ -74,7 +75,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 				m := KubeEventsManager.GetMonitor(monitorConfig.Metadata.MonitorId)
 				m.EnableKubeEventCb()
 
-				Kubectl(ContextName).Apply("default", "testdata/test-pod.yaml")
+				testutils.Kubectl(ContextName).Apply("default", "testdata/test-pod.yaml")
 			})
 
 			It("should return KubeEvent with type 'Event'", func() {
@@ -92,7 +93,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			}, 25)
 
 			AfterEach(func() {
-				Kubectl(ContextName).Delete("default", "pod/test")
+				testutils.Kubectl(ContextName).Delete("default", "pod/test")
 			})
 		})
 	})

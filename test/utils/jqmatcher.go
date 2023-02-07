@@ -1,3 +1,4 @@
+//go:build test
 // +build test
 
 package utils
@@ -12,8 +13,7 @@ import (
 	. "github.com/flant/libjq-go"
 )
 
-//var _ = Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, Equal(true)))
-
+// var _ = Ω(verBcs).To(MatchJq(`.[0] | has("objects")`, Equal(true)))
 func MatchJq(jqExpression string, matcher interface{}) types.GomegaMatcher {
 	return &matchJq{
 		JqExpr:  jqExpression,
@@ -42,6 +42,7 @@ func (matcher *matchJq) Match(actual interface{}) (success bool, err error) {
 		matcher.InputString = string(inputBytes)
 	}
 
+	// nolint:typecheck // Ignore false positive: undeclared name: `Jq`.
 	res, err := Jq().Program(matcher.JqExpr).Run(matcher.InputString)
 	if err != nil {
 		return false, fmt.Errorf("MatchJq apply jq expression: %s\n", err)

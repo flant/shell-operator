@@ -41,10 +41,12 @@ type HookMetadata struct {
 	ExecuteOnSynchronization bool // A flag to skip hook execution in Synchronization tasks.
 }
 
-var _ HookNameAccessor = HookMetadata{}
-var _ BindingContextAccessor = HookMetadata{}
-var _ MonitorIDAccessor = HookMetadata{}
-var _ task.MetadataDescriptable = HookMetadata{}
+var (
+	_ HookNameAccessor          = HookMetadata{}
+	_ BindingContextAccessor    = HookMetadata{}
+	_ MonitorIDAccessor         = HookMetadata{}
+	_ task.MetadataDescriptable = HookMetadata{}
+)
 
 func HookMetadataAccessor(t task.Task) (hookMeta HookMetadata) {
 	meta := t.GetMetadata()

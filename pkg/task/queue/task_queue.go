@@ -389,7 +389,7 @@ func (q *TaskQueue) Start() {
 		var sleepDelay time.Duration
 		for {
 			q.debugf("queue %s: wait for task, delay %d", q.Name, sleepDelay)
-			var t = q.waitForTask(sleepDelay)
+			t := q.waitForTask(sleepDelay)
 			if t == nil {
 				q.Status = "stop"
 				log.Infof("queue '%s' stopped", q.Name)
@@ -586,7 +586,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 	defer q.MeasureActionTime("Filter")()
 
 	q.withLock(func() {
-		var newItems = make([]task.Task, 0)
+		newItems := make([]task.Task, 0)
 		for _, t := range q.items {
 			if filterFn(t) {
 				newItems = append(newItems, t)
@@ -602,7 +602,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 func (q *TaskQueue) String() string {
 	var buf strings.Builder
 	var index int
-	var qLen = q.Length()
+	qLen := q.Length()
 	q.Iterate(func(t task.Task) {
 		buf.WriteString(fmt.Sprintf("[%s,id=%10.10s]", t.GetDescription(), t.GetId()))
 		index++

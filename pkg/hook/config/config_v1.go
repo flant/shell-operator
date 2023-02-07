@@ -260,7 +260,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 
 	// Update IncludeSnapshotsFrom for every binding with a group.
 	// Merge binding's IncludeSnapshotsFrom with snapshots list calculated for group.
-	var groupSnapshots = make(map[string][]string)
+	groupSnapshots := make(map[string][]string)
 	for _, kubeCfg := range c.OnKubernetesEvents {
 		if kubeCfg.Group == "" {
 			continue
@@ -352,7 +352,7 @@ func (cv1 *HookConfigV1) CheckSchedule(kubeConfigs []OnKubernetesEventConfig, sc
 	return allErr
 }
 
-func (сv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV1, rootPath string) (allErr error) {
+func (cv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV1, rootPath string) (allErr error) {
 	if kubeCfg.ApiVersion != "" {
 		_, err := schema.ParseGroupVersion(kubeCfg.ApiVersion)
 		if err != nil {

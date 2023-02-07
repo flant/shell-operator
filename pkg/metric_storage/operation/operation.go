@@ -57,7 +57,7 @@ func (m MetricOperation) String() string {
 }
 
 func MetricOperationsFromReader(r io.Reader) ([]MetricOperation, error) {
-	var operations = make([]MetricOperation, 0)
+	operations := make([]MetricOperation, 0)
 
 	dec := json.NewDecoder(r)
 	for {

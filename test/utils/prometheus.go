@@ -1,3 +1,4 @@
+//go:build test
 // +build test
 
 package utils
@@ -127,11 +128,9 @@ func (p *PromScraper) Scrape() error {
 }
 
 func (p *PromScraper) HasMetric(name string) {
-
 }
 
 func (p *PromScraper) MetricEquals(name string) {
-
 }
 
 // FindExact searches metric by name and labels

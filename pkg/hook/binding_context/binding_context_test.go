@@ -3,17 +3,17 @@ package binding_context
 import (
 	"testing"
 
+	. "github.com/flant/libjq-go"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	. "github.com/flant/libjq-go"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 func JqEqual(t *testing.T, input []byte, program string, expected string) {
+	// nolint:typecheck // Ignore false positive: undeclared name: `Jq`.
 	res, err := Jq().Program(program).Run(string(input))
 	if assert.NoError(t, err) {
 		assert.Equal(t, expected, res, "jq: '%s', json was '%s'", program, string(input))
@@ -82,7 +82,6 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				assert.Equal(t, "Added", bcList[0]["watchEvent"])
 				assert.IsType(t, &unstructured.Unstructured{}, bcList[0]["object"])
 				assert.Contains(t, bcList[0]["object"].(*unstructured.Unstructured).Object, "metadata")
-
 			},
 			[][]string{
 				// JSON dump should has only 4 fields: binding, type, watchEvent and object.
@@ -143,7 +142,8 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 								"name":      "deployment-2",
 							},
 							"kind": "Deployment",
-						}},
+						},
+					},
 					FilterResult: `""`,
 				}
 				obj.Metadata.JqFilter = ".metadata.labels"
@@ -174,7 +174,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 		{
 			"binding context with group",
 			func() []BindingContext {
-				var bcs = []BindingContext{}
+				bcs := []BindingContext{}
 
 				bc := BindingContext{
 					Binding:    "monitor_pods",
@@ -254,7 +254,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 		{
 			"grouped Synchronization",
 			func() []BindingContext {
-				var bcs = []BindingContext{}
+				bcs := []BindingContext{}
 
 				bc := BindingContext{
 					Binding:   "monitor_config_maps",
@@ -376,7 +376,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bcList = ConvertBindingContextList("v1", tt.bc())
-			//assert.Len(t, bcList, 1)
+			// assert.Len(t, bcList, 1)
 
 			var err error
 			bcJson, err = bcList.Json()

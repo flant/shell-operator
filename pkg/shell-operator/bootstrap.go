@@ -102,7 +102,7 @@ func EnsureTempDirectory(inDir string) (string, error) {
 		return "", fmt.Errorf("get absolute path: %v", err)
 	}
 	if exists, _ := utils_file.DirExists(dir); !exists {
-		err := os.Mkdir(dir, os.FileMode(0777))
+		err := os.Mkdir(dir, os.FileMode(0o777))
 		if err != nil {
 			return "", fmt.Errorf("create tmp dir '%s': %s", dir, err)
 		}

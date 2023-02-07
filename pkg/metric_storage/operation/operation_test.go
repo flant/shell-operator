@@ -7,7 +7,7 @@ import (
 )
 
 func Test_ValidateMetricOperations(t *testing.T) {
-	//g := NewWithT(t)
+	// g := NewWithT(t)
 	tests := []struct {
 		name     string
 		op       string
@@ -46,7 +46,7 @@ func Test_ValidateMetricOperations(t *testing.T) {
 			if tt.expected {
 				g.Expect(err).ShouldNot(HaveOccurred())
 			} else {
-				//t.Logf("expected error: %v", err)
+				// t.Logf("expected error: %v", err)
 				g.Expect(err).Should(HaveOccurred())
 			}
 		})

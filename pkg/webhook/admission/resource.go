@@ -41,7 +41,6 @@ func (w *ValidatingWebhookResource) Get(id string) *ValidatingWebhookConfig {
 }
 
 func (w *ValidatingWebhookResource) Register() error {
-
 	configuration := &v1.ValidatingWebhookConfiguration{
 		Webhooks: []v1.ValidatingWebhook{},
 	}
@@ -137,7 +136,6 @@ func (w *MutatingWebhookResource) Get(id string) *MutatingWebhookConfig {
 }
 
 func (w *MutatingWebhookResource) Register() error {
-
 	configuration := &v1.MutatingWebhookConfiguration{
 		Webhooks: []v1.MutatingWebhook{},
 	}

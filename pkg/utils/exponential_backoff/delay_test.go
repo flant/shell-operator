@@ -30,6 +30,6 @@ func Test_Delay(t *testing.T) {
 		}
 
 		// debug messages
-		//t.Logf("Delay for %02d retry: %s\n", i, delay)
+		// t.Logf("Delay for %02d retry: %s\n", i, delay)
 	}
 }

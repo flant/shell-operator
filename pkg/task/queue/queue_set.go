@@ -84,10 +84,10 @@ func (tqs *TaskQueueSet) GetMain() *TaskQueue {
 	return tqs.GetByName(tqs.MainName)
 }
 
-/**
-taskQueueSet.DoWithLock(func(tqs *TaskQueueSet){
-   tqs.GetMain().Pop()
-})
+/*
+	taskQueueSet.DoWithLock(func(tqs *TaskQueueSet){
+	   tqs.GetMain().Pop()
+	})
 */
 func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
 	tqs.m.Lock()

@@ -1,9 +1,9 @@
 package conversion
 
 import (
-	. "github.com/onsi/gomega"
-
 	"testing"
+
+	. "github.com/onsi/gomega"
 )
 
 func Test_VersionsMatched(t *testing.T) {

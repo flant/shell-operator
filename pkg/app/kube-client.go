@@ -6,21 +6,27 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-var KubeContext = ""
-var KubeConfig = ""
-var KubeServer = ""
+var (
+	KubeContext = ""
+	KubeConfig  = ""
+	KubeServer  = ""
+)
 
-var KubeClientQpsDefault = "5" // DefaultQPS from k8s.io/client-go/rest/config.go
-var KubeClientQps float32
-var KubeClientBurstDefault = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
-var KubeClientBurst int
+var (
+	KubeClientQpsDefault   = "5" // DefaultQPS from k8s.io/client-go/rest/config.go
+	KubeClientQps          float32
+	KubeClientBurstDefault = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
+	KubeClientBurst        int
+)
 
-var ObjectPatcherKubeClientQpsDefault = "5" // DefaultQPS from k8s.io/client-go/rest/config.go
-var ObjectPatcherKubeClientQps float32
-var ObjectPatcherKubeClientBurstDefault = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
-var ObjectPatcherKubeClientBurst int
-var ObjectPatcherKubeClientTimeoutDefault = "10s"
-var ObjectPatcherKubeClientTimeout time.Duration
+var (
+	ObjectPatcherKubeClientQpsDefault     = "5" // DefaultQPS from k8s.io/client-go/rest/config.go
+	ObjectPatcherKubeClientQps            float32
+	ObjectPatcherKubeClientBurstDefault   = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
+	ObjectPatcherKubeClientBurst          int
+	ObjectPatcherKubeClientTimeoutDefault = "10s"
+	ObjectPatcherKubeClientTimeout        time.Duration
+)
 
 func DefineKubeClientFlags(cmd *kingpin.CmdClause) {
 	// Settings for Kubernetes connection.
@@ -60,5 +66,4 @@ func DefineKubeClientFlags(cmd *kingpin.CmdClause) {
 		Envar("OBJECT_PATCHER_KUBE_CLIENT_TIMEOUT").
 		Default(ObjectPatcherKubeClientTimeoutDefault).
 		DurationVar(&ObjectPatcherKubeClientTimeout)
-
 }

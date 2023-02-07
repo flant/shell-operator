@@ -28,15 +28,19 @@ type subresourceHolder struct {
 func WithSubresource(s string) *subresourceHolder {
 	return &subresourceHolder{subresource: s}
 }
+
 func (s *subresourceHolder) applyToCreate(operation *createOperation) {
 	operation.subresource = s.subresource
 }
+
 func (s *subresourceHolder) applyToDelete(operation *deleteOperation) {
 	operation.subresource = s.subresource
 }
+
 func (s *subresourceHolder) applyToPatch(operation *patchOperation) {
 	operation.subresource = s.subresource
 }
+
 func (s *subresourceHolder) applyToFilter(operation *filterOperation) {
 	operation.subresource = s.subresource
 }

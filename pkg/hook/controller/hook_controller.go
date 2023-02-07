@@ -114,14 +114,12 @@ func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, schedu
 }
 
 func (hc *hookController) InitAdmissionBindings(vbindings []ValidatingConfig, mbindings []MutatingConfig, webhookMgr *admission.WebhookManager) {
-
 	bindingCtrl := NewValidatingBindingsController()
 	bindingCtrl.WithWebhookManager(webhookMgr)
 	hc.AdmissionController = bindingCtrl
 
 	hc.initValidatingBindings(vbindings)
 	hc.initMutatingBindings(mbindings)
-
 }
 
 func (hc *hookController) initValidatingBindings(bindings []ValidatingConfig) {

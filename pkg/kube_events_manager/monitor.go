@@ -316,7 +316,6 @@ func (m *monitor) PauseHandleEvents() {
 	if m.NamespaceInformer != nil {
 		m.NamespaceInformer.PauseHandleEvents()
 	}
-
 }
 
 func (m *monitor) SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo) {

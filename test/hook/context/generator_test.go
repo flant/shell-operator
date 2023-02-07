@@ -178,7 +178,6 @@ spec:
 `)
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(bindingContexts.Rendered).To(ContainSubstring("MyResource"))
-
 }
 
 func Test_PreferredGVR(t *testing.T) {
@@ -354,7 +353,6 @@ metadata:
 	g.Expect(string(parsedBindingContexts[0].Type)).To(Equal("Synchronization"))
 	g.Expect(parsedBindingContexts[0].Objects).To(HaveLen(2))
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
-
 }
 
 func Test_RunSchedule(t *testing.T) {

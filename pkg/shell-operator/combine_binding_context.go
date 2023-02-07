@@ -28,17 +28,17 @@ func CombineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t
 	if q == nil {
 		return nil
 	}
-	var taskMeta = t.GetMetadata()
+	taskMeta := t.GetMetadata()
 	if taskMeta == nil {
 		// Ignore task without metadata
 		return nil
 	}
-	var hookName = taskMeta.(HookNameAccessor).GetHookName()
+	hookName := taskMeta.(HookNameAccessor).GetHookName()
 
-	var res = new(CombineResult)
+	res := new(CombineResult)
 
-	var otherTasks = make([]task.Task, 0)
-	var stopIterate = false
+	otherTasks := make([]task.Task, 0)
+	stopIterate := false
 	q.Iterate(func(tsk task.Task) {
 		if stopIterate {
 			return
@@ -74,9 +74,9 @@ func CombineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t
 	}
 
 	// Combine binding context and make a map to delete excess tasks
-	var combinedContext = make([]BindingContext, 0)
-	var monitorIDs = taskMeta.(MonitorIDAccessor).GetMonitorIDs()
-	var tasksFilter = make(map[string]bool)
+	combinedContext := make([]BindingContext, 0)
+	monitorIDs := taskMeta.(MonitorIDAccessor).GetMonitorIDs()
+	tasksFilter := make(map[string]bool)
 	// current task always remain in queue
 	combinedContext = append(combinedContext, taskMeta.(BindingContextAccessor).GetBindingContext()...)
 	tasksFilter[t.GetId()] = true
@@ -98,12 +98,12 @@ func CombineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t
 	})
 
 	// group is used to compact binding contexts when only snapshots are needed
-	var compactedContext = make([]BindingContext, 0)
+	compactedContext := make([]BindingContext, 0)
 	for i := 0; i < len(combinedContext); i++ {
-		var keep = true
+		keep := true
 
 		// Binding context is ignored if next binding context has the similar group.
-		var groupName = combinedContext[i].Metadata.Group
+		groupName := combinedContext[i].Metadata.Group
 		if groupName != "" && (i+1 <= len(combinedContext)-1) && combinedContext[i+1].Metadata.Group == groupName {
 			keep = false
 		}

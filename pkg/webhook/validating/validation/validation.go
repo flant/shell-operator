@@ -33,7 +33,7 @@ func ValidateValidatingWebhooks(e *v1.ValidatingWebhookConfiguration) error {
 	hookNames := make(map[string]struct{})
 	for i, hook := range e.Webhooks {
 		allErrors = multierror.Append(allErrors, ValidateValidatingWebhook(&hook, field.NewPath("webhooks").Index(i)))
-		//allErrors = append(allErrors, validateAdmissionReviewVersions(hook.AdmissionReviewVersions, opts.requireRecognizedAdmissionReviewVersion, field.NewPath("webhooks").Index(i).Child("admissionReviewVersions"))...)
+		// allErrors = append(allErrors, validateAdmissionReviewVersions(hook.AdmissionReviewVersions, opts.requireRecognizedAdmissionReviewVersion, field.NewPath("webhooks").Index(i).Child("admissionReviewVersions"))...)
 		if len(hook.Name) > 0 {
 			if _, has := hookNames[hook.Name]; has {
 				allErrors = multierror.Append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))

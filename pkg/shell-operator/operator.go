@@ -339,7 +339,7 @@ func (op *ShellOperator) ConversionEventHandler(event conversion.Event) (*conver
 
 			// Stop iterating if hook has converted all objects to a desiredAPIVersions.
 			newSourceVersions := conversion.ExtractAPIVersions(event.Objects)
-			//logEntry.Infof("Hook return conversion response: failMsg=%s, %d convertedObjects, versions:%v, desired: %s", response.FailedMessage, len(response.ConvertedObjects), newSourceVersions, event.Review.Request.DesiredAPIVersion)
+			// logEntry.Infof("Hook return conversion response: failMsg=%s, %d convertedObjects, versions:%v, desired: %s", response.FailedMessage, len(response.ConvertedObjects), newSourceVersions, event.Review.Request.DesiredAPIVersion)
 
 			if len(newSourceVersions) == 1 && newSourceVersions[0] == event.Review.Request.DesiredAPIVersion {
 				// success
@@ -387,8 +387,8 @@ func (op *ShellOperator) Start() {
 
 // TaskHandler
 func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
-	var logEntry = log.WithField("operator.component", "taskRunner")
-	var hookMeta = HookMetadataAccessor(t)
+	logEntry := log.WithField("operator.component", "taskRunner")
+	hookMeta := HookMetadataAccessor(t)
 	var res queue.TaskResult
 
 	switch t.GetType() {
@@ -418,7 +418,7 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 
 // TaskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
 func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.TaskResult {
-	var hookMeta = HookMetadataAccessor(t)
+	hookMeta := HookMetadataAccessor(t)
 
 	metricLabels := map[string]string{
 		"hook": hookMeta.HookName,
@@ -486,7 +486,7 @@ func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.T
 
 // TODO use Context to pass labels and a queue name
 func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
-	var hookMeta = HookMetadataAccessor(t)
+	hookMeta := HookMetadataAccessor(t)
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
 	err := taskHook.RateLimitWait(context.Background())
@@ -661,17 +661,17 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	if q == nil {
 		return nil
 	}
-	var taskMeta = t.GetMetadata()
+	taskMeta := t.GetMetadata()
 	if taskMeta == nil {
 		// Ignore task without metadata
 		return nil
 	}
-	var hookName = taskMeta.(HookNameAccessor).GetHookName()
+	hookName := taskMeta.(HookNameAccessor).GetHookName()
 
-	var res = new(CombineResult)
+	res := new(CombineResult)
 
-	var otherTasks = make([]task.Task, 0)
-	var stopIterate = false
+	otherTasks := make([]task.Task, 0)
+	stopIterate := false
 	q.Iterate(func(tsk task.Task) {
 		if stopIterate {
 			return
@@ -707,9 +707,9 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	}
 
 	// Combine binding context and make a map to delete excess tasks
-	var combinedContext = make([]BindingContext, 0)
-	var monitorIDs = taskMeta.(MonitorIDAccessor).GetMonitorIDs()
-	var tasksFilter = make(map[string]bool)
+	combinedContext := make([]BindingContext, 0)
+	monitorIDs := taskMeta.(MonitorIDAccessor).GetMonitorIDs()
+	tasksFilter := make(map[string]bool)
 	// current task always remain in queue
 	combinedContext = append(combinedContext, taskMeta.(BindingContextAccessor).GetBindingContext()...)
 	tasksFilter[t.GetId()] = true
@@ -731,12 +731,12 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	})
 
 	// group is used to compact binding contexts when only snapshots are needed
-	var compactedContext = make([]BindingContext, 0)
+	compactedContext := make([]BindingContext, 0)
 	for i := 0; i < len(combinedContext); i++ {
-		var keep = true
+		keep := true
 
 		// Binding context is ignored if next binding context has the similar group.
-		var groupName = combinedContext[i].Metadata.Group
+		groupName := combinedContext[i].Metadata.Group
 		if groupName != "" && (i+1 <= len(combinedContext)-1) && combinedContext[i+1].Metadata.Group == groupName {
 			keep = false
 		}
@@ -821,7 +821,6 @@ func (op *ShellOperator) BootstrapMainQueue(tqs *queue.TaskQueueSet) {
 			logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
 		}
 	}
-
 }
 
 // InitAndStartHookQueues create all queues defined in hooks

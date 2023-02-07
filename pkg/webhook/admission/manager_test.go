@@ -18,7 +18,6 @@ func Test_Manager_AddWebhook(t *testing.T) {
 	m.Settings = vs
 
 	err := m.Init()
-
 	if err != nil {
 		t.Fatalf("WebhookManager should init: %v", err)
 	}

@@ -1,11 +1,12 @@
 run:
   timeout: 15m
 linters:
-  include:
-    - bodyclose
+  enable:
     - asciicheck
+    - bodyclose
     - dogsled
     - durationcheck
+    - gofumpt
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
