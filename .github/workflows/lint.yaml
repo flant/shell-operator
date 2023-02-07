@@ -40,10 +40,10 @@ jobs:
 
       - name: Run golangci-lint
         run: |
-          #export CGO_ENABLED=1
+          export CGO_ENABLED=1
           #export CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
           #export CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
-          #export GOOS=linux
+          export GOOS=linux
 
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.50.1
           ./golangci-lint run --sort-results 
