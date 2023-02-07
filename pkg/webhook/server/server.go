@@ -19,8 +19,7 @@ type WebhookServer struct {
 	Router    chi.Router
 }
 
-// StartWebhookServer starts https server
-// to listen for AdmissionReview requests from cluster
+// Start runs https server to listen for AdmissionReview requests from the API-server.
 func (s *WebhookServer) Start() error {
 	// Load server certificate.
 	keyPair, err := tls.LoadX509KeyPair(
