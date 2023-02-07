@@ -41,9 +41,9 @@ jobs:
       - name: Run golangci-lint
         run: |
           export CGO_ENABLED=1
-          export CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
-          export CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
-          export GOOS=linux
+#          export CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
+#          export CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
+#          export GOOS=linux
 
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.50.1
           ./golangci-lint run --sort-results 
@@ -63,4 +63,4 @@ jobs:
       - name: Run codespell
         run: |
           pip install codespell==v1.17.1
-          codespell --skip=".git,go.mod,go.sum,*.log,*.gif,*.png,*.md" -L witht,eventtypes,uint,uptodate,afterall,keyPair
+          codespell --skip=".git,go.mod,go.sum,*.log,*.gif,*.png,*.md" -L witht,eventtypes,uint,uptodate,afterall,keypair
