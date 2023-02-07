@@ -158,7 +158,7 @@ func TaskQueueToText(q *queue.TaskQueue) string {
 	buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", q.Name, q.Length(), q.Status))
 	buf.WriteString("\n")
 
-	var index = 1
+	index := 1
 	q.Iterate(func(task task.Task) {
 		buf.WriteString(fmt.Sprintf("%2d. ", index))
 		buf.WriteString(task.GetDescription())

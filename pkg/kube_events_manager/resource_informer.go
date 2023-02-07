@@ -218,10 +218,10 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 	}
 
 	// FIXME objList.Items has too much information for log
-	//log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
+	// log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
 	log.Debugf("%s: '%s' initial list: Got %d existing resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, len(objList.Items))
 
-	var filteredObjects = make(map[string]*ObjectAndFilterResult)
+	filteredObjects := make(map[string]*ObjectAndFilterResult)
 
 	for _, item := range objList.Items {
 		// copy loop var to avoid duplication of pointer in filteredObjects
@@ -295,7 +295,7 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 	if staleObj, stale := object.(cache.DeletedFinalStateUnknown); stale {
 		object = staleObj.Obj
 	}
-	var obj = object.(*unstructured.Unstructured)
+	obj := object.(*unstructured.Unstructured)
 
 	resourceId := ResourceId(obj)
 
@@ -381,7 +381,7 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			resourceId,
 		)
 		// TODO: should be disabled by default and enabled by a debug feature switch
-		//log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
+		// log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
 		kubeEvent := KubeEvent{
 			Type:        TypeEvent,

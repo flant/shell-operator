@@ -1,3 +1,4 @@
+//go:build test
 // +build test
 
 package utils
@@ -96,7 +97,7 @@ func (a *JsonLogAnalyzer) HandleLine(line string) {
 	}
 
 	if a.finished && a.OnStopFn != nil {
-		//fmt.Printf("analyzer.HandleLine OnStopFn()\n")
+		// fmt.Printf("analyzer.HandleLine OnStopFn()\n")
 		a.OnStopFn()
 	}
 }
@@ -156,7 +157,6 @@ func NewJsonLogMatcher(steps ...*MatcherStep) *JsonLogMatcher {
 }
 
 func (m *JsonLogMatcher) HandleRecord(r JsonLogRecord) {
-
 }
 
 func (m *JsonLogMatcher) HandleLine(line string) {
@@ -177,19 +177,19 @@ func (m *JsonLogMatcher) HandleLine(line string) {
 	if m.finished && step.Matcher != nil {
 		return
 	}
-	//Ω(line).Should(HavePrefix("{"))
+	// Ω(line).Should(HavePrefix("{"))
 
 	logRecord, _ := NewJsonLogRecord().FromString(line)
-	//Ω(err).ShouldNot(HaveOccurred())
+	// Ω(err).ShouldNot(HaveOccurred())
 
 	var err error
 	if step.Matcher != nil {
 		res := step.Matcher(logRecord)
 		if res {
 			if step.OnMatch != nil {
-				//fmt.Printf("matcher.HandleLine OnMatch()\n")
+				// fmt.Printf("matcher.HandleLine OnMatch()\n")
 				err = step.OnMatch(logRecord)
-				//fmt.Printf("matcher.HandleLine OnMatchDone()\n")
+				// fmt.Printf("matcher.HandleLine OnMatchDone()\n")
 				if err != nil {
 					m.err = err
 					m.finished = true

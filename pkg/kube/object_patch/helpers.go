@@ -77,7 +77,7 @@ func applyJQPatch(jqFilter string, obj *unstructured.Unstructured) (*unstructure
 			"error: %s", jqFilter, obj, err)
 	}
 
-	var retObj = &unstructured.Unstructured{}
+	retObj := &unstructured.Unstructured{}
 	_, _, err = unstructured.UnstructuredJSONScheme.Decode([]byte(filterResult), nil, retObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert filterResult:\n%s\nto Unstructured Object\nerror: %s", filterResult, err)

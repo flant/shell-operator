@@ -51,8 +51,8 @@ func ParseOperations(specBytes []byte) ([]Operation, error) {
 		return nil, err
 	}
 
-	var validationErrors = &multierror.Error{}
-	var ops = make([]Operation, 0)
+	validationErrors := &multierror.Error{}
+	ops := make([]Operation, 0)
 	for _, spec := range specs {
 		err = ValidateOperationSpec(spec, GetSchema("v0"), "")
 		if err != nil {

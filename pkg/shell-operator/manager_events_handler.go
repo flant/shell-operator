@@ -63,7 +63,7 @@ func (m *ManagerEventsHandler) Start() {
 	go func() {
 		for {
 			var tailTasks []task.Task
-			var logEntry = log.WithField("operator.component", "handleEvents")
+			logEntry := log.WithField("operator.component", "handleEvents")
 			select {
 			case crontab := <-m.scheduleManager.Ch():
 				if m.scheduleCb != nil {

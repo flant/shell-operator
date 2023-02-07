@@ -6,19 +6,25 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-var AppName = "shell-operator"
-var AppDescription = "Run your custom cluster-wide scripts in reaction to Kubernetes events or on schedule."
-var AppStartMessage = "shell-operator"
+var (
+	AppName         = "shell-operator"
+	AppDescription  = "Run your custom cluster-wide scripts in reaction to Kubernetes events or on schedule."
+	AppStartMessage = "shell-operator"
+)
 
 var Version = "dev"
 
-var HooksDir = "hooks"
-var TempDir = "/tmp/shell-operator"
+var (
+	HooksDir = "hooks"
+	TempDir  = "/tmp/shell-operator"
+)
 
-var Namespace = ""
-var ListenAddress = "0.0.0.0"
-var ListenPort = "9115"
-var HookMetricsListenPort = ""
+var (
+	Namespace             = ""
+	ListenAddress         = "0.0.0.0"
+	ListenPort            = "9115"
+	HookMetricsListenPort = ""
+)
 
 var PrometheusMetricsPrefix = "shell_operator_"
 

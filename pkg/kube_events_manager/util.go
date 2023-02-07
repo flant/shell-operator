@@ -49,10 +49,12 @@ func FormatFieldSelector(selector *FieldSelector) (string, error) {
 	return fields.AndSelectors(requirements...).String(), nil
 }
 
-const ResyncPeriodMedian = time.Duration(3) * time.Hour
-const ResyncPeriodSpread = time.Duration(2) * time.Hour
-const ResyncPeriodGranularity = time.Duration(5) * time.Minute
-const ResyncPeriodJitterGranularity = time.Duration(15) * time.Second
+const (
+	ResyncPeriodMedian            = time.Duration(3) * time.Hour
+	ResyncPeriodSpread            = time.Duration(2) * time.Hour
+	ResyncPeriodGranularity       = time.Duration(5) * time.Minute
+	ResyncPeriodJitterGranularity = time.Duration(15) * time.Second
+)
 
 // RandomizedResyncPeriod returns a time.Duration between 2 hours and 4 hours with jitter and granularity
 func RandomizedResyncPeriod() time.Duration {

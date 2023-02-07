@@ -134,7 +134,7 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Conv
 	// Convert objects from hook into to array of runtime.RawExtension
 	rawObjects := make([]runtime.RawExtension, len(conversionResponse.ConvertedObjects))
 	for i, obj := range conversionResponse.ConvertedObjects {
-		var tmpObj = obj
+		tmpObj := obj
 		rawObjects[i] = runtime.RawExtension{Object: &tmpObj}
 	}
 	review.Response.ConvertedObjects = rawObjects
@@ -159,7 +159,7 @@ func ExtractAPIVersions(objs []unstructured.Unstructured) []string {
 	for _, obj := range objs {
 		verMap[obj.GetAPIVersion()] = true
 	}
-	var res = make([]string, 0)
+	res := make([]string, 0)
 	for ver := range verMap {
 		res = append(res, ver)
 	}
@@ -167,7 +167,7 @@ func ExtractAPIVersions(objs []unstructured.Unstructured) []string {
 }
 
 func RawExtensionToUnstructured(objects []runtime.RawExtension) ([]unstructured.Unstructured, error) {
-	var res = make([]unstructured.Unstructured, 0)
+	res := make([]unstructured.Unstructured, 0)
 
 	for _, obj := range objects {
 		cr := unstructured.Unstructured{}

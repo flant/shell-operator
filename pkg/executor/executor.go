@@ -3,7 +3,6 @@ package executor
 import (
 	"bufio"
 	"encoding/json"
-	"github.com/flant/shell-operator/pkg/app"
 	"io"
 	"os/exec"
 	"strings"
@@ -13,6 +12,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/flant/shell-operator/pkg/app"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

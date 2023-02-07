@@ -91,7 +91,6 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 				g.Expect(sch1min.BindingName).To(Equal("each 1 min"))
 				sch5min := hookConfig.Schedules[1]
 				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
-
 			},
 		},
 
@@ -144,7 +143,6 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 
 				sch5min := hookConfig.Schedules[1]
 				g.Expect(sch5min.BindingName).To(Equal("each 5 min"))
-
 			},
 		},
 		{
@@ -178,7 +176,6 @@ func Test_HookConfig_VersionedConfig_LoadAndValidate(t *testing.T) {
 				sch5sec := hookConfig.Schedules[1]
 				g.Expect(sch5sec.BindingName).To(Equal("each 5 sec"))
 				g.Expect(sch5sec.Queue).To(Equal("off-schedule"))
-
 			},
 		},
 		{
@@ -325,7 +322,6 @@ schedule:
 				g.Expect(cfg.Monitor).ToNot(BeNil())
 				g.Expect(cfg.Monitor.NameSelector).ToNot(BeNil())
 				g.Expect(cfg.Monitor.NameSelector.MatchNames).ToNot(BeNil())
-
 			},
 		},
 		{
@@ -424,7 +420,7 @@ schedule:
 
 				// Schedule binding should has includeSnapshotsFrom
 				s := hookConfig.Schedules[0]
-				//g.Expect(s.BindingName).To(Equal("each 1 min"))
+				// g.Expect(s.BindingName).To(Equal("each 1 min"))
 				g.Expect(s.Queue).To(Equal("main"))
 				g.Expect(s.IncludeSnapshotsFrom).Should(HaveLen(2))
 
@@ -497,9 +493,9 @@ schedule:
 				g.Expect(secrets.ExecuteHookOnSynchronization).Should(BeTrue())
 				g.Expect(hookConfig.V1.OnKubernetesEvent[2].ExecuteHookOnSynchronization).Should(Equal(""))
 
-				//g.Expect(kPods.IncludeSnapshotsFrom).Should(HaveLen(2))
-				//kPods = hookConfig.OnKubernetesEvents[1]
-				//g.Expect(kPods.IncludeSnapshotsFrom).Should(HaveLen(2))
+				// g.Expect(kPods.IncludeSnapshotsFrom).Should(HaveLen(2))
+				// kPods = hookConfig.OnKubernetesEvents[1]
+				// g.Expect(kPods.IncludeSnapshotsFrom).Should(HaveLen(2))
 			},
 		},
 		{
@@ -617,7 +613,6 @@ kubernetesValidating:
 				g.Expect(*wh.SideEffects).To(Equal(v1.SideEffectClassNoneOnDryRun))
 				g.Expect(wh.TimeoutSeconds).ShouldNot(BeNil())
 				g.Expect(*wh.TimeoutSeconds).To(BeEquivalentTo(30))
-
 			},
 		},
 		{

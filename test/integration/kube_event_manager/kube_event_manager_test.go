@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package kube_event_manager_test

@@ -1,8 +1,9 @@
 package utils
 
 import (
-	log "github.com/sirupsen/logrus"
 	"sort"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // MergeLabels merges several maps into one. Last map keys overrides keys from first maps.
@@ -39,7 +40,7 @@ func LabelNames(labels map[string]string) []string {
 }
 
 func LabelValues(labels map[string]string, labelNames []string) []string {
-	var values = make([]string, 0)
+	values := make([]string, 0)
 	for _, name := range labelNames {
 		values = append(values, labels[name])
 	}

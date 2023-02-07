@@ -6,9 +6,11 @@ import (
 	"time"
 )
 
-const MaxExponentialBackoffDelay = time.Duration(32 * time.Second)
-const ExponentialDelayFactor float64 = 2.0 // Each delta delay is twice bigger.
-const ExponentialDelayRandomMs = 1000      // Each delay has random additional milliseconds.
+const (
+	MaxExponentialBackoffDelay         = time.Duration(32 * time.Second)
+	ExponentialDelayFactor     float64 = 2.0  // Each delta delay is twice bigger.
+	ExponentialDelayRandomMs           = 1000 // Each delay has random additional milliseconds.
+)
 
 // Count of exponential calculations before return max delay to prevent overflow with big numbers.
 var ExponentialCalculationsCount = int(math.Log(MaxExponentialBackoffDelay.Seconds()) / math.Log(ExponentialDelayFactor))
@@ -16,14 +18,15 @@ var ExponentialCalculationsCount = int(math.Log(MaxExponentialBackoffDelay.Secon
 // CalculateDelay returns delay distributed from initialDelay to default maxDelay (32s)
 //
 // Example:
-//   Retry 0: 5s
-//   Retry 1: 6s
-//   Retry 2: 7.8s
-//   Retry 3: 9.8s
-//   Retry 4: 13s
-//   Retry 5: 21s
-//   Retry 6: 32s
-//   Retry 7: 32s
+//
+//	Retry 0: 5s
+//	Retry 1: 6s
+//	Retry 2: 7.8s
+//	Retry 3: 9.8s
+//	Retry 4: 13s
+//	Retry 5: 21s
+//	Retry 6: 32s
+//	Retry 7: 32s
 func CalculateDelay(initialDelay time.Duration, retryCount int) time.Duration {
 	return CalculateDelayWithMax(initialDelay, MaxExponentialBackoffDelay, retryCount)
 }

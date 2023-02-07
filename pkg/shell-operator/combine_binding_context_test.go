@@ -25,7 +25,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 		}
 	})
 
-	var tasks = []task.Task{
+	tasks := []task.Task{
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
@@ -118,7 +118,7 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 		}
 	})
 
-	var tasks = []task.Task{
+	tasks := []task.Task{
 		task.NewTask(HookRun).
 			WithQueueName("test_no_combine").
 			WithMetadata(HookMetadata{
@@ -179,7 +179,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 	bcMeta := binding_context.BindingContext{}.Metadata
 	bcMeta.Group = "pods"
 
-	var tasks = []task.Task{
+	tasks := []task.Task{
 		// 3 tasks with Group should be compacted
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
@@ -285,7 +285,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	schMeta.Group = "pods"
 	schMeta.BindingType = types.Schedule
 
-	var tasks = []task.Task{
+	tasks := []task.Task{
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{

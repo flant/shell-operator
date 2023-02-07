@@ -193,7 +193,7 @@ func ValidateOperationSpec(obj interface{}, s *spec.Schema, rootName string) (mu
 		return nil
 	}
 
-	var allErrs = &multierror.Error{Errors: make([]error, 1)}
+	allErrs := &multierror.Error{Errors: make([]error, 1)}
 	for _, err := range result.Errors {
 		allErrs = multierror.Append(allErrs, err)
 	}

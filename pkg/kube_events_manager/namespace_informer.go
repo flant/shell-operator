@@ -82,12 +82,11 @@ func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func
 	ni.SharedInformer = corev1.NewFilteredNamespaceInformer(ni.KubeClient, resyncPeriod, indexers, tweakListOptions)
 	ni.addFn = addFn
 	ni.delFn = delFn
-	ni.SharedInformer.AddEventHandler(ni) //SharedNamespaceInformerEventHandler(ni, addFn, delFn))
+	ni.SharedInformer.AddEventHandler(ni) // SharedNamespaceInformerEventHandler(ni, addFn, delFn))
 
 	listOptions := metav1.ListOptions{}
 	tweakListOptions(&listOptions)
 	existedObjects, err := ni.KubeClient.CoreV1().Namespaces().List(context.TODO(), listOptions)
-
 	if err != nil {
 		log.Errorf("list existing namespaces: %v", err)
 		return err
@@ -114,9 +113,11 @@ func (ni *namespaceInformer) OnAdd(obj interface{}) {
 		ni.addFn(nsObj.Name)
 	}
 }
+
 func (ni *namespaceInformer) OnUpdate(_ interface{}, _ interface{}) {
 	// Modified event for namespace is ignored
 }
+
 func (ni *namespaceInformer) OnDelete(obj interface{}) {
 	if ni.stopped {
 		return

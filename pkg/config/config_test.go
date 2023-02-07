@@ -62,7 +62,6 @@ func TestConfig_OnChange(t *testing.T) {
 
 	c.Unset("log.level")
 	assert.Equal(t, "info", newValue, "onChange not called for Unset after SetTemporarily+Set")
-
 }
 
 func TestConfig_Errors(t *testing.T) {

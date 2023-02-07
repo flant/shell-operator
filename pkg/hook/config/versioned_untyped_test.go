@@ -7,11 +7,11 @@ import (
 )
 
 func Test_VersionedUntyped_Load(t *testing.T) {
-	var g = NewWithT(t)
+	g := NewWithT(t)
 	var vu *VersionedUntyped
 	var err error
 
-	var tests = []struct {
+	tests := []struct {
 		name  string
 		input string
 		fn    func()
@@ -131,7 +131,6 @@ schedule:
 			"",
 			``,
 			func() {
-
 			},
 		},
 	}
@@ -144,5 +143,4 @@ schedule:
 			tt.fn()
 		})
 	}
-
 }

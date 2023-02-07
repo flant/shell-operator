@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package kubeclient_test
@@ -102,9 +103,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 	})
 
 	Context("deleting an object", func() {
-		var (
-			testCM *corev1.ConfigMap
-		)
+		var testCM *corev1.ConfigMap
 
 		BeforeEach(func() {
 			testCM = testObject.DeepCopy()
@@ -119,7 +118,6 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully delete an object", func() {
-
 			err := ObjectPatcher.ExecuteOperation(object_patch.NewDeleteOperation(
 				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name,
 				object_patch.InBackground()))
@@ -136,9 +134,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 	})
 
 	Context("patching an object", func() {
-		var (
-			testCM *corev1.ConfigMap
-		)
+		var testCM *corev1.ConfigMap
 
 		BeforeEach(func() {
 			testCM = testObject.DeepCopy()
@@ -153,7 +149,6 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully JQPatch an object", func() {
-
 			err := ObjectPatcher.ExecuteOperation(object_patch.NewFromOperationSpec(object_patch.OperationSpec{
 				Operation:  object_patch.JQPatch,
 				ApiVersion: testCM.APIVersion,

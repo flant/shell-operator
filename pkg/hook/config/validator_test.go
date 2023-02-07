@@ -21,7 +21,7 @@ func Test_Validate_V1_With_Error(t *testing.T) {
 	var vu *VersionedUntyped
 	var err error
 
-	var tests = []struct {
+	tests := []struct {
 		name       string
 		configText string
 		fn         func()
@@ -149,7 +149,7 @@ func Test_Validate_V1_With_Error(t *testing.T) {
 			vu = prepareConfigObj(g, tt.configText)
 			s := GetSchema(vu.Version)
 			err = ValidateConfig(vu.Obj, s, "root")
-			//t.Logf("expected multierror was: %v", err)
+			// t.Logf("expected multierror was: %v", err)
 			tt.fn()
 		})
 	}
@@ -161,7 +161,7 @@ func Test_Validate_V1_KubernetesValidating(t *testing.T) {
 	var vu *VersionedUntyped
 	var err error
 
-	var tests = []struct {
+	tests := []struct {
 		name       string
 		configText string
 		fn         func()
@@ -198,7 +198,7 @@ kubernetesValidating:
 			t.Logf("version: %s", vu.Version)
 			s := GetSchema(vu.Version)
 			err = ValidateConfig(vu.Obj, s, "root")
-			//t.Logf("expected multierror was: %v", err)
+			// t.Logf("expected multierror was: %v", err)
 			tt.fn()
 		})
 	}

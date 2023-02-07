@@ -35,7 +35,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 	}
 
 	fakeDiscovery.Resources = []*metav1.APIResourceList{
-		&metav1.APIResourceList{
+		{
 			GroupVersion: "v1",
 			APIResources: []metav1.APIResource{
 				{
@@ -110,7 +110,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	}
 
 	fakeDiscovery.Resources = []*metav1.APIResourceList{
-		&metav1.APIResourceList{
+		{
 			GroupVersion: "v1",
 			APIResources: []metav1.APIResource{
 				{
@@ -237,7 +237,6 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-
 }
 
 // Test_FakeClient_CatchUpdates try to catch updates from fake client with additional WatchReactor
@@ -265,7 +264,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	}
 
 	fakeDiscovery.Resources = []*metav1.APIResourceList{
-		&metav1.APIResourceList{
+		{
 			GroupVersion: "v1",
 			APIResources: []metav1.APIResource{
 				{
@@ -353,7 +352,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 		case ev := <-mgr.Ch():
 			eventCounter = eventCounter + 1
 			fmt.Printf("Got event: %d %#v\n", eventCounter, ev)
-			//t.Logf("Got event: %d %#v\n", eventCounter, ev)
+			// t.Logf("Got event: %d %#v\n", eventCounter, ev)
 
 			if !state.podsCreated {
 				assert.Equal(t, "Synchronization", ev.Type)
@@ -419,5 +418,4 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-
 }

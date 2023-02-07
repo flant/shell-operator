@@ -63,7 +63,6 @@ func ResponseFromReader(r io.Reader) (*Response, error) {
 	dec := json.NewDecoder(r)
 
 	err := dec.Decode(response)
-
 	if err != nil {
 		return nil, err
 	}

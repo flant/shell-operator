@@ -1,3 +1,4 @@
+//go:build test
 // +build test
 
 package utils
@@ -40,7 +41,7 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 		return fmt.Errorf("unable to create os pipe for stderr: %s", err)
 	}
 
-	//outputReader := io.MultiReader(stdoutReadPipe, stderrReadPipe)
+	// outputReader := io.MultiReader(stdoutReadPipe, stderrReadPipe)
 
 	fmt.Printf("gexec.Start\n")
 	session, err := gexec.Start(cmd, stdoutWritePipe, stderrWritePipe)

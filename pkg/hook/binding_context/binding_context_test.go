@@ -82,7 +82,6 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				assert.Equal(t, "Added", bcList[0]["watchEvent"])
 				assert.IsType(t, &unstructured.Unstructured{}, bcList[0]["object"])
 				assert.Contains(t, bcList[0]["object"].(*unstructured.Unstructured).Object, "metadata")
-
 			},
 			[][]string{
 				// JSON dump should has only 4 fields: binding, type, watchEvent and object.
@@ -143,7 +142,8 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 								"name":      "deployment-2",
 							},
 							"kind": "Deployment",
-						}},
+						},
+					},
 					FilterResult: `""`,
 				}
 				obj.Metadata.JqFilter = ".metadata.labels"
@@ -174,7 +174,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 		{
 			"binding context with group",
 			func() []BindingContext {
-				var bcs = []BindingContext{}
+				bcs := []BindingContext{}
 
 				bc := BindingContext{
 					Binding:    "monitor_pods",
@@ -254,7 +254,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 		{
 			"grouped Synchronization",
 			func() []BindingContext {
-				var bcs = []BindingContext{}
+				bcs := []BindingContext{}
 
 				bc := BindingContext{
 					Binding:   "monitor_config_maps",
@@ -376,7 +376,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bcList = ConvertBindingContextList("v1", tt.bc())
-			//assert.Len(t, bcList, 1)
+			// assert.Len(t, bcList, 1)
 
 			var err error
 			bcJson, err = bcList.Json()

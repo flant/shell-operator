@@ -31,7 +31,7 @@ func Test_ObjectAndFilterResult_ToJson(t *testing.T) {
 	data, err := json.Marshal(obj)
 	assert.NoError(t, err)
 	jsonStr := string(data)
-	//fmt.Printf("%s\n", jsonStr)
+	// fmt.Printf("%s\n", jsonStr)
 	assert.Contains(t, jsonStr, "filterResult")
 }
 
@@ -42,7 +42,7 @@ func Test_ObjectAndFilterResult_ToJson_EmptyFilterResult(t *testing.T) {
 	data, err := json.Marshal(obj)
 	assert.NoError(t, err)
 	jsonStr := string(data)
-	//fmt.Printf("%s\n", jsonStr)
+	// fmt.Printf("%s\n", jsonStr)
 	assert.Contains(t, jsonStr, `"filterResult":null`)
 }
 
@@ -53,7 +53,7 @@ func Test_ObjectAndFilterResult_ToJson_NullFilterResult(t *testing.T) {
 	data, err := json.Marshal(obj)
 	assert.NoError(t, err)
 	jsonStr := string(data)
-	//fmt.Printf("%s\n", jsonStr)
+	// fmt.Printf("%s\n", jsonStr)
 	assert.Contains(t, jsonStr, `"filterResult":null`)
 }
 
@@ -64,7 +64,7 @@ func Test_ObjectAndFilterResult_ToJson_Empty_JQFilter_Has_FilterResult(t *testin
 	data, err := json.Marshal(obj)
 	assert.NoError(t, err)
 	jsonStr := string(data)
-	//fmt.Printf("%s\n", jsonStr)
+	// fmt.Printf("%s\n", jsonStr)
 	assert.Contains(t, jsonStr, "filterResult")
 }
 

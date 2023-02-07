@@ -10,8 +10,10 @@ import (
 	"github.com/flant/shell-operator/pkg/metric_storage"
 )
 
-var DefaultMainKubeClientMetricLabels = map[string]string{"component": "main"}
-var DefaultObjectPatcherKubeClientMetricLabels = map[string]string{"component": "object_patcher"}
+var (
+	DefaultMainKubeClientMetricLabels          = map[string]string{"component": "main"}
+	DefaultObjectPatcherKubeClientMetricLabels = map[string]string{"component": "object_patcher"}
+)
 
 func DefaultIfEmpty(m map[string]string, def map[string]string) map[string]string {
 	if len(m) == 0 {

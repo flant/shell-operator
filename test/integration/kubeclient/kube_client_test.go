@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package kubeclient_test
@@ -19,7 +20,6 @@ func Test(t *testing.T) {
 
 var _ = Describe("Kubernetes API client package", func() {
 	When("client connect outside of the cluster", func() {
-
 		It("should list deployments", func() {
 			list, err := KubeClient.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{})
 			Ω(err).Should(Succeed())

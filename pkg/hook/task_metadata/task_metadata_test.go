@@ -14,7 +14,7 @@ import (
 )
 
 func Test_HookMetadata_Access(t *testing.T) {
-	var g = NewWithT(t)
+	g := NewWithT(t)
 
 	Task := task.NewTask(HookRun).
 		WithMetadata(HookMetadata{
@@ -35,7 +35,6 @@ func Test_HookMetadata_Access(t *testing.T) {
 	g.Expect(hm.BindingContext).Should(HaveLen(2))
 	g.Expect(hm.BindingContext[0].Binding).Should(Equal("each_1_min"))
 	g.Expect(hm.BindingContext[1].Binding).Should(Equal("each_5_min"))
-
 }
 
 func Test_HookMetadata_QueueDump_Task_Description(t *testing.T) {

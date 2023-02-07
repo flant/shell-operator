@@ -101,7 +101,7 @@ data:
 	)
 
 	// Filter func to add a new field.
-	var filter = func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	filter := func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		res := u.DeepCopy()
 		data := res.Object["data"].(map[string]interface{})
 		data[newField] = newValue
@@ -659,7 +659,6 @@ object:
 					return err
 				}
 				return patcher.ExecuteOperations(operations)
-
 			},
 			shouldNotCreateNew,
 			shouldBeError,
@@ -682,7 +681,6 @@ object:
 					return err
 				}
 				return patcher.ExecuteOperations(operations)
-
 			},
 			shouldNotCreateNew,
 			shouldNotBeError,
@@ -727,7 +725,6 @@ object: |
 					return err
 				}
 				return patcher.ExecuteOperations(operations)
-
 			},
 			shouldCreateNew,
 			shouldNotBeError,
@@ -746,7 +743,6 @@ object: |
 					return err
 				}
 				return patcher.ExecuteOperations(operations)
-
 			},
 			shouldCreateNew,
 			shouldNotBeError,

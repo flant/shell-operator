@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"gopkg.in/robfig/cron.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +44,6 @@ type KubeNamespaceSelectorV0 struct {
 
 // ConvertAndCheckV0 fills non-versioned structures and run inter-field checks not covered by OpenAPI schemas.
 func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) (err error) {
-
 	c.OnStartup, err = c.ConvertOnStartup(cv0.OnStartup)
 	if err != nil {
 		return err

@@ -13,14 +13,18 @@ import (
 )
 
 // Use info level with timestamps and a text output by default
-var LogLevel = "info"
-var LogNoTime = false
-var LogType = "text"
-var LogProxyHookJSON = false
+var (
+	LogLevel         = "info"
+	LogNoTime        = false
+	LogType          = "text"
+	LogProxyHookJSON = false
+)
 
 // ForcedDurationForDebugLevel - force expiration for debug level.
-const ForcedDurationForDebugLevel = 30 * time.Minute
-const ProxyJsonLogKey = "proxyJsonLog"
+const (
+	ForcedDurationForDebugLevel = 30 * time.Minute
+	ProxyJsonLogKey             = "proxyJsonLog"
+)
 
 // DefineLoggingFlags defines flags for logger settings.
 func DefineLoggingFlags(cmd *kingpin.CmdClause) {

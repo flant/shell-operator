@@ -61,7 +61,7 @@ func (c *StateController) ChangeState(newRawState string) error {
 		return fmt.Errorf("error while changing state: %v", err)
 	}
 
-	var newState = make(map[string]manifest.Manifest)
+	newState := make(map[string]manifest.Manifest)
 
 	// Create new objects in FakeCluster
 	for _, m := range newManifests {

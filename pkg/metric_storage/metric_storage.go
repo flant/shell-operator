@@ -192,7 +192,6 @@ func (m *MetricStorage) Counter(metric string, labels map[string]string) *promet
 	}
 
 	return m.RegisterCounter(metric, labels)
-
 }
 
 // RegisterCounter registers a counter.
@@ -331,8 +330,8 @@ func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[st
 	}
 
 	// Group operations by 'Group' value.
-	var groupedOps = make(map[string][]operation.MetricOperation)
-	var nonGroupedOps = make([]operation.MetricOperation, 0)
+	groupedOps := make(map[string][]operation.MetricOperation)
+	nonGroupedOps := make([]operation.MetricOperation, 0)
 
 	for _, op := range ops {
 		if op.Group == "" {

@@ -128,7 +128,7 @@ func Test_Hook_WithConfig(t *testing.T) {
 				g.Expect(err).Should(HaveOccurred())
 				g.Expect(err.Error()).To(MatchRegexp("onStartup .*must be of type integer: \"string\""))
 
-				//t.Logf("expected validation error was: %v", err)
+				// t.Logf("expected validation error was: %v", err)
 			},
 		},
 	}

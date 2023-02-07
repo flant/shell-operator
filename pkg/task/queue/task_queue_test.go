@@ -137,7 +137,6 @@ func Test_ExponentialBackoff(t *testing.T) {
 	g.Expect(mean).Should(BeNumerically(">", mockExponentialDelay),
 		"mean delay of %d fails should be more than %s, got %s. Check exponential delaying not broken in Start or waitForTask.",
 		fails, mockExponentialDelay.String(), mean.Truncate(100*time.Microsecond).String())
-
 }
 
 func calculateMeanDelay(in []time.Time) (mean time.Duration, deltas []int64) {
