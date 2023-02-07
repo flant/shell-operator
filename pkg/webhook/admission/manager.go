@@ -1,7 +1,7 @@
 package admission
 
 import (
-	"io/ioutil"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -17,7 +17,7 @@ const DefaultConfigurationId = "hooks"
 //
 // No dynamic configuration for now. The steps are:
 //   - Init manager
-//   - Call AddWEbhook for every binding in hooks
+//   - Call AddWebhook for every binding in hooks
 //   - Start() to run server and create ValidatingWebhookConfiguration/MutatingWebhookConfiguration
 type WebhookManager struct {
 	KubeClient klient.Client
@@ -56,13 +56,13 @@ func (m *WebhookManager) WithAdmissionEventHandler(handler AdmissionEventHandler
 
 // Init creates dependencies
 func (m *WebhookManager) Init() error {
-	log.Info("Initialize validating webhooks manager. Load certificates.")
+	log.Info("Initialize admission webhooks manager. Load certificates.")
 
 	if m.DefaultConfigurationId == "" {
 		m.DefaultConfigurationId = DefaultConfigurationId
 	}
 	// settings
-	caBundleBytes, err := ioutil.ReadFile(m.Settings.CAPath)
+	caBundleBytes, err := os.ReadFile(m.Settings.CAPath)
 	if err != nil {
 		return err
 	}

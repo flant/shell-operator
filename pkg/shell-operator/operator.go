@@ -179,19 +179,20 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 
 	// Define handler for AdmissionEvent
 	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
+		eventBindingType := op.HookManager.DetectAdmissionEventType(event)
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
-			"binding":  string(BindingType(event.Binding)),
+			"event":    string(eventBindingType),
 		}
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
-		logEntry.Debugf("Handle '%s' event '%s' '%s'", BindingType(event.Binding), event.ConfigurationId, event.WebhookId)
+		logEntry.Debugf("Handle '%s' event '%s' '%s'", eventBindingType, event.ConfigurationId, event.WebhookId)
 
 		var tasks []task.Task
 		op.HookManager.HandleAdmissionEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
 					HookName:       hook.Name,
-					BindingType:    BindingType(event.Binding),
+					BindingType:    eventBindingType,
 					BindingContext: info.BindingContext,
 					AllowFailure:   info.AllowFailure,
 					Binding:        info.Binding,
@@ -220,13 +221,13 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 			}, nil
 		}
 
-		validatingProp := tasks[0].GetProp("validatingResponse")
-		validatingResponse, ok := validatingProp.(*AdmissionResponse)
+		admissionProp := tasks[0].GetProp("admissionResponse")
+		admissionResponse, ok := admissionProp.(*AdmissionResponse)
 		if !ok {
-			logEntry.Errorf("'validatingResponse' task prop is not of type *ValidatingResponse: %T", validatingProp)
+			logEntry.Errorf("'admissionResponse' task prop is not of type *AdmissionResponse: %T", admissionProp)
 			return nil, fmt.Errorf("hook task prop error")
 		}
-		return validatingResponse, nil
+		return admissionResponse, nil
 	})
 
 	err = op.AdmissionWebhookManager.Start()
@@ -634,9 +635,9 @@ func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 	}
 
 	// Save validatingResponse in task props for future use.
-	if result.ValidatingResponse != nil {
-		t.SetProp("validatingResponse", result.ValidatingResponse)
-		taskLogEntry.Infof("ValidatingResponse from hook: %s", result.ValidatingResponse.Dump())
+	if result.AdmissionResponse != nil {
+		t.SetProp("admissionResponse", result.AdmissionResponse)
+		taskLogEntry.Infof("AdmissionResponse from hook: %s", result.AdmissionResponse.Dump())
 	}
 
 	// Save conversionResponse in task props for future use.

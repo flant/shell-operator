@@ -10,8 +10,9 @@ import (
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 )
 
-// A link between a hook and a kube monitor
+// AdmissionBindingToWebhookLink is a link between a hook and a webhook configuration.
 type AdmissionBindingToWebhookLink struct {
+	BindingType     BindingType
 	BindingName     string
 	ConfigurationId string
 	WebhookId       string
@@ -20,7 +21,7 @@ type AdmissionBindingToWebhookLink struct {
 	Group            string
 }
 
-// ScheduleBindingsController handles schedule bindings for one hook.
+// AdmissionBindingsController handles admission bindings for one hook.
 type AdmissionBindingsController interface {
 	WithValidatingBindings([]ValidatingConfig)
 	WithMutatingBindings([]MutatingConfig)
@@ -89,6 +90,7 @@ func (c *admissionBindingsController) EnableValidatingBindings() {
 
 	for _, config := range c.ValidatingBindings {
 		c.AdmissionLinks[config.Webhook.Metadata.WebhookId] = &AdmissionBindingToWebhookLink{
+			BindingType:      KubernetesValidating,
 			BindingName:      config.BindingName,
 			ConfigurationId:  c.ConfigurationId,
 			WebhookId:        config.Webhook.Metadata.WebhookId,
@@ -122,6 +124,7 @@ func (c *admissionBindingsController) EnableMutatingBindings() {
 
 	for _, config := range c.MutatingBindings {
 		c.AdmissionLinks[config.Webhook.Metadata.WebhookId] = &AdmissionBindingToWebhookLink{
+			BindingType:      KubernetesMutating,
 			BindingName:      config.BindingName,
 			ConfigurationId:  c.ConfigurationId,
 			WebhookId:        config.Webhook.Metadata.WebhookId,
@@ -170,7 +173,7 @@ func (c *admissionBindingsController) HandleEvent(event AdmissionEvent) BindingE
 		Binding:         link.BindingName,
 		AdmissionReview: event.Review,
 	}
-	bc.Metadata.BindingType = KubernetesValidating
+	bc.Metadata.BindingType = link.BindingType
 	bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
 	bc.Metadata.Group = link.Group
 

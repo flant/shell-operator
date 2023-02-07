@@ -39,6 +39,7 @@ type HookManager interface {
 	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	DetectAdmissionEventType(event AdmissionEvent) BindingType
 	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo))
 	FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule
 }
@@ -324,7 +325,6 @@ func (hm *hookManager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn f
 	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
-		event.Binding = string(KubernetesValidating)
 		if h.HookController.CanHandleAdmissionEvent(event) {
 			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
@@ -337,7 +337,6 @@ func (hm *hookManager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn f
 	mHooks, _ := hm.GetHooksInOrder(KubernetesMutating)
 	for _, hookName := range mHooks {
 		h := hm.GetHook(hookName)
-		event.Binding = string(KubernetesMutating)
 		if h.HookController.CanHandleAdmissionEvent(event) {
 			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
@@ -346,6 +345,27 @@ func (hm *hookManager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn f
 			})
 		}
 	}
+}
+
+func (hm *hookManager) DetectAdmissionEventType(event AdmissionEvent) BindingType {
+	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
+	for _, hookName := range vHooks {
+		h := hm.GetHook(hookName)
+		if h.HookController.CanHandleAdmissionEvent(event) {
+			return KubernetesValidating
+		}
+	}
+
+	mHooks, _ := hm.GetHooksInOrder(KubernetesMutating)
+	for _, hookName := range mHooks {
+		h := hm.GetHook(hookName)
+		if h.HookController.CanHandleAdmissionEvent(event) {
+			return KubernetesMutating
+		}
+	}
+
+	log.Errorf("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s", event.ConfigurationId, event.WebhookId, event.Review.Request.Kind, event.Review.Request.Name, event.Review.Request.Namespace)
+	return ""
 }
 
 // HandleConversionEvent receives a crdName and calculates a sequence of hooks to run.

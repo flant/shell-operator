@@ -11,14 +11,14 @@ function hook::run() {
     export BINDING_CONTEXT_CURRENT_INDEX="${i}"
     export BINDING_CONTEXT_CURRENT_BINDING=$(context::jq -r '.binding // "unknown"')
 
-    HANDLERS=$(hook::_determine_kubernetes_and_scheduler_handlers)
+    HANDLERS=$(hook::_get_possible_handler_names)
     HANDLERS="${HANDLERS} __main__"
 
     hook::_run_first_available_handler "${HANDLERS}"
   done
 }
 
-function hook::_determine_kubernetes_and_scheduler_handlers() {
+function hook::_get_possible_handler_names() {
   if [[ "$BINDING_CONTEXT_CURRENT_BINDING" == "onStartup" ]]; then
     echo __on_startup
   elif BINDING_CONTEXT_CURRENT_TYPE=$(context::jq -er '.type'); then
@@ -53,6 +53,9 @@ function hook::_determine_kubernetes_and_scheduler_handlers() {
     ;;
     "Validating")
       echo __on_validating::${BINDING_CONTEXT_CURRENT_BINDING}
+    ;;
+    "Mutating")
+      echo __on_mutating::${BINDING_CONTEXT_CURRENT_BINDING}
     ;;
     "Conversion")
       echo __on_conversion::${BINDING_CONTEXT_CURRENT_BINDING}::$(context::jq -er '[.fromVersion,.toVersion]| map(sub("/";".")) | join("::")')
