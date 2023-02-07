@@ -34,16 +34,24 @@ jobs:
           go mod download
           echo -n "Go modules unpacked size is: " && du -sh $HOME/go/pkg/mod
 
-      - name: Download prebuilt libjq static libraries
-        run: |
-          curl -sSfL https://github.com/flant/libjq-go/releases/download/jq-b6be13d5-0/libjq-glibc-amd64.tgz | tar zxf -
-
       - name: Run golangci-lint
         run: |
-          export CGO_ENABLED=1
-          export CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
-          export CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
-          export GOOS=linux
-
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.50.1
-          ./golangci-lint run --sort-results --timeout 5m --build-tags integration,test
+          ./golangci-lint run --sort-results 
+
+
+  codespell:
+    name: Run codespell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.8
+
+      - name: Check out addon-operator code
+        uses: actions/checkout@v3
+
+      - name: Run codespell
+        run: |
+          pip install codespell==v1.17.1
+          codespell --skip=".git,go.mod,go.sum,*.log,*.gif,*.png" -L witht,eventtypes,uint,uptodate,afterall
