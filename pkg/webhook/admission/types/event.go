@@ -8,5 +8,4 @@ type AdmissionEvent struct {
 	WebhookId       string
 	ConfigurationId string
 	Review          *v1.AdmissionReview
-	Binding         string
 }

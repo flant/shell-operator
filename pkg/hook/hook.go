@@ -32,7 +32,7 @@ type HookResult struct {
 	Usage                *executor.CmdUsage
 	Metrics              []operation.MetricOperation
 	ConversionResponse   *conversion.Response
-	ValidatingResponse   *AdmissionResponse
+	AdmissionResponse    *AdmissionResponse
 	KubernetesPatchBytes []byte
 }
 
@@ -98,7 +98,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		return nil, err
 	}
 
-	validatingPath, err := h.prepareValidatingResponseFile()
+	admissionPath, err := h.prepareAdmissionResponseFile()
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 			_ = os.Remove(contextPath)
 			_ = os.Remove(metricsPath)
 			_ = os.Remove(conversionPath)
-			_ = os.Remove(validatingPath)
+			_ = os.Remove(admissionPath)
 			_ = os.Remove(kubernetesPatchPath)
 		}
 	}()
@@ -130,7 +130,8 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
 		envs = append(envs, fmt.Sprintf("METRICS_PATH=%s", metricsPath))
 		envs = append(envs, fmt.Sprintf("CONVERSION_RESPONSE_PATH=%s", conversionPath))
-		envs = append(envs, fmt.Sprintf("VALIDATING_RESPONSE_PATH=%s", validatingPath))
+		envs = append(envs, fmt.Sprintf("VALIDATING_RESPONSE_PATH=%s", admissionPath))
+		envs = append(envs, fmt.Sprintf("ADMISSION_RESPONSE_PATH=%s", admissionPath))
 		envs = append(envs, fmt.Sprintf("KUBERNETES_PATCH_PATH=%s", kubernetesPatchPath))
 	}
 
@@ -148,7 +149,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		return result, fmt.Errorf("got bad metrics: %s", err)
 	}
 
-	result.ValidatingResponse, err = AdmissionResponseFromFile(validatingPath)
+	result.AdmissionResponse, err = AdmissionResponseFromFile(admissionPath)
 	if err != nil {
 		return result, fmt.Errorf("got bad validating response: %s", err)
 	}
@@ -215,6 +216,24 @@ func (h *Hook) GetConfigDescription() string {
 		}
 		msgs = append(msgs, fmt.Sprintf("Validate k8s kinds: '%s'", strings.Join(kindList, "', '")))
 	}
+	if len(h.Config.KubernetesMutating) > 0 {
+		kinds := map[string]struct{}{}
+		for _, mutating := range h.Config.KubernetesMutating {
+			if mutating.Webhook == nil {
+				continue
+			}
+			for _, rule := range mutating.Webhook.Rules {
+				for _, resource := range rule.Resources {
+					kinds[strings.ToLower(resource)] = struct{}{}
+				}
+			}
+		}
+		kindList := make([]string, 0, len(kinds))
+		for kind := range kinds {
+			kindList = append(kindList, kind)
+		}
+		msgs = append(msgs, fmt.Sprintf("Mutate k8s kinds: '%s'", strings.Join(kindList, "', '")))
+	}
 	if len(h.Config.KubernetesConversion) > 0 {
 		crds := map[string]struct{}{}
 		for _, cfg := range h.Config.KubernetesConversion {
@@ -264,15 +283,16 @@ func (h *Hook) prepareMetricsFile() (string, error) {
 	return metricsPath, nil
 }
 
-func (h *Hook) prepareValidatingResponseFile() (string, error) {
-	validatingPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-validating-response-%s.json", h.SafeName(), uuid.NewV4().String()))
+// prepareAdmissionResponseFile create file to store response from validating and mutating hooks.
+func (h *Hook) prepareAdmissionResponseFile() (string, error) {
+	filePath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-admission-response-%s.json", h.SafeName(), uuid.NewV4().String()))
 
-	err := os.WriteFile(validatingPath, []byte{}, 0644)
+	err := os.WriteFile(filePath, []byte{}, 0644)
 	if err != nil {
 		return "", err
 	}
 
-	return validatingPath, nil
+	return filePath, nil
 }
 
 func (h *Hook) prepareConversionResponseFile() (string, error) {

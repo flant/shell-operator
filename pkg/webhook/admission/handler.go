@@ -3,7 +3,7 @@ package admission
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -31,7 +31,7 @@ func NewWebhookHandler() *WebhookHandler {
 	h := &WebhookHandler{
 		Router: rtr,
 	}
-	rtr.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "validatingWebhook"))
+	rtr.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "admissionWebhook"))
 	rtr.Use(middleware.Recoverer)
 	rtr.Use(middleware.AllowContentType("application/json"))
 	rtr.Post("/*", h.ServeReviewRequest)
@@ -42,7 +42,7 @@ func NewWebhookHandler() *WebhookHandler {
 func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(r.Body)
+	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error reading request body"))
@@ -103,7 +103,7 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 		Review:          &review,
 	}
 
-	validatingResponse, err := h.Handler(event)
+	admissionResponse, err := h.Handler(event)
 	if err != nil {
 		response.Response.Allowed = false
 		response.Response.Result = &metav1.Status{
@@ -113,15 +113,15 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 		return response, nil
 	}
 
-	if len(validatingResponse.Warnings) > 0 {
-		response.Response.Warnings = validatingResponse.Warnings
+	if len(admissionResponse.Warnings) > 0 {
+		response.Response.Warnings = admissionResponse.Warnings
 	}
 
-	if !validatingResponse.Allowed {
+	if !admissionResponse.Allowed {
 		response.Response.Allowed = false
 		response.Response.Result = &metav1.Status{
 			Code:    403,
-			Message: validatingResponse.Message,
+			Message: admissionResponse.Message,
 		}
 		return response, nil
 	}
@@ -133,8 +133,8 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 	// The only currently supported patchType is JSONPatch. See JSON patch documentation for
 	// more details. For patchType: JSONPatch, the patch field contains a base64-encoded
 	// array of JSON patch operations.
-	if len(validatingResponse.Patch) > 0 {
-		response.Response.Patch = validatingResponse.Patch
+	if len(admissionResponse.Patch) > 0 {
+		response.Response.Patch = admissionResponse.Patch
 		patchType := v1.PatchTypeJSONPatch
 		response.Response.PatchType = &patchType
 	}

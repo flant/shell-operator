@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -18,7 +18,7 @@ type AdmissionResponse struct {
 }
 
 func AdmissionResponseFromFile(filePath string) (*AdmissionResponse, error) {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
 	}
@@ -47,14 +47,18 @@ func FromReader(r io.Reader) (*AdmissionResponse, error) {
 
 func (r *AdmissionResponse) Dump() string {
 	b := new(strings.Builder)
-	b.WriteString("ValidatingResponse(allowed=")
+	b.WriteString("AdmissionResponse(allowed=")
 	b.WriteString(strconv.FormatBool(r.Allowed))
+	if len(r.Patch) > 0 {
+		b.WriteString(",patch=")
+		b.Write(r.Patch)
+	}
 	if r.Message != "" {
-		b.WriteString(",")
+		b.WriteString(",msg=")
 		b.WriteString(r.Message)
 	}
 	for _, warning := range r.Warnings {
-		b.WriteString(",")
+		b.WriteString(",warn=")
 		b.WriteString(warning)
 	}
 	b.WriteString(")")

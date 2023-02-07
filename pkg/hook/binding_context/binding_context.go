@@ -71,9 +71,15 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		}
 	}
 
-	// Handle validating and conversion before grouping.
+	// Handle admission and conversion before grouping.
 	if bc.Metadata.BindingType == KubernetesValidating {
 		res["type"] = "Validating"
+		res["review"] = bc.AdmissionReview
+		return res
+	}
+
+	if bc.Metadata.BindingType == KubernetesMutating {
+		res["type"] = "Mutating"
 		res["review"] = bc.AdmissionReview
 		return res
 	}
