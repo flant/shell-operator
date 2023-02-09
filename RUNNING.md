@@ -4,11 +4,11 @@
 
 ### Run in a cluster
 
-- Build an image from flant/shell-operator:v1.0.0-beta.7, copy your hooks to `/hooks` directory.
+- Build an image from flant/shell-operator:v1.2.0, copy your hooks to `/hooks` directory.
 - Apply RBAC manifests.
 - Apply Pod or Deployment manifest with the built image.
 
-More detailed explanation is available in [README](README.md#quickstart), also see [examples](/examples).
+More detailed explanation is available in [README](README.md#quickstart), also see installing with Helm in the [example](/examples/201-install-with-helm-chart).
 
 ### Run outside of a cluster
 

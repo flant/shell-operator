@@ -12,7 +12,7 @@ var (
 	AppStartMessage = "shell-operator"
 )
 
-var Version = "dev"
+var Version = "v1.2.0-dev"
 
 var (
 	HooksDir = "hooks"
