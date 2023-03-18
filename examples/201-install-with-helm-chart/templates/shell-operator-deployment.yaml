@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: shell-operator
-        image: "flant/shell-operator:latest"
+        image: "ghcr.io/flant/shell-operator:latest"
         imagePullPolicy: Always
         volumeMounts:
         - name: example-helm-hooks

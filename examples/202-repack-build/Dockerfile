@@ -1,4 +1,4 @@
-FROM flant/shell-operator:v1.0.0-beta.14 as shell-operator
+FROM ghcr.io/flant/shell-operator:latest as shell-operator
 
 # Final image with kubectl 1.17 and curl
 FROM ubuntu:20.04

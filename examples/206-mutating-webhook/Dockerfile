@@ -1,4 +1,4 @@
-FROM flant/shell-operator:latest
+FROM ghcr.io/flant/shell-operator:latest
 LABEL app="shell-operator" example="206-mutating-webhook"
 
 # Add hooks

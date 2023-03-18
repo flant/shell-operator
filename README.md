@@ -81,12 +81,12 @@ Make the `pods-hook.sh` executable:
 chmod +x pods-hook.sh
 ```
 
-You can use a prebuilt image [flant/shell-operator:latest](https://hub.docker.com/r/flant/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to `ADD` your hook into `/hooks` directory in the `Dockerfile`.
+You can use a prebuilt image [ghcr.io/flant/shell-operator:latest](https://github.com/flant/shell-operator/pkgs/container/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to `ADD` your hook into `/hooks` directory in the `Dockerfile`.
 
 Create the following `Dockerfile` in the directory where you created the `pods-hook.sh` file:
 
 ```dockerfile
-FROM flant/shell-operator:latest
+FROM ghcr.io/flant/shell-operator:latest
 ADD pods-hook.sh /hooks
 ```
 

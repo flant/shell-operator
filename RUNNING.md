@@ -4,7 +4,8 @@
 
 ### Run in a cluster
 
-- Build an image from flant/shell-operator:v1.2.0, copy your hooks to `/hooks` directory.
+- Build an image from ghcr.io/flant/shell-operator:latest (or use a specific tag).
+- Copy your hooks to `/hooks` directory.
 - Apply RBAC manifests.
 - Apply Pod or Deployment manifest with the built image.
 
