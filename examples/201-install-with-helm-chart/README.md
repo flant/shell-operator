@@ -1,6 +1,6 @@
 ## example with helm chart
 
-A helm version of [102-monitor-namespaces](https://github.com/flant/shell-operator/tree/master/examples/102-monitor-namespaces) example. It uses `flant/shell-operator:latest` image in chart template to run shell-operator and a ConfigMap as a storage for hooks.
+A helm version of [102-monitor-namespaces](https://github.com/flant/shell-operator/tree/master/examples/102-monitor-namespaces) example. It uses `ghcr.io/flant/shell-operator:latest` image in chart template to run shell-operator and a ConfigMap as a storage for hooks.
 
 
 ### Run

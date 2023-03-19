@@ -15,7 +15,8 @@ on:
 env:
   QEMU_PLATFORMS: arm64,arm
   BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/arm/v7"
-  IMAGE_REPO: flant/shell-operator
+  DOCKER_HUB_REPO: flant/shell-operator
+  GHCR_IO_REPO: ghcr.io/flant/shell-operator
 
 jobs:
   check:
@@ -94,27 +95,33 @@ jobs:
           ADDITIONAL_TAG: ${{ needs.check.outputs.additional_tag }}
           IMAGE_TAG: ${{ needs.check.outputs.image_tag }}
         run: |
-          : Setup FINAL_IMAGE_NAME and APP_VERSION for image build
+          : Setup DOCKER_HUB_IMAGE_NAME, DOCKER_HUB_IMAGE_NAME and APP_VERSION for image build
           APP_VERSION=${IMAGE_TAG}
           if [[ $APP_VERSION == "latest" ]] ; then
             APP_VERSION=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
           fi
 
-          FINAL_IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
+          DOCKER_HUB_IMAGE_NAME="${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+          GHCR_IO_IMAGE_NAME="${GHCR_IO_REPO}:${IMAGE_TAG}"
 
           if [[ -n $ADDITIONAL_TAG ]] ; then
-            ADDITIONAL_IMAGE_NAME="${IMAGE_REPO}:${ADDITIONAL_TAG}"
+            ADDITIONAL_DOCKER_HUB_IMAGE_NAME="${DOCKER_HUB_REPO}:${ADDITIONAL_TAG}"
+            ADDITIONAL_GHCR_IO_IMAGE_NAME="${GHCR_IO_REPO}:${ADDITIONAL_TAG}"
           fi
 
           echo "APP_VERSION=${APP_VERSION}" >> ${GITHUB_ENV}
-          echo "FINAL_IMAGE_NAME=${FINAL_IMAGE_NAME}" >> ${GITHUB_ENV}
-          echo "ADDITIONAL_IMAGE_NAME=${ADDITIONAL_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "DOCKER_HUB_IMAGE_NAME=${DOCKER_HUB_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "ADDITIONAL_DOCKER_HUB_IMAGE_NAME=${ADDITIONAL_DOCKER_HUB_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "GHCR_IO_IMAGE_NAME=${GHCR_IO_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "ADDITIONAL_GHCR_IO_IMAGE_NAME=${ADDITIONAL_GHCR_IO_IMAGE_NAME}" >> ${GITHUB_ENV}
 
           echo "========================================="
           echo "APP_VERSION            = $APP_VERSION"
-          echo "FINAL_IMAGE_NAME       = $FINAL_IMAGE_NAME"
-          [ -n $ADDITIONAL_IMAGE_NAME ] && \
-          echo "ADDITIONAL_IMAGE_NAME  = $ADDITIONAL_IMAGE_NAME"
+          echo "DOCKER_HUB_IMAGE_NAME  = $DOCKER_HUB_IMAGE_NAME"
+          echo "GHCR_IO_IMAGE_NAME     = $GHCR_IO_IMAGE_NAME"
+          [ -n $ADDITIONAL_GHCR_IO_IMAGE_NAME ] && \
+          echo "ADDITIONAL_DOCKER_HUB_IMAGE_NAME  = $ADDITIONAL_DOCKER_HUB_IMAGE_NAME" && \
+          echo "ADDITIONAL_GHCR_IO_IMAGE_NAME     = $ADDITIONAL_GHCR_IO_IMAGE_NAME"
           echo "========================================="
 
       - name: Set up QEMU
@@ -128,22 +135,23 @@ jobs:
         with:
           version: latest
 
-      - name: Login to DockerHub
+      - name: Login to Github Container Registry
         uses: docker/login-action@v2.1.0
         with:
-          username: ${{ secrets.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PASS }}
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_IO_USER }}
+          password: ${{ secrets.GHCR_IO_PASS }}
 
       - name: Build and push multi-arch image
         run: |
           echo "Build and push $FINAL_IMAGE_NAME with version '$APP_VERSION'."
-          [ -n "$ADDITIONAL_IMAGE_NAME" ] && echo "Also push $ADDITIONAL_IMAGE_NAME."
+          [ -n "$ADDITIONAL_GHCR_IO_IMAGE_NAME" ] && echo "Also push $ADDITIONAL_GHCR_IO_IMAGE_NAME."
           echo
           docker buildx build \
             --platform $BUILDX_PLATFORMS \
             --build-arg appVersion=$APP_VERSION \
-            $( [ -n "$ADDITIONAL_IMAGE_NAME" ] && echo "--tag $ADDITIONAL_IMAGE_NAME" ) \
-            --tag $FINAL_IMAGE_NAME \
+            $( [ -n "$ADDITIONAL_GHCR_IO_IMAGE_NAME" ] && echo "--tag $ADDITIONAL_GHCR_IO_IMAGE_NAME" ) \
+            --tag $GHCR_IO_IMAGE_NAME \
             --push \
             .
 
@@ -151,14 +159,14 @@ jobs:
         run: |
           # Image for one arhitecture has digest in config field.
           # Image with multiple manifests has digest in each manifest.
-          manifests=$(docker buildx imagetools inspect "${FINAL_IMAGE_NAME}" --raw)
+          manifests=$(docker buildx imagetools inspect "${GHCR_IO_IMAGE_NAME}" --raw)
           if grep manifests <<<"${manifests}" 2>&1 >/dev/null ; then
             jq -r '.manifests[]? | .digest + " " + .platform.os + "/" + .platform.architecture' <<<"${manifests}"
           else
             echo $(echo -n "${manifests}" | openssl dgst -sha256 | sed s/^.stdin.*\ //) ' linux/amd64'
           fi \
           | while read digest platform ; do
-            image=$FINAL_IMAGE_NAME@${digest}
+            image=${GHCR_IO_IMAGE_NAME}@${digest}
             echo "====================================="
             echo "Inspect image for platform ${platform}"
             echo "  ${image}"
@@ -166,3 +174,33 @@ jobs:
             docker run --rm --platform ${platform} --entrypoint sh ${image} -c \
               'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'
           done
+
+      - name: Copy image to Docker Hub
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        run: |
+          echo "Copy ${GHCR_IO_IMAGE_NAME} to ${DOCKER_HUB_IMAGE_NAME} ..."
+          docker run \
+            -e "DOCKER_USER=${DOCKER_USER}" \
+            -e "DOCKER_PASS=${DOCKER_PASS}" \
+            -e "GHCR_IO_IMAGE_NAME=${GHCR_IO_IMAGE_NAME}" \
+            -e "DOCKER_HUB_IMAGE_NAME=${DOCKER_HUB_IMAGE_NAME}" \
+            quay.io/skopeo/stable:latest \
+              copy --all \
+              --dest-creds ${DOCKER_USER}:${DOCKER_PASS} \
+              docker://${GHCR_IO_IMAGE_NAME} \
+              docker://${DOCKER_HUB_IMAGE_NAME}
+
+          [ -n "$ADDITIONAL_DOCKER_HUB_IMAGE_NAME" ] && \
+          echo "Copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} to ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME} ..." && \
+          docker run \
+            -e "DOCKER_USER=${DOCKER_USER}" \
+            -e "DOCKER_PASS=${DOCKER_PASS}" \
+            -e "GHCR_IO_IMAGE_NAME=${ADDITIONAL_GHCR_IO_IMAGE_NAME}" \
+            -e "DOCKER_HUB_IMAGE_NAME=${ADDITIONAL_DOCKER_HUB_IMAGE_NAME}" \
+            quay.io/skopeo/stable:latest \
+              copy --all \
+              --dest-creds ${DOCKER_USER}:${DOCKER_PASS} \
+              docker://${GHCR_IO_IMAGE_NAME} \
+              docker://${DOCKER_HUB_IMAGE_NAME}
