@@ -166,6 +166,13 @@ jobs:
             echo $(echo -n "${manifests}" | openssl dgst -sha256 | sed s/^.stdin.*\ //) ' linux/amd64'
           fi \
           | while read digest platform ; do
+            if [[ ${BUILDX_PLATFORMS} != *"${platform}"* ]] ; then
+              echo "====================================="
+              echo "Ignore image for non-runnable platform ${platform}"
+              echo "  ${image}"
+              echo "====================================="
+              continue          
+            fi
             image=${GHCR_IO_IMAGE_NAME}@${digest}
             echo "====================================="
             echo "Inspect image for platform ${platform}"
