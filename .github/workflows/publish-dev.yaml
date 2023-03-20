@@ -10,7 +10,6 @@ env:
   QEMU_PLATFORMS: arm64,arm
   BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/arm/v7"
   BUILDX_PLATFORMS_AMD64: "linux/amd64"
-  DOCKER_HUB_REPO: flant/shell-operator-dev
   GHCR_IO_REPO: ghcr.io/flant/shell-operator-dev
 
 jobs:
@@ -78,16 +77,13 @@ jobs:
           : Image name and version for dev image
           # Example: dev-feat_branch-371e2d3b-2020.02.06_18:37:42
           APP_VERSION=dev-${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}-$(date +'%Y.%m.%d_%H:%M:%S')
-          DOCKER_HUB_IMAGE_NAME="${DOCKER_HUB_REPO}:pr${{ github.event.pull_request.number }}"
           GHCR_IO_IMAGE_NAME="${GHCR_IO_REPO}:pr${{ github.event.pull_request.number }}"
 
           echo "APP_VERSION=${APP_VERSION}" >> ${GITHUB_ENV}
-          echo "DOCKER_HUB_IMAGE_NAME=${DOCKER_HUB_IMAGE_NAME}" >> ${GITHUB_ENV}
           echo "GHCR_IO_IMAGE_NAME=${GHCR_IO_IMAGE_NAME}" >> ${GITHUB_ENV}
 
           echo "========================================="
           echo "APP_VERSION             = $APP_VERSION"
-          echo "DOCKER_HUB_IMAGE_NAME   = $DOCKER_HUB_IMAGE_NAME"
           echo "GHCR_IO_IMAGE_NAME      = $GHCR_IO_IMAGE_NAME"
           echo "========================================="
 
@@ -135,7 +131,14 @@ jobs:
           if grep manifests <<<"${manifests}" 2>&1 >/dev/null ; then
             jq -r '.manifests[]? | .digest + " " + .platform.os + "/" + .platform.architecture' <<<"${manifests}" \
             | while read digest platform ; do
-            image=${GHCR_IO_IMAGE_NAME}@${digest}
+              image=${GHCR_IO_IMAGE_NAME}@${digest}
+              if [[ ${BUILDX_PLATFORMS} != *"${platform}"* ]] ; then
+                echo "====================================="
+                echo "Ignore image for non-runnable platform ${platform}"
+                echo "  ${image}"
+                echo "====================================="
+                continue          
+              fi
               echo "====================================="
               echo "Inspect image for platform ${platform}"
               echo "  ${image}"
@@ -147,19 +150,3 @@ jobs:
             echo Not a multi-arhitecture image.
             #echo $(echo -n "${manifests}" | openssl dgst -sha256) ' linux/amd64'
           fi
-
-      - name: Copy image to Docker Hub
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USER }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-        run: |
-          docker run \
-            -e "DOCKER_USER=${DOCKER_USER}" \
-            -e "DOCKER_PASS=${DOCKER_PASS}" \
-            -e "GHCR_IO_IMAGE_NAME=${GHCR_IO_IMAGE_NAME}" \
-            -e "DOCKER_HUB_IMAGE_NAME=${DOCKER_HUB_IMAGE_NAME}" \
-            quay.io/skopeo/stable:latest \
-              copy --all \
-              --dest-creds ${DOCKER_USER}:${DOCKER_PASS} \
-              docker://${GHCR_IO_IMAGE_NAME} \
-              docker://${DOCKER_HUB_IMAGE_NAME}
