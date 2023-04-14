@@ -18,7 +18,7 @@ pipeline {
     stage("Push Image") {
       when {
         anyOf {
-          branch 'master'
+          branch 'main'
           branch 'jenkinsfile'
         }
       }
