@@ -1,0 +1,424 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Validating Webhook - Shell-operator</title>
+                
+
+        <!-- Custom HTML head -->
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+                <link rel="icon" href="favicon.svg">
+                        <link rel="shortcut icon" href="favicon.png">
+                <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+                <link rel="stylesheet" href="css/print.css" media="print">
+        
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="fonts/fonts.css">
+        
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+            </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">Introduction</a></li><li class="chapter-item expanded "><a href="QUICK_START.html"><strong aria-hidden="true">1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="RUNNING.html"><strong aria-hidden="true">2.</strong> Running Shell-operator</a></li><li class="chapter-item expanded "><a href="HOOKS.html"><strong aria-hidden="true">3.</strong> Hooks</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="KUBERNETES.html"><strong aria-hidden="true">3.1.</strong> Work with Kubernetes</a></li><li class="chapter-item expanded "><a href="BINDING_VALIDATING.html" class="active"><strong aria-hidden="true">3.2.</strong> Validating Webhook</a></li><li class="chapter-item expanded "><a href="BINDING_CONVERSION.html"><strong aria-hidden="true">3.3.</strong> Conversion Webhooks</a></li></ol></li><li class="chapter-item expanded "><a href="metrics/ROOT.html"><strong aria-hidden="true">4.</strong> Metrics</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="metrics/SELF_METRICS.html"><strong aria-hidden="true">4.1.</strong> Shell-operator metrics</a></li><li class="chapter-item expanded "><a href="metrics/METRICS_FROM_HOOKS.html"><strong aria-hidden="true">4.2.</strong> Return metrics from hooks</a></li></ol></li></ol>            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                                                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                                            </div>
+
+                    <h1 class="menu-title">Shell-operator</h1>
+
+                    <div class="right-buttons">
+                                                <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                                                                        <a href="https://github.com/flant/shell-operator" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                                                
+                    </div>
+                </div>
+
+                                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="kubernetesvalidating"><a class="header" href="#kubernetesvalidating">kubernetesValidating</a></h1>
+<p>This binding transforms a hook into a handler for ValidatingWebhookConfiguration. The Shell-operator creates ValidatingWebhookConfiguration, starts HTTPS server, and runs hooks to handle <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#request">AdmissionReview requests</a>.</p>
+<blockquote>
+<p>Note: shell-operator use <code>admissionregistration.k8s.io/v1</code>, so Kubernetes 1.16+ is needed.</p>
+</blockquote>
+<h2 id="syntax"><a class="header" href="#syntax">Syntax</a></h2>
+<pre><code class="language-yaml">configVersion: v1
+onStartup: 10
+kubernetes:
+- name: myCrdObjects
+  ...
+kubernetesValidating:
+- name: my-crd-validator.example.com
+  # include snapshots by binding names
+  includeSnapshotsFrom: [&quot;myCrdObjects&quot;]
+  # or use group name to include all snapshots in a group
+  group: &quot;group name&quot;
+  labelSelector:   # equivalent of objectSelector
+    matchLabels:
+      label1: value1
+      ...
+  namespace:
+    labelSelector: # equivalent of namespaceSelector
+      matchLabels:
+        label1: value1
+        ...
+      matchExpressions:
+      - key: environment
+        operator: In
+        values: [&quot;prod&quot;,&quot;staging&quot;]
+  rules:
+  - apiVersions:
+    - v1
+    apiGroups:
+    - stable.example.com
+    resources:
+    - CronTab
+    operations:
+    - &quot;*&quot;
+  - operations: [&quot;CREATE&quot;, &quot;UPDATE&quot;]
+    apiGroups: [&quot;apps&quot;]
+    apiVersions: [&quot;v1&quot;, &quot;v1beta1&quot;]
+    resources: [&quot;deployments&quot;, &quot;replicasets&quot;]
+    scope: &quot;Namespaced&quot;
+  failurePolicy: Ignore | Fail (default)
+  sideEffects: None (default) | NoneOnDryRun
+  timeoutSeconds: 2 (default is 10)
+</code></pre>
+<h2 id="parameters"><a class="header" href="#parameters">Parameters</a></h2>
+<ul>
+<li>
+<p><code>name</code> — a required parameter. It should be a domain with at least three segments separated by dots.</p>
+</li>
+<li>
+<p><code>includeSnapshotsFrom</code> — an array of names of <code>kubernetes</code> bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the <code>snapshots</code> field.</p>
+</li>
+<li>
+<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+</li>
+<li>
+<p><code>labelSelector</code> — <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta">standard</a> selector of objects by labels (examples <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels">of use</a>). See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector">objectSelector</a>.</p>
+</li>
+<li>
+<p><code>namespace.labelSelector</code> — this filter works like <code>labelSelector</code> but for namespaces. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector">namespaceSelector</a>.</p>
+</li>
+<li>
+<p><code>rules</code> — a required list of rules used to determine if a request to the Kubernetes API server should be sent to the hook. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules">Rules</a>.</p>
+</li>
+<li>
+<p><code>failurePolicy</code> — defines how errors from the hook are handled. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy">Failure policy</a>. Default is <code>Fail</code>.</p>
+</li>
+<li>
+<p><code>sideEffects</code> — determine whether the hook is <code>dryRun</code>-aware. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#side-effects">side effects</a> documentation. Default is <code>None</code>.</p>
+</li>
+<li>
+<p><code>timeoutSeconds</code> — a seconds API server should wait for a hook to respond before treating the call as a failure. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#timeouts">timeouts</a>. Default is 10 (seconds).</p>
+</li>
+</ul>
+<p>As you can see, it is the close copy of a <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#webhook-configuration">Webhook configuration</a>. Differences are:</p>
+<ul>
+<li><code>objectSelector</code> is a <code>labelSelector</code> as in the <code>kubernetes</code> binding.</li>
+<li><code>namespaceSelector</code> is a <code>namespace.labelSelector</code> as in the <code>kubernetes</code> binding.</li>
+<li><code>clientConfig</code> is managed by the Shell-operator. You should provide a Service for the Shell-operator HTTPS endpoint. See example <a href="./examples/204-validating-webhook">204-validating-webhook</a> for possible solution.</li>
+<li><code>matchPolicy</code> is always “Equivalent”. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy">Matching requests: matchPolicy</a>.</li>
+<li>there are additional fields <code>group</code> and <code>includeSnapshotsFrom</code> to include snapshots in the binding context.</li>
+</ul>
+<h2 id="example"><a class="header" href="#example">Example</a></h2>
+<pre><code>configVersion: v1
+kubernetesValidating:
+- name: private-repo-policy.example.com
+  rules:
+  - apiGroups:   [&quot;stable.example.com&quot;]
+    apiVersions: [&quot;v1&quot;]
+    operations:  [&quot;CREATE&quot;]
+    resources:   [&quot;crontabs&quot;]
+    scope:       &quot;Namespaced&quot;
+</code></pre>
+<p>The Shell-operator will execute hook with this configuration on every creation of CronTab object.</p>
+<p>See example <a href="./examples/204-validating-webhook">204-validating-webhook</a>.</p>
+<h2 id="hook-input-and-output"><a class="header" href="#hook-input-and-output">Hook input and output</a></h2>
+<blockquote>
+<p>Note that the <code>group</code> parameter is only for including snapshots. <code>kubernetesValidating</code> hook is never executed on <code>schedule</code> or <code>kubernetes</code> events with binding context with <code>&quot;type&quot;:&quot;Group&quot;</code>.</p>
+</blockquote>
+<p>The hook receives a binding context and should return response in <code>$VALIDATING_RESPONSE_PATH</code>.</p>
+<p>$BINDING_CONTEXT_PATH file example:</p>
+<pre><code class="language-yaml">[{
+# Name as defined in binding configuration.
+&quot;binding&quot;: &quot;my-crd-validator.example.com&quot;,
+# Validating to distinguish from other events.
+&quot;type&quot;: &quot;Validating&quot;,
+# Snapshots as defined by includeSnapshotsFrom or group.
+&quot;snapshots&quot;: { ... }
+# AdmissionReview object.
+&quot;review&quot;: {
+  &quot;apiVersion&quot;: &quot;admission.k8s.io/v1&quot;,
+  &quot;kind&quot;: &quot;AdmissionReview&quot;,
+  &quot;request&quot;: {
+    # Random uid uniquely identifying this admission call
+    &quot;uid&quot;: &quot;705ab4f5-6393-11e8-b7cc-42010a800002&quot;,
+
+    # Fully-qualified group/version/kind of the incoming object
+    &quot;kind&quot;: {&quot;group&quot;:&quot;autoscaling&quot;,&quot;version&quot;:&quot;v1&quot;,&quot;kind&quot;:&quot;Scale&quot;},
+    # Fully-qualified group/version/kind of the resource being modified
+    &quot;resource&quot;: {&quot;group&quot;:&quot;apps&quot;,&quot;version&quot;:&quot;v1&quot;,&quot;resource&quot;:&quot;deployments&quot;},
+    # subresource, if the request is to a subresource
+    &quot;subResource&quot;: &quot;scale&quot;,
+
+    # Fully-qualified group/version/kind of the incoming object in the original request to the API server.
+    # This only differs from `kind` if the webhook specified `matchPolicy: Equivalent` and the
+    # original request to the API server was converted to a version the webhook registered for.
+    &quot;requestKind&quot;: {&quot;group&quot;:&quot;autoscaling&quot;,&quot;version&quot;:&quot;v1&quot;,&quot;kind&quot;:&quot;Scale&quot;},
+    # Fully-qualified group/version/kind of the resource being modified in the original request to the API server.
+    # This only differs from `resource` if the webhook specified `matchPolicy: Equivalent` and the
+    # original request to the API server was converted to a version the webhook registered for.
+    &quot;requestResource&quot;: {&quot;group&quot;:&quot;apps&quot;,&quot;version&quot;:&quot;v1&quot;,&quot;resource&quot;:&quot;deployments&quot;},
+    # subresource, if the request is to a subresource
+    # This only differs from `subResource` if the webhook specified `matchPolicy: Equivalent` and the
+    # original request to the API server was converted to a version the webhook registered for.
+    &quot;requestSubResource&quot;: &quot;scale&quot;,
+
+    # Name of the resource being modified
+    &quot;name&quot;: &quot;my-deployment&quot;,
+    # Namespace of the resource being modified, if the resource is namespaced (or is a Namespace object)
+    &quot;namespace&quot;: &quot;my-namespace&quot;,
+
+    # operation can be CREATE, UPDATE, DELETE, or CONNECT
+    &quot;operation&quot;: &quot;UPDATE&quot;,
+
+    &quot;userInfo&quot;: {
+      # Username of the authenticated user making the request to the API server
+      &quot;username&quot;: &quot;admin&quot;,
+      # UID of the authenticated user making the request to the API server
+      &quot;uid&quot;: &quot;014fbff9a07c&quot;,
+      # Group memberships of the authenticated user making the request to the API server
+      &quot;groups&quot;: [&quot;system:authenticated&quot;,&quot;my-admin-group&quot;],
+      # Arbitrary extra info associated with the user making the request to the API server.
+      # This is populated by the API server authentication layer and should be included
+      # if any SubjectAccessReview checks are performed by the webhook.
+      &quot;extra&quot;: {
+        &quot;some-key&quot;:[&quot;some-value1&quot;, &quot;some-value2&quot;]
+      }
+    },
+
+    # object is the new object being admitted.
+    # It is null for DELETE operations.
+    &quot;object&quot;: {&quot;apiVersion&quot;:&quot;autoscaling/v1&quot;,&quot;kind&quot;:&quot;Scale&quot;,...},
+    # oldObject is the existing object.
+    # It is null for CREATE and CONNECT operations.
+    &quot;oldObject&quot;: {&quot;apiVersion&quot;:&quot;autoscaling/v1&quot;,&quot;kind&quot;:&quot;Scale&quot;,...},
+    # options contains the options for the operation being admitted, like meta.k8s.io/v1 CreateOptions, UpdateOptions, or DeleteOptions.
+    # It is null for CONNECT operations.
+    &quot;options&quot;: {&quot;apiVersion&quot;:&quot;meta.k8s.io/v1&quot;,&quot;kind&quot;:&quot;UpdateOptions&quot;,...},
+
+    # dryRun indicates the API request is running in dry run mode and will not be persisted.
+    # Webhooks with side effects should avoid actuating those side effects when dryRun is true.
+    # See http://k8s.io/docs/reference/using-api/api-concepts/#make-a-dry-run-request for more details.
+    &quot;dryRun&quot;: false
+  }
+}
+}]
+</code></pre>
+<p>Response example:</p>
+<pre><code>cat &lt;&lt;EOF &gt; $VALIDATING_RESPONSE_PATH
+{&quot;allowed&quot;: true}
+EOF
+</code></pre>
+<p>Allow with warnings (Kubernetes 1.19+):</p>
+<pre><code>cat &lt;&lt;EOF &gt; $VALIDATING_RESPONSE_PATH
+{&quot;allowed&quot;: true, &quot;warnings&quot;:[&quot;It might be risky because it is Tuesday&quot;, &quot;It might be risky because your name starts with A&quot;]}
+EOF
+</code></pre>
+<p>Deny object creation and explain why:</p>
+<pre><code>cat &lt;&lt;EOF &gt; $VALIDATING_RESPONSE_PATH
+{&quot;allowed&quot;: false, &quot;message&quot;: &quot;You cannot do this because it is Tuesday and your name starts with A&quot;}
+EOF
+</code></pre>
+<p>User will see an error message:</p>
+<pre><code>Error from server: admission webhook &quot;policy.example.com&quot; denied the request: You cannot do this because it is Tuesday and your name starts with A
+</code></pre>
+<p>Empty or invalid $VALIDATING_RESPONSE_PATH file is considered as <code>&quot;allowed&quot;: false</code> with a short message about the problem and a more verbose error in the log.</p>
+<h2 id="http-server-and-kubernetes-configuration"><a class="header" href="#http-server-and-kubernetes-configuration">HTTP server and Kubernetes configuration</a></h2>
+<p>Shell-operator should create an HTTP endpoint with TLS support and register endpoints in the ValidatingWebhookConfiguration resource.</p>
+<p>There should be a Service for shell-operator (see <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#availability">Availability</a>).</p>
+<p>Command line options:</p>
+<pre><code>  --validating-webhook-configuration-name=&quot;shell-operator-hooks&quot;
+                                 A name of a ValidatingWebhookConfiguration resource. Can be set with
+                                 $VALIDATING_WEBHOOK_CONFIGURATION_NAME.
+  --validating-webhook-service-name=&quot;shell-operator-validating-svc&quot;
+                                 A name of a service used in ValidatingWebhookConfiguration. Can be set
+                                 with $VALIDATING_WEBHOOK_SERVICE_NAME.
+  --validating-webhook-server-cert=&quot;/validating-certs/tls.crt&quot;
+                                 A path to a server certificate for service used in
+                                 ValidatingWebhookConfiguration. Can be set with
+                                 $VALIDATING_WEBHOOK_SERVER_CERT.
+  --validating-webhook-server-key=&quot;/validating-certs/tls.key&quot;
+                                 A path to a server private key for service used in
+                                 ValidatingWebhookConfiguration. Can be set with
+                                 $VALIDATING_WEBHOOK_SERVER_KEY.
+  --validating-webhook-ca=&quot;/validating-certs/ca.crt&quot;
+                                 A path to a ca certificate for ValidatingWebhookConfiguration. Can be set
+                                 with $VALIDATING_WEBHOOK_CA.
+  --validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
+                                 A path to a server certificate for ValidatingWebhookConfiguration. Can be
+                                 set with $VALIDATING_WEBHOOK_CLIENT_CA.
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                                                    <a rel="prev" href="KUBERNETES.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+                                                    <a rel="next" href="BINDING_CONVERSION.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                                    <a rel="prev" href="KUBERNETES.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+                                    <a rel="next" href="BINDING_CONVERSION.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                            </nav>
+
+        </div>
+
+        
+        
+        
+                <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+        
+                <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+        
+    </body>
+</html>

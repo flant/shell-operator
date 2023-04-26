@@ -1,0 +1,1877 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Shell-operator</title>
+                <meta name="robots" content="noindex" />
+                
+
+        <!-- Custom HTML head -->
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+                <link rel="icon" href="favicon.svg">
+                        <link rel="shortcut icon" href="favicon.png">
+                <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+                <link rel="stylesheet" href="css/print.css" media="print">
+        
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="fonts/fonts.css">
+        
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+            </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">Introduction</a></li><li class="chapter-item expanded "><a href="QUICK_START.html"><strong aria-hidden="true">1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="RUNNING.html"><strong aria-hidden="true">2.</strong> Running Shell-operator</a></li><li class="chapter-item expanded "><a href="HOOKS.html"><strong aria-hidden="true">3.</strong> Hooks</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="KUBERNETES.html"><strong aria-hidden="true">3.1.</strong> Work with Kubernetes</a></li><li class="chapter-item expanded "><a href="BINDING_VALIDATING.html"><strong aria-hidden="true">3.2.</strong> Validating Webhook</a></li><li class="chapter-item expanded "><a href="BINDING_CONVERSION.html"><strong aria-hidden="true">3.3.</strong> Conversion Webhooks</a></li></ol></li><li class="chapter-item expanded "><a href="metrics/ROOT.html"><strong aria-hidden="true">4.</strong> Metrics</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="metrics/SELF_METRICS.html"><strong aria-hidden="true">4.1.</strong> Shell-operator metrics</a></li><li class="chapter-item expanded "><a href="metrics/METRICS_FROM_HOOKS.html"><strong aria-hidden="true">4.2.</strong> Return metrics from hooks</a></li></ol></li></ol>            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                                                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                                            </div>
+
+                    <h1 class="menu-title">Shell-operator</h1>
+
+                    <div class="right-buttons">
+                                                <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                                                                        <a href="https://github.com/flant/shell-operator" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                                                
+                    </div>
+                </div>
+
+                                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <p align="center">
+<img src="image/shell-operator-small-logo.png" alt="shell-operator logo" />
+</p>
+<p align="center">
+<a href="https://hub.docker.com/r/flant/shell-operator"><img src="https://img.shields.io/docker/pulls/flant/shell-operator.svg?logo=docker" alt="docker pull flant/shell-operator"/></a>
+ <a href="https://github.com/flant/shell-operator/discussions"><img src="https://img.shields.io/badge/GitHub-discussions-brightgreen" alt="GH Discussions"/></a>
+</p>
+<p><strong>Shell-operator</strong> is a tool for running event-driven scripts in a Kubernetes cluster.</p>
+<p>This operator is not an operator for a <em>particular software product</em> such as <code>prometheus-operator</code> or <code>kafka-operator</code>. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an <code>operator-sdk</code> but for scripts.</p>
+<p>Shell-operator is used as a base for more advanced <a href="https://github.com/flant/addon-operator">addon-operator</a> that supports Helm charts and value storages.</p>
+<p>Shell-operator provides:</p>
+<ul>
+<li><strong>Ease of management of a Kubernetes cluster</strong>: use the tools that Ops are familiar with. It can be bash, python, kubectl, etc.</li>
+<li><strong>Kubernetes object events</strong>: hook can be triggered by <code>add</code>, <code>update</code> or <code>delete</code> events. <strong><a href="HOOKS.html">Learn more</a> about hooks.</strong></li>
+<li><strong>Object selector and properties filter</strong>: shell-operator can monitor a particular set of objects and detect changes in their properties.</li>
+<li><strong>Simple configuration</strong>: hook binding definition is a JSON or YAML document on script’s stdout.</li>
+<li><strong>Validating webhook machinery</strong>: hook can handle validating for Kubernetes resources.</li>
+<li><strong>Conversion webhook machinery</strong>: hook can handle version conversion for Kubernetes resources.</li>
+</ul>
+<h1 id="articles--talks"><a class="header" href="#articles--talks">Articles &amp; talks</a></h1>
+<p>Shell-operator has been presented during KubeCon + CloudNativeCon Europe 2020 Virtual (Aug’20). Here is the talk called “Go? Bash! Meet the shell-operator”:</p>
+<ul>
+<li><a href="https://www.youtube.com/watch?v=we0s4ETUBLc">YouTube video</a>;</li>
+<li><a href="https://medium.com/flant-com/meet-the-shell-operator-kubecon-36c14ba2f8fe">text summary</a>;</li>
+<li><a href="https://speakerdeck.com/flant/go-bash-meet-the-shell-operator">slides</a>.</li>
+</ul>
+<p>Official publications on shell-operator:</p>
+<ul>
+<li>“<a href="https://blog.deckhouse.io/shell-operator-v1-0-0-the-long-awaited-release-of-our-tool-to-create-kubernetes-operators-b20fc0bbca9f?source=friends_link&amp;sk=4d5f991eef62ad22222c5a725712ccdd">shell-operator v1.0.0: the long-awaited release of our tool to create Kubernetes operators</a>“ (Apr’21);</li>
+<li>“<a href="https://blog.deckhouse.io/shell-operator-addon-operator-news-hooks-as-admission-webhooks-helm-3-openapi-go-hooks-and-369df9b4af08?source=friends_link&amp;sk=142aec38bdcdbca73868eb4cc0b85483">shell-operator &amp; addon-operator news: hooks as admission webhooks, Helm 3, OpenAPI, Go hooks, and more!</a>“ (Feb’21);</li>
+<li>“<a href="https://blog.deckhouse.io/shell-operator-for-kubernetes-update-2f1f9f9ebfb1">Kubernetes operators made easy with shell-operator: project status &amp; news</a>“ (Jul’20);</li>
+<li>“<a href="https://blog.deckhouse.io/kubernetes-shell-operator-76c596b42f23">Announcing shell-operator to simplify creating of Kubernetes operators</a>“ (May’19).</li>
+</ul>
+<p>Other languages:</p>
+<ul>
+<li>Chinese: “<a href="https://blog.fleeto.us/post/shell-operator/">介绍一个不太小的工具：Shell Operator</a>“; “<a href="https://cloud.tencent.com/developer/article/1701733">使用shell-operator实现Operator</a>“;</li>
+<li>Dutch: “<a href="https://www.hcs-company.com/blog/operator-automatiseren-namespace-openshift">Een operator om te automatiseren – Hoe pak je dat aan?</a>“;</li>
+<li>Russian: “<a href="https://habr.com/ru/company/flant/blog/551456/">shell-operator v1.0.0: долгожданный релиз нашего проекта для Kubernetes-операторов</a>“; “<a href="https://habr.com/ru/company/flant/blog/447442/">Представляем shell-operator: создавать операторы для Kubernetes стало ещё проще</a>“.</li>
+</ul>
+<h1 id="community"><a class="header" href="#community">Community</a></h1>
+<p>Please feel free to reach developers/maintainers and users via <a href="https://github.com/flant/shell-operator/discussions">GitHub Discussions</a> for any questions regarding shell-operator.</p>
+<p>You’re also welcome to follow <a href="https://twitter.com/flant_com">@flant_com</a> to stay informed about all our Open Source initiatives.</p>
+<h1 id="license"><a class="header" href="#license">License</a></h1>
+<p>Apache License 2.0, see <a href="LICENSE">LICENSE</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="quickstart"><a class="header" href="#quickstart">Quickstart</a></h1>
+<blockquote>
+<p>You need to have a Kubernetes cluster, and the <code>kubectl</code> must be configured to communicate with your cluster.</p>
+</blockquote>
+<p>The simplest setup of shell-operator in your cluster consists of these steps:</p>
+<ul>
+<li>build an image with your hooks (scripts)</li>
+<li>create necessary RBAC objects (for <code>kubernetes</code> bindings)</li>
+<li>run Pod or Deployment with the built image</li>
+</ul>
+<p>For more configuration options see <a href="RUNNING.html">RUNNING</a>.</p>
+<h2 id="build-an-image-with-your-hooks"><a class="header" href="#build-an-image-with-your-hooks">Build an image with your hooks</a></h2>
+<p>A hook is a script that, when executed with <code>--config</code> option, outputs configuration to stdout in YAML or JSON format. <a href="HOOKS.html">Learn more</a> about hooks.</p>
+<p>Let’s create a small operator that will watch for all Pods in all Namespaces and simply log the name of a new Pod.</p>
+<p><code>kubernetes</code> binding is used to tell shell-operator about objects that we want to watch. Create the <code>pods-hook.sh</code> file with the following content:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+
+if [[ $1 == &quot;--config&quot; ]] ; then
+  cat &lt;&lt;EOF
+configVersion: v1
+kubernetes:
+- apiVersion: v1
+  kind: Pod
+  executeHookOnEvent: [&quot;Added&quot;]
+EOF
+else
+  podName=$(jq -r .[0].object.metadata.name $BINDING_CONTEXT_PATH)
+  echo &quot;Pod '${podName}' added&quot;
+fi
+</code></pre>
+<p>Make the <code>pods-hook.sh</code> executable:</p>
+<pre><code class="language-shell">chmod +x pods-hook.sh
+</code></pre>
+<p>You can use a prebuilt image <a href="https://github.com/flant/shell-operator/pkgs/container/shell-operator">ghcr.io/flant/shell-operator:latest</a> with <code>bash</code>, <code>kubectl</code>, <code>jq</code> and <code>shell-operator</code> binaries to build you own image. You just need to <code>ADD</code> your hook into <code>/hooks</code> directory in the <code>Dockerfile</code>.</p>
+<p>Create the following <code>Dockerfile</code> in the directory where you created the <code>pods-hook.sh</code> file:</p>
+<pre><code class="language-dockerfile">FROM ghcr.io/flant/shell-operator:latest
+ADD pods-hook.sh /hooks
+</code></pre>
+<p>Build an image (change image tag according to your Docker registry):</p>
+<pre><code class="language-shell">docker build -t &quot;registry.mycompany.com/shell-operator:monitor-pods&quot; .
+</code></pre>
+<p>Push image to the Docker registry accessible by the Kubernetes cluster:</p>
+<pre><code class="language-shell">docker push registry.mycompany.com/shell-operator:monitor-pods
+</code></pre>
+<h2 id="create-rbac-objects"><a class="header" href="#create-rbac-objects">Create RBAC objects</a></h2>
+<p>We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator:</p>
+<pre><code class="language-shell">kubectl create namespace example-monitor-pods
+kubectl create serviceaccount monitor-pods-acc --namespace example-monitor-pods
+kubectl create clusterrole monitor-pods --verb=get,watch,list --resource=pods
+kubectl create clusterrolebinding monitor-pods --clusterrole=monitor-pods --serviceaccount=example-monitor-pods:monitor-pods-acc
+</code></pre>
+<h2 id="install-shell-operator-in-a-cluster"><a class="header" href="#install-shell-operator-in-a-cluster">Install shell-operator in a cluster</a></h2>
+<p>Shell-operator can be deployed as a Pod. Put this manifest into the <code>shell-operator-pod.yaml</code> file:</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: shell-operator
+spec:
+  containers:
+  - name: shell-operator
+    image: registry.mycompany.com/shell-operator:monitor-pods
+    imagePullPolicy: Always
+  serviceAccountName: monitor-pods-acc
+</code></pre>
+<p>Start shell-operator by applying a <code>shell-operator-pod.yaml</code> file:</p>
+<pre><code class="language-shell">kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
+</code></pre>
+<h2 id="it-all-comes-together"><a class="header" href="#it-all-comes-together">It all comes together</a></h2>
+<p>Let’s deploy a <a href="https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/">kubernetes-dashboard</a> to trigger  <code>kubernetes</code> binding defined in our hook:</p>
+<pre><code class="language-shell">kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
+</code></pre>
+<p>Now run <code>kubectl -n example-monitor-pods logs po/shell-operator</code> and observe that the hook will print dashboard pod name:</p>
+<pre><code class="language-plain">...
+INFO[0027] queue task HookRun:main                       operator.component=handleEvents queue=main
+INFO[0030] Execute hook                                  binding=kubernetes hook=pods-hook.sh operator.component=taskRunner queue=main task=HookRun
+INFO[0030] Pod 'kubernetes-dashboard-775dd7f59c-hr7kj' added  binding=kubernetes hook=pods-hook.sh output=stdout queue=main task=HookRun
+INFO[0030] Hook executed successfully                    binding=kubernetes hook=pods-hook.sh operator.component=taskRunner queue=main task=HookRun
+...
+</code></pre>
+<blockquote>
+<p><em>Note:</em> hook output is logged with output=stdout label.</p>
+</blockquote>
+<p>To clean up a cluster, delete namespace and RBAC objects:</p>
+<pre><code class="language-shell">kubectl delete ns example-monitor-pods
+kubectl delete clusterrole monitor-pods
+kubectl delete clusterrolebinding monitor-pods
+</code></pre>
+<p>This example is also available in /examples: <a href="examples/101-monitor-pods">monitor-pods</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="running-shell-operator"><a class="header" href="#running-shell-operator">Running Shell-operator</a></h1>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<h3 id="run-in-a-cluster"><a class="header" href="#run-in-a-cluster">Run in a cluster</a></h3>
+<ul>
+<li>Build an image from ghcr.io/flant/shell-operator:latest (or use a specific tag).</li>
+<li>Copy your hooks to <code>/hooks</code> directory.</li>
+<li>Apply RBAC manifests.</li>
+<li>Apply Pod or Deployment manifest with the built image.</li>
+</ul>
+<p>More detailed explanation is available in <a href="README.html#quickstart">README</a>, also see installing with Helm in the <a href="/examples/201-install-with-helm-chart">example</a>.</p>
+<h3 id="run-outside-of-a-cluster"><a class="header" href="#run-outside-of-a-cluster">Run outside of a cluster</a></h3>
+<ul>
+<li>Setup kube context,</li>
+<li>Prepare hooks directory,</li>
+<li>Run shell-operator with context and path to hooks directory.</li>
+</ul>
+<p>It is not recommended for production but can be useful while debugging hooks. A scenario can be like this:</p>
+<pre><code># Start local cluster
+kind create cluster
+
+# Start Shell-operator from outside the cluster
+shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type color
+
+</code></pre>
+<h3 id="environment-variables-and-flags"><a class="header" href="#environment-variables-and-flags">Environment variables and flags</a></h3>
+<p>You can configure the operator with the following environment variables and cli flags:</p>
+<table><thead><tr><th>CLI flag</th><th>Env-Variable name</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td>--hooks-dir</td><td>SHELL_OPERATOR_HOOKS_DIR</td><td><code>&quot;&quot;</code></td><td>A path to a hooks file structure</td></tr>
+<tr><td>--tmp-dir</td><td>SHELL_OPERATOR_TMP_DIR</td><td><code>&quot;/tmp/shell-operator&quot;</code></td><td>A path to store temporary files with data for hooks</td></tr>
+<tr><td>--listen-address</td><td>SHELL_OPERATOR_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address to use for HTTP serving.</td></tr>
+<tr><td>--listen-port</td><td>SHELL_OPERATOR_LISTEN_PORT</td><td><code>&quot;9115&quot;</code></td><td>Port to use for HTTP serving.</td></tr>
+<tr><td>--prometheus-metrics-prefix</td><td>SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX</td><td><code>&quot;shell_operator_&quot;</code></td><td>A prefix for metrics names.</td></tr>
+<tr><td>--kube-context</td><td>KUBE_CONTEXT</td><td><code>&quot;&quot;</code></td><td>The name of the kubeconfig context to use. (as a <code>--context</code> flag of kubectl)</td></tr>
+<tr><td>--kube-config</td><td>KUBE_CONFIG</td><td><code>&quot;&quot;</code></td><td>Path to the kubeconfig file. (as a <code>$KUBECONFIG</code> for kubectl)</td></tr>
+<tr><td>--kube-client-qps</td><td>KUBE_CLIENT_QPS</td><td><code>5</code></td><td>QPS for rate limiter of k8s.io/client-go</td></tr>
+<tr><td>--kube-client-burst</td><td>KUBE_CLIENT_BURST</td><td><code>10</code></td><td>burst for rate limiter of k8s.io/client-go</td></tr>
+<tr><td>--object-patcher-kube-client-timeout</td><td>OBJECT_PATCHER_KUBE_CLIENT_TIMEOUT</td><td><code>10s</code></td><td>timeout for object patcher’s requests to the Kubernetes API server</td></tr>
+<tr><td>--jq-library-path</td><td>JQ_LIBRARY_PATH</td><td><code>&quot;&quot;</code></td><td>Prepend directory to the search list for jq modules (works as <code>jq -L</code>).</td></tr>
+<tr><td>n/a</td><td>JQ_EXEC</td><td><code>&quot;&quot;</code></td><td>Set to <code>yes</code> to use jq as executable — it is more for <strong>developing purposes</strong>.</td></tr>
+<tr><td>--log-level</td><td>LOG_LEVEL</td><td><code>&quot;info&quot;</code></td><td>Logging level: <code>debug</code>, <code>info</code>, <code>error</code>.</td></tr>
+<tr><td>--log-type</td><td>LOG_TYPE</td><td><code>&quot;text&quot;</code></td><td>Logging formatter type: <code>json</code>, <code>text</code> or <code>color</code>.</td></tr>
+<tr><td>--log-no-time</td><td>LOG_NO_TIME</td><td><code>false</code></td><td>Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps.</td></tr>
+<tr><td>--log-proxy-hook-json</td><td>LOG_PROXY_HOOK_JSON</td><td><code>false</code></td><td>Delegate hook stdout/ stderr JSON logging to the hooks and act as a proxy that adds some extra fields before just printing the output. <strong>NOTE: It ignores <code>LOG_TYPE</code> for the output of the hooks; expects JSON lines to stdout/ stderr from the hooks</strong></td></tr>
+<tr><td>--debug-keep-tmp-files</td><td>DEBUG_KEEP_TMP_FILES</td><td><code>&quot;no&quot;</code></td><td>Set to <code>yes</code> to keep files in $SHELL_OPERATOR_TMP_DIR for debugging purposes. Note that it can generate many files.</td></tr>
+<tr><td>--debug-unix-socket</td><td>DEBUG_UNIX_SOCKET</td><td><code>&quot;/var/run/shell-operator/debug.socket&quot;</code></td><td>Path to the unix socket file for debugging purposes.</td></tr>
+<tr><td>--validating-webhook-configuration-name</td><td>VALIDATING_WEBHOOK_CONFIGURATION_NAME</td><td><code>&quot;shell-operator-hooks&quot;</code></td><td>A name of a ValidatingWebhookConfiguration resource.</td></tr>
+<tr><td>--validating-webhook-service-name</td><td>VALIDATING_WEBHOOK_SERVICE_NAME</td><td><code>&quot;shell-operator-validating-svc&quot;</code></td><td>A name of a service used in ValidatingWebhookConfiguration.</td></tr>
+<tr><td>--validating-webhook-server-cert</td><td>VALIDATING_WEBHOOK_SERVER_CERT</td><td><code>&quot;/validating-certs/tls.crt&quot;</code></td><td>A path to a server certificate for service used in ValidatingWebhookConfiguration.</td></tr>
+<tr><td>--validating-webhook-server-key</td><td>VALIDATING_WEBHOOK_SERVER_KEY</td><td><code>&quot;/validating-certs/tls.key&quot;</code></td><td>A path to a server private key for service used in ValidatingWebhookConfiguration.</td></tr>
+<tr><td>--validating-webhook-ca</td><td>VALIDATING_WEBHOOK_CA</td><td><code>&quot;/validating-certs/ca.crt&quot;</code></td><td>A path to a ca certificate for ValidatingWebhookConfiguration.</td></tr>
+<tr><td>--validating-webhook-client-ca</td><td>VALIDATING_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a server certificate for ValidatingWebhookConfiguration.</td></tr>
+<tr><td>--conversion-webhook-service-name</td><td>CONVERSION_WEBHOOK_SERVICE_NAME</td><td><code>&quot;shell-operator-conversion-svc&quot;</code></td><td>A name of a service for clientConfig in CRD.</td></tr>
+<tr><td>--conversion-webhook-server-cert</td><td>CONVERSION_WEBHOOK_SERVER_CERT</td><td><code>&quot;/conversion-certs/tls.crt&quot;</code></td><td>A path to a server certificate for clientConfig in CRD.</td></tr>
+<tr><td>--conversion-webhook-server-key</td><td>CONVERSION_WEBHOOK_SERVER_KEY</td><td><code>&quot;/conversion-certs/tls.key&quot;</code></td><td>A path to a server private key for clientConfig in CRD.</td></tr>
+<tr><td>--conversion-webhook-ca</td><td>CONVERSION_WEBHOOK_CA</td><td><code>&quot;/conversion-certs/ca.crt&quot;</code></td><td>A path to a ca certificate for clientConfig in CRD.</td></tr>
+<tr><td>--conversion-webhook-client-ca</td><td>CONVERSION_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a server certificate for CRD.spec.conversion.webhook.</td></tr>
+</tbody></table>
+<h3 id="notes-on-json-log-proxying"><a class="header" href="#notes-on-json-log-proxying">Notes on JSON log proxying</a></h3>
+<ul>
+<li>JSON log proxying (see above <code>--log-proxy-hook-json</code>) gives a lot of control to the hooks, which might want to use their own logger or different fields or log level</li>
+<li>It is incompatible with the other log flags in regard to filtering or configuring logging for the hooks. <code>shell-operator</code> will always expect valid json lines and output them regardless of the other flags</li>
+<li>The log lines from the hooks will be enhanced with these top-level fields, from <code>shell-operator</code> before being printed: ‘hook’, ‘binding’, ‘event’, ‘task’, ‘queue’</li>
+<li>Configure hooks to use the <code>msg</code>, <code>time</code> and <code>level</code> fields for consistency with the logs coming from <code>shell-operator</code>. This, however, is not enforced.</li>
+</ul>
+<h2 id="debug"><a class="header" href="#debug">Debug</a></h2>
+<p>The following tools for debugging and fine-tuning of Shell-operator and hooks are available:</p>
+<ul>
+<li>Analysis of logs of a Shell-operator’s pod (enter <code>kubectl logs -f po/POD_NAME</code> in terminal),</li>
+<li>The environment variable can be set to <code>LOG_LEVEL=debug</code> to include the detailed debugging information into logs,</li>
+<li>You can view the contents of the working queues with cli command from inside a Pod:
+<pre><code>kubectl exec -ti po/shell-operator /bin/bash
+shell-operator queue list
+</code></pre>
+</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="hooks"><a class="header" href="#hooks">Hooks</a></h1>
+<p>A hook is an executable file that Shell-operator runs when some event occurs. It can be a script or a compiled program written in any programming language. For illustrative purposes, we will use bash scripts. An example with a hook in the form of a Python script is available here: <a href="examples/002-startup-python">002-startup-python</a>.</p>
+<p>The hook receives the data and returns the result via files. Paths to files are passed to the hook via environment variables.</p>
+<h2 id="shell-operator-lifecycle"><a class="header" href="#shell-operator-lifecycle">Shell-operator lifecycle</a></h2>
+<p>At startup Shell-operator initializes the hooks:</p>
+<ul>
+<li>The recursive search for hook files is performed in the hooks directory. You can specify it with <code>--hooks-dir</code> command-line argument or with the <code>SHELL_OPERATOR_HOOKS_DIR</code> environment variable (the default path is <code>/hooks</code>).
+<ul>
+<li>Every executable file found in the path is considered a hook.</li>
+</ul>
+</li>
+<li>Found hooks are sorted alphabetically according to the directories’ and hooks’ names. Then they are executed with the <code>--config</code> flag to get bindings to events in YAML or JSON format.</li>
+<li>If hook’s configuration is successful, the working queue named “main” is filled with <code>onStartup</code> hooks.</li>
+<li>Then, the “main” queue is filled with <code>kubernetes</code> hooks with <code>Synchronization</code> <a href="HOOKS.html#binding-context">binding context</a> type, so that each hook receives all existing objects described in hook’s configuration.</li>
+<li>After executing <code>kubernetes</code> hook with <code>Synchronization</code> binding context, Shell-operator starts a monitor of Kubernetes events according to configured <code>kubernetes</code> binding.
+<ul>
+<li>Each monitor stores a <em>snapshot</em> — a refreshable list of all Kubernetes objects that match a binding definition.</li>
+</ul>
+</li>
+</ul>
+<p>Next, the main cycle is started:</p>
+<ul>
+<li>
+<p>Event handler adds hooks to the named queues on events:</p>
+<ul>
+<li><code>kubernetes</code> hooks are added to the queue when desired <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.16/#watchevent-v1-meta">WatchEvent</a> is received from Kubernetes,</li>
+<li><code>schedule</code> hooks are added according to the schedule,</li>
+<li><code>kubernetes</code> and <code>schedule</code> hooks are added to the “main” queue or the named queue if <code>queue</code> field was specified.</li>
+</ul>
+</li>
+<li>
+<p>Each named queue has its queue handler which executes hooks strictly sequentially. If hook fails with an error (non-zero exit code), Shell-operator restarts it (every 5 seconds) until it succeeds. In case of an erroneous execution of a hook, when other events occur, a queue will be filled with new tasks, but their execution will be blocked until the failing hook succeeds.</p>
+<ul>
+<li>You can change this behavior for a specific hook by adding <code>allowFailure: true</code> to the binding configuration (not available for <code>onStartup</code> hooks).</li>
+</ul>
+</li>
+<li>
+<p>Each hook is executed with a binding context, that describes an already occurred event:</p>
+<ul>
+<li><code>kubernetes</code> hook receives <code>Event</code> binding context with an object related to the event.</li>
+<li><code>schedule</code> hook receives a name of triggered schedule binding.</li>
+</ul>
+</li>
+<li>
+<p>If there is a sequence of hook executions in a queue, then hook is executed once with array of binding contexts.</p>
+<ul>
+<li>If binding contains <code>group</code> key, then a sequence of binding context with similar <code>group</code> key is compacted into one binding context.</li>
+</ul>
+</li>
+<li>
+<p>Several metrics are available for monitoring the activity of the queues and hooks: queues size, number of execution errors for specific hooks, etc. See <a href="METRICS.html">METRICS</a> for more details.</p>
+</li>
+</ul>
+<h2 id="hook-configuration"><a class="header" href="#hook-configuration">Hook configuration</a></h2>
+<p>Shell-operator runs the hook with the <code>--config</code> flag. In response, the hook should print its event binding configuration to stdout. The response can be in YAML format:</p>
+<pre><code class="language-yaml">configVersion: v1
+onStartup: ORDER,
+schedule:
+- {SCHEDULE_PARAMETERS}
+- {SCHEDULE_PARAMETERS}
+kubernetes:
+- {KUBERNETES_PARAMETERS}
+- {KUBERNETES_PARAMETERS}
+kubernetesValidating:
+- {VALIDATING_PARAMETERS}
+- {VALIDATING_PARAMETERS}
+settings:
+  SETTINGS_PARAMETERS
+</code></pre>
+<p>or in JSON format:</p>
+<pre><code class="language-yaml">{
+  &quot;configVersion&quot;: &quot;v1&quot;,
+  &quot;onStartup&quot;: STARTUP_ORDER,
+  &quot;schedule&quot;: [
+    {SCHEDULE_PARAMETERS},
+    {SCHEDULE_PARAMETERS}
+  ],
+  &quot;kubernetes&quot;: [
+    {KUBERNETES_PARAMETERS},
+    {KUBERNETES_PARAMETERS}
+  ],
+  &quot;kubernetesValidating&quot;: [
+    {VALIDATING_PARAMETERS},
+    {VALIDATING_PARAMETERS}
+  ],
+  &quot;settings&quot;: {SETTINGS_PARAMETERS}
+}
+</code></pre>
+<p><code>configVersion</code> field specifies a version of configuration schema. The latest schema version is <strong>v1</strong> and it is described below.</p>
+<p>Event binding is an event type (one of “onStartup”, “schedule”, “kubernetes” or “kubernetesValidating”) plus parameters required for a subscription.</p>
+<h3 id="onstartup"><a class="header" href="#onstartup">onStartup</a></h3>
+<p>Use this binding type to execute a hook at the Shell-operator’s startup.</p>
+<p>Syntax:</p>
+<pre><code class="language-yaml">configVersion: v1
+onStartup: ORDER
+</code></pre>
+<p>Parameters:</p>
+<p><code>ORDER</code> — an integer value that specifies an execution order. “OnStartup” hooks will be sorted by this value and then alphabetically by file name.</p>
+<h3 id="schedule"><a class="header" href="#schedule">schedule</a></h3>
+<p>Scheduled execution. You can bind a hook to any number of schedules.</p>
+<h4 id="syntax"><a class="header" href="#syntax">Syntax</a></h4>
+<pre><code class="language-yaml">configVersion: v1
+
+schedule:
+
+- crontab: &quot;*/5 * * * *&quot;
+  allowFailure: true|false
+
+- name: &quot;Every 20 minutes&quot;
+  crontab: &quot;*/20 * * * *&quot;
+  allowFailure: true|false
+
+- name: &quot;every 10 seconds&quot;,
+  crontab: &quot;*/10 * * * * *&quot;
+  allowFailure: true|false
+  queue: &quot;every-ten&quot;
+  includeSnapshotsFrom: &quot;monitor-pods&quot;
+
+- name: &quot;every minute&quot;
+  crontab: &quot;* * * * *&quot;
+  allowFailure: true|false
+  group: &quot;pods&quot;
+  ...
+</code></pre>
+<h4 id="parameters"><a class="header" href="#parameters">Parameters</a></h4>
+<ul>
+<li>
+<p><code>name</code> — is an optional identifier. It is used to distinguish between multiple schedules during runtime. For more information see <a href="HOOKS.html#binding-context">binding context</a>.</p>
+</li>
+<li>
+<p><code>crontab</code> – is a mandatory schedule with a regular crontab syntax with 5 fields. 6 fields style crontab also supported, for more information see <a href="https://godoc.org/gopkg.in/robfig/cron.v2">documentation on robfig/cron.v2 library</a>.</p>
+</li>
+<li>
+<p><code>allowFailure</code> — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.</p>
+</li>
+<li>
+<p><code>queue</code> — a name of a separate queue. It can be used to execute long-running hooks in parallel with other hooks.</p>
+</li>
+<li>
+<p><code>includeSnapshotsFrom</code> — a list of names of <code>kubernetes</code> bindings. When specified, all monitored objects will be added to the binding context in a <code>snapshots</code> field.</p>
+</li>
+<li>
+<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+</li>
+</ul>
+<h3 id="kubernetes"><a class="header" href="#kubernetes">kubernetes</a></h3>
+<p>Run a hook on a Kubernetes object changes.</p>
+<h4 id="syntax-1"><a class="header" href="#syntax-1">Syntax</a></h4>
+<pre><code class="language-yaml">configVersion: v1
+kubernetes:
+- name: &quot;Monitor pods in cache tier&quot;
+  apiVersion: v1
+  kind: Pod  # required
+  executeHookOnEvent: [ &quot;Added&quot;, &quot;Modified&quot;, &quot;Deleted&quot; ]
+  executeHookOnSynchronization: true|false # default is true
+  keepFullObjectsInMemory: true|false # default is true
+  nameSelector:
+    matchNames:
+    - pod-0
+    - pod-1
+  labelSelector:
+    matchLabels:
+      myLabel: myLabelValue
+      someKey: someValue
+    matchExpressions:
+    - key: &quot;tier&quot;
+      operator: &quot;In&quot;
+      values: [&quot;cache&quot;]
+    # - ...
+  fieldSelector:
+    matchExpressions:
+    - field: &quot;status.phase&quot;
+      operator: &quot;Equals&quot;
+      value: &quot;Pending&quot;
+    # - ...
+  namespace:
+    nameSelector:
+      matchNames: [&quot;somenamespace&quot;, &quot;proj-production&quot;, &quot;proj-stage&quot;]
+    labelSelector:
+      matchLabels:
+        myLabel: &quot;myLabelValue&quot;
+        someKey: &quot;someValue&quot;
+      matchExpressions:
+      - key: &quot;env&quot;
+        operator: &quot;In&quot;
+        values: [&quot;production&quot;]
+      # - ...
+  jqFilter: &quot;.metadata.labels&quot;
+  includeSnapshotsFrom:
+  - &quot;Monitor pods in cache tier&quot;
+  - &quot;monitor Pods&quot;
+  - ...
+  allowFailure: true|false  # default is false
+  queue: &quot;cache-pods&quot;
+  group: &quot;pods&quot;
+
+- name: &quot;monitor Pods&quot;
+  kind: &quot;pod&quot;
+  # ...
+</code></pre>
+<h4 id="parameters-1"><a class="header" href="#parameters-1">Parameters</a></h4>
+<ul>
+<li>
+<p><code>name</code> is an optional identifier. It is used to distinguish different bindings during runtime. See also <a href="HOOKS.html#binding-context">binding context</a>.</p>
+</li>
+<li>
+<p><code>apiVersion</code> is an optional group and version of object API. For example, it is <code>v1</code> for core objects (Pod, etc.), <code>rbac.authorization.k8s.io/v1beta1</code> for ClusterRole and <code>monitoring.coreos.com/v1</code> for prometheus-operator.</p>
+</li>
+<li>
+<p><code>kind</code> is the type of a monitored Kubernetes resource. This field is required. CRDs are supported, but the resource should be registered in the cluster before Shell-operator starts. This can be checked with <code>kubectl api-resources</code> command. You can specify a case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:</p>
+<pre><code class="language-text">&quot;kind&quot;: &quot;DaemonSet&quot;
+&quot;kind&quot;: &quot;Daemonset&quot;
+&quot;kind&quot;: &quot;daemonsets&quot;
+&quot;kind&quot;: &quot;DaemonSets&quot;
+&quot;kind&quot;: &quot;ds&quot;
+</code></pre>
+</li>
+<li>
+<p><code>executeHookOnEvent</code> — the list of events which led to a hook’s execution. By default, all events are used to execute a hook: “Added”, “Modified” and “Deleted”. Docs: <a href="https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes">Using API</a> <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta">WatchEvent</a>. Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.</p>
+</li>
+<li>
+<p><code>executeHookOnSynchronization</code> — if <code>false</code>, Shell-operator skips the hook execution with Synchronization binding context. See <a href="HOOKS.html#binding-context">binding context</a>.</p>
+</li>
+<li>
+<p><code>nameSelector</code> — selector of objects by their name. If this selector is not set, then all objects of a specified Kind are monitored.</p>
+</li>
+<li>
+<p><code>labelSelector</code> — <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta">standard</a> selector of objects by labels (examples <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels">of use</a>).
+If the selector is not set, then all objects of a specified kind are monitored.</p>
+</li>
+<li>
+<p><code>fieldSelector</code> — selector of objects by their fields, works like <code>--field-selector=''</code> flag of <code>kubectl</code>. Supported operators are Equals (or <code>=</code>, <code>==</code>) and NotEquals (or <code>!=</code>) and all expressions are combined with AND. Also, note that fieldSelector with ‘metadata.name’ the field is mutually exclusive with nameSelector. There are limits on fields, see <a href="HOOKS.html#fieldselector">Note</a>.</p>
+</li>
+<li>
+<p><code>namespace</code> — filters to choose namespaces. If omitted, events from all namespaces will be monitored.</p>
+</li>
+<li>
+<p><code>namespace.nameSelector</code> — this filter can be used to monitor events from objects in a particular list of namespaces.</p>
+</li>
+<li>
+<p><code>namespace.labelSelector</code> — this filter works like <code>labelSelector</code> but for namespaces and Shell-operator dynamically subscribes to events from matched namespaces.</p>
+</li>
+<li>
+<p><code>jqFilter</code> —  an optional parameter that specifies event <strong>filtering</strong> using <a href="https://stedolan.github.io/jq/manual/">jq syntax</a>. The hook will be triggered on the “Modified” event only if the filter result is <em>changed</em> after the last event. See example <a href="examples/102-monitor-namespaces">102-monitor-namespaces</a>.</p>
+</li>
+<li>
+<p><code>allowFailure</code> — if <code>true</code>, Shell-operator skips the hook execution errors. If <code>false</code> or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.</p>
+</li>
+<li>
+<p><code>queue</code> — a name of a separate queue. It can be used to execute long-running hooks in parallel with hooks in the “main” queue.</p>
+</li>
+<li>
+<p><code>includeSnapshotsFrom</code> — an array of names of <code>kubernetes</code> bindings in a hook. When specified, a list of monitored objects from that bindings will be added to the binding context in a <code>snapshots</code> field. Self-include is also possible.</p>
+</li>
+<li>
+<p><code>keepFullObjectsInMemory</code> — if not set or <code>true</code>, dumps of Kubernetes resources are cached for this binding, and the snapshot includes them as <code>object</code> fields. Set to <code>false</code> if the hook does not rely on full objects to reduce the memory footprint.</p>
+</li>
+<li>
+<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+</li>
+</ul>
+<h4 id="example"><a class="header" href="#example">Example</a></h4>
+<pre><code class="language-yaml">configVersion: v1
+kubernetes:
+# Trigger on labels changes of Pods with myLabel:myLabelValue in any namespace
+- name: &quot;label-changes-of-mylabel-pods&quot;
+  kind: pod
+  executeHookOnEvent: [&quot;Modified&quot;]
+  labelSelector:
+    matchLabels:
+      myLabel: &quot;myLabelValue&quot;
+  namespace:
+    nameSelector: [&quot;default&quot;]
+  jqFilter: .metadata.labels
+  allowFailure: true
+  includeSnapshotsFrom: [&quot;label-changes-of-mylabel-pods&quot;]
+</code></pre>
+<p>This hook configuration will execute hook on each change in labels of pods labeled with <code>myLabel=myLabelValue</code> in “default” namespace. The binding context will contain all pods with <code>myLabel=myLabelValue</code> from “default” namespace.</p>
+<h4 id="notes"><a class="header" href="#notes">Notes</a></h4>
+<h5 id="default-namespace"><a class="header" href="#default-namespace">default Namespace</a></h5>
+<p>Unlike <code>kubectl</code> you should explicitly define <code>namespace.nameSelector</code> to monitor events from <code>default</code> namespace.</p>
+<pre><code class="language-yaml">  namespace:
+    nameSelector: [&quot;default&quot;]
+</code></pre>
+<h5 id="rbac-is-required"><a class="header" href="#rbac-is-required">RBAC is required</a></h5>
+<p>Shell-operator requires a ServiceAccount with the appropriate <a href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/">RBAC</a> permissions. See examples with RBAC: <a href="examples/101-monitor-pods">monitor-pods</a> and <a href="examples/102-monitor-namespaces">monitor-namespaces</a>.</p>
+<h5 id="jqfilter"><a class="header" href="#jqfilter">jqFilter</a></h5>
+<p>This filter is used to <em>ignore</em> superfluous “Modified” events, <em>and</em> to <em>exclude</em> object from event subscription. For example, if the hook should track changes of object’s labels, <code>jqFilter: &quot;.metadata.labels&quot;</code> can be used to ignore changes in other properties (<code>.status</code>,<code>.metadata.annotations</code>, etc.).</p>
+<p>The result of applying the filter to the event’s object is passed to the hook in a <code>filterResult</code> field of a <a href="HOOKS.html#binding-context">binding context</a>.</p>
+<p>You can use <code>JQ_LIBRARY_PATH</code> environment variable to set a path with <code>jq</code> modules.</p>
+<h5 id="added--object-created"><a class="header" href="#added--object-created">Added != Object created</a></h5>
+<p>Consider that the “Added” event is not always equal to “Object created” if <code>labelSelector</code>, <code>fieldSelector</code> or <code>namespace.labelSelector</code> is specified in the <code>binding</code>. If objects and/or namespace are updated in Kubernetes, the <code>binding</code> may suddenly start matching them, with the “Added” event. The same with “Deleted” event: “Deleted” is not always equal to “Object removed”, the object can just move out of a scope of selectors.</p>
+<h5 id="fieldselector"><a class="header" href="#fieldselector">fieldSelector</a></h5>
+<p>There is no support for filtering by arbitrary field neither for core resources nor for custom resources (see <a href="https://github.com/kubernetes/kubernetes/issues/53459">issue#53459</a>). Only <code>metadata.name</code> and <code>metadata.namespace</code> fields are commonly supported.</p>
+<p>However fieldSelector can be useful for some resources with extended set of supported fields:</p>
+<table><thead><tr><th>kind</th><th>fieldSelector</th><th>src url</th></tr></thead><tbody>
+<tr><td>Pod</td><td>spec.nodeName<br>spec.restartPolicy<br>spec.schedulerName<br>spec.serviceAccountName<br>status.phase<br>status.podIP<br>status.nominatedNodeName</td><td><a href="https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/pod/strategy.go#L219-L230">1.16</a></td></tr>
+<tr><td>Event</td><td>involvedObject.kind<br>involvedObject.namespace<br>involvedObject.name<br>involvedObject.uid<br>involvedObject.apiVersion<br>involvedObject.resourceVersion<br>involvedObject.fieldPath<br>reason<br>source<br>type</td><td><a href="https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/event/strategy.go#L102-L112">1.16</a></td></tr>
+<tr><td>Secret</td><td>type</td><td><a href="https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/secret/strategy.go#L128">1.16</a></td></tr>
+<tr><td>Namespace</td><td>status.phase</td><td><a href="https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/namespace/strategy.go#L163">1.16</a></td></tr>
+<tr><td>ReplicaSet</td><td>status.replicas</td><td><a href="https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/apps/replicaset/strategy.go#L">1.16</a></td></tr>
+<tr><td>Job</td><td>status.successful</td><td><a href="https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/batch/job/strategy.go#L205">1.16</a></td></tr>
+<tr><td>Node</td><td>spec.unschedulable</td><td><a href="https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/node/strategy.go#L204">1.16</a></td></tr>
+</tbody></table>
+<p>Example of selecting Pods by ‘Running’ phase:</p>
+<pre><code class="language-yaml">kind: Pod
+fieldSelector:
+  matchExpressions:
+  - field: &quot;status.phase&quot;
+    operator: Equals
+    value: Running
+</code></pre>
+<h5 id="fieldselector-and-labelselector-expressions-are-anded"><a class="header" href="#fieldselector-and-labelselector-expressions-are-anded">fieldSelector and labelSelector expressions are ANDed</a></h5>
+<p>Objects should match all expressions defined in <code>fieldSelector</code> and <code>labelSelector</code>, so, for example, multiple <code>fieldSelector</code> expressions with <code>metadata.name</code> field and different values will not match any object.</p>
+<h3 id="kubernetesvalidating"><a class="header" href="#kubernetesvalidating">kubernetesValidating</a></h3>
+<p>Use a hook as handler for <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers">ValidationWebhookConfiguration</a>.</p>
+<p>See syntax and parameters in <a href="BINDING_VALIDATING.html">BINDING_VALIDATING.md</a></p>
+<h3 id="kubernetescustomresourceconversion"><a class="header" href="#kubernetescustomresourceconversion">kubernetesCustomResourceConversion</a></h3>
+<p>Use a hook as handler for <a href="https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning">custom resource conversion</a>.</p>
+<p>See syntax and parameters in <a href="BINDING_CONVERSION.html">BINDING_CONVERSION.md</a></p>
+<h2 id="binding-context"><a class="header" href="#binding-context">Binding context</a></h2>
+<p>When an event associated with a hook is triggered, Shell-operator executes the hook without arguments. The information about the event that led to the hook execution is called the <strong>binding context</strong> and is written in JSON format to a temporary file. The path to this file is available to hook via environment variable <code>BINDING_CONTEXT_PATH</code>.</p>
+<p>Temporary files have unique names to prevent collisions between queues and are deleted after the hook run.</p>
+<p>Binging context is a JSON-array of structures with the following fields:</p>
+<ul>
+<li><code>binding</code> — a string from the <code>name</code> or <code>group</code> parameters. If these parameters has not been set in the binding configuration, then strings “schedule” or “kubernetes” are used. For a hook executed at startup, this value is always “onStartup”.</li>
+<li><code>type</code> — “Schedule” for <code>schedule</code> bindings. “Synchronization” or “Event” for <code>kubernetes</code> bindings. “Group” if <code>group</code> is defined.</li>
+</ul>
+<p>The hook receives “Event”-type binding context on Kubernetes event and it contains more fields:</p>
+<ul>
+<li><code>watchEvent</code> — the possible value is one of the values you can use with <code>executeHookOnEvent</code> parameter: “Added”, “Modified” or “Deleted”.</li>
+<li><code>object</code> — a JSON dump of the full object related to the event. It contains an exact copy of the corresponding field in <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a> response, so it’s the object state <strong>at the moment of the event</strong> (not at the moment of the hook execution).</li>
+<li><code>filterResult</code> — the result of <code>jq</code> execution with specified <code>jqFilter</code> on the above mentioned object. If <code>jqFilter</code> is not specified, then <code>filterResult</code> is omitted.</li>
+</ul>
+<p>The hook receives existed objects on startup for each binding with “Synchronization”-type binding context:</p>
+<ul>
+<li><code>objects</code> — a list of existing objects that match selectors in binding configuration. Each item of this list contains <code>object</code> and <code>filterResult</code> fields. The state of items is actual <strong>for the moment of the hook execution</strong>. If the list is empty, the value of <code>objects</code> is an empty array.</li>
+</ul>
+<p>If <code>group</code> or <code>includeSnapshotsFrom</code> are defined, the hook receives binding context with additional field:</p>
+<ul>
+<li><code>snapshots</code> — a map that contains an up-to-date lists of objects for each binding name from <code>includeSnapshotsFrom</code> or for each <code>kubernetes</code> binding with a similar <code>group</code>. If <code>includeSnapshotsFrom</code> list is empty, the field is omitted.</li>
+</ul>
+<h3 id="onstartup-binding-context-example"><a class="header" href="#onstartup-binding-context-example"><code>onStartup</code> binding context example</a></h3>
+<p>Hook with this configuration:</p>
+<pre><code class="language-yaml">configVersion: v1
+onStartup: 1
+</code></pre>
+<p>will be executed with this binding context at startup:</p>
+<pre><code class="language-json">[{&quot;binding&quot;: &quot;onStartup&quot;}]
+</code></pre>
+<h3 id="schedule-binding-context-example"><a class="header" href="#schedule-binding-context-example"><code>schedule</code> binding context example</a></h3>
+<p>For example, if you have the following configuration in a hook:</p>
+<pre><code class="language-yaml">configVersion: v1
+schedule:
+- name: incremental
+  crontab: &quot;0 2 */3 * * *&quot;
+  allowFailure: true
+</code></pre>
+<p>then at 12:02, it will be executed with the following binding context:</p>
+<pre><code class="language-json">[{ &quot;binding&quot;: &quot;incremental&quot;, &quot;type&quot;:&quot;Schedule&quot;}]
+</code></pre>
+<h3 id="kubernetes-binding-context-example"><a class="header" href="#kubernetes-binding-context-example"><code>kubernetes</code> binding context example</a></h3>
+<p>A hook can monitor Pods in all namespaces with this simple configuration:</p>
+<pre><code class="language-yaml">configVersion: v1
+kubernetes:
+- kind: Pod
+</code></pre>
+<h4 id="synchronization-binding-context"><a class="header" href="#synchronization-binding-context">“Synchronization” binding context</a></h4>
+<p>During startup, the hook receives all existing objects with “Synchronization”-type binding context:</p>
+<pre><code class="language-yaml">[
+  {
+    &quot;binding&quot;: &quot;kubernetes&quot;,
+    &quot;type&quot;: &quot;Synchronization&quot;,
+    &quot;objects&quot;: [
+      {
+        &quot;object&quot;: {
+          &quot;kind&quot;: &quot;Pod&quot;,
+          &quot;metadata&quot;:{
+            &quot;name&quot;:&quot;etcd-...&quot;,
+            &quot;namespace&quot;:&quot;kube-system&quot;,
+            ...
+          },
+        }
+      },
+      {
+        &quot;object&quot;: {
+          &quot;kind&quot;: &quot;Pod&quot;,
+          &quot;metadata&quot;: {
+            &quot;name&quot;: &quot;kube-proxy-...&quot;,
+            &quot;namespace&quot;: &quot;kube-system&quot;,
+            ...
+          },
+        }
+      },
+      ...
+    ]
+  }
+]
+</code></pre>
+<blockquote>
+<p>Note: hook execution at startup with “Synchronization” binding context can be turned off with <code>executeHookOnSynchronization: false</code></p>
+</blockquote>
+<h4 id="event-binding-context"><a class="header" href="#event-binding-context">“Event” binding context</a></h4>
+<p>If pod <code>pod-321d12</code> is then added into namespace ‘default’, then the hook will be executed with the “Event”-type binding context:</p>
+<pre><code class="language-yaml">[
+  {
+    &quot;binding&quot;: &quot;kubernetes&quot;,
+    &quot;type&quot;: &quot;Event&quot;,
+    &quot;watchEvent&quot;: &quot;Added&quot;,
+    &quot;object&quot;: {
+      &quot;apiVersion&quot;: &quot;v1&quot;,
+      &quot;kind&quot;: &quot;Pod&quot;,
+      &quot;metadata&quot;: {
+        &quot;name&quot;: &quot;pod-321d12&quot;,
+        &quot;namespace&quot;: &quot;default&quot;,
+        ...
+      },
+      &quot;spec&quot;: {
+        ...
+      },
+      ...
+    }
+  }
+]
+</code></pre>
+<h3 id="snapshots"><a class="header" href="#snapshots">Snapshots</a></h3>
+<p>“Event”-type binding context contains an object state at the moment of the event. Actual objects’ state for the moment of the execution can be received in a form of <em>Snapshots</em>.</p>
+<p>Shell-operator maintains an up-to-date list of objects for each <code>kubernetes</code> binding. <code>schedule</code> and <code>kubernetes</code> bindings can be configured to receive these lists via <code>includeSnapshotsFrom</code> parameter. Also, there is a <code>group</code> parameter to automatically receive all snapshots from multiple bindings and to deduplicate executions.</p>
+<p>Snapshot is a JSON array of Kubernetes objects and corresponding jqFilter results. To access the snapshot during the hook execution, there is a map <code>snapshots</code> in the binding context. The key of this map is a binding name, and the value is the snapshot.</p>
+<p><code>snapshots</code> example:</p>
+<pre><code class="language-yaml">[
+  { &quot;binding&quot;: ...,
+    &quot;snapshots&quot;: {
+      &quot;binding-name-1&quot;: [ 
+        {
+          &quot;object&quot;: {
+            &quot;kind&quot;: &quot;Pod&quot;,
+            &quot;metadata&quot;: {
+              &quot;name&quot;: &quot;etcd-...&quot;,
+              &quot;namespace&quot;: &quot;kube-system&quot;,
+              ...
+            },
+          },
+          &quot;filterResult&quot;: { ... },
+        },
+        ...
+      ]
+    }}]
+</code></pre>
+<ul>
+<li><code>object</code> — a JSON dump of Kubernetes object.</li>
+<li><code>filterResult</code> — a JSON result of applying <code>jqFilter</code> to the Kubernetes object.</li>
+</ul>
+<p>Keeping dumps for <code>object</code> fields can take a lot of memory. There is a parameter <code>keepFullObjectsInMemory: false</code> to disable full dumps.</p>
+<p>Note that disabling full objects make sense only if <code>jqFilter</code> is defined, as it disables full objects in <code>snapshots</code> field, <code>objects</code> field of “Synchronization” binding context and <code>object</code> field of “Event” binding context.</p>
+<p>For example, this binding configuration will execute hook with empty items in <code>objects</code> field of “Synchronization” binding context:</p>
+<pre><code class="language-yaml">kubernetes:
+- name: pods
+  kinds: Pod   
+  keepFullObjectsInMemory: false
+</code></pre>
+<h3 id="snapshots-example"><a class="header" href="#snapshots-example">Snapshots example</a></h3>
+<p>To illustrate the <code>includeSnapshotsFrom</code> parameter, consider the hook that reacts to changes of labels of all Pods and requires the content of the ConfigMap named “settings-for-my-hook”. There is also a schedule to do periodic checks:</p>
+<pre><code class="language-yaml">configVersion: v1
+schedule:
+- name: periodic-checking
+  crontab: &quot;0 */3 * * *&quot;
+  includeSnapshotsFrom: [&quot;monitor-pods&quot;, &quot;configmap-content&quot;]
+kubernetes:
+- name: configmap-content
+  kind: ConfigMap
+  nameSelector:
+    matchNames: [&quot;settings-for-my-hook&quot;]
+  executeHookOnSynchronization: false
+  executeHookOnEvent: []
+- name: monitor-pods
+  kind: Pod
+  jqFilter: '.metadata.labels'
+  includeSnapshotsFrom: [&quot;configmap-content&quot;]
+</code></pre>
+<p>This hook will not be executed for events related to the binding “configmap-content”. <code>executeHookOnSynchronization: false</code> accompanied by <code>executeHookOnEvent: []</code> defines a “snapshot-only” binding. This is one of the techniques to reduce the number of <code>kubectl</code> invocations.</p>
+<h4 id="synchronization-binding-context-with-snapshots"><a class="header" href="#synchronization-binding-context-with-snapshots">“Synchronization” binding context with snapshots</a></h4>
+<p>During startup, the hook will be executed with the “Synchronization” binding context with <code>snapshots</code> and <code>objects</code>:</p>
+<pre><code class="language-yaml">[
+  {
+    &quot;binding&quot;: &quot;monitor-pods&quot;,
+    &quot;type&quot;: &quot;Synchronization&quot;,
+    &quot;objects&quot;: [
+      {
+        &quot;object&quot;: {
+          &quot;kind&quot;: &quot;Pod&quot;,
+          &quot;metadata&quot;: {
+            &quot;name&quot;: &quot;etcd-...&quot;,
+            &quot;namespace&quot;: &quot;kube-system&quot;,
+            &quot;labels&quot;: { ... },
+            ...
+          },
+        },
+        &quot;filterResult&quot;: {
+          &quot;label1&quot;: &quot;value&quot;,
+          ...
+        }
+      },
+      {
+        &quot;object&quot;: {
+          &quot;kind&quot;: &quot;Pod&quot;,
+          &quot;metadata&quot;: {
+            &quot;name&quot;: &quot;kube-proxy-...&quot;,
+            &quot;namespace&quot;: &quot;kube-system&quot;,
+            ...
+          },
+        },
+        &quot;filterResult&quot;: {
+          &quot;label1&quot;: &quot;value&quot;,
+          ...
+        }
+      },
+      ...
+    ],
+    &quot;snapshots&quot;: {
+      &quot;configmap-content&quot;: [
+        {
+          &quot;object&quot;: {
+            &quot;kind&quot;: &quot;ConfigMap&quot;,
+            &quot;metadata&quot;: {&quot;name&quot;: &quot;settings-for-my-hook&quot;, ... },
+            &quot;data&quot;: {&quot;field1&quot;: ... }
+          }
+        }
+      ]
+    }
+  }
+]
+</code></pre>
+<h4 id="event-binding-context-with-snapshots"><a class="header" href="#event-binding-context-with-snapshots">“Event” binding context with snapshots</a></h4>
+<p>If pod <code>pod-321d12</code> is then added into the “default” namespace, then the hook will be executed with the “Event” binding context with <code>object</code> and <code>filterResult</code> fields:</p>
+<pre><code class="language-yaml">[
+  {
+    &quot;binding&quot;: &quot;monitor-pods&quot;,
+    &quot;type&quot;: &quot;Event&quot;,
+    &quot;watchEvent&quot;: &quot;Added&quot;,
+    &quot;object&quot;: {
+      &quot;apiVersion&quot;: &quot;v1&quot;,
+      &quot;kind&quot;: &quot;Pod&quot;,
+      &quot;metadata&quot;: {
+        &quot;name&quot;: &quot;pod-321d12&quot;,
+        &quot;namespace&quot;: &quot;default&quot;,
+        ...
+      },
+      &quot;spec&quot;: {
+        ...
+      },
+      ...
+    },
+    &quot;filterResult&quot;: { ... },
+    &quot;snapshots&quot;: {
+      &quot;configmap-content&quot;: [
+        {
+          &quot;object&quot;: {
+            &quot;kind&quot;: &quot;ConfigMap&quot;,
+            &quot;metadata&quot;: {&quot;name&quot;: &quot;settings-for-my-hook&quot;, ... },
+            &quot;data&quot;: {&quot;field1&quot;: ... }
+          }
+        }
+      ]
+    }
+  }
+]
+</code></pre>
+<h4 id="schedule-binding-context-with-snapshots"><a class="header" href="#schedule-binding-context-with-snapshots">“Schedule” binding context with snapshots</a></h4>
+<p>Every 3 hours, the hook will be executed with the binding context that include 2 snapshots (”monitor-pods” and “configmap-content”):</p>
+<pre><code class="language-yaml">[
+  {
+    &quot;binding&quot;: &quot;periodic-checking&quot;,
+    &quot;type&quot;: &quot;Schedule&quot;,
+    &quot;snapshots&quot;: {
+      &quot;monitor-pods&quot;: [
+        {
+          &quot;object&quot;: {
+            &quot;kind&quot;: &quot;Pod&quot;,
+            &quot;metadata&quot;: {
+              &quot;name&quot;: &quot;etcd-...&quot;,
+              &quot;namespace&quot;: &quot;kube-system&quot;,
+              ...
+            },
+          },
+          &quot;filterResult&quot;: { ... },
+        },
+        ...
+      ],
+      &quot;configmap-content&quot;: [
+        {
+          &quot;object&quot;: {
+            &quot;kind&quot;: &quot;ConfigMap&quot;,
+            &quot;metadata&quot;: {&quot;name&quot;: &quot;settings-for-my-hook&quot;, ... },
+            &quot;data&quot;: {&quot;field1&quot;: ... }
+          }
+        }
+      ]
+    }
+  }
+]
+</code></pre>
+<h3 id="binding-context-of-grouped-bindings"><a class="header" href="#binding-context-of-grouped-bindings">Binding context of grouped bindings</a></h3>
+<p><code>group</code> parameter defines a named group of bindings. Group is used when the source of the event is not important, and data in snapshots is enough for the hook. When binding with <code>group</code> is triggered with the event, the hook receives snapshots from all <code>kubernetes</code> bindings with the same <code>group</code> name.</p>
+<p>Adjacent tasks for <code>kubernetes</code> and <code>schedule</code> bindings with the same <code>group</code> and <code>queue</code> are “compacted”, and the hook is executed only once. So it is wise to use the same <code>queue</code> for all hooks in a group. This “compaction” mechanism is not available for <code>kubernetesValidating</code> and <code>kubernetesCustomResourceConversion</code> bindings as they’re not queued.</p>
+<p><code>executeHookOnSynchronization</code>, <code>executeHookOnEvent</code> and <code>keepFullObjectsInMemory</code> can be used  with <code>group</code>. Their effects are as described above for non-grouped bindings.</p>
+<p><code>group</code> parameter is compatible with <code>includeSnapshotsFrom</code> parameter. <code>includeSnapshotsFrom</code> can be used to include additional snapshots into binding context.</p>
+<p>Binding context for group contains:</p>
+<ul>
+<li><code>binding</code> field with the group name.</li>
+<li><code>type</code> field with the value “Group”.</li>
+<li><code>snapshots</code> field if there is at least one <code>kubernetes</code> binding in the group or <code>includeSnapshotsFrom</code> is not empty.</li>
+</ul>
+<h3 id="group-binding-context-example"><a class="header" href="#group-binding-context-example">Group binding context example</a></h3>
+<p>Consider the hook that is executed on changes of labels of all Pods, changes in ConfigMap’s data and also on schedule:</p>
+<pre><code class="language-yaml">configVersion: v1
+schedule:
+- name: periodic-checking
+  crontab: &quot;0 */3 * * *&quot;
+  group: &quot;pods&quot;
+kubernetes:
+- name: monitor-pods
+  apiVersion: v1
+  kind: Pod
+  jqFilter: '.metadata.labels'
+  group: &quot;pods&quot;
+- name: configmap-content
+  apiVersion: v1
+  kind: ConfigMap
+  nameSelector:
+    matchNames: [&quot;settings-for-my-hook&quot;]
+  jqFilter: '.data'
+  group: &quot;pods&quot;
+
+</code></pre>
+<h4 id="binding-context-for-grouped-bindings"><a class="header" href="#binding-context-for-grouped-bindings">binding context for grouped bindings</a></h4>
+<p>Grouped bindings is used when only the occurrence of an event is important. So, the hook receives actual state of Pods and the ConfigMap on every of these events:</p>
+<ul>
+<li>During startup.</li>
+<li>A new Pod is added.</li>
+<li>The Pod is deleted.</li>
+<li>Labels of the Pod are changed.</li>
+<li>ConfigMap/settings-for-my-hook is deleted.</li>
+<li>ConfigMap/settings-for-my-hook is added.</li>
+<li>Data field is changed in ConfigMap/settings-for-my-hook.</li>
+<li>Every 3 hours.</li>
+</ul>
+<p>Binding context for these events will be the same:</p>
+<pre><code class="language-yaml">[
+  {
+    &quot;binding&quot;: &quot;pods&quot;,
+    &quot;type&quot;: &quot;Group&quot;,
+    &quot;snapshots&quot;: {
+      &quot;monitor-pods&quot;: [
+        {
+          &quot;object&quot;: {
+            &quot;kind&quot;: &quot;Pod&quot;,
+            &quot;metadata&quot;: {
+              &quot;name&quot;: &quot;etcd-...&quot;,
+              &quot;namespace&quot;: &quot;kube-system&quot;,
+              ...
+            },
+          },
+          &quot;filterResult&quot;: { ... },
+        },
+        ...
+      ],
+      &quot;configmap-content&quot;: [
+        {
+          &quot;object&quot;: {
+            &quot;kind&quot;: &quot;ConfigMap&quot;,
+            &quot;metadata&quot;: {
+              &quot;name&quot;: &quot;etcd-...&quot;,
+              &quot;namespace&quot;: &quot;kube-system&quot;,
+              ...
+            },
+          },
+          &quot;filterResult&quot;: { ... },
+        },
+        ...
+      ]
+    }
+  }
+]
+</code></pre>
+<h3 id="settings"><a class="header" href="#settings">settings</a></h3>
+<p>An optional block with hook-level settings.</p>
+<h4 id="syntax-2"><a class="header" href="#syntax-2">Syntax</a></h4>
+<pre><code class="language-yaml">configVersion: v1
+settings:
+  executionMinInterval: 3s
+  executionBurst: 1
+</code></pre>
+<h4 id="parameters-2"><a class="header" href="#parameters-2">Parameters</a></h4>
+<ul>
+<li><code>executionMinInterval</code> defines a minimum time between hook executions.</li>
+<li><code>executionBurst</code> a number of allowed executions during a period.</li>
+</ul>
+<h4 id="execution-rate"><a class="header" href="#execution-rate">Execution rate</a></h4>
+<p><code>executionMinInterval</code> and <code>executionBurst</code> are parameters for “token bucket” algorithm. These parameters are used to throttle hook executions and wait for more events in the queue. It is wise to use a separate queue for bindings in such a hook, as a hook with execution rate settings and with default (”main”) queue can hold the execution of other hooks.</p>
+<h4 id="example-1"><a class="header" href="#example-1">Example</a></h4>
+<pre><code class="language-yaml">configVersion: v1
+kubernetes:
+- name: &quot;all-pods-in-ns&quot;
+  kind: pod
+  executeHookOnEvent: [&quot;Modified&quot;]
+  namespace:
+    nameSelector: [&quot;default&quot;]
+  queue: handle-pods-queue
+settings:
+  executionMinInterval: 3s
+  executionBurst: 1
+</code></pre>
+<p>If the Shell-operator will receive a lot of events for the “all-pods-in-ns” binding, the hook will be executed no more than once in 3 seconds.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="modifying-kubernetes-objects"><a class="header" href="#modifying-kubernetes-objects">Modifying Kubernetes objects</a></h1>
+<p>You can delegate Kubernetes object manipulation to the shell-operator.</p>
+<p>To do this, you have to write one or more JSON or YAML documents describing operation type and its parameters to a file.
+List of possible operations and corresponding JSON specifications can be found below.</p>
+<p>The path to the file is found in the <code>$KUBERNETES_PATCH_PATH</code> environment variable.</p>
+<h2 id="operations"><a class="header" href="#operations">Operations</a></h2>
+<h3 id="create"><a class="header" href="#create">Create</a></h3>
+<ul>
+<li><code>operation</code> — specifies an operation’s type.
+<ul>
+<li><code>CreateOrUpdate</code> — accept a Kubernetes object.
+It retrieves an object, and if it already exists, computes a JSON Merge Patch and applies it (will not update .status field).
+If it does not exist, we create the object.</li>
+<li><code>Create</code> — will fail if an object already exists</li>
+<li><code>CreateIfNotExists</code> — create an object if such an object does not already
+exist by namespace/name.</li>
+</ul>
+</li>
+<li><code>object</code> — full object specification including “apiVersion”, “kind” and all necessary metadata. Can be a normal JSON or YAML object or a stringified JSON or YAML object.</li>
+</ul>
+<h4 id="example-2"><a class="header" href="#example-2">Example</a></h4>
+<pre><code class="language-json">{
+  &quot;operation&quot;: &quot;CreateOrUpdate&quot;,
+  &quot;object&quot;: {
+    &quot;apiVersion&quot;: &quot;apps/v1&quot;,
+    &quot;kind&quot;: &quot;DaemonSet&quot;,
+    &quot;metadata&quot;: {
+      &quot;name&quot;: &quot;flannel&quot;,
+      &quot;namespace&quot;: &quot;d8-flannel&quot;
+    },
+    &quot;spec&quot;: {
+      &quot;selector&quot;: {
+        &quot;matchLabels&quot;: {
+          &quot;app&quot;: &quot;flannel&quot;
+        }
+      },
+      &quot;template&quot;: {
+        &quot;metadata&quot;: {
+          &quot;labels&quot;: {
+            &quot;app&quot;: &quot;flannel&quot;,
+            &quot;tier&quot;: &quot;node&quot;
+          }
+        },
+        &quot;spec&quot;: {
+          &quot;containers&quot;: [
+            {
+              &quot;args&quot;: [
+                &quot;--ip-masq&quot;,
+                &quot;--kube-subnet-mgr&quot;
+              ],
+              &quot;image&quot;: &quot;flannel:v0.11&quot;,
+              &quot;name&quot;: &quot;kube-flannel&quot;,
+              &quot;securityContext&quot;: {
+                &quot;privileged&quot;: true
+              }
+            }
+          ],
+          &quot;hostNetwork&quot;: true,
+          &quot;imagePullSecrets&quot;: [
+            {
+              &quot;name&quot;: &quot;registry&quot;
+            }
+          ],
+          &quot;terminationGracePeriodSeconds&quot;: 5
+        }
+      },
+      &quot;updateStrategy&quot;: {
+        &quot;type&quot;: &quot;RollingUpdate&quot;
+      }
+    }
+  }
+}
+</code></pre>
+<pre><code class="language-yaml">operation: Create
+object:
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    namespace: default
+    name: testcm
+  data: ...
+</code></pre>
+<pre><code class="language-yaml">operation: Create
+object: |
+  {&quot;apiVersion&quot;:&quot;v1&quot;, &quot;kind&quot;:&quot;ConfigMap&quot;,
+   &quot;metadata&quot;:{&quot;namespace&quot;:&quot;default&quot;,&quot;name&quot;:&quot;testcm&quot;},
+   &quot;data&quot;:{&quot;foo&quot;: &quot;bar&quot;}}
+</code></pre>
+<h3 id="delete"><a class="header" href="#delete">Delete</a></h3>
+<ul>
+<li><code>operation</code> — specifies an operation’s type. Deletion types map directly to Kubernetes
+DELETE’s <a href="https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/"><code>propagationPolicy</code></a>.
+<ul>
+<li><code>Delete</code> — foreground deletion. Hook will block the queue until the referenced object and all its descendants are deleted.</li>
+<li><code>DeleteInBackground</code> — will delete the referenced object immediately. All its descendants will be removed by Kubernetes’
+garbage collector.</li>
+<li><code>DeleteNonCascading</code> — will delete the referenced object immediately, and orphan all its descendants.</li>
+</ul>
+</li>
+<li><code>apiVersion</code> — optional field that specifies object’s apiVersion. If not present, we’ll use preferred apiVersion
+for the given kind.</li>
+<li><code>kind</code> — object’s Kind.</li>
+<li><code>namespace</code> — object’s namespace. If empty, implies operation on a cluster-level resource.</li>
+<li><code>name</code> — object’s name.</li>
+<li><code>subresource</code> — a subresource name if subresource is to be transformed. For example, <code>status</code>.</li>
+</ul>
+<h4 id="example-3"><a class="header" href="#example-3">Example</a></h4>
+<pre><code class="language-json">{
+  &quot;operation&quot;: &quot;Delete&quot;,
+  &quot;kind&quot;: &quot;Pod&quot;,
+  &quot;namespace&quot;: &quot;default&quot;,
+  &quot;name&quot;: &quot;nginx&quot;
+}
+</code></pre>
+<h3 id="patch"><a class="header" href="#patch">Patch</a></h3>
+<p>Use <code>JQPatch</code> for almost everything. Consider using <code>MergePatch</code> or <code>JSONPatch</code> if you are attempting to modify 
+rapidly changing object, for example <code>status</code> field with many concurrent changes (and incrementing <code>resourceVersion</code>).</p>
+<p>Be careful, when updating a <code>.status</code> field. If a <code>/status</code> subresource is enabled on a resource,
+it’ll ignore updates to the <code>.status</code> field if you haven’t specified <code>subresource: status</code> in the operation spec.
+More info <a href="https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">here</a>.</p>
+<h4 id="jqpatch"><a class="header" href="#jqpatch">JQPatch</a></h4>
+<ul>
+<li><code>operation</code> — specifies an operation’s type.</li>
+<li><code>apiVersion</code> — optional field that specifies object’s apiVersion. If not present, we’ll use preferred apiVersion
+for the given kind.</li>
+<li><code>kind</code> — object’s Kind.</li>
+<li><code>namespace</code> — object’s Namespace. If empty, implies operation on a Cluster-level resource.</li>
+<li><code>name</code> — object’s name.</li>
+<li><code>jqFilter</code> — describes transformations to perform on an object.</li>
+<li><code>subresource</code> — a subresource name if subresource is to be transformed. For example, <code>status</code>.</li>
+</ul>
+<h5 id="example-4"><a class="header" href="#example-4">Example</a></h5>
+<pre><code class="language-json">{
+  &quot;operation&quot;: &quot;JQPatch&quot;,
+  &quot;kind&quot;: &quot;Deployment&quot;,
+  &quot;namespace&quot;: &quot;default&quot;,
+  &quot;name&quot;: &quot;nginx&quot;,
+  &quot;jqFilter&quot;: &quot;.spec.replicas = 1&quot;
+}
+</code></pre>
+<h4 id="mergepatch"><a class="header" href="#mergepatch">MergePatch</a></h4>
+<ul>
+<li><code>operation</code> — specifies an operation’s type.</li>
+<li><code>apiVersion</code> — optional field that specifies object’s apiVersion. If not present, we’ll use preferred apiVersion
+for the given kind.</li>
+<li><code>kind</code> — object’s Kind.</li>
+<li><code>namespace</code> — object’s Namespace. If empty, implies operation on a Cluster-level resource.</li>
+<li><code>name</code> — object’s name.</li>
+<li><code>mergePatch</code> — describes transformations to perform on an object. Can be a normal JSON or YAML object or a stringified JSON or YAML object.</li>
+<li><code>subresource</code> — e.g., <code>status</code>.</li>
+<li><code>ignoreMissingObject</code> — set to true to ignore error when patching non existent object.</li>
+</ul>
+<h5 id="example-5"><a class="header" href="#example-5">Example</a></h5>
+<pre><code class="language-json">{
+  &quot;operation&quot;: &quot;MergePatch&quot;,
+  &quot;kind&quot;: &quot;Deployment&quot;,
+  &quot;namespace&quot;: &quot;default&quot;,
+  &quot;name&quot;: &quot;nginx&quot;,
+  &quot;mergePatch&quot;: {
+    &quot;spec&quot;: {
+      &quot;replicas&quot;: 1
+    }
+  }
+}
+</code></pre>
+<pre><code class="language-yaml">operation: MergePatch
+kind: Deployment
+namespace: default
+name: nginx
+ignoreMissingObject: true
+mergePatch: |
+  spec:
+    replicas: 1
+</code></pre>
+<h4 id="jsonpatch"><a class="header" href="#jsonpatch">JSONPatch</a></h4>
+<ul>
+<li><code>operation</code> — specifies an operation’s type.</li>
+<li><code>apiVersion</code> — optional field that specifies object’s apiVersion. If not present, we’ll use preferred apiVersion
+for the given kind.</li>
+<li><code>kind</code> — object’s Kind.</li>
+<li><code>namespace</code> — object’s Namespace. If empty, implies operation on a Cluster-level resource.</li>
+<li><code>name</code> — object’s name.</li>
+<li><code>jsonPatch</code> — describes transformations to perform on an object. Can be a normal JSON or YAML array or a stringified JSON or YAML array.</li>
+<li><code>subresource</code> — a subresource name if subresource is to be transformed. For example, <code>status</code>.</li>
+<li><code>ignoreMissingObject</code> — set to true to ignore error when patching non existent object.</li>
+</ul>
+<h5 id="example-6"><a class="header" href="#example-6">Example</a></h5>
+<pre><code class="language-json">{
+  &quot;operation&quot;: &quot;JSONPatch&quot;,
+  &quot;kind&quot;: &quot;Deployment&quot;,
+  &quot;namespace&quot;: &quot;default&quot;,
+  &quot;name&quot;: &quot;nginx&quot;,
+  &quot;jsonPatch&quot;: [
+    {&quot;op&quot;: &quot;replace&quot;, &quot;path&quot;:  &quot;/spec/replicas&quot;, &quot;value&quot;:  1}
+  ]
+}
+</code></pre>
+<pre><code class="language-json">{
+  &quot;operation&quot;: &quot;JSONPatch&quot;,
+  &quot;kind&quot;: &quot;Deployment&quot;,
+  &quot;namespace&quot;: &quot;default&quot;,
+  &quot;name&quot;: &quot;nginx&quot;,
+  &quot;jsonPatch&quot;: &quot;[
+    {\&quot;op\&quot;: \&quot;replace\&quot;, \&quot;path\&quot;:  \&quot;/spec/replicas\&quot;, \&quot;value\&quot;:  1}
+  ]&quot;
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="kubernetesvalidating-1"><a class="header" href="#kubernetesvalidating-1">kubernetesValidating</a></h1>
+<p>This binding transforms a hook into a handler for ValidatingWebhookConfiguration. The Shell-operator creates ValidatingWebhookConfiguration, starts HTTPS server, and runs hooks to handle <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#request">AdmissionReview requests</a>.</p>
+<blockquote>
+<p>Note: shell-operator use <code>admissionregistration.k8s.io/v1</code>, so Kubernetes 1.16+ is needed.</p>
+</blockquote>
+<h2 id="syntax-3"><a class="header" href="#syntax-3">Syntax</a></h2>
+<pre><code class="language-yaml">configVersion: v1
+onStartup: 10
+kubernetes:
+- name: myCrdObjects
+  ...
+kubernetesValidating:
+- name: my-crd-validator.example.com
+  # include snapshots by binding names
+  includeSnapshotsFrom: [&quot;myCrdObjects&quot;]
+  # or use group name to include all snapshots in a group
+  group: &quot;group name&quot;
+  labelSelector:   # equivalent of objectSelector
+    matchLabels:
+      label1: value1
+      ...
+  namespace:
+    labelSelector: # equivalent of namespaceSelector
+      matchLabels:
+        label1: value1
+        ...
+      matchExpressions:
+      - key: environment
+        operator: In
+        values: [&quot;prod&quot;,&quot;staging&quot;]
+  rules:
+  - apiVersions:
+    - v1
+    apiGroups:
+    - stable.example.com
+    resources:
+    - CronTab
+    operations:
+    - &quot;*&quot;
+  - operations: [&quot;CREATE&quot;, &quot;UPDATE&quot;]
+    apiGroups: [&quot;apps&quot;]
+    apiVersions: [&quot;v1&quot;, &quot;v1beta1&quot;]
+    resources: [&quot;deployments&quot;, &quot;replicasets&quot;]
+    scope: &quot;Namespaced&quot;
+  failurePolicy: Ignore | Fail (default)
+  sideEffects: None (default) | NoneOnDryRun
+  timeoutSeconds: 2 (default is 10)
+</code></pre>
+<h2 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h2>
+<ul>
+<li>
+<p><code>name</code> — a required parameter. It should be a domain with at least three segments separated by dots.</p>
+</li>
+<li>
+<p><code>includeSnapshotsFrom</code> — an array of names of <code>kubernetes</code> bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the <code>snapshots</code> field.</p>
+</li>
+<li>
+<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="BINDING_VALIDATING.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+</li>
+<li>
+<p><code>labelSelector</code> — <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta">standard</a> selector of objects by labels (examples <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels">of use</a>). See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector">objectSelector</a>.</p>
+</li>
+<li>
+<p><code>namespace.labelSelector</code> — this filter works like <code>labelSelector</code> but for namespaces. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector">namespaceSelector</a>.</p>
+</li>
+<li>
+<p><code>rules</code> — a required list of rules used to determine if a request to the Kubernetes API server should be sent to the hook. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules">Rules</a>.</p>
+</li>
+<li>
+<p><code>failurePolicy</code> — defines how errors from the hook are handled. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy">Failure policy</a>. Default is <code>Fail</code>.</p>
+</li>
+<li>
+<p><code>sideEffects</code> — determine whether the hook is <code>dryRun</code>-aware. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#side-effects">side effects</a> documentation. Default is <code>None</code>.</p>
+</li>
+<li>
+<p><code>timeoutSeconds</code> — a seconds API server should wait for a hook to respond before treating the call as a failure. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#timeouts">timeouts</a>. Default is 10 (seconds).</p>
+</li>
+</ul>
+<p>As you can see, it is the close copy of a <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#webhook-configuration">Webhook configuration</a>. Differences are:</p>
+<ul>
+<li><code>objectSelector</code> is a <code>labelSelector</code> as in the <code>kubernetes</code> binding.</li>
+<li><code>namespaceSelector</code> is a <code>namespace.labelSelector</code> as in the <code>kubernetes</code> binding.</li>
+<li><code>clientConfig</code> is managed by the Shell-operator. You should provide a Service for the Shell-operator HTTPS endpoint. See example <a href="./examples/204-validating-webhook">204-validating-webhook</a> for possible solution.</li>
+<li><code>matchPolicy</code> is always “Equivalent”. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy">Matching requests: matchPolicy</a>.</li>
+<li>there are additional fields <code>group</code> and <code>includeSnapshotsFrom</code> to include snapshots in the binding context.</li>
+</ul>
+<h2 id="example-7"><a class="header" href="#example-7">Example</a></h2>
+<pre><code>configVersion: v1
+kubernetesValidating:
+- name: private-repo-policy.example.com
+  rules:
+  - apiGroups:   [&quot;stable.example.com&quot;]
+    apiVersions: [&quot;v1&quot;]
+    operations:  [&quot;CREATE&quot;]
+    resources:   [&quot;crontabs&quot;]
+    scope:       &quot;Namespaced&quot;
+</code></pre>
+<p>The Shell-operator will execute hook with this configuration on every creation of CronTab object.</p>
+<p>See example <a href="./examples/204-validating-webhook">204-validating-webhook</a>.</p>
+<h2 id="hook-input-and-output"><a class="header" href="#hook-input-and-output">Hook input and output</a></h2>
+<blockquote>
+<p>Note that the <code>group</code> parameter is only for including snapshots. <code>kubernetesValidating</code> hook is never executed on <code>schedule</code> or <code>kubernetes</code> events with binding context with <code>&quot;type&quot;:&quot;Group&quot;</code>.</p>
+</blockquote>
+<p>The hook receives a binding context and should return response in <code>$VALIDATING_RESPONSE_PATH</code>.</p>
+<p>$BINDING_CONTEXT_PATH file example:</p>
+<pre><code class="language-yaml">[{
+# Name as defined in binding configuration.
+&quot;binding&quot;: &quot;my-crd-validator.example.com&quot;,
+# Validating to distinguish from other events.
+&quot;type&quot;: &quot;Validating&quot;,
+# Snapshots as defined by includeSnapshotsFrom or group.
+&quot;snapshots&quot;: { ... }
+# AdmissionReview object.
+&quot;review&quot;: {
+  &quot;apiVersion&quot;: &quot;admission.k8s.io/v1&quot;,
+  &quot;kind&quot;: &quot;AdmissionReview&quot;,
+  &quot;request&quot;: {
+    # Random uid uniquely identifying this admission call
+    &quot;uid&quot;: &quot;705ab4f5-6393-11e8-b7cc-42010a800002&quot;,
+
+    # Fully-qualified group/version/kind of the incoming object
+    &quot;kind&quot;: {&quot;group&quot;:&quot;autoscaling&quot;,&quot;version&quot;:&quot;v1&quot;,&quot;kind&quot;:&quot;Scale&quot;},
+    # Fully-qualified group/version/kind of the resource being modified
+    &quot;resource&quot;: {&quot;group&quot;:&quot;apps&quot;,&quot;version&quot;:&quot;v1&quot;,&quot;resource&quot;:&quot;deployments&quot;},
+    # subresource, if the request is to a subresource
+    &quot;subResource&quot;: &quot;scale&quot;,
+
+    # Fully-qualified group/version/kind of the incoming object in the original request to the API server.
+    # This only differs from `kind` if the webhook specified `matchPolicy: Equivalent` and the
+    # original request to the API server was converted to a version the webhook registered for.
+    &quot;requestKind&quot;: {&quot;group&quot;:&quot;autoscaling&quot;,&quot;version&quot;:&quot;v1&quot;,&quot;kind&quot;:&quot;Scale&quot;},
+    # Fully-qualified group/version/kind of the resource being modified in the original request to the API server.
+    # This only differs from `resource` if the webhook specified `matchPolicy: Equivalent` and the
+    # original request to the API server was converted to a version the webhook registered for.
+    &quot;requestResource&quot;: {&quot;group&quot;:&quot;apps&quot;,&quot;version&quot;:&quot;v1&quot;,&quot;resource&quot;:&quot;deployments&quot;},
+    # subresource, if the request is to a subresource
+    # This only differs from `subResource` if the webhook specified `matchPolicy: Equivalent` and the
+    # original request to the API server was converted to a version the webhook registered for.
+    &quot;requestSubResource&quot;: &quot;scale&quot;,
+
+    # Name of the resource being modified
+    &quot;name&quot;: &quot;my-deployment&quot;,
+    # Namespace of the resource being modified, if the resource is namespaced (or is a Namespace object)
+    &quot;namespace&quot;: &quot;my-namespace&quot;,
+
+    # operation can be CREATE, UPDATE, DELETE, or CONNECT
+    &quot;operation&quot;: &quot;UPDATE&quot;,
+
+    &quot;userInfo&quot;: {
+      # Username of the authenticated user making the request to the API server
+      &quot;username&quot;: &quot;admin&quot;,
+      # UID of the authenticated user making the request to the API server
+      &quot;uid&quot;: &quot;014fbff9a07c&quot;,
+      # Group memberships of the authenticated user making the request to the API server
+      &quot;groups&quot;: [&quot;system:authenticated&quot;,&quot;my-admin-group&quot;],
+      # Arbitrary extra info associated with the user making the request to the API server.
+      # This is populated by the API server authentication layer and should be included
+      # if any SubjectAccessReview checks are performed by the webhook.
+      &quot;extra&quot;: {
+        &quot;some-key&quot;:[&quot;some-value1&quot;, &quot;some-value2&quot;]
+      }
+    },
+
+    # object is the new object being admitted.
+    # It is null for DELETE operations.
+    &quot;object&quot;: {&quot;apiVersion&quot;:&quot;autoscaling/v1&quot;,&quot;kind&quot;:&quot;Scale&quot;,...},
+    # oldObject is the existing object.
+    # It is null for CREATE and CONNECT operations.
+    &quot;oldObject&quot;: {&quot;apiVersion&quot;:&quot;autoscaling/v1&quot;,&quot;kind&quot;:&quot;Scale&quot;,...},
+    # options contains the options for the operation being admitted, like meta.k8s.io/v1 CreateOptions, UpdateOptions, or DeleteOptions.
+    # It is null for CONNECT operations.
+    &quot;options&quot;: {&quot;apiVersion&quot;:&quot;meta.k8s.io/v1&quot;,&quot;kind&quot;:&quot;UpdateOptions&quot;,...},
+
+    # dryRun indicates the API request is running in dry run mode and will not be persisted.
+    # Webhooks with side effects should avoid actuating those side effects when dryRun is true.
+    # See http://k8s.io/docs/reference/using-api/api-concepts/#make-a-dry-run-request for more details.
+    &quot;dryRun&quot;: false
+  }
+}
+}]
+</code></pre>
+<p>Response example:</p>
+<pre><code>cat &lt;&lt;EOF &gt; $VALIDATING_RESPONSE_PATH
+{&quot;allowed&quot;: true}
+EOF
+</code></pre>
+<p>Allow with warnings (Kubernetes 1.19+):</p>
+<pre><code>cat &lt;&lt;EOF &gt; $VALIDATING_RESPONSE_PATH
+{&quot;allowed&quot;: true, &quot;warnings&quot;:[&quot;It might be risky because it is Tuesday&quot;, &quot;It might be risky because your name starts with A&quot;]}
+EOF
+</code></pre>
+<p>Deny object creation and explain why:</p>
+<pre><code>cat &lt;&lt;EOF &gt; $VALIDATING_RESPONSE_PATH
+{&quot;allowed&quot;: false, &quot;message&quot;: &quot;You cannot do this because it is Tuesday and your name starts with A&quot;}
+EOF
+</code></pre>
+<p>User will see an error message:</p>
+<pre><code>Error from server: admission webhook &quot;policy.example.com&quot; denied the request: You cannot do this because it is Tuesday and your name starts with A
+</code></pre>
+<p>Empty or invalid $VALIDATING_RESPONSE_PATH file is considered as <code>&quot;allowed&quot;: false</code> with a short message about the problem and a more verbose error in the log.</p>
+<h2 id="http-server-and-kubernetes-configuration"><a class="header" href="#http-server-and-kubernetes-configuration">HTTP server and Kubernetes configuration</a></h2>
+<p>Shell-operator should create an HTTP endpoint with TLS support and register endpoints in the ValidatingWebhookConfiguration resource.</p>
+<p>There should be a Service for shell-operator (see <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#availability">Availability</a>).</p>
+<p>Command line options:</p>
+<pre><code>  --validating-webhook-configuration-name=&quot;shell-operator-hooks&quot;
+                                 A name of a ValidatingWebhookConfiguration resource. Can be set with
+                                 $VALIDATING_WEBHOOK_CONFIGURATION_NAME.
+  --validating-webhook-service-name=&quot;shell-operator-validating-svc&quot;
+                                 A name of a service used in ValidatingWebhookConfiguration. Can be set
+                                 with $VALIDATING_WEBHOOK_SERVICE_NAME.
+  --validating-webhook-server-cert=&quot;/validating-certs/tls.crt&quot;
+                                 A path to a server certificate for service used in
+                                 ValidatingWebhookConfiguration. Can be set with
+                                 $VALIDATING_WEBHOOK_SERVER_CERT.
+  --validating-webhook-server-key=&quot;/validating-certs/tls.key&quot;
+                                 A path to a server private key for service used in
+                                 ValidatingWebhookConfiguration. Can be set with
+                                 $VALIDATING_WEBHOOK_SERVER_KEY.
+  --validating-webhook-ca=&quot;/validating-certs/ca.crt&quot;
+                                 A path to a ca certificate for ValidatingWebhookConfiguration. Can be set
+                                 with $VALIDATING_WEBHOOK_CA.
+  --validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
+                                 A path to a server certificate for ValidatingWebhookConfiguration. Can be
+                                 set with $VALIDATING_WEBHOOK_CLIENT_CA.
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="kubernetescustomresourceconversion-1"><a class="header" href="#kubernetescustomresourceconversion-1">kubernetesCustomResourceConversion</a></h1>
+<p>This binding transforms a hook into a handler for conversions defined in CustomResourceDefinition. The Shell-operator updates a CRD with .spec.conversion, starts HTTPS server, and runs hooks to handle <a href="https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#conversionreview-request-0">ConversionReview requests</a>.</p>
+<blockquote>
+<p>Note: shell-operator use <code>apiextensions.k8s.io/v1</code>, so Kubernetes 1.16+ is required.</p>
+</blockquote>
+<h2 id="syntax-4"><a class="header" href="#syntax-4">Syntax</a></h2>
+<pre><code class="language-yaml">configVersion: v1
+onStartup: 10
+kubernetes:
+- name: additionalObjects
+  ...
+kubernetesCustomResourceConversion:
+- name: alpha1_to_alpha2
+  # Include snapshots by binding names.
+  includeSnapshotsFrom: [&quot;additionalObjects&quot;]
+  # Or use group name to include all snapshots in a group.
+  group: &quot;group name&quot;
+  # A CRD name.
+  crdName: crontabs.stable.example.com
+  # An array of conversions supported by this hook.
+  conversion:
+  - fromVersion: stable.example.com/v1alpha1
+    toVersion: stable.example.com/v1alpha2
+</code></pre>
+<h2 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h2>
+<ul>
+<li>
+<p><code>name</code> — a required parameter. It is used to distinguish between multiple schedules during runtime. For more information see <a href="HOOKS.html#binding-context">binding context</a>.</p>
+</li>
+<li>
+<p><code>includeSnapshotsFrom</code> — an array of names of <code>kubernetes</code> bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the <code>snapshots</code> field.</p>
+</li>
+<li>
+<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+</li>
+<li>
+<p><code>crdName</code> — a required name of a CRD.</p>
+</li>
+<li>
+<p><code>conversions</code> — a required list of conversion rules. These rules are used to determine if a custom resource in ConversionReview can be converted by the hook.</p>
+<ul>
+<li>
+<p><code>fromVersion</code> — a version of a custom resource that hook can convert.</p>
+</li>
+<li>
+<p><code>toVersion</code> — a version of a custom resource that hook can produce.</p>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="example-8"><a class="header" href="#example-8">Example</a></h2>
+<pre><code>configVersion: v1
+kubernetesCustomResourceConversion:
+- name: conversions
+  crdName: crontabs.stable.example.com
+  conversions:
+  - fromVersion: unstable.crontab.io/v1beta1
+    toVersion: stable.example.com/v1beta1
+  - fromVersion: stable.example.com/v1beta1
+    toVersion: stable.example.com/v1beta2
+  - fromVersion: v1beta2
+    toVersion: v1
+</code></pre>
+<p>The Shell-operator will execute this hook to convert custom resources ‘crontabs.stable.example.com’ from unstable.crontab.io/v1beta1 to stable.example.com/v1beta1, from stable.example.com/v1beta1 to stable.example.com/v1beta2, from unstable.crontab.io/v1beta1 to stable.example.com/v1 and so on.</p>
+<p>See example <a href="./examples/210-conversion-webhook">210-conversion-webhook</a>.</p>
+<h2 id="hook-input-and-output-1"><a class="header" href="#hook-input-and-output-1">Hook input and output</a></h2>
+<blockquote>
+<p>Note that the <code>group</code> parameter is only for including snapshots. <code>kubernetesCustomResourceConversion</code> hook is never executed on <code>schedule</code> or <code>kubernetes</code> events with binding context with <code>&quot;type&quot;:&quot;Group&quot;</code>.</p>
+</blockquote>
+<p>The hook receives a binding context and should return response in <code>$CONVERSION_RESPONSE_PATH</code>.</p>
+<p>$BINDING_CONTEXT_PATH file example:</p>
+<pre><code class="language-yaml">[{
+# Name as defined in binding configuration.
+&quot;binding&quot;: &quot;alpha1_to_alpha2&quot;,
+# type &quot;Conversion&quot; to distinguish from other events.
+&quot;type&quot;: &quot;Conversion&quot;,
+# Snapshots as defined by includeSnapshotsFrom or group.
+&quot;snapshots&quot;: { ... }
+# fromVersion and toVersion as defined in a conversion rule.
+&quot;fromVersion&quot;: &quot;unstable.crontab.io/v1beta1&quot;,
+&quot;toVersion&quot;: &quot;stable.example.com/v1beta1&quot;,
+# ConversionReview object.
+&quot;review&quot;: {
+  &quot;apiVersion&quot;: &quot;apiextensions.k8s.io/v1&quot;,
+  &quot;kind&quot;: &quot;ConversionReview&quot;,
+  &quot;request&quot;: {
+    &quot;desiredAPIVersion&quot;: &quot;stable.example.com/v1beta1&quot;,
+    &quot;objects&quot;: [
+      {
+        # A source version.
+        &quot;apiVersion&quot;: &quot;unstable.crontab.io/v1beta1&quot;,
+        &quot;kind&quot;: &quot;CronTab&quot;,
+        &quot;metadata&quot;: {
+          &quot;name&quot;: &quot;crontab-v1alpha1&quot;,
+          &quot;namespace&quot;: &quot;example-210&quot;,
+          ...
+        },
+        &quot;spec&quot;: {
+          &quot;cron&quot;: [
+            &quot;*&quot;,
+            &quot;*&quot;,
+            &quot;*&quot;,
+            &quot;*&quot;,
+            &quot;*/5&quot;
+          ],
+          &quot;imageName&quot;: [
+            &quot;repo.example.com/my-awesome-cron-image:v1&quot;
+          ]
+        }
+      }
+    ],
+    &quot;uid&quot;: &quot;42f90c87-87f5-4686-8109-eba065c7fa6e&quot;
+  }
+}
+}]
+</code></pre>
+<p>Response example:</p>
+<pre><code>    cat &lt;&lt;EOF &gt;$CONVERSION_RESPONSE_PATH
+{&quot;convertedObjects&quot;: [{
+# A converted version.
+&quot;apiVersion&quot;: &quot;stable.example.com/v1beta1&quot;,
+&quot;kind&quot;: &quot;CronTab&quot;,
+&quot;metadata&quot;: {
+  &quot;name&quot;: &quot;crontab-v1alpha1&quot;,
+  &quot;namespace&quot;: &quot;example-210&quot;,
+  ...
+},
+&quot;spec&quot;: {
+  &quot;cron&quot;: [
+    &quot;*&quot;,
+    &quot;*&quot;,
+    &quot;*&quot;,
+    &quot;*&quot;,
+    &quot;*/5&quot;
+  ],
+  &quot;imageName&quot;: [
+    &quot;repo.example.com/my-awesome-cron-image:v1&quot;
+  ]
+}
+}]}
+EOF
+</code></pre>
+<p>Return a message if something goes wrong:</p>
+<pre><code>cat &lt;&lt;EOF &gt;$CONVERSION_RESPONSE_PATH
+{&quot;failedMessage&quot;:&quot;Conversion of crontabs.stable.example.com is failed&quot;}
+EOF
+</code></pre>
+<p>User will see an error message:</p>
+<pre><code>Error from server: conversion webhook for unstable.crontab.io/v1beta1, Kind=CronTab failed: Conversion of crontabs.stable.example.com is failed
+</code></pre>
+<p>Empty or invalid $CONVERSION_RESPONSE_PATH file is considered as a fail with a short message about the problem and a more verbose error in the log.</p>
+<blockquote>
+<p>Note: kube-apiserver applies OpenAPI spec to the object returned by webhook. It can cause removing unknown fields without notifying a user.</p>
+</blockquote>
+<h2 id="http-server-and-kubernetes-configuration-1"><a class="header" href="#http-server-and-kubernetes-configuration-1">HTTP server and Kubernetes configuration</a></h2>
+<p>Shell-operator should create an HTTP endpoint with TLS support and register an endpoint in the CustomResourceDefinition resource.</p>
+<p>There should be a Service for shell-operator (see <a href="https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#service-reference">Service Reference</a>).</p>
+<p>There are command line options and corresponding environment variables to setup TLS certificates and a service name:</p>
+<pre><code>  --conversion-webhook-service-name=&quot;shell-operator-conversion-svc&quot;
+                                 A name of a service for clientConfig in CRD. Can be set with
+                                 $CONVERSION_WEBHOOK_SERVICE_NAME.
+  --conversion-webhook-server-cert=&quot;/conversion-certs/tls.crt&quot;
+                                 A path to a server certificate for clientConfig in CRD. Can be set with
+                                 $CONVERSION_WEBHOOK_SERVER_CERT.
+  --conversion-webhook-server-key=&quot;/conversion-certs/tls.key&quot;
+                                 A path to a server private key for clientConfig in CRD. Can be set with
+                                 $CONVERSION_WEBHOOK_SERVER_KEY.
+  --conversion-webhook-ca=&quot;/conversion-certs/ca.crt&quot;
+                                 A path to a ca certificate for clientConfig in CRD. Can be set with
+                                 $CONVERSION_WEBHOOK_CA.
+  --conversion-webhook-client-ca=CONVERSION-WEBHOOK-CLIENT-CA ...
+                                 A path to a server certificate for CRD.spec.conversion.webhook. Can be set
+                                 with $CONVERSION_WEBHOOK_CLIENT_CA.
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="shell-operator-metrics"><a class="header" href="#shell-operator-metrics">Shell-operator metrics</a></h1>
+<p>Shell-operator exports Prometheus metrics to the <code>/metrics</code> path. The default port is 9115.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="metrics"><a class="header" href="#metrics">Metrics</a></h1>
+<ul>
+<li>
+<p><code>shell_operator_hook_run_seconds{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a histogram with hook execution times. “hook” label is a name of the hook, “binding” is a binding name from configuration, “queue” is a queue name where hook is queued.</p>
+</li>
+<li>
+<p><code>shell_operator_hook_run_errors_total{hook=&quot;hook-name&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — this is the counter of hooks’ execution errors. It only tracks errors of hooks with the disabled <code>allowFailure</code> (i.e. respective key is omitted in the configuration or the <code>allowFailure: false</code> parameter is set). This metric has a “hook” label with the name of a failed hook.</p>
+</li>
+<li>
+<p><code>shell_operator_hook_run_allowed_errors_total{hook=&quot;hook-name&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — this is the counter of hooks’ execution errors. It only tracks errors of hooks that are allowed to exit with an error (the parameter <code>allowFailure: true</code> is set in the configuration). The metric has a “hook” label with the name of a failed hook.</p>
+</li>
+<li>
+<p><code>shell_operator_hook_run_success_total{hook=&quot;hook-name&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — this is the counter of hooks’ success execution. The metric has a “hook” label with the name of a succeeded hook.</p>
+</li>
+<li>
+<p><code>shell_operator_hook_enable_kubernetes_bindings_success{hook=&quot;&quot;}</code> — this gauge have two values: 0.0 if Kubernetes informers are not started and 1.0 if Kubernetes informers are successfully started for a hook.</p>
+</li>
+<li>
+<p><code>shell_operator_hook_enable_kubernetes_bindings_errors_total{hook=&quot;&quot;}</code> — a counter of failed attempts to start Kubernetes informers for a hook. </p>
+</li>
+<li>
+<p><code>shell_operator_hook_enable_kubernetes_bindings_seconds{hook=&quot;&quot;}</code> — a gauge with time of Kubernetes informers start.</p>
+</li>
+<li>
+<p><code>shell_operator_tasks_queue_length{queue=&quot;&quot;}</code> — a gauge showing the length of the working queue. This metric can be used to warn about stuck hooks. It has the “queue” label with the queue name.</p>
+</li>
+<li>
+<p><code>shell_operator_task_wait_in_queue_seconds_total{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a counter with seconds that the task to run a hook elapsed in the queue.</p>
+</li>
+<li>
+<p><code>shell_operator_live_ticks</code> — a counter that increases every 10 seconds. This metric can be used for alerting about an unhealthy Shell-operator. It has no labels.</p>
+</li>
+<li>
+<p><code>shell_operator_kube_jq_filter_duration_seconds{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a histogram with jq filter timings.</p>
+</li>
+<li>
+<p><code>shell_operator_kube_event_duration_seconds{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a histogram with kube event handling timings.</p>
+</li>
+<li>
+<p><code>shell_operator_kube_snapshot_objects{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a gauge with count of cached objects (the snapshot) for particular binding.</p>
+</li>
+<li>
+<p><code>shell_operator_kubernetes_client_request_result_total</code> — a counter of requests made by kubernetes/client-go library.</p>
+</li>
+<li>
+<p><code>shell_operator_kubernetes_client_request_latency_seconds</code> — a histogram with latency of requests made by kubernetes/client-go library. </p>
+</li>
+<li>
+<p><code>shell_operator_tasks_queue_action_duration_seconds{queue_name=&quot;&quot;, queue_action=&quot;&quot;}</code> — a histogram with measurements of low level queue operations. Use QUEUE_ACTIONS_METRICS=”no” to disable this metric.</p>
+</li>
+<li>
+<p><code>shell_operator_hook_run_sys_cpu_seconds{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a histogram with system cpu seconds.</p>
+</li>
+<li>
+<p><code>shell_operator_hook_run_user_cpu_seconds{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a histogram with user cpu seconds.</p>
+</li>
+<li>
+<p><code>shell_operator_hook_run_max_rss_bytes{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a gauge with maximum resident set size used in bytes.</p>
+</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="custom-metrics"><a class="header" href="#custom-metrics">Custom metrics</a></h1>
+<p>Hooks can export metrics by writing a set of operations in JSON format into $METRICS_PATH file.</p>
+<p>Operation to register a counter and increase its value:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;metric_name&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
+</code></pre>
+<p>Operation to register a gauge and set its value:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;metric_name&quot;,&quot;action&quot;:&quot;set&quot;,&quot;value&quot;:33,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
+</code></pre>
+<p>Operation to register a histogram and observe a duration:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;metric_name&quot;,&quot;action&quot;:&quot;observe&quot;,&quot;value&quot;:42, &quot;buckets&quot;: [1,2,5,10,20,50], &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
+</code></pre>
+<p>Labels are not required, but Shell-operator adds a <code>hook</code> label with a path to a hook script relative to hooks directory.</p>
+<p>Several metrics can be exported at once. For example, this script will create 2 metrics:</p>
+<pre><code>echo '{&quot;name&quot;:&quot;hook_metric_count&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;name&quot;:&quot;hook_metrics_items&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>The metric name is used as-is, so several hooks can export the same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.</p>
+<p>There are fields “add” and “set” that can be used as shortcuts for action and value. This feature may be deprecated in future releases.</p>
+<pre><code>{&quot;name&quot;:&quot;metric_name&quot;,&quot;add&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
+</code></pre>
+<p>Note that there is no mechanism to expire this kind of metrics except the shell-operator restart. It is the default behavior of prometheus-client.</p>
+<h3 id="grouped-metrics"><a class="header" href="#grouped-metrics">Grouped metrics</a></h3>
+<p>The common cause to expire a metric is a removed object. It means that the object is no longer in the snapshot, and the hook can’t identify the metric that should be expired.</p>
+<p>To solve this, use the “group” field in metric operations. When Shell-operator receives operations with the “group” field, it expires previous metrics with the same group and applies new metric values. This grouping works across hooks and label values.</p>
+<pre><code>echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metric_count&quot;,  &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metrics_items&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>To expire all metrics in a group, use action “expire”:</p>
+<pre><code>{&quot;group&quot;:&quot;group_name_1&quot;, &quot;action&quot;:&quot;expire&quot;}
+</code></pre>
+<p><strong>WARNING</strong>: “observe” is currently an unsupported <em>action</em> for grouped metrics</p>
+<h3 id="example-9"><a class="header" href="#example-9">Example</a></h3>
+<p><code>hook1.sh</code> returns these metrics:</p>
+<pre><code>echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;replicaset&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;deployment&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook1_special_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:12, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:300, &quot;labels&quot;:{&quot;source&quot;:&quot;source3&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:100, &quot;labels&quot;:{&quot;source&quot;:&quot;source1&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p><code>hook2.sh</code> returns these metrics:</p>
+<pre><code>echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;configmap&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;secret&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook2_special_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:42}' &gt;&gt; $METRICS_PATH
+echo '{&quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:200, &quot;labels&quot;:{&quot;source&quot;:&quot;source2&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>Prometheus scrapes these metrics:</p>
+<pre><code># HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;} 1 -------------------+---------- group:hook1
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;replicaset&quot;} 1 ------------+
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;deployment&quot;} 1 ------------+
+hook_metric{hook=&quot;hook2.sh&quot;, kind=&quot;configmap&quot;} 1  ------------|-------+-- group:hook2
+hook_metric{hook=&quot;hook2.sh&quot;, kind=&quot;secret&quot;} 1 ----------------|-------+
+# HELP hook1_special_metric hook1_special_metric              |       |
+# TYPE hook1_special_metric gauge                             |       |
+hook1_special_metric{hook=&quot;hook1.sh&quot;, label1=&quot;value1&quot;} 12 ----+       |
+# HELP hook2_special_metric hook2_special_metric              |       |
+# TYPE hook2_special_metric gauge                             |       |
+hook2_special_metric{hook=&quot;hook2.sh&quot;} 42 ---------------------|-------'
+# HELP common_metric common_metric                            |
+# TYPE common_metric gauge                                    |
+common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source3&quot;} 300 ---------'
+common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 ---------------+---- no group
+common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 ---------------'
+</code></pre>
+<p>On next execution of <code>hook1.sh</code> values for <code>hook_metric{kind=&quot;replicaset&quot;}</code>, <code>hook_metric{kind=&quot;deployment&quot;}</code>, <code>common_metric{source=&quot;source3&quot;}</code> and <code>hook1_special_metric</code> are expired and hook returns only one metric:</p>
+<pre><code>echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>Shell-operator expires previous values for group “hook1” and updates value for <code>hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;}</code>. Values for group <code>hook2</code> and <code>common_metric</code> without group are left intact. Now Prometheus scrapes these metrics:</p>
+<pre><code># HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;} 2 --------------- group:hook1
+hook_metric{hook=&quot;hook2.sh&quot;, kind=&quot;configmap&quot;} 1 ----+---- group:hook2
+hook_metric{hook=&quot;hook2.sh&quot;, kind=&quot;secret&quot;} 1 -------+
+# HELP hook2_special_metric hook2_special_metric     |
+# TYPE hook2_special_metric gauge                    |
+hook2_special_metric{hook=&quot;hook2.sh&quot;} 42 ------------'
+# HELP common_metric common_metric
+# TYPE common_metric gauge
+common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 --+-- no group
+common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 --'
+</code></pre>
+<p>Next execution of <code>hook2.sh</code> expires all metrics in group ‘hook2’:</p>
+<pre><code>echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;action&quot;:&quot;expire&quot;}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>Shell-operator expires previous values for group “hook2” but leaves <code>common_metrics</code> for “hook2.sh” as is. Now Prometheus scrapes these metrics:</p>
+<pre><code># HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;} 2 --------------- group:hook1
+# HELP common_metric common_metric
+# TYPE common_metric gauge
+common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 --+-- no group
+common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 --'
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                        
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                            </nav>
+
+        </div>
+
+        
+        
+        
+                <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+        
+                <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+                        <script type="text/javascript">
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+                
+    </body>
+</html>

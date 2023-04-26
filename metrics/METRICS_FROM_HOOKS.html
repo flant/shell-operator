@@ -1,0 +1,288 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Return metrics from hooks - Shell-operator</title>
+                
+
+        <!-- Custom HTML head -->
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+                <link rel="icon" href="../favicon.svg">
+                        <link rel="shortcut icon" href="../favicon.png">
+                <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+                <link rel="stylesheet" href="../css/print.css" media="print">
+        
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="../fonts/fonts.css">
+        
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+            </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">Introduction</a></li><li class="chapter-item expanded "><a href="../QUICK_START.html"><strong aria-hidden="true">1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../RUNNING.html"><strong aria-hidden="true">2.</strong> Running Shell-operator</a></li><li class="chapter-item expanded "><a href="../HOOKS.html"><strong aria-hidden="true">3.</strong> Hooks</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../KUBERNETES.html"><strong aria-hidden="true">3.1.</strong> Work with Kubernetes</a></li><li class="chapter-item expanded "><a href="../BINDING_VALIDATING.html"><strong aria-hidden="true">3.2.</strong> Validating Webhook</a></li><li class="chapter-item expanded "><a href="../BINDING_CONVERSION.html"><strong aria-hidden="true">3.3.</strong> Conversion Webhooks</a></li></ol></li><li class="chapter-item expanded "><a href="../metrics/ROOT.html"><strong aria-hidden="true">4.</strong> Metrics</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../metrics/SELF_METRICS.html"><strong aria-hidden="true">4.1.</strong> Shell-operator metrics</a></li><li class="chapter-item expanded "><a href="../metrics/METRICS_FROM_HOOKS.html" class="active"><strong aria-hidden="true">4.2.</strong> Return metrics from hooks</a></li></ol></li></ol>            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                                                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                                            </div>
+
+                    <h1 class="menu-title">Shell-operator</h1>
+
+                    <div class="right-buttons">
+                                                <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                                                                        <a href="https://github.com/flant/shell-operator" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                                                
+                    </div>
+                </div>
+
+                                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="custom-metrics"><a class="header" href="#custom-metrics">Custom metrics</a></h1>
+<p>Hooks can export metrics by writing a set of operations in JSON format into $METRICS_PATH file.</p>
+<p>Operation to register a counter and increase its value:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;metric_name&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
+</code></pre>
+<p>Operation to register a gauge and set its value:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;metric_name&quot;,&quot;action&quot;:&quot;set&quot;,&quot;value&quot;:33,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
+</code></pre>
+<p>Operation to register a histogram and observe a duration:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;metric_name&quot;,&quot;action&quot;:&quot;observe&quot;,&quot;value&quot;:42, &quot;buckets&quot;: [1,2,5,10,20,50], &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
+</code></pre>
+<p>Labels are not required, but Shell-operator adds a <code>hook</code> label with a path to a hook script relative to hooks directory.</p>
+<p>Several metrics can be exported at once. For example, this script will create 2 metrics:</p>
+<pre><code>echo '{&quot;name&quot;:&quot;hook_metric_count&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;name&quot;:&quot;hook_metrics_items&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>The metric name is used as-is, so several hooks can export the same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.</p>
+<p>There are fields “add” and “set” that can be used as shortcuts for action and value. This feature may be deprecated in future releases.</p>
+<pre><code>{&quot;name&quot;:&quot;metric_name&quot;,&quot;add&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
+</code></pre>
+<p>Note that there is no mechanism to expire this kind of metrics except the shell-operator restart. It is the default behavior of prometheus-client.</p>
+<h3 id="grouped-metrics"><a class="header" href="#grouped-metrics">Grouped metrics</a></h3>
+<p>The common cause to expire a metric is a removed object. It means that the object is no longer in the snapshot, and the hook can’t identify the metric that should be expired.</p>
+<p>To solve this, use the “group” field in metric operations. When Shell-operator receives operations with the “group” field, it expires previous metrics with the same group and applies new metric values. This grouping works across hooks and label values.</p>
+<pre><code>echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metric_count&quot;,  &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metrics_items&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>To expire all metrics in a group, use action “expire”:</p>
+<pre><code>{&quot;group&quot;:&quot;group_name_1&quot;, &quot;action&quot;:&quot;expire&quot;}
+</code></pre>
+<p><strong>WARNING</strong>: “observe” is currently an unsupported <em>action</em> for grouped metrics</p>
+<h3 id="example"><a class="header" href="#example">Example</a></h3>
+<p><code>hook1.sh</code> returns these metrics:</p>
+<pre><code>echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;replicaset&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;deployment&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook1_special_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:12, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:300, &quot;labels&quot;:{&quot;source&quot;:&quot;source3&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:100, &quot;labels&quot;:{&quot;source&quot;:&quot;source1&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p><code>hook2.sh</code> returns these metrics:</p>
+<pre><code>echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;configmap&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;secret&quot;}}' &gt;&gt; $METRICS_PATH
+echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook2_special_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:42}' &gt;&gt; $METRICS_PATH
+echo '{&quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:200, &quot;labels&quot;:{&quot;source&quot;:&quot;source2&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>Prometheus scrapes these metrics:</p>
+<pre><code># HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;} 1 -------------------+---------- group:hook1
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;replicaset&quot;} 1 ------------+
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;deployment&quot;} 1 ------------+
+hook_metric{hook=&quot;hook2.sh&quot;, kind=&quot;configmap&quot;} 1  ------------|-------+-- group:hook2
+hook_metric{hook=&quot;hook2.sh&quot;, kind=&quot;secret&quot;} 1 ----------------|-------+
+# HELP hook1_special_metric hook1_special_metric              |       |
+# TYPE hook1_special_metric gauge                             |       |
+hook1_special_metric{hook=&quot;hook1.sh&quot;, label1=&quot;value1&quot;} 12 ----+       |
+# HELP hook2_special_metric hook2_special_metric              |       |
+# TYPE hook2_special_metric gauge                             |       |
+hook2_special_metric{hook=&quot;hook2.sh&quot;} 42 ---------------------|-------'
+# HELP common_metric common_metric                            |
+# TYPE common_metric gauge                                    |
+common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source3&quot;} 300 ---------'
+common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 ---------------+---- no group
+common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 ---------------'
+</code></pre>
+<p>On next execution of <code>hook1.sh</code> values for <code>hook_metric{kind=&quot;replicaset&quot;}</code>, <code>hook_metric{kind=&quot;deployment&quot;}</code>, <code>common_metric{source=&quot;source3&quot;}</code> and <code>hook1_special_metric</code> are expired and hook returns only one metric:</p>
+<pre><code>echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>Shell-operator expires previous values for group “hook1” and updates value for <code>hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;}</code>. Values for group <code>hook2</code> and <code>common_metric</code> without group are left intact. Now Prometheus scrapes these metrics:</p>
+<pre><code># HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;} 2 --------------- group:hook1
+hook_metric{hook=&quot;hook2.sh&quot;, kind=&quot;configmap&quot;} 1 ----+---- group:hook2
+hook_metric{hook=&quot;hook2.sh&quot;, kind=&quot;secret&quot;} 1 -------+
+# HELP hook2_special_metric hook2_special_metric     |
+# TYPE hook2_special_metric gauge                    |
+hook2_special_metric{hook=&quot;hook2.sh&quot;} 42 ------------'
+# HELP common_metric common_metric
+# TYPE common_metric gauge
+common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 --+-- no group
+common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 --'
+</code></pre>
+<p>Next execution of <code>hook2.sh</code> expires all metrics in group ‘hook2’:</p>
+<pre><code>echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;action&quot;:&quot;expire&quot;}' &gt;&gt; $METRICS_PATH
+</code></pre>
+<p>Shell-operator expires previous values for group “hook2” but leaves <code>common_metrics</code> for “hook2.sh” as is. Now Prometheus scrapes these metrics:</p>
+<pre><code># HELP hook_metric hook_metric
+# TYPE hook_metric counter
+hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;} 2 --------------- group:hook1
+# HELP common_metric common_metric
+# TYPE common_metric gauge
+common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 --+-- no group
+common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 --'
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                                                    <a rel="prev" href="../metrics/SELF_METRICS.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+                        
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                                    <a rel="prev" href="../metrics/SELF_METRICS.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+                            </nav>
+
+        </div>
+
+        
+        
+        
+                <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+        
+                <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+        
+    </body>
+</html>
