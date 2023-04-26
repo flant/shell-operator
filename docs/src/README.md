@@ -1,5 +1,5 @@
 <p align="center">
-<img src="docs/src/image/shell-operator-small-logo.png" alt="shell-operator logo" />
+<img src="image/shell-operator-small-logo.png" alt="shell-operator logo" />
 </p>
 
 <p align="center">
@@ -21,22 +21,6 @@ Shell-operator provides:
 - __Simple configuration__: hook binding definition is a JSON or YAML document on script's stdout.
 - __Validating webhook machinery__: hook can handle validating for Kubernetes resources.
 - __Conversion webhook machinery__: hook can handle version conversion for Kubernetes resources.
-
-# Documentation
-
-Please see the [docs](https://TODO-add-link) for more in-depth information and supported features.
-
-# Examples and notable users
-
-More examples of how you can use shell-operator are available in the [examples](examples/) directory.
-
-Prominent shell-operator use cases include:
-
-* [Deckhouse](https://deckhouse.io/) Kubernetes platform where both projects, shell-operator and addon-operator, are used as the core technology to configure & extend K8s features;
-* KubeSphere Kubernetes platform's [installer](https://github.com/kubesphere/ks-installer);
-* [Kafka DevOps solution](https://github.com/confluentinc/streaming-ops) from Confluent.
-
-Please find out & share more examples in [Show & tell discussions](https://github.com/flant/shell-operator/discussions/categories/show-and-tell).
 
 # Articles & talks
 
