@@ -24,7 +24,7 @@ Shell-operator provides:
 
 # Documentation
 
-Please see the [docs](https://TODO-add-link) for more in-depth information and supported features.
+Please see the [docs](https://flant.github.io/shell-operator/) for more in-depth information and supported features.
 
 # Examples and notable users
 
