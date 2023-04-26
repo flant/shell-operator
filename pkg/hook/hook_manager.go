@@ -10,16 +10,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
-
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
+	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -253,10 +252,9 @@ func (hm *hookManager) GetHook(name string) *Hook {
 	hook, exists := hm.hooksByName[name]
 	if exists {
 		return hook
-	} else {
-		log.Errorf("Possible bug!!! Hook '%s' not found in hook manager", name)
-		return nil
 	}
+	log.Errorf("Possible bug!!! Hook '%s' not found in hook manager", name)
+	return nil
 }
 
 func (hm *hookManager) GetHookNames() []string {
@@ -278,12 +276,12 @@ func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error
 			}
 		}
 
-		sort.Slice(hooks[:], func(i, j int) bool {
+		sort.Slice(hooks, func(i, j int) bool {
 			return hooks[i].Config.OnStartup.Order < hooks[j].Config.OnStartup.Order
 		})
 	}
 
-	var hooksNames []string
+	hooksNames := make([]string, 0, len(hooks))
 	for _, hook := range hooks {
 		hooksNames = append(hooksNames, hook.Name)
 	}

@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	uuid "gopkg.in/satori/go.uuid.v1"
+
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type MetadataDescriptable interface {

@@ -30,7 +30,7 @@ func Init() (*ShellOperator, error) {
 	app.SetupLogging(runtimeConfig)
 	// Log version and jq filtering implementation.
 	log.Infof(app.AppStartMessage)
-	log.Debug(jq.JqFilterInfo())
+	log.Debug(jq.FilterInfo())
 
 	hooksDir, err := RequireExistingDirectory(app.HooksDir)
 	if err != nil {

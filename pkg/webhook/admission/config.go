@@ -1,8 +1,9 @@
 package admission
 
 import (
-	"github.com/flant/shell-operator/pkg/utils/string_helper"
 	v1 "k8s.io/api/admissionregistration/v1"
+
+	"github.com/flant/shell-operator/pkg/utils/string_helper"
 )
 
 // ConfigurationId is a first element in Path field for each Webhook.
@@ -26,32 +27,30 @@ type IWebhookConfig interface {
 	UpdateIds(string, string)
 }
 
-// ValidatingWebhookConfig
 type ValidatingWebhookConfig struct {
 	*v1.ValidatingWebhook
 	Metadata
 }
 
-func (wc *ValidatingWebhookConfig) GetMeta() Metadata  { return wc.Metadata }
-func (wc *ValidatingWebhookConfig) SetMeta(m Metadata) { wc.Metadata = m }
-func (wc *ValidatingWebhookConfig) SetClientConfig(cc v1.WebhookClientConfig) {
+func (c *ValidatingWebhookConfig) GetMeta() Metadata  { return c.Metadata }
+func (c *ValidatingWebhookConfig) SetMeta(m Metadata) { c.Metadata = m }
+func (c *ValidatingWebhookConfig) SetClientConfig(cc v1.WebhookClientConfig) {
 	equivalent := v1.Equivalent
-	wc.MatchPolicy = &equivalent
-	wc.ClientConfig = cc
+	c.MatchPolicy = &equivalent
+	c.ClientConfig = cc
 }
 
-// MutatingWebhookConfig
 type MutatingWebhookConfig struct {
 	*v1.MutatingWebhook
 	Metadata
 }
 
-func (wc *MutatingWebhookConfig) GetMeta() Metadata  { return wc.Metadata }
-func (wc *MutatingWebhookConfig) SetMeta(m Metadata) { wc.Metadata = m }
-func (wc *MutatingWebhookConfig) SetClientConfig(cc v1.WebhookClientConfig) {
+func (c *MutatingWebhookConfig) GetMeta() Metadata  { return c.Metadata }
+func (c *MutatingWebhookConfig) SetMeta(m Metadata) { c.Metadata = m }
+func (c *MutatingWebhookConfig) SetClientConfig(cc v1.WebhookClientConfig) {
 	equivalent := v1.Equivalent
-	wc.MatchPolicy = &equivalent
-	wc.ClientConfig = cc
+	c.MatchPolicy = &equivalent
+	c.ClientConfig = cc
 }
 
 // UpdateIds use confId and webhookId to set a ConfigurationId prefix and a WebhookId.

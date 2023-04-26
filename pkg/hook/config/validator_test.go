@@ -3,9 +3,8 @@ package config
 import (
 	"testing"
 
-	. "github.com/onsi/gomega"
-
 	"github.com/hashicorp/go-multierror"
+	. "github.com/onsi/gomega"
 )
 
 func prepareConfigObj(g *WithT, input string) *VersionedUntyped {

@@ -39,19 +39,19 @@ func Test_ScheduleManager_Add(t *testing.T) {
 		t.Run(expectation.testName, func(t *testing.T) {
 			sm.Add(types.ScheduleEntry{Crontab: expectation.crontab, Id: expectation.id})
 
-			//if expectation.err != "" {
+			// if expectation.err != "" {
 			//	if err == nil {
 			//		t.Errorf("Expected specific error: %s", expectation.err)
 			//	} else {
 			//		assert.Equal(t, expectation.err, err.Error())
 			//	}
-			//} else if err != nil {
+			// } else if err != nil {
 			//	t.Error(err)
 			//}
 		})
 	}
 
-	//t.Run("1 crontab == 1 job", func(t *testing.T) {
+	// t.Run("1 crontab == 1 job", func(t *testing.T) {
 	//	id1, err := sm.Add("* */2 * * *")
 	//	if err != nil {
 	//		t.Fatal(err)
@@ -63,11 +63,11 @@ func Test_ScheduleManager_Add(t *testing.T) {
 	//	}
 	//
 	//	assert.Equal(t, id1, id2)
-	//})
+	// })
 }
 
 // TODO rewrite with faked time
-//func Test_ScheduleManager_Run(t *testing.T) {
+// func Test_ScheduleManager_Run(t *testing.T) {
 //	sm := NewScheduleManager()
 //	sm.ScheduleCh = make(chan string)
 //
@@ -113,7 +113,7 @@ func Test_ScheduleManager_Add(t *testing.T) {
 //}
 
 // TODO rewrite with faked time
-//func Test_ScheduleManager_Remove(t *testing.T) {
+// func Test_ScheduleManager_Remove(t *testing.T) {
 //	t.Run("base", func(t *testing.T) {
 //		sm := NewScheduleManager()
 //

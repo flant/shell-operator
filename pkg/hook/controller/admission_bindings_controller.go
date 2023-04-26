@@ -5,9 +5,8 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
-
 	"github.com/flant/shell-operator/pkg/webhook/admission"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 )
 
 // AdmissionBindingToWebhookLink is a link between a hook and a webhook configuration.
@@ -48,7 +47,7 @@ type admissionBindingsController struct {
 
 var _ AdmissionBindingsController = &admissionBindingsController{}
 
-// NewKubernetesHooksController returns an implementation of KubernetesHooksController
+// NewValidatingBindingsController returns an implementation of AdmissionBindingsController
 var NewValidatingBindingsController = func() *admissionBindingsController {
 	return &admissionBindingsController{
 		AdmissionLinks: make(map[string]*AdmissionBindingToWebhookLink),
@@ -70,7 +69,7 @@ func (c *admissionBindingsController) WithWebhookManager(mgr *admission.WebhookM
 func (c *admissionBindingsController) EnableValidatingBindings() {
 	confId := ""
 
-	if len(c.ValidatingBindings) <= 0 {
+	if len(c.ValidatingBindings) == 0 {
 		return
 	}
 
@@ -104,7 +103,7 @@ func (c *admissionBindingsController) EnableValidatingBindings() {
 func (c *admissionBindingsController) EnableMutatingBindings() {
 	confId := ""
 
-	if len(c.MutatingBindings) <= 0 {
+	if len(c.MutatingBindings) == 0 {
 		return
 	}
 

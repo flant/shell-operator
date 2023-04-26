@@ -3,7 +3,6 @@ package controller
 import (
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
@@ -43,7 +42,7 @@ type scheduleBindingsController struct {
 // kubernetesHooksController should implement the KubernetesHooksController
 var _ ScheduleBindingsController = &scheduleBindingsController{}
 
-// NewKubernetesHooksController returns an implementation of KubernetesHooksController
+// NewScheduleBindingsController returns an implementation of ScheduleBindingsController
 var NewScheduleBindingsController = func() *scheduleBindingsController {
 	return &scheduleBindingsController{
 		ScheduleLinks: make(map[string]*ScheduleBindingToCrontabLink),

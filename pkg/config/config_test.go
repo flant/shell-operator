@@ -47,14 +47,14 @@ func TestConfig_OnChange(t *testing.T) {
 	assert.Equal(t, "info", newValue, "onChange not called for Unset after Set")
 
 	// Temporal value
-	c.SetTemporarily("log.level", "debug", time.Duration(10*time.Second))
+	c.SetTemporarily("log.level", "debug", 10*time.Second)
 	assert.Equal(t, "debug", newValue, "onChange not called for SetTemporarily")
 
 	c.Unset("log.level")
 	assert.Equal(t, "info", newValue, "onChange not called for Unset after SetTemporarily")
 
 	// Set after SetTemporarily
-	c.SetTemporarily("log.level", "debug", time.Duration(10*time.Second))
+	c.SetTemporarily("log.level", "debug", 10*time.Second)
 	assert.Equal(t, "debug", newValue, "onChange not called for SetTemporarily")
 
 	c.Set("log.level", "error")

@@ -21,8 +21,7 @@ func WaitForProcessInterruption(cb ...func()) {
 		log.Infof("Forced shutdown by '%s' signal", s.String())
 
 		signum := 0
-		switch v := s.(type) {
-		case syscall.Signal:
+		if v, ok := s.(syscall.Signal); ok {
 			signum = int(v)
 		}
 		os.Exit(128 + signum)

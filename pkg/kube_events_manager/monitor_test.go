@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/flant/kube-client/fake"
-	"github.com/flant/kube-client/manifest"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/flant/kube-client/fake"
+	"github.com/flant/kube-client/manifest"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 

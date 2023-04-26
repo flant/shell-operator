@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flant/kube-client/fake"
 	"github.com/sirupsen/logrus"
 
+	"github.com/flant/kube-client/fake"
 	"github.com/flant/shell-operator/pkg/hook"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"

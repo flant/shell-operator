@@ -3,11 +3,11 @@ package config
 import (
 	"fmt"
 
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"gopkg.in/robfig/cron.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )

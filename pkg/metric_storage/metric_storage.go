@@ -79,10 +79,10 @@ func (m *MetricStorage) Stop() {
 }
 
 func (m *MetricStorage) Start() {
-	//go func() {
+	// go func() {
 	//	<-m.ctx.Done()
 	//	return
-	//}()
+	// }()
 }
 
 func (m *MetricStorage) ResolveMetricName(name string) string {
@@ -276,7 +276,7 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 	// If there are buckets for this histogram about to be registered, keep them
 	// Otherwise, use the new buckets.
 	// No need to check for nil or empty slice, as the p8s lib will use DefBuckets
-	//(https://pkg.go.dev/github.com/prometheus/client_golang/prometheus#HistogramOpts)
+	// (https://pkg.go.dev/github.com/prometheus/client_golang/prometheus#HistogramOpts)
 	if has {
 		buckets = b
 	}
@@ -365,7 +365,7 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 		m.CounterAdd(op.Name, *op.Value, labels)
 		return
 	}
-	// nolint:staticcheck
+	//nolint:staticcheck
 	if op.Add != nil {
 		m.CounterAdd(op.Name, *op.Add, labels)
 		return
@@ -374,7 +374,7 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 		m.GaugeSet(op.Name, *op.Value, labels)
 		return
 	}
-	// nolint:staticcheck
+	//nolint:staticcheck
 	if op.Set != nil {
 		m.GaugeSet(op.Name, *op.Set, labels)
 		return
@@ -399,14 +399,14 @@ func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.Metri
 		if op.Action == "add" && op.Value != nil {
 			m.GroupedVault.CounterAdd(group, op.Name, *op.Value, labels)
 		}
-		// nolint:staticcheck
+		//nolint:staticcheck
 		if op.Add != nil {
 			m.GroupedVault.CounterAdd(group, op.Name, *op.Add, labels)
 		}
 		if op.Action == "set" && op.Value != nil {
 			m.GroupedVault.GaugeSet(group, op.Name, *op.Value, labels)
 		}
-		// nolint:staticcheck
+		//nolint:staticcheck
 		if op.Set != nil {
 			m.GroupedVault.GaugeSet(group, op.Name, *op.Set, labels)
 		}
@@ -416,9 +416,9 @@ func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.Metri
 func (m *MetricStorage) Handler() http.Handler {
 	if m.Registry == nil {
 		return promhttp.Handler()
-	} else {
-		return promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
-			Registry: m.Registry,
-		})
 	}
+
+	return promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
+		Registry: m.Registry,
+	})
 }

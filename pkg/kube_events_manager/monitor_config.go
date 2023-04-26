@@ -2,9 +2,8 @@ package kube_events_manager
 
 import (
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )

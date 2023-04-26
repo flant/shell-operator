@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	klient "github.com/flant/kube-client/client"
 	log "github.com/sirupsen/logrus"
 	uuid "gopkg.in/satori/go.uuid.v1"
 
+	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/hook"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
@@ -161,7 +161,11 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 	hookNamesV, _ := op.HookManager.GetHooksInOrder(KubernetesValidating)
 	hookNamesM, _ := op.HookManager.GetHooksInOrder(KubernetesMutating)
 
-	hookNames := append(hookNamesV, hookNamesM...)
+	var hookNames []string
+
+	hookNames = append(hookNames, hookNamesV...)
+	hookNames = append(hookNames, hookNamesM...)
+
 	if len(hookNames) == 0 {
 		return
 	}

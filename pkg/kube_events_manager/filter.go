@@ -10,9 +10,8 @@ import (
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/jq"
-	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
-
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 )
 
 // ApplyFilter filters object json representation with jq expression, calculate checksum

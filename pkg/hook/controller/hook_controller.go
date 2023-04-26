@@ -3,12 +3,11 @@ package controller
 import (
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
-
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -182,7 +181,6 @@ func (hc *hookController) CanHandleConversionEvent(event conversion.Event, rule 
 
 func (hc *hookController) HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error {
 	if hc.KubernetesController != nil {
-
 		execInfos, err := hc.KubernetesController.EnableKubernetesBindings()
 		if err != nil {
 			return err

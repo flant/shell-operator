@@ -39,19 +39,18 @@ func MergeArrays(a1 []string, a2 []string) []string {
 func MonitorDebugName(configName string, configIndex int) string {
 	if configName == "" {
 		return fmt.Sprintf("kubernetes[%d]", configIndex)
-	} else {
-		return fmt.Sprintf("kubernetes[%d]{%s}", configIndex, configName)
 	}
+	return fmt.Sprintf("kubernetes[%d]{%s}", configIndex, configName)
 }
 
 // TODO uuid is not a good choice here. Make it more readable.
 func MonitorConfigID() string {
 	return uuid.NewV4().String()
-	//ei.DebugName = uuid.NewV4().String()
-	//if ei.Monitor.ConfigIdPrefix != "" {
+	// ei.DebugName = uuid.NewV4().String()
+	// if ei.Monitor.ConfigIdPrefix != "" {
 	//	ei.DebugName = ei.Monitor.ConfigIdPrefix + "-" + ei.DebugName[len(ei.Monitor.ConfigIdPrefix)+1:]
 	//}
-	//return ei.DebugName
+	// return ei.DebugName
 }
 
 // TODO uuid is not a good choice here. Make it more readable.
