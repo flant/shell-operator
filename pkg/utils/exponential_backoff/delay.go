@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	MaxExponentialBackoffDelay         = time.Duration(32 * time.Second)
+	MaxExponentialBackoffDelay         = 32 * time.Second
 	ExponentialDelayFactor     float64 = 2.0  // Each delta delay is twice bigger.
 	ExponentialDelayRandomMs           = 1000 // Each delay has random additional milliseconds.
 )
 
-// Count of exponential calculations before return max delay to prevent overflow with big numbers.
+// ExponentialCalculationsCount counts of exponential calculations before return max delay to prevent overflow with big numbers.
 var ExponentialCalculationsCount = int(math.Log(MaxExponentialBackoffDelay.Seconds()) / math.Log(ExponentialDelayFactor))
 
 // CalculateDelay returns delay distributed from initialDelay to default maxDelay (32s)

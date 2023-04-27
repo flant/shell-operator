@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/gomega"
-
 	"github.com/hashicorp/go-multierror"
+	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/admissionregistration/v1"
 )
 
@@ -757,7 +756,7 @@ settings:
 				g.Expect(hookConfig.V0).To(BeNil())
 				g.Expect(hookConfig.V1).NotTo(BeNil())
 				g.Expect(hookConfig.Settings).NotTo(BeNil())
-				g.Expect(hookConfig.Settings.ExecutionMinInterval).To(Equal(time.Duration(time.Second * 30)))
+				g.Expect(hookConfig.Settings.ExecutionMinInterval).To(Equal(time.Second * 30))
 				g.Expect(hookConfig.Settings.ExecutionBurst).To(Equal(1))
 			},
 		},
@@ -1040,7 +1039,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
 					        	* kubernetes.fieldSelector.matchExpressions.value must be of type string: "number"
 
 				*/
-				//t.Logf("expected error was: %v\n", err)
+				// t.Logf("expected error was: %v\n", err)
 			},
 		},
 	}

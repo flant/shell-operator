@@ -12,15 +12,14 @@ import (
 	"golang.org/x/time/rate"
 	uuid "gopkg.in/satori/go.uuid.v1"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
-
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
+	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/hook/controller"
+	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
+	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 

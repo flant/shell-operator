@@ -28,7 +28,7 @@ func ApplyJqFilter(jqFilter string, jsonData []byte, libPath string) (string, er
 	return result, nil
 }
 
-func JqFilterInfo() string {
+func FilterInfo() string {
 	if os.Getenv("JQ_EXEC") == "yes" {
 		return "jqFilter implementation: use jq binary from $PATH (JQ_EXEC=yes is set)"
 	}

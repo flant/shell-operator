@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/admission/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	v1 "k8s.io/api/admission/v1"
 )
 
-// Information about event for hook
+// BindingContext contains information about event for hook
 type BindingContext struct {
 	Metadata struct {
 		Version             string

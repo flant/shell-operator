@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	klient "github.com/flant/kube-client/client"
-
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
 	"github.com/flant/shell-operator/pkg/metric_storage"

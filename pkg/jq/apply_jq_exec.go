@@ -12,6 +12,6 @@ func ApplyJqFilter(jqFilter string, jsonData []byte, libPath string) (string, er
 	return jqExec(jqFilter, jsonData, libPath)
 }
 
-func JqFilterInfo() string {
+func FilterInfo() string {
 	return "jqFilter implementation: use jq binary from $PATH"
 }

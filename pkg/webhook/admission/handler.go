@@ -10,12 +10,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	log "github.com/sirupsen/logrus"
-
 	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
-
 	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 )
 

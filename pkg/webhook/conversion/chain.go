@@ -69,7 +69,6 @@ func (cs ChainStorage) FindConversionChain(crdName string, rule Rule) []Rule {
 
 		// Try only paths that starts from a similar FromVersion as in input rule.
 		for _, ruleToCheck := range chain.RulesWithSimilarFromVersion(rule) {
-
 			if ruleToCheck.ShortToVersion() == rule.ShortFromVersion() {
 				// Ignore loops.
 				continue
@@ -87,6 +86,7 @@ func (cs ChainStorage) FindConversionChain(crdName string, rule Rule) []Rule {
 					continue
 				}
 
+				//nolint
 				newPath := append(chain.PathsCache[ruleToCheck], nextRule)
 
 				// This path is already discovered.

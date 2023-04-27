@@ -41,7 +41,7 @@ type conversionBindingsController struct {
 
 var _ ConversionBindingsController = &conversionBindingsController{}
 
-// NewKubernetesHooksController returns an implementation of KubernetesHooksController
+// NewConversionBindingsController returns an implementation of ConversionBindingsController
 var NewConversionBindingsController = func() *conversionBindingsController {
 	return &conversionBindingsController{
 		Links: make(map[string]map[conversion.Rule]*ConversionBindingToWebhookLink),

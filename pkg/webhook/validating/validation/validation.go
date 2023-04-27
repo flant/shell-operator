@@ -73,13 +73,13 @@ func ValidateValidatingWebhook(hook *v1.ValidatingWebhook, fldPath *field.Path) 
 		allErrors = AppendFieldList(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, fldPath.Child("objectSelector")))
 	}
 
-	//cc := hook.ClientConfig
-	//switch {
-	//case (cc.URL == nil) == (cc.Service == nil):
+	// cc := hook.ClientConfig
+	// switch {
+	// case (cc.URL == nil) == (cc.Service == nil):
 	//	allErrors = multierror.Append(allErrors, field.Required(fldPath.Child("clientConfig"), "exactly one of url or service is required"))
-	//case cc.URL != nil:
+	// case cc.URL != nil:
 	//	allErrors = multierror.Append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
-	//case cc.Service != nil:
+	// case cc.Service != nil:
 	//	allErrors = multierror.Append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
 	//}
 	return allErrors

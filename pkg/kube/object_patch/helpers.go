@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/flant/kube-client/manifest"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8yaml "sigs.k8s.io/yaml"
 
+	"github.com/flant/kube-client/manifest"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/jq"
 )

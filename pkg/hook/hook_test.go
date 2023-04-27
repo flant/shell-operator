@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flant/shell-operator/pkg/hook/config"
 	. "github.com/onsi/gomega"
 	"golang.org/x/time/rate"
 
+	"github.com/flant/shell-operator/pkg/hook/config"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 )
 

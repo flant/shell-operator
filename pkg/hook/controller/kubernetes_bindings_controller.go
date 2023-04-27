@@ -53,7 +53,7 @@ type kubernetesBindingsController struct {
 // kubernetesHooksController should implement the KubernetesHooksController
 var _ KubernetesBindingsController = &kubernetesBindingsController{}
 
-// NewKubernetesHooksController returns an implementation of KubernetesHooksController
+// NewKubernetesBindingsController returns an implementation of KubernetesBindingsController
 var NewKubernetesBindingsController = func() *kubernetesBindingsController {
 	return &kubernetesBindingsController{
 		BindingMonitorLinks: make(map[string]*KubernetesBindingToMonitorLink),

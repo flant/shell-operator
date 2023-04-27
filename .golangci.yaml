@@ -1,12 +1,70 @@
 run:
   timeout: 15m
+  skip-dirs:
+  - test/integration
 linters:
+  disable-all: true
   enable:
     - asciicheck
     - bodyclose
+    - depguard
     - dogsled
     - durationcheck
+    - exportloopref
+    - gci
+    - gochecknoinits
+    - gocritic
+    - gofmt
     - gofumpt
+    - goprintffuncname
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - prealloc
+    - revive
+    - staticcheck
+    - stylecheck
+    - unconvert
+    - unused
+    - whitespace
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/flant/)
+  goimports:
+    local-prefixes: github.com/flant/
 issues:
+  exclude:
+    # Using underscores is a common practice, refactor in the future
+    - "var-naming: don't use an underscore in package name" # revive
+    - "ST1003: should not use underscores in package names" # stylecheck
+
+    # Sometime errors are used to propagate messages for end-users
+    - "ST1005: error strings should not be capitalized" # stylecheck
+    - "error-strings: error strings should not be capitalized or end with punctuation or a newline" # revive
+    - "ST1005: error strings should not end with punctuation or newlines" # stylecheck
+
+    # Dot imports are used for types, consider refactoring
+    - "dot-imports: should not use dot imports" # revive
+    - "ST1001: should not use dot imports" # stylecheck
+
+    # Init functions are used for global variables' initialization, consider refactoring
+    - "don't use `init` function"
+
+    # Suggests changing Json -> JSON. Figure out which style we want to follow.
+    - "var-naming:" # revive
+    - "ST1003: " # stylecheck
+
+    # Exported name should not start with the package name, e.g., helm3.Helm3Options.
+    # However, this penetrates all the code and sometimes is used to avoid name collisions.
+    # Nice to refactor, but not necessary.
+    - "exported: type name will be used as" # revive
+
+    # It is annoying be design, consider refactoring
+    - "unexported-return: exported func (.*), which can be annoying to use" # revive
   max-issues-per-linter: 0
   max-same-issues: 0

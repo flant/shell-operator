@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
-
 	"github.com/prometheus/client_golang/prometheus"
 	promtest "github.com/prometheus/client_golang/prometheus/testutil"
 	log "github.com/sirupsen/logrus"

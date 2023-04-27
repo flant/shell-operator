@@ -105,14 +105,14 @@ func (q *TaskQueue) WithMetricStorage(mstor *metric_storage.MetricStorage) {
 	q.metricStorage = mstor
 }
 
-func (tq *TaskQueue) WithName(name string) *TaskQueue {
-	tq.Name = name
-	return tq
+func (q *TaskQueue) WithName(name string) *TaskQueue {
+	q.Name = name
+	return q
 }
 
-func (tq *TaskQueue) WithHandler(fn func(task.Task) TaskResult) *TaskQueue {
-	tq.Handler = fn
-	return tq
+func (q *TaskQueue) WithHandler(fn func(task.Task) TaskResult) *TaskQueue {
+	q.Handler = fn
+	return q
 }
 
 // MeasureActionTime is a helper to measure execution time of queue's actions
@@ -190,7 +190,7 @@ func (q *TaskQueue) GetFirst() task.Task {
 	return q.items[0]
 }
 
-// AddFirst adds new tail element.
+// AddLast adds new tail element.
 func (q *TaskQueue) AddLast(t task.Task) {
 	defer q.MeasureActionTime("AddLast")()
 	q.withLock(func() {

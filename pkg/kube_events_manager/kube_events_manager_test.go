@@ -88,7 +88,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 // - receive and check events with objects
 func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	t.SkipNow()
-	timeout := time.Duration(3 * time.Second)
+	timeout := 3 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -174,7 +174,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 		fmt.Printf("Start select\n")
 		select {
 		case ev := <-mgr.Ch():
-			eventCounter = eventCounter + 1
+			eventCounter++
 			t.Logf("Got event: %d %#v\n", eventCounter, ev)
 
 			if !state.podsCreated {
@@ -242,7 +242,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 // Test_FakeClient_CatchUpdates try to catch updates from fake client with additional WatchReactor
 func Test_FakeClient_CatchUpdates(t *testing.T) {
 	t.SkipNow()
-	timeout := time.Duration(30 * time.Second)
+	timeout := 30 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -350,7 +350,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 		fmt.Printf("Start select\n")
 		select {
 		case ev := <-mgr.Ch():
-			eventCounter = eventCounter + 1
+			eventCounter++
 			fmt.Printf("Got event: %d %#v\n", eventCounter, ev)
 			// t.Logf("Got event: %d %#v\n", eventCounter, ev)
 

@@ -1,10 +1,11 @@
 package app
 
 import (
+	"gopkg.in/alecthomas/kingpin.v2"
+
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/server"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var ValidatingWebhookSettings = &admission.WebhookSettings{
