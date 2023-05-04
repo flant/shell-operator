@@ -37,10 +37,10 @@ func NewWebhookHandler() *WebhookHandler {
 	})
 
 	rtr.Group(func(r chi.Router) {
-		rtr.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "admissionWebhook"))
-		rtr.Use(middleware.Recoverer)
-		rtr.Use(middleware.AllowContentType("application/json"))
-		rtr.Post("/*", h.serveReviewRequest)
+		r.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "admissionWebhook"))
+		r.Use(middleware.Recoverer)
+		r.Use(middleware.AllowContentType("application/json"))
+		r.Post("/*", h.serveReviewRequest)
 	})
 
 	return h
