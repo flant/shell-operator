@@ -94,7 +94,7 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 		sysUsage := cmd.ProcessState.SysUsage()
 		if v, ok := sysUsage.(*syscall.Rusage); ok {
 			// v.Maxrss is int32 on arm/v7
-			usage.MaxRss = int64(v.Maxrss) // nolint:unconvert
+			usage.MaxRss = int64(v.Maxrss) //nolint:unconvert
 		}
 	}
 
