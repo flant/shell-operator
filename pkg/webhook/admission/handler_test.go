@@ -42,7 +42,7 @@ func Test_DetectConfigurationAndWebhook(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, w := DetectConfigurationAndWebhook(tt.path)
+			c, w := detectConfigurationAndWebhook(tt.path)
 			if c != tt.expect[0] {
 				t.Fatalf("expected configurationId '%s', got '%s'", tt.expect[0], c)
 			}

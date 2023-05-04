@@ -36,6 +36,11 @@ spec:
           value: {{ .Values.shellOperator.webhookServiceName | quote }}
         - name: VALIDATING_WEBHOOK_CONFIGURATION_NAME
           value: {{ .Values.shellOperator.webhookConfigurationName | quote }}
+        livenessProbe:
+          httpGet:
+            port: 9680
+            path: /healthz
+            scheme: HTTPS
         volumeMounts:
         - name: validating-certs
           mountPath: /validating-certs/
