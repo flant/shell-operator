@@ -29,8 +29,10 @@ func NewWebhookHandler() *WebhookHandler {
 		Router: rtr,
 	}
 
-	rtr.Get("/healthz", func(writer http.ResponseWriter, _ *http.Request) {
-		writer.WriteHeader(http.StatusOK)
+	rtr.Group(func(r chi.Router) {
+		r.Get("/healthz", func(writer http.ResponseWriter, _ *http.Request) {
+			writer.WriteHeader(http.StatusOK)
+		})
 	})
 
 	rtr.Group(func(r chi.Router) {
