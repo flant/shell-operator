@@ -29,15 +29,22 @@ func NewWebhookHandler() *WebhookHandler {
 	h := &WebhookHandler{
 		Router: rtr,
 	}
-	rtr.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "admissionWebhook"))
-	rtr.Use(middleware.Recoverer)
-	rtr.Use(middleware.AllowContentType("application/json"))
-	rtr.Post("/*", h.ServeReviewRequest)
+
+	rtr.Get("/healthz", func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+	})
+
+	rtr.Group(func(r chi.Router) {
+		rtr.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "admissionWebhook"))
+		rtr.Use(middleware.Recoverer)
+		rtr.Use(middleware.AllowContentType("application/json"))
+		rtr.Post("/*", h.serveReviewRequest)
+	})
 
 	return h
 }
 
-func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Request) {
+func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	bodyBytes, err := io.ReadAll(r.Body)
@@ -48,7 +55,7 @@ func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	admissionResponse, err := h.HandleReviewRequest(r.URL.Path, bodyBytes)
+	admissionResponse, err := h.handleReviewRequest(r.URL.Path, bodyBytes)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(err.Error()))
@@ -68,8 +75,8 @@ func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Reque
 	_, _ = w.Write(respBytes)
 }
 
-func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.AdmissionReview, error) {
-	configurationID, webhookID := DetectConfigurationAndWebhook(path)
+func (h *WebhookHandler) handleReviewRequest(path string, body []byte) (*v1.AdmissionReview, error) {
+	configurationID, webhookID := detectConfigurationAndWebhook(path)
 	log.Infof("Got AdmissionReview request for confId='%s' webhookId='%s'", configurationID, webhookID)
 
 	var review v1.AdmissionReview
@@ -89,7 +96,7 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 	if h.Handler == nil {
 		response.Response.Allowed = false
 		response.Response.Result = &metav1.Status{
-			Code:    500,
+			Code:    http.StatusInternalServerError,
 			Message: "AdmissionReview handler is not defined",
 		}
 		return response, nil
@@ -105,7 +112,7 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 	if err != nil {
 		response.Response.Allowed = false
 		response.Response.Result = &metav1.Status{
-			Code:    500,
+			Code:    http.StatusInternalServerError,
 			Message: err.Error(),
 		}
 		return response, nil
@@ -118,7 +125,7 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 	if !admissionResponse.Allowed {
 		response.Response.Allowed = false
 		response.Response.Result = &metav1.Status{
-			Code:    403,
+			Code:    http.StatusForbidden,
 			Message: admissionResponse.Message,
 		}
 		return response, nil
@@ -140,10 +147,10 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Admi
 	return response, nil
 }
 
-// DetectConfigurationAndWebhook extracts configurationID and a webhookID from the url path.
-func DetectConfigurationAndWebhook(path string) (configurationID string, webhookID string) {
+// detectConfigurationAndWebhook extracts configurationID and a webhookID from the url path.
+func detectConfigurationAndWebhook(path string) (configurationID string, webhookID string) {
 	parts := strings.Split(path, "/")
-	webhookParts := []string{}
+	webhookParts := make([]string, 0)
 	for _, p := range parts {
 		if p == "" {
 			continue

@@ -10,12 +10,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/flant/shell-operator/pkg/utils/structured-logger"
+	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type WebhookHandler struct {
@@ -29,15 +29,21 @@ func NewWebhookHandler() *WebhookHandler {
 		Router: rtr,
 	}
 
-	rtr.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "conversionWebhook"))
-	rtr.Use(middleware.Recoverer)
-	rtr.Use(middleware.AllowContentType("application/json"))
-	rtr.Post("/*", h.ServeReviewRequest)
+	rtr.Get("/healthz", func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+	})
+
+	rtr.Group(func(r chi.Router) {
+		r.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "conversionWebhook"))
+		r.Use(middleware.Recoverer)
+		r.Use(middleware.AllowContentType("application/json"))
+		r.Post("/*", h.serveReviewRequest)
+	})
 
 	return h
 }
 
-func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Request) {
+func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	bodyBytes, err := io.ReadAll(r.Body)
@@ -48,7 +54,7 @@ func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	conversionResponse, err := h.HandleReviewRequest(r.URL.Path, bodyBytes)
+	conversionResponse, err := h.handleReviewRequest(r.URL.Path, bodyBytes)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(err.Error()))
@@ -70,8 +76,8 @@ func (h *WebhookHandler) ServeReviewRequest(w http.ResponseWriter, r *http.Reque
 
 // See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#write-a-conversion-webhook-server
 // This code always response with v1 ConversionReview: it works for 1.16+.
-func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.ConversionReview, error) {
-	crdName := DetectCrdName(path)
+func (h *WebhookHandler) handleReviewRequest(path string, body []byte) (*v1.ConversionReview, error) {
+	crdName := detectCrdName(path)
 	log.Infof("Got ConversionReview request for crd/%s", crdName)
 
 	var inReview v1.ConversionReview
@@ -96,7 +102,7 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Conv
 		return review, nil
 	}
 
-	event, err := PrepareConversionEvent(crdName, &inReview)
+	event, err := prepareConversionEvent(crdName, &inReview)
 	if err != nil {
 		return nil, err
 	}
@@ -141,15 +147,15 @@ func (h *WebhookHandler) HandleReviewRequest(path string, body []byte) (*v1.Conv
 	return review, nil
 }
 
-// DetectCrdName extracts crdName from the url path.
-func DetectCrdName(path string) string {
+// detectCrdName extracts crdName from the url path.
+func detectCrdName(path string) string {
 	return strings.TrimPrefix(path, "/")
 }
 
-func PrepareConversionEvent(crdName string, review *v1.ConversionReview) (event Event, err error) {
+func prepareConversionEvent(crdName string, review *v1.ConversionReview) (event Event, err error) {
 	event.CrdName = crdName
 	event.Review = review
-	event.Objects, err = RawExtensionToUnstructured(review.Request.Objects)
+	event.Objects, err = rawExtensionToUnstructured(review.Request.Objects)
 	return event, err
 }
 
@@ -165,7 +171,7 @@ func ExtractAPIVersions(objs []unstructured.Unstructured) []string {
 	return res
 }
 
-func RawExtensionToUnstructured(objects []runtime.RawExtension) ([]unstructured.Unstructured, error) {
+func rawExtensionToUnstructured(objects []runtime.RawExtension) ([]unstructured.Unstructured, error) {
 	res := make([]unstructured.Unstructured, 0)
 
 	for _, obj := range objects {
