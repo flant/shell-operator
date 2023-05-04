@@ -32,6 +32,11 @@ spec:
               fieldPath: metadata.namespace
         - name: CONVERSION_WEBHOOK_SERVICE_NAME
           value: {{ .Values.shellOperator.conversionWebhookServiceName | quote }}
+        livenessProbe:
+          httpGet:
+            port: 9681
+            path: /healthz
+            scheme: HTTPS
         volumeMounts:
         - name: conversion-certs
           mountPath: /conversion-certs/
