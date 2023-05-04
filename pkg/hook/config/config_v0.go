@@ -151,6 +151,6 @@ func (cv0 *HookConfigV0) ConvertSchedule(schV0 ScheduleConfigV0) (ScheduleConfig
 	return res, nil
 }
 
-func (cv0 *HookConfigV0) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV0, rootPath string) error {
+func (cv0 *HookConfigV0) CheckOnKubernetesEvent(_ OnKubernetesEventConfigV0, _ string) error {
 	return nil
 }

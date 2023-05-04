@@ -269,7 +269,7 @@ func (ei *resourceInformer) OnAdd(obj interface{}) {
 	ei.HandleWatchEvent(obj, WatchEventAdded)
 }
 
-func (ei *resourceInformer) OnUpdate(oldObj, newObj interface{}) {
+func (ei *resourceInformer) OnUpdate(_, newObj interface{}) {
 	ei.HandleWatchEvent(newObj, WatchEventModified)
 }
 
