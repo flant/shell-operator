@@ -3,7 +3,7 @@ module github.com/flant/shell-operator
 go 1.19
 
 require (
-	github.com/flant/kube-client v0.25.0
+	github.com/flant/kube-client v0.26.1
 	github.com/flant/libjq-go v1.6.3-0.20201126171326-c46a40ff22ee // branch: master
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-openapi/spec v0.19.8
