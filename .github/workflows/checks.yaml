@@ -15,4 +15,4 @@ jobs:
         with:
           mode: minimum
           count: 1
-          labels: "release-note/dependencies, dependencies, release-note/deprecation, release-note/breaking-change, release-note/bug, bug, release-note/enhancement, enhancement, release-note/new-feature, release-note/ignore
+          labels: "release-note/dependencies, dependencies, release-note/deprecation, release-note/breaking-change, release-note/bug, bug, release-note/enhancement, enhancement, release-note/new-feature, release-note/ignore"
