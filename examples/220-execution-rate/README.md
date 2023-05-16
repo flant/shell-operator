@@ -1,6 +1,6 @@
 # Example with conversion hooks
 
-This is a simple example of execution rate settings. Read more information in [HOOKS.md](../../HOOKS.md#execution-rate).
+This is a simple example of execution rate settings. Read more information in [HOOKS.md](../../docs/src/HOOKS.md#execution-rate).
 
 The example contains one hook that is subscribed to "crontab" resources and should be executed not more than once in 5 seconds.
 
