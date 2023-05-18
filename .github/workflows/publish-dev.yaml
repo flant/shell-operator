@@ -118,7 +118,9 @@ jobs:
           echo "Build ${GHCR_IO_IMAGE_NAME} with version '${APP_VERSION}' and tag '${IMAGE_TAG}'"
           
           source "$(werf ci-env github --as-file)"
-          
+
+          export WERF_BUILDAH_MODE=auto
+
           werf build --repo ${GHCR_IO_REPO} --add-custom-tag ${IMAGE_TAG}
           
 #          docker buildx build \
