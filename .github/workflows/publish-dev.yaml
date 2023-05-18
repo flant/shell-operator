@@ -119,7 +119,7 @@ jobs:
           
           source "$(werf ci-env github --as-file)"
           
-          werf build --repo ${GHCR_IO_REPO} --add-custom-tag '${IMAGE_TAG}' 
+          werf build --repo ${GHCR_IO_REPO} --add-custom-tag ${IMAGE_TAG}
           
 #          docker buildx build \
 #              --platform $BUILDX_PLATFORMS \
