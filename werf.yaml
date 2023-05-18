@@ -1,7 +1,7 @@
 project: shell-operator
 configVersion: 1
 build:
-  platforms:
+  platform:
     - linux/amd64
     - linux/arm64
 ---
