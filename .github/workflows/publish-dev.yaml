@@ -24,8 +24,8 @@ jobs:
         id: check
         with:
           script: |
-            const PUBLISH_FULL_LABEL = 'publish/image/dev/full';
-            const PUBLISH_AMD64_LABEL = 'publish/image/dev/amd64';
+            const PUBLISH_FULL_LABEL = 'dev-image/publish/amd64-only';
+            const PUBLISH_AMD64_LABEL = 'dev-image/publish/multiarch';
             const labelName = context.payload.label.name;
 
             let runPublish = false;

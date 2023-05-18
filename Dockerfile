@@ -1,5 +1,6 @@
 # Prebuilt libjq.
 FROM flant/jq:b6be13d5-musl as libjq
+LABEL workaround="support single FROM"
 
 # Go builder.
 FROM golang:1.20-alpine3.18 AS builder
