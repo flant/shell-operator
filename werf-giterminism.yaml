@@ -1,0 +1,10 @@
+giterminismConfigVersion: 1
+config:
+  goTemplateRendering:	# The rules for the Go-template functions
+    allowEnvVariables: [ /APP_VERSION/ ]
+    #allowUncommittedFiles: [ "tools/build_includes/*" ]
+#  stapel:
+#    mount:
+#      allowBuildDir: true
+#      allowFromPaths:
+#        - ~/go-pkg-cache
