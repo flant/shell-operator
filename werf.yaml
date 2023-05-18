@@ -1,0 +1,12 @@
+project: shell-operator
+configVersion: 1
+build:
+  platforms:
+    - linux/amd64
+    - linux/arm64
+---
+image: main
+dockerfile: Dockerfile
+staged: true
+args:
+  appVersion: {{ env "APP_VERSION" }}
