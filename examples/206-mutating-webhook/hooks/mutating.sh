@@ -27,7 +27,8 @@ function __main__() {
 #  echo "Got image: $image"
 
 #  if [[ $image == repo.example.com* ]] ; then
-  PATCH=$( echo '[{"op": "add", "path": "/spec/replicas", "value": 333 }]' | base64 )
+  # we need to have base64 output in one line, otherwise PATCH operation will not work
+  PATCH=$( echo '[{"op": "add", "path": "/spec/replicas", "value": 333 }]' | base64 -w 0 )
     cat <<EOF > $VALIDATING_RESPONSE_PATH
 {"allowed":true, "patch": "$PATCH"}
 EOF
