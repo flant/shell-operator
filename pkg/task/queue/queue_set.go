@@ -13,14 +13,15 @@ const MainQueueName = "main"
 
 // TaskQueueSet is a manager for a set of named queues
 type TaskQueueSet struct {
-	Queues   map[string]*TaskQueue
 	MainName string
 
 	metricStorage *metric_storage.MetricStorage
 
-	m      sync.Mutex
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	m      sync.Mutex
+	Queues map[string]*TaskQueue
 }
 
 func NewTaskQueueSet() *TaskQueueSet {
@@ -69,7 +70,9 @@ func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(task.Task) Task
 	q.WithHandler(handler)
 	q.WithContext(tqs.ctx)
 	q.WithMetricStorage(tqs.metricStorage)
+	tqs.m.Lock()
 	tqs.Queues[name] = q
+	tqs.m.Unlock()
 }
 
 func (tqs *TaskQueueSet) GetByName(name string) *TaskQueue {
