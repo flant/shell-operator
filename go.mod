@@ -8,7 +8,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-openapi/spec v0.19.8
 	github.com/go-openapi/strfmt v0.19.5
-	github.com/go-openapi/swag v0.19.14
+	github.com/go-openapi/swag v0.22.4
 	github.com/go-openapi/validate v0.19.12
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kennygrant/sanitize v1.2.4
@@ -66,7 +66,7 @@ require (
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/mailru/easyjson v0.7.6 // indirect
+	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
