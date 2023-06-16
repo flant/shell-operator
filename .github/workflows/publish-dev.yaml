@@ -96,7 +96,7 @@ jobs:
 
       - name: Set up QEMU
         if: needs.check.outputs.build_multi_arch == 'true'
-        uses: docker/setup-qemu-action@v2.1.0
+        uses: docker/setup-qemu-action@v2.2.0
         with:
           platforms: "${{ env.QEMU_PLATFORMS }}"
 
