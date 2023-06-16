@@ -47,7 +47,6 @@ func TaskQueueMainToText(tqs *queue.TaskQueueSet) string {
 
 // TaskQueues dumps all queues.
 func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) string {
-	//return TaskQueueSetToText(tqs, showEmpty)
 	result := dumpTaskQueues{
 		Empty:  make([]dumpQueue, 0),
 		Active: make([]dumpQueue, 0),
@@ -296,7 +295,7 @@ func (dtq dumpTaskQueues) asText(showEmpty bool) string {
 		}
 		buf.WriteString("Summary:\n")
 		if dtq.MainQueue != nil {
-			otherQueuesCount -= 1 // minus main queue
+			otherQueuesCount-- // minus main queue
 			buf.WriteString(fmt.Sprintf("- '%s' queue: %s.\n",
 				dtq.MainQueue.Name,
 				pluralize(len(dtq.MainQueue.Tasks), "empty", "task", "tasks")))
