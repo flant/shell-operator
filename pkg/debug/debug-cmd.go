@@ -11,13 +11,13 @@ import (
 
 var (
 	outputFormat = "text"
+	showEmpty    = false
 )
 
 func DefineDebugCommands(kpApp *kingpin.Application) {
 	// Queue dump commands.
 	queueCmd := app.CommandWithDefaultUsageTemplate(kpApp, "queue", "Dump queues.")
 
-	var showEmpty bool
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(c *kingpin.ParseContext) error {
 			out, err := Queue(DefaultClient()).List(outputFormat, showEmpty)
