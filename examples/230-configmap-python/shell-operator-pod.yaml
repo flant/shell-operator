@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shell-operator
+spec:
+  containers:
+  - name: shell-operator
+    image: registry.mycompany.com/shell-operator:startup-python
+    imagePullPolicy: Always
