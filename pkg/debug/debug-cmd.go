@@ -9,7 +9,10 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 )
 
-var OutputFormat = "text"
+var (
+	outputFormat = "text"
+	showEmpty    = false
+)
 
 func DefineDebugCommands(kpApp *kingpin.Application) {
 	// Queue dump commands.
@@ -17,19 +20,22 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(c *kingpin.ParseContext) error {
-			out, err := Queue(DefaultClient()).List(OutputFormat)
+			out, err := Queue(DefaultClient()).List(outputFormat, showEmpty)
 			if err != nil {
 				return err
 			}
 			fmt.Println(string(out))
 			return nil
 		})
+	queueListCmd.Flag("show-empty", "Show empty queues.").Short('e').
+		Default("false").
+		BoolVar(&showEmpty)
 	AddOutputJsonYamlTextFlag(queueListCmd)
 	app.DefineDebugUnixSocketFlag(queueListCmd)
 
 	queueMainCmd := queueCmd.Command("main", "Dump tasks in the main queue.").
 		Action(func(c *kingpin.ParseContext) error {
-			out, err := Queue(DefaultClient()).Main(OutputFormat)
+			out, err := Queue(DefaultClient()).Main(outputFormat)
 			if err != nil {
 				return err
 			}
@@ -44,7 +50,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	configListCmd := configCmd.Command("list", "List available runtime parameters.").
 		Action(func(c *kingpin.ParseContext) error {
-			out, err := Config(DefaultClient()).List(OutputFormat)
+			out, err := Config(DefaultClient()).List(outputFormat)
 			if err != nil {
 				return err
 			}
@@ -92,7 +98,7 @@ func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
 	hookCmd := app.CommandWithDefaultUsageTemplate(kpApp, "hook", "Actions for hooks")
 	hookListCmd := hookCmd.Command("list", "List all hooks.").
 		Action(func(c *kingpin.ParseContext) error {
-			outBytes, err := Hook(DefaultClient()).List(OutputFormat)
+			outBytes, err := Hook(DefaultClient()).List(outputFormat)
 			if err != nil {
 				return err
 			}
@@ -106,7 +112,7 @@ func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
 	var hookName string
 	hookSnapshotCmd := hookCmd.Command("snapshot", "Dump hook snapshots.").
 		Action(func(c *kingpin.ParseContext) error {
-			outBytes, err := Hook(DefaultClient()).Name(hookName).Snapshots(OutputFormat)
+			outBytes, err := Hook(DefaultClient()).Name(hookName).Snapshots(outputFormat)
 			if err != nil {
 				return err
 			}
@@ -121,7 +127,7 @@ func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
 func AddOutputJsonYamlTextFlag(cmd *kingpin.CmdClause) {
 	cmd.Flag("output", "Output format: json|yaml|text.").Short('o').
 		Default("text").
-		EnumVar(&OutputFormat, "json", "yaml", "text")
+		EnumVar(&outputFormat, "json", "yaml", "text")
 }
 
 type QueueRequest struct {
@@ -134,8 +140,8 @@ func Queue(client *Client) *QueueRequest {
 	}
 }
 
-func (qr *QueueRequest) List(format string) ([]byte, error) {
-	url := fmt.Sprintf("http://unix/queue/list.%s", format)
+func (qr *QueueRequest) List(format string, showEmpty bool) ([]byte, error) {
+	url := fmt.Sprintf("http://unix/queue/list.%s?showEmpty=%t", format, showEmpty)
 	return qr.client.Get(url)
 }
 

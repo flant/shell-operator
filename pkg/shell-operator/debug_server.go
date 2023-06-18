@@ -3,6 +3,7 @@ package shell_operator
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -37,8 +38,14 @@ func RegisterDebugQueueRoutes(dbgSrv *debug.Server, op *ShellOperator) {
 		return dump.TaskQueueMainToText(op.TaskQueues), nil
 	})
 
-	dbgSrv.Route("/queue/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
-		return dump.TaskQueueSetToText(op.TaskQueues), nil
+	dbgSrv.Route("/queue/list.{format:(json|yaml|text)}", func(req *http.Request) (interface{}, error) {
+		showEmptyStr := req.URL.Query().Get("showEmpty")
+		showEmpty, err := strconv.ParseBool(showEmptyStr)
+		if err != nil {
+			showEmpty = false
+		}
+		format := debug.FormatFromRequest(req)
+		return dump.TaskQueues(op.TaskQueues, format, showEmpty), nil
 	})
 }
 
