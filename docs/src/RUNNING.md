@@ -4,14 +4,14 @@
 
 ### Run in a cluster
 
-- Build an image from ghcr.io/flant/shell-operator:latest (or use a specific tag).
+- Build an image from `ghcr.io/flant/shell-operator:latest` (or use a specific tag).
 - Copy your hooks to `/hooks` directory.
 - Apply RBAC manifests.
 - Apply Pod or Deployment manifest with the built image.
 
-More detailed explanation is available in [README](README.md#quickstart), also see installing with Helm in the [example](/examples/201-install-with-helm-chart).
+More detailed explanation is available in [Quick Start](QUICK_START.md), also see installing with Helm in the [example][helm-chart-example].
 
-### Run outside of a cluster
+### Run outside a cluster
 
 - Setup kube context,
 - Prepare hooks directory,
@@ -19,13 +19,12 @@ More detailed explanation is available in [README](README.md#quickstart), also s
 
 It is not recommended for production but can be useful while debugging hooks. A scenario can be like this:
 
-```
+```sh
 # Start local cluster
 kind create cluster
 
 # Start Shell-operator from outside the cluster
 shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type color
-
 ```
 
 ### Environment variables and flags
@@ -66,6 +65,7 @@ You can configure the operator with the following environment variables and cli 
 
 
 ### Notes on JSON log proxying
+
 * JSON log proxying (see above `--log-proxy-hook-json`) gives a lot of control to the hooks, which might want to use their own logger or different fields or log level
 * It is incompatible with the other log flags in regard to filtering or configuring logging for the hooks. `shell-operator` will always expect valid json lines and output them regardless of the other flags
 * The log lines from the hooks will be enhanced with these top-level fields, from `shell-operator` before being printed: 'hook', 'binding', 'event', 'task', 'queue'
@@ -78,7 +78,9 @@ The following tools for debugging and fine-tuning of Shell-operator and hooks ar
 - Analysis of logs of a Shell-operator’s pod (enter `kubectl logs -f po/POD_NAME` in terminal),
 - The environment variable can be set to `LOG_LEVEL=debug` to include the detailed debugging information into logs,
 - You can view the contents of the working queues with cli command from inside a Pod:
-   ```
+   ```sh
    kubectl exec -ti po/shell-operator /bin/bash
    shell-operator queue list
    ```
+
+[helm-chart-example]: https://github.com/flant/shell-operator/tree/main/examples/210-conversion-webhook

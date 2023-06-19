@@ -98,7 +98,7 @@ object: |
 ### Delete
 
 * `operation` — specifies an operation's type. Deletion types map directly to Kubernetes
-  DELETE's [`propagationPolicy`](https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/).
+  DELETE's [`propagationPolicy`][controller-gc].
   * `Delete` — foreground deletion. Hook will block the queue until the referenced object and all its descendants are deleted.
   * `DeleteInBackground` — will delete the referenced object immediately. All its descendants will be removed by Kubernetes'
     garbage collector.
@@ -128,7 +128,7 @@ rapidly changing object, for example `status` field with many concurrent changes
 
 Be careful, when updating a `.status` field. If a `/status` subresource is enabled on a resource,
 it'll ignore updates to the `.status` field if you haven't specified `subresource: status` in the operation spec.
-More info [here](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status).
+More info [here][spec-and-status].
 
 #### JQPatch
 
@@ -229,3 +229,5 @@ mergePatch: |
 }
 ```
 
+[controller-gc]: https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/
+[spec-and-status]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status

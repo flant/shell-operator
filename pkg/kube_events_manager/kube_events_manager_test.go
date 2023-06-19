@@ -162,7 +162,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 		t.FailNow()
 	}
 
-	// First event — Synchronization, second and third are Event
+	// First event — Synchronization, second and third are Event
 	eventCounter := 0
 	done := false
 	state := struct {
@@ -338,7 +338,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 		t.FailNow()
 	}
 
-	// First event — Synchronization, second and third are Event
+	// First event — Synchronization, second and third are Event
 	eventCounter := 0
 	done := false
 	state := struct {
