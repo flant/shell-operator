@@ -177,7 +177,7 @@ else
 fi
 </code></pre>
 <p>Make the <code>pods-hook.sh</code> executable:</p>
-<pre><code class="language-shell">chmod +x pods-hook.sh
+<pre><code class="language-sh">chmod +x pods-hook.sh
 </code></pre>
 <p>You can use a prebuilt image <a href="https://github.com/flant/shell-operator/pkgs/container/shell-operator">ghcr.io/flant/shell-operator:latest</a> with <code>bash</code>, <code>kubectl</code>, <code>jq</code> and <code>shell-operator</code> binaries to build you own image. You just need to <code>ADD</code> your hook into <code>/hooks</code> directory in the <code>Dockerfile</code>.</p>
 <p>Create the following <code>Dockerfile</code> in the directory where you created the <code>pods-hook.sh</code> file:</p>
@@ -185,14 +185,14 @@ fi
 ADD pods-hook.sh /hooks
 </code></pre>
 <p>Build an image (change image tag according to your Docker registry):</p>
-<pre><code class="language-shell">docker build -t &quot;registry.mycompany.com/shell-operator:monitor-pods&quot; .
+<pre><code class="language-sh">docker build -t &quot;registry.mycompany.com/shell-operator:monitor-pods&quot; .
 </code></pre>
 <p>Push image to the Docker registry accessible by the Kubernetes cluster:</p>
-<pre><code class="language-shell">docker push registry.mycompany.com/shell-operator:monitor-pods
+<pre><code class="language-sh">docker push registry.mycompany.com/shell-operator:monitor-pods
 </code></pre>
 <h2 id="create-rbac-objects"><a class="header" href="#create-rbac-objects">Create RBAC objects</a></h2>
 <p>We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator:</p>
-<pre><code class="language-shell">kubectl create namespace example-monitor-pods
+<pre><code class="language-sh">kubectl create namespace example-monitor-pods
 kubectl create serviceaccount monitor-pods-acc --namespace example-monitor-pods
 kubectl create clusterrole monitor-pods --verb=get,watch,list --resource=pods
 kubectl create clusterrolebinding monitor-pods --clusterrole=monitor-pods --serviceaccount=example-monitor-pods:monitor-pods-acc
@@ -211,11 +211,11 @@ spec:
   serviceAccountName: monitor-pods-acc
 </code></pre>
 <p>Start shell-operator by applying a <code>shell-operator-pod.yaml</code> file:</p>
-<pre><code class="language-shell">kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
+<pre><code class="language-sh">kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
 </code></pre>
 <h2 id="it-all-comes-together"><a class="header" href="#it-all-comes-together">It all comes together</a></h2>
-<p>Let’s deploy a <a href="https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/">kubernetes-dashboard</a> to trigger  <code>kubernetes</code> binding defined in our hook:</p>
-<pre><code class="language-shell">kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
+<p>Let’s deploy a <a href="https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/">kubernetes-dashboard</a> to trigger <code>kubernetes</code> binding defined in our hook:</p>
+<pre><code class="language-sh">kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
 </code></pre>
 <p>Now run <code>kubectl -n example-monitor-pods logs po/shell-operator</code> and observe that the hook will print dashboard pod name:</p>
 <pre><code class="language-plain">...
@@ -229,11 +229,11 @@ INFO[0030] Hook executed successfully                    binding=kubernetes hook
 <p><em>Note:</em> hook output is logged with output=stdout label.</p>
 </blockquote>
 <p>To clean up a cluster, delete namespace and RBAC objects:</p>
-<pre><code class="language-shell">kubectl delete ns example-monitor-pods
+<pre><code class="language-sh">kubectl delete ns example-monitor-pods
 kubectl delete clusterrole monitor-pods
 kubectl delete clusterrolebinding monitor-pods
 </code></pre>
-<p>This example is also available in /examples: <a href="examples/101-monitor-pods">monitor-pods</a>.</p>
+<p>This example is also available in /examples: <a href="https://github.com/flant/shell-operator/tree/main/examples/101-monitor-pods">monitor-pods</a>.</p>
 
                     </main>
 

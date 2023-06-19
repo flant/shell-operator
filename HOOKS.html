@@ -147,7 +147,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="hooks"><a class="header" href="#hooks">Hooks</a></h1>
-<p>A hook is an executable file that Shell-operator runs when some event occurs. It can be a script or a compiled program written in any programming language. For illustrative purposes, we will use bash scripts. An example with a hook in the form of a Python script is available here: <a href="examples/002-startup-python">002-startup-python</a>.</p>
+<p>A hook is an executable file that Shell-operator runs when some event occurs. It can be a script or a compiled program written in any programming language. For illustrative purposes, we will use bash scripts. An example with a hook in the form of a Python script is available here: <a href="https://github.com/flant/shell-operator/tree/main/examples/002-startup-python">002-startup-python</a>.</p>
 <p>The hook receives the data and returns the result via files. Paths to files are passed to the hook via environment variables.</p>
 <h2 id="shell-operator-lifecycle"><a class="header" href="#shell-operator-lifecycle">Shell-operator lifecycle</a></h2>
 <p>At startup Shell-operator initializes the hooks:</p>
@@ -162,7 +162,7 @@
 <li>Then, the “main” queue is filled with <code>kubernetes</code> hooks with <code>Synchronization</code> <a href="#binding-context">binding context</a> type, so that each hook receives all existing objects described in hook’s configuration.</li>
 <li>After executing <code>kubernetes</code> hook with <code>Synchronization</code> binding context, Shell-operator starts a monitor of Kubernetes events according to configured <code>kubernetes</code> binding.
 <ul>
-<li>Each monitor stores a <em>snapshot</em> — a refreshable list of all Kubernetes objects that match a binding definition.</li>
+<li>Each monitor stores a <em>snapshot</em> - a refreshable list of all Kubernetes objects that match a binding definition.</li>
 </ul>
 </li>
 </ul>
@@ -171,7 +171,7 @@
 <li>
 <p>Event handler adds hooks to the named queues on events:</p>
 <ul>
-<li><code>kubernetes</code> hooks are added to the queue when desired <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.16/#watchevent-v1-meta">WatchEvent</a> is received from Kubernetes,</li>
+<li><code>kubernetes</code> hooks are added to the queue when desired <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a> is received from Kubernetes,</li>
 <li><code>schedule</code> hooks are added according to the schedule,</li>
 <li><code>kubernetes</code> and <code>schedule</code> hooks are added to the “main” queue or the named queue if <code>queue</code> field was specified.</li>
 </ul>
@@ -196,7 +196,7 @@
 </ul>
 </li>
 <li>
-<p>Several metrics are available for monitoring the activity of the queues and hooks: queues size, number of execution errors for specific hooks, etc. See <a href="METRICS.html">METRICS</a> for more details.</p>
+<p>Several metrics are available for monitoring the activity of the queues and hooks: queues size, number of execution errors for specific hooks, etc. See <a href="metrics/ROOT.html">METRICS</a> for more details.</p>
 </li>
 </ul>
 <h2 id="hook-configuration"><a class="header" href="#hook-configuration">Hook configuration</a></h2>
@@ -288,7 +288,7 @@ schedule:
 <p><code>includeSnapshotsFrom</code> — a list of names of <code>kubernetes</code> bindings. When specified, all monitored objects will be added to the binding context in a <code>snapshots</code> field.</p>
 </li>
 <li>
-<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 </ul>
 <h3 id="kubernetes"><a class="header" href="#kubernetes">kubernetes</a></h3>
@@ -364,7 +364,7 @@ kubernetes:
 </code></pre>
 </li>
 <li>
-<p><code>executeHookOnEvent</code> — the list of events which led to a hook’s execution. By default, all events are used to execute a hook: “Added”, “Modified” and “Deleted”. Docs: <a href="https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes">Using API</a> <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta">WatchEvent</a>. Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.</p>
+<p><code>executeHookOnEvent</code> — the list of events which led to a hook’s execution. By default, all events are used to execute a hook: “Added”, “Modified” and “Deleted”. Docs: <a href="https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes">Using API</a> <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a>. Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.</p>
 </li>
 <li>
 <p><code>executeHookOnSynchronization</code> — if <code>false</code>, Shell-operator skips the hook execution with Synchronization binding context. See <a href="#binding-context">binding context</a>.</p>
@@ -389,7 +389,7 @@ If the selector is not set, then all objects of a specified kind are monitored.<
 <p><code>namespace.labelSelector</code> — this filter works like <code>labelSelector</code> but for namespaces and Shell-operator dynamically subscribes to events from matched namespaces.</p>
 </li>
 <li>
-<p><code>jqFilter</code> —  an optional parameter that specifies event <strong>filtering</strong> using <a href="https://stedolan.github.io/jq/manual/">jq syntax</a>. The hook will be triggered on the “Modified” event only if the filter result is <em>changed</em> after the last event. See example <a href="examples/102-monitor-namespaces">102-monitor-namespaces</a>.</p>
+<p><code>jqFilter</code> —  an optional parameter that specifies event <strong>filtering</strong> using <a href="https://stedolan.github.io/jq/manual/">jq syntax</a>. The hook will be triggered on the “Modified” event only if the filter result is <em>changed</em> after the last event. See example <a href="https://github.com/flant/shell-operator/tree/main/examples/102-monitor-namespaces">102-monitor-namespaces</a>.</p>
 </li>
 <li>
 <p><code>allowFailure</code> — if <code>true</code>, Shell-operator skips the hook execution errors. If <code>false</code> or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.</p>
@@ -404,7 +404,7 @@ If the selector is not set, then all objects of a specified kind are monitored.<
 <p><code>keepFullObjectsInMemory</code> — if not set or <code>true</code>, dumps of Kubernetes resources are cached for this binding, and the snapshot includes them as <code>object</code> fields. Set to <code>false</code> if the hook does not rely on full objects to reduce the memory footprint.</p>
 </li>
 <li>
-<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 </ul>
 <h4 id="example"><a class="header" href="#example">Example</a></h4>
@@ -431,13 +431,13 @@ kubernetes:
     nameSelector: [&quot;default&quot;]
 </code></pre>
 <h5 id="rbac-is-required"><a class="header" href="#rbac-is-required">RBAC is required</a></h5>
-<p>Shell-operator requires a ServiceAccount with the appropriate <a href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/">RBAC</a> permissions. See examples with RBAC: <a href="examples/101-monitor-pods">monitor-pods</a> and <a href="examples/102-monitor-namespaces">monitor-namespaces</a>.</p>
+<p>Shell-operator requires a ServiceAccount with the appropriate <a href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/">RBAC</a> permissions. See examples with RBAC: <a href="https://github.com/flant/shell-operator/tree/main/examples/101-monitor-pods">monitor-pods</a> and <a href="https://github.com/flant/shell-operator/tree/main/examples/102-monitor-namespaces">monitor-namespaces</a>.</p>
 <h5 id="jqfilter"><a class="header" href="#jqfilter">jqFilter</a></h5>
 <p>This filter is used to <em>ignore</em> superfluous “Modified” events, <em>and</em> to <em>exclude</em> object from event subscription. For example, if the hook should track changes of object’s labels, <code>jqFilter: &quot;.metadata.labels&quot;</code> can be used to ignore changes in other properties (<code>.status</code>,<code>.metadata.annotations</code>, etc.).</p>
 <p>The result of applying the filter to the event’s object is passed to the hook in a <code>filterResult</code> field of a <a href="#binding-context">binding context</a>.</p>
 <p>You can use <code>JQ_LIBRARY_PATH</code> environment variable to set a path with <code>jq</code> modules.</p>
 <h5 id="added--object-created"><a class="header" href="#added--object-created">Added != Object created</a></h5>
-<p>Consider that the “Added” event is not always equal to “Object created” if <code>labelSelector</code>, <code>fieldSelector</code> or <code>namespace.labelSelector</code> is specified in the <code>binding</code>. If objects and/or namespace are updated in Kubernetes, the <code>binding</code> may suddenly start matching them, with the “Added” event. The same with “Deleted” event: “Deleted” is not always equal to “Object removed”, the object can just move out of a scope of selectors.</p>
+<p>Consider that the “Added” event is not always equal to “Object created” if <code>labelSelector</code>, <code>fieldSelector</code> or <code>namespace.labelSelector</code> is specified in the <code>binding</code>. If objects and/or namespace are updated in Kubernetes, the <code>binding</code> may suddenly start matching them, with the “Added” event. The same with “Deleted”, event “Deleted” is not always equal to “Object removed”, the object can just move out of a scope of selectors.</p>
 <h5 id="fieldselector"><a class="header" href="#fieldselector">fieldSelector</a></h5>
 <p>There is no support for filtering by arbitrary field neither for core resources nor for custom resources (see <a href="https://github.com/kubernetes/kubernetes/issues/53459">issue#53459</a>). Only <code>metadata.name</code> and <code>metadata.namespace</code> fields are commonly supported.</p>
 <p>However fieldSelector can be useful for some resources with extended set of supported fields:</p>
@@ -477,7 +477,7 @@ fieldSelector:
 <p>The hook receives “Event”-type binding context on Kubernetes event and it contains more fields:</p>
 <ul>
 <li><code>watchEvent</code> — the possible value is one of the values you can use with <code>executeHookOnEvent</code> parameter: “Added”, “Modified” or “Deleted”.</li>
-<li><code>object</code> — a JSON dump of the full object related to the event. It contains an exact copy of the corresponding field in <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a> response, so it’s the object state <strong>at the moment of the event</strong> (not at the moment of the hook execution).</li>
+<li><code>object</code> — a JSON dump of the full object related to the event. It contains an exact copy of the corresponding field in <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a> response, so it’s the object state <strong>at the moment of the event</strong> (not at the moment of the hook execution).</li>
 <li><code>filterResult</code> — the result of <code>jq</code> execution with specified <code>jqFilter</code> on the above mentioned object. If <code>jqFilter</code> is not specified, then <code>filterResult</code> is omitted.</li>
 </ul>
 <p>The hook receives existed objects on startup for each binding with “Synchronization”-type binding context:</p>

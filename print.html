@@ -190,7 +190,7 @@
 <p>Please feel free to reach developers/maintainers and users via <a href="https://github.com/flant/shell-operator/discussions">GitHub Discussions</a> for any questions regarding shell-operator.</p>
 <p>You’re also welcome to follow <a href="https://twitter.com/flant_com">@flant_com</a> to stay informed about all our Open Source initiatives.</p>
 <h1 id="license"><a class="header" href="#license">License</a></h1>
-<p>Apache License 2.0, see <a href="LICENSE">LICENSE</a>.</p>
+<p>Apache License 2.0, see <a href="https://github.com/flant/shell-operator/blob/main/LICENSE">LICENSE</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="quickstart"><a class="header" href="#quickstart">Quickstart</a></h1>
 <blockquote>
 <p>You need to have a Kubernetes cluster, and the <code>kubectl</code> must be configured to communicate with your cluster.</p>
@@ -222,7 +222,7 @@ else
 fi
 </code></pre>
 <p>Make the <code>pods-hook.sh</code> executable:</p>
-<pre><code class="language-shell">chmod +x pods-hook.sh
+<pre><code class="language-sh">chmod +x pods-hook.sh
 </code></pre>
 <p>You can use a prebuilt image <a href="https://github.com/flant/shell-operator/pkgs/container/shell-operator">ghcr.io/flant/shell-operator:latest</a> with <code>bash</code>, <code>kubectl</code>, <code>jq</code> and <code>shell-operator</code> binaries to build you own image. You just need to <code>ADD</code> your hook into <code>/hooks</code> directory in the <code>Dockerfile</code>.</p>
 <p>Create the following <code>Dockerfile</code> in the directory where you created the <code>pods-hook.sh</code> file:</p>
@@ -230,14 +230,14 @@ fi
 ADD pods-hook.sh /hooks
 </code></pre>
 <p>Build an image (change image tag according to your Docker registry):</p>
-<pre><code class="language-shell">docker build -t &quot;registry.mycompany.com/shell-operator:monitor-pods&quot; .
+<pre><code class="language-sh">docker build -t &quot;registry.mycompany.com/shell-operator:monitor-pods&quot; .
 </code></pre>
 <p>Push image to the Docker registry accessible by the Kubernetes cluster:</p>
-<pre><code class="language-shell">docker push registry.mycompany.com/shell-operator:monitor-pods
+<pre><code class="language-sh">docker push registry.mycompany.com/shell-operator:monitor-pods
 </code></pre>
 <h2 id="create-rbac-objects"><a class="header" href="#create-rbac-objects">Create RBAC objects</a></h2>
 <p>We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator:</p>
-<pre><code class="language-shell">kubectl create namespace example-monitor-pods
+<pre><code class="language-sh">kubectl create namespace example-monitor-pods
 kubectl create serviceaccount monitor-pods-acc --namespace example-monitor-pods
 kubectl create clusterrole monitor-pods --verb=get,watch,list --resource=pods
 kubectl create clusterrolebinding monitor-pods --clusterrole=monitor-pods --serviceaccount=example-monitor-pods:monitor-pods-acc
@@ -256,11 +256,11 @@ spec:
   serviceAccountName: monitor-pods-acc
 </code></pre>
 <p>Start shell-operator by applying a <code>shell-operator-pod.yaml</code> file:</p>
-<pre><code class="language-shell">kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
+<pre><code class="language-sh">kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
 </code></pre>
 <h2 id="it-all-comes-together"><a class="header" href="#it-all-comes-together">It all comes together</a></h2>
-<p>Let’s deploy a <a href="https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/">kubernetes-dashboard</a> to trigger  <code>kubernetes</code> binding defined in our hook:</p>
-<pre><code class="language-shell">kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
+<p>Let’s deploy a <a href="https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/">kubernetes-dashboard</a> to trigger <code>kubernetes</code> binding defined in our hook:</p>
+<pre><code class="language-sh">kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
 </code></pre>
 <p>Now run <code>kubectl -n example-monitor-pods logs po/shell-operator</code> and observe that the hook will print dashboard pod name:</p>
 <pre><code class="language-plain">...
@@ -274,34 +274,33 @@ INFO[0030] Hook executed successfully                    binding=kubernetes hook
 <p><em>Note:</em> hook output is logged with output=stdout label.</p>
 </blockquote>
 <p>To clean up a cluster, delete namespace and RBAC objects:</p>
-<pre><code class="language-shell">kubectl delete ns example-monitor-pods
+<pre><code class="language-sh">kubectl delete ns example-monitor-pods
 kubectl delete clusterrole monitor-pods
 kubectl delete clusterrolebinding monitor-pods
 </code></pre>
-<p>This example is also available in /examples: <a href="examples/101-monitor-pods">monitor-pods</a>.</p>
+<p>This example is also available in /examples: <a href="https://github.com/flant/shell-operator/tree/main/examples/101-monitor-pods">monitor-pods</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="running-shell-operator"><a class="header" href="#running-shell-operator">Running Shell-operator</a></h1>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <h3 id="run-in-a-cluster"><a class="header" href="#run-in-a-cluster">Run in a cluster</a></h3>
 <ul>
-<li>Build an image from ghcr.io/flant/shell-operator:latest (or use a specific tag).</li>
+<li>Build an image from <code>ghcr.io/flant/shell-operator:latest</code> (or use a specific tag).</li>
 <li>Copy your hooks to <code>/hooks</code> directory.</li>
 <li>Apply RBAC manifests.</li>
 <li>Apply Pod or Deployment manifest with the built image.</li>
 </ul>
-<p>More detailed explanation is available in <a href="README.html#quickstart">README</a>, also see installing with Helm in the <a href="/examples/201-install-with-helm-chart">example</a>.</p>
-<h3 id="run-outside-of-a-cluster"><a class="header" href="#run-outside-of-a-cluster">Run outside of a cluster</a></h3>
+<p>More detailed explanation is available in <a href="QUICK_START.html">Quick Start</a>, also see installing with Helm in the <a href="https://github.com/flant/shell-operator/tree/main/examples/210-conversion-webhook">example</a>.</p>
+<h3 id="run-outside-a-cluster"><a class="header" href="#run-outside-a-cluster">Run outside a cluster</a></h3>
 <ul>
 <li>Setup kube context,</li>
 <li>Prepare hooks directory,</li>
 <li>Run shell-operator with context and path to hooks directory.</li>
 </ul>
 <p>It is not recommended for production but can be useful while debugging hooks. A scenario can be like this:</p>
-<pre><code># Start local cluster
+<pre><code class="language-sh"># Start local cluster
 kind create cluster
 
 # Start Shell-operator from outside the cluster
 shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type color
-
 </code></pre>
 <h3 id="environment-variables-and-flags"><a class="header" href="#environment-variables-and-flags">Environment variables and flags</a></h3>
 <p>You can configure the operator with the following environment variables and cli flags:</p>
@@ -349,13 +348,13 @@ shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type co
 <li>Analysis of logs of a Shell-operator’s pod (enter <code>kubectl logs -f po/POD_NAME</code> in terminal),</li>
 <li>The environment variable can be set to <code>LOG_LEVEL=debug</code> to include the detailed debugging information into logs,</li>
 <li>You can view the contents of the working queues with cli command from inside a Pod:
-<pre><code>kubectl exec -ti po/shell-operator /bin/bash
+<pre><code class="language-sh">kubectl exec -ti po/shell-operator /bin/bash
 shell-operator queue list
 </code></pre>
 </li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="hooks"><a class="header" href="#hooks">Hooks</a></h1>
-<p>A hook is an executable file that Shell-operator runs when some event occurs. It can be a script or a compiled program written in any programming language. For illustrative purposes, we will use bash scripts. An example with a hook in the form of a Python script is available here: <a href="examples/002-startup-python">002-startup-python</a>.</p>
+<p>A hook is an executable file that Shell-operator runs when some event occurs. It can be a script or a compiled program written in any programming language. For illustrative purposes, we will use bash scripts. An example with a hook in the form of a Python script is available here: <a href="https://github.com/flant/shell-operator/tree/main/examples/002-startup-python">002-startup-python</a>.</p>
 <p>The hook receives the data and returns the result via files. Paths to files are passed to the hook via environment variables.</p>
 <h2 id="shell-operator-lifecycle"><a class="header" href="#shell-operator-lifecycle">Shell-operator lifecycle</a></h2>
 <p>At startup Shell-operator initializes the hooks:</p>
@@ -370,7 +369,7 @@ shell-operator queue list
 <li>Then, the “main” queue is filled with <code>kubernetes</code> hooks with <code>Synchronization</code> <a href="HOOKS.html#binding-context">binding context</a> type, so that each hook receives all existing objects described in hook’s configuration.</li>
 <li>After executing <code>kubernetes</code> hook with <code>Synchronization</code> binding context, Shell-operator starts a monitor of Kubernetes events according to configured <code>kubernetes</code> binding.
 <ul>
-<li>Each monitor stores a <em>snapshot</em> — a refreshable list of all Kubernetes objects that match a binding definition.</li>
+<li>Each monitor stores a <em>snapshot</em> - a refreshable list of all Kubernetes objects that match a binding definition.</li>
 </ul>
 </li>
 </ul>
@@ -379,7 +378,7 @@ shell-operator queue list
 <li>
 <p>Event handler adds hooks to the named queues on events:</p>
 <ul>
-<li><code>kubernetes</code> hooks are added to the queue when desired <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.16/#watchevent-v1-meta">WatchEvent</a> is received from Kubernetes,</li>
+<li><code>kubernetes</code> hooks are added to the queue when desired <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a> is received from Kubernetes,</li>
 <li><code>schedule</code> hooks are added according to the schedule,</li>
 <li><code>kubernetes</code> and <code>schedule</code> hooks are added to the “main” queue or the named queue if <code>queue</code> field was specified.</li>
 </ul>
@@ -404,7 +403,7 @@ shell-operator queue list
 </ul>
 </li>
 <li>
-<p>Several metrics are available for monitoring the activity of the queues and hooks: queues size, number of execution errors for specific hooks, etc. See <a href="METRICS.html">METRICS</a> for more details.</p>
+<p>Several metrics are available for monitoring the activity of the queues and hooks: queues size, number of execution errors for specific hooks, etc. See <a href="metrics/ROOT.html">METRICS</a> for more details.</p>
 </li>
 </ul>
 <h2 id="hook-configuration"><a class="header" href="#hook-configuration">Hook configuration</a></h2>
@@ -496,7 +495,7 @@ schedule:
 <p><code>includeSnapshotsFrom</code> — a list of names of <code>kubernetes</code> bindings. When specified, all monitored objects will be added to the binding context in a <code>snapshots</code> field.</p>
 </li>
 <li>
-<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 </ul>
 <h3 id="kubernetes"><a class="header" href="#kubernetes">kubernetes</a></h3>
@@ -572,7 +571,7 @@ kubernetes:
 </code></pre>
 </li>
 <li>
-<p><code>executeHookOnEvent</code> — the list of events which led to a hook’s execution. By default, all events are used to execute a hook: “Added”, “Modified” and “Deleted”. Docs: <a href="https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes">Using API</a> <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta">WatchEvent</a>. Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.</p>
+<p><code>executeHookOnEvent</code> — the list of events which led to a hook’s execution. By default, all events are used to execute a hook: “Added”, “Modified” and “Deleted”. Docs: <a href="https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes">Using API</a> <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a>. Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.</p>
 </li>
 <li>
 <p><code>executeHookOnSynchronization</code> — if <code>false</code>, Shell-operator skips the hook execution with Synchronization binding context. See <a href="HOOKS.html#binding-context">binding context</a>.</p>
@@ -597,7 +596,7 @@ If the selector is not set, then all objects of a specified kind are monitored.<
 <p><code>namespace.labelSelector</code> — this filter works like <code>labelSelector</code> but for namespaces and Shell-operator dynamically subscribes to events from matched namespaces.</p>
 </li>
 <li>
-<p><code>jqFilter</code> —  an optional parameter that specifies event <strong>filtering</strong> using <a href="https://stedolan.github.io/jq/manual/">jq syntax</a>. The hook will be triggered on the “Modified” event only if the filter result is <em>changed</em> after the last event. See example <a href="examples/102-monitor-namespaces">102-monitor-namespaces</a>.</p>
+<p><code>jqFilter</code> —  an optional parameter that specifies event <strong>filtering</strong> using <a href="https://stedolan.github.io/jq/manual/">jq syntax</a>. The hook will be triggered on the “Modified” event only if the filter result is <em>changed</em> after the last event. See example <a href="https://github.com/flant/shell-operator/tree/main/examples/102-monitor-namespaces">102-monitor-namespaces</a>.</p>
 </li>
 <li>
 <p><code>allowFailure</code> — if <code>true</code>, Shell-operator skips the hook execution errors. If <code>false</code> or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.</p>
@@ -612,7 +611,7 @@ If the selector is not set, then all objects of a specified kind are monitored.<
 <p><code>keepFullObjectsInMemory</code> — if not set or <code>true</code>, dumps of Kubernetes resources are cached for this binding, and the snapshot includes them as <code>object</code> fields. Set to <code>false</code> if the hook does not rely on full objects to reduce the memory footprint.</p>
 </li>
 <li>
-<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+<p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 </ul>
 <h4 id="example"><a class="header" href="#example">Example</a></h4>
@@ -639,13 +638,13 @@ kubernetes:
     nameSelector: [&quot;default&quot;]
 </code></pre>
 <h5 id="rbac-is-required"><a class="header" href="#rbac-is-required">RBAC is required</a></h5>
-<p>Shell-operator requires a ServiceAccount with the appropriate <a href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/">RBAC</a> permissions. See examples with RBAC: <a href="examples/101-monitor-pods">monitor-pods</a> and <a href="examples/102-monitor-namespaces">monitor-namespaces</a>.</p>
+<p>Shell-operator requires a ServiceAccount with the appropriate <a href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/">RBAC</a> permissions. See examples with RBAC: <a href="https://github.com/flant/shell-operator/tree/main/examples/101-monitor-pods">monitor-pods</a> and <a href="https://github.com/flant/shell-operator/tree/main/examples/102-monitor-namespaces">monitor-namespaces</a>.</p>
 <h5 id="jqfilter"><a class="header" href="#jqfilter">jqFilter</a></h5>
 <p>This filter is used to <em>ignore</em> superfluous “Modified” events, <em>and</em> to <em>exclude</em> object from event subscription. For example, if the hook should track changes of object’s labels, <code>jqFilter: &quot;.metadata.labels&quot;</code> can be used to ignore changes in other properties (<code>.status</code>,<code>.metadata.annotations</code>, etc.).</p>
 <p>The result of applying the filter to the event’s object is passed to the hook in a <code>filterResult</code> field of a <a href="HOOKS.html#binding-context">binding context</a>.</p>
 <p>You can use <code>JQ_LIBRARY_PATH</code> environment variable to set a path with <code>jq</code> modules.</p>
 <h5 id="added--object-created"><a class="header" href="#added--object-created">Added != Object created</a></h5>
-<p>Consider that the “Added” event is not always equal to “Object created” if <code>labelSelector</code>, <code>fieldSelector</code> or <code>namespace.labelSelector</code> is specified in the <code>binding</code>. If objects and/or namespace are updated in Kubernetes, the <code>binding</code> may suddenly start matching them, with the “Added” event. The same with “Deleted” event: “Deleted” is not always equal to “Object removed”, the object can just move out of a scope of selectors.</p>
+<p>Consider that the “Added” event is not always equal to “Object created” if <code>labelSelector</code>, <code>fieldSelector</code> or <code>namespace.labelSelector</code> is specified in the <code>binding</code>. If objects and/or namespace are updated in Kubernetes, the <code>binding</code> may suddenly start matching them, with the “Added” event. The same with “Deleted”, event “Deleted” is not always equal to “Object removed”, the object can just move out of a scope of selectors.</p>
 <h5 id="fieldselector"><a class="header" href="#fieldselector">fieldSelector</a></h5>
 <p>There is no support for filtering by arbitrary field neither for core resources nor for custom resources (see <a href="https://github.com/kubernetes/kubernetes/issues/53459">issue#53459</a>). Only <code>metadata.name</code> and <code>metadata.namespace</code> fields are commonly supported.</p>
 <p>However fieldSelector can be useful for some resources with extended set of supported fields:</p>
@@ -685,7 +684,7 @@ fieldSelector:
 <p>The hook receives “Event”-type binding context on Kubernetes event and it contains more fields:</p>
 <ul>
 <li><code>watchEvent</code> — the possible value is one of the values you can use with <code>executeHookOnEvent</code> parameter: “Added”, “Modified” or “Deleted”.</li>
-<li><code>object</code> — a JSON dump of the full object related to the event. It contains an exact copy of the corresponding field in <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a> response, so it’s the object state <strong>at the moment of the event</strong> (not at the moment of the hook execution).</li>
+<li><code>object</code> — a JSON dump of the full object related to the event. It contains an exact copy of the corresponding field in <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta">WatchEvent</a> response, so it’s the object state <strong>at the moment of the event</strong> (not at the moment of the hook execution).</li>
 <li><code>filterResult</code> — the result of <code>jq</code> execution with specified <code>jqFilter</code> on the above mentioned object. If <code>jqFilter</code> is not specified, then <code>filterResult</code> is omitted.</li>
 </ul>
 <p>The hook receives existed objects on startup for each binding with “Synchronization”-type binding context:</p>
@@ -1332,7 +1331,7 @@ kubernetesValidating:
 <p><code>includeSnapshotsFrom</code> — an array of names of <code>kubernetes</code> bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the <code>snapshots</code> field.</p>
 </li>
 <li>
-<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="BINDING_VALIDATING.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 <li>
 <p><code>labelSelector</code> — <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta">standard</a> selector of objects by labels (examples <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels">of use</a>). See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector">objectSelector</a>.</p>
@@ -1357,7 +1356,7 @@ kubernetesValidating:
 <ul>
 <li><code>objectSelector</code> is a <code>labelSelector</code> as in the <code>kubernetes</code> binding.</li>
 <li><code>namespaceSelector</code> is a <code>namespace.labelSelector</code> as in the <code>kubernetes</code> binding.</li>
-<li><code>clientConfig</code> is managed by the Shell-operator. You should provide a Service for the Shell-operator HTTPS endpoint. See example <a href="./examples/204-validating-webhook">204-validating-webhook</a> for possible solution.</li>
+<li><code>clientConfig</code> is managed by the Shell-operator. You should provide a Service for the Shell-operator HTTPS endpoint. See example <a href="https://github.com/flant/shell-operator/tree/main/examples/204-validating-webhook">204-validating-webhook</a> for possible solution.</li>
 <li><code>matchPolicy</code> is always “Equivalent”. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy">Matching requests: matchPolicy</a>.</li>
 <li>there are additional fields <code>group</code> and <code>includeSnapshotsFrom</code> to include snapshots in the binding context.</li>
 </ul>
@@ -1533,7 +1532,7 @@ kubernetesCustomResourceConversion:
 <p><code>includeSnapshotsFrom</code> — an array of names of <code>kubernetes</code> bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the <code>snapshots</code> field.</p>
 </li>
 <li>
-<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 <li>
 <p><code>crdName</code> — a required name of a CRD.</p>
@@ -1564,7 +1563,7 @@ kubernetesCustomResourceConversion:
     toVersion: v1
 </code></pre>
 <p>The Shell-operator will execute this hook to convert custom resources ‘crontabs.stable.example.com’ from unstable.crontab.io/v1beta1 to stable.example.com/v1beta1, from stable.example.com/v1beta1 to stable.example.com/v1beta2, from unstable.crontab.io/v1beta1 to stable.example.com/v1 and so on.</p>
-<p>See example <a href="./examples/210-conversion-webhook">210-conversion-webhook</a>.</p>
+<p>See example <a href="https://github.com/flant/shell-operator/tree/main/examples/210-conversion-webhook">210-conversion-webhook</a>.</p>
 <h2 id="hook-input-and-output-1"><a class="header" href="#hook-input-and-output-1">Hook input and output</a></h2>
 <blockquote>
 <p>Note that the <code>group</code> parameter is only for including snapshots. <code>kubernetesCustomResourceConversion</code> hook is never executed on <code>schedule</code> or <code>kubernetes</code> events with binding context with <code>&quot;type&quot;:&quot;Group&quot;</code>.</p>
@@ -1749,7 +1748,7 @@ EOF
 </code></pre>
 <p>Labels are not required, but Shell-operator adds a <code>hook</code> label with a path to a hook script relative to hooks directory.</p>
 <p>Several metrics can be exported at once. For example, this script will create 2 metrics:</p>
-<pre><code>echo '{&quot;name&quot;:&quot;hook_metric_count&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;name&quot;:&quot;hook_metric_count&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;name&quot;:&quot;hook_metrics_items&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p>The metric name is used as-is, so several hooks can export the same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.</p>
@@ -1760,7 +1759,7 @@ echo '{&quot;name&quot;:&quot;hook_metrics_items&quot;,&quot;action&quot;:&quot;
 <h3 id="grouped-metrics"><a class="header" href="#grouped-metrics">Grouped metrics</a></h3>
 <p>The common cause to expire a metric is a removed object. It means that the object is no longer in the snapshot, and the hook can’t identify the metric that should be expired.</p>
 <p>To solve this, use the “group” field in metric operations. When Shell-operator receives operations with the “group” field, it expires previous metrics with the same group and applies new metric values. This grouping works across hooks and label values.</p>
-<pre><code>echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metric_count&quot;,  &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metric_count&quot;,  &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metrics_items&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p>To expire all metrics in a group, use action “expire”:</p>
@@ -1769,7 +1768,7 @@ echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metrics
 <p><strong>WARNING</strong>: “observe” is currently an unsupported <em>action</em> for grouped metrics</p>
 <h3 id="example-9"><a class="header" href="#example-9">Example</a></h3>
 <p><code>hook1.sh</code> returns these metrics:</p>
-<pre><code>echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;replicaset&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;deployment&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook1_special_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:12, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
@@ -1777,7 +1776,7 @@ echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;common_metric
 echo '{&quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:100, &quot;labels&quot;:{&quot;source&quot;:&quot;source1&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p><code>hook2.sh</code> returns these metrics:</p>
-<pre><code>echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;configmap&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;configmap&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;secret&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook2_special_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:42}' &gt;&gt; $METRICS_PATH
 echo '{&quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:200, &quot;labels&quot;:{&quot;source&quot;:&quot;source2&quot;}}' &gt;&gt; $METRICS_PATH
@@ -1803,7 +1802,7 @@ common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 -------
 common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 ---------------'
 </code></pre>
 <p>On next execution of <code>hook1.sh</code> values for <code>hook_metric{kind=&quot;replicaset&quot;}</code>, <code>hook_metric{kind=&quot;deployment&quot;}</code>, <code>common_metric{source=&quot;source3&quot;}</code> and <code>hook1_special_metric</code> are expired and hook returns only one metric:</p>
-<pre><code>echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p>Shell-operator expires previous values for group “hook1” and updates value for <code>hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;}</code>. Values for group <code>hook2</code> and <code>common_metric</code> without group are left intact. Now Prometheus scrapes these metrics:</p>
 <pre><code># HELP hook_metric hook_metric
@@ -1820,7 +1819,7 @@ common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 --+-- n
 common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 --'
 </code></pre>
 <p>Next execution of <code>hook2.sh</code> expires all metrics in group ‘hook2’:</p>
-<pre><code>echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;action&quot;:&quot;expire&quot;}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;action&quot;:&quot;expire&quot;}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p>Shell-operator expires previous values for group “hook2” but leaves <code>common_metrics</code> for “hook2.sh” as is. Now Prometheus scrapes these metrics:</p>
 <pre><code># HELP hook_metric hook_metric

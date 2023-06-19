@@ -179,7 +179,7 @@ kubernetesCustomResourceConversion:
 <p><code>includeSnapshotsFrom</code> — an array of names of <code>kubernetes</code> bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the <code>snapshots</code> field.</p>
 </li>
 <li>
-<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 <li>
 <p><code>crdName</code> — a required name of a CRD.</p>
@@ -210,7 +210,7 @@ kubernetesCustomResourceConversion:
     toVersion: v1
 </code></pre>
 <p>The Shell-operator will execute this hook to convert custom resources ‘crontabs.stable.example.com’ from unstable.crontab.io/v1beta1 to stable.example.com/v1beta1, from stable.example.com/v1beta1 to stable.example.com/v1beta2, from unstable.crontab.io/v1beta1 to stable.example.com/v1 and so on.</p>
-<p>See example <a href="./examples/210-conversion-webhook">210-conversion-webhook</a>.</p>
+<p>See example <a href="https://github.com/flant/shell-operator/tree/main/examples/210-conversion-webhook">210-conversion-webhook</a>.</p>
 <h2 id="hook-input-and-output"><a class="header" href="#hook-input-and-output">Hook input and output</a></h2>
 <blockquote>
 <p>Note that the <code>group</code> parameter is only for including snapshots. <code>kubernetesCustomResourceConversion</code> hook is never executed on <code>schedule</code> or <code>kubernetes</code> events with binding context with <code>&quot;type&quot;:&quot;Group&quot;</code>.</p>

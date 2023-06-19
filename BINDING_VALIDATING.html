@@ -203,7 +203,7 @@ kubernetesValidating:
 <p><code>includeSnapshotsFrom</code> — an array of names of <code>kubernetes</code> bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the <code>snapshots</code> field.</p>
 </li>
 <li>
-<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="#an-example-of-a-binding-context-with-group">grouping</a>.</p>
+<p><code>group</code> — a key to include snapshots from a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 <li>
 <p><code>labelSelector</code> — <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta">standard</a> selector of objects by labels (examples <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels">of use</a>). See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector">objectSelector</a>.</p>
@@ -228,7 +228,7 @@ kubernetesValidating:
 <ul>
 <li><code>objectSelector</code> is a <code>labelSelector</code> as in the <code>kubernetes</code> binding.</li>
 <li><code>namespaceSelector</code> is a <code>namespace.labelSelector</code> as in the <code>kubernetes</code> binding.</li>
-<li><code>clientConfig</code> is managed by the Shell-operator. You should provide a Service for the Shell-operator HTTPS endpoint. See example <a href="./examples/204-validating-webhook">204-validating-webhook</a> for possible solution.</li>
+<li><code>clientConfig</code> is managed by the Shell-operator. You should provide a Service for the Shell-operator HTTPS endpoint. See example <a href="https://github.com/flant/shell-operator/tree/main/examples/204-validating-webhook">204-validating-webhook</a> for possible solution.</li>
 <li><code>matchPolicy</code> is always “Equivalent”. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy">Matching requests: matchPolicy</a>.</li>
 <li>there are additional fields <code>group</code> and <code>includeSnapshotsFrom</code> to include snapshots in the binding context.</li>
 </ul>

@@ -150,25 +150,24 @@
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <h3 id="run-in-a-cluster"><a class="header" href="#run-in-a-cluster">Run in a cluster</a></h3>
 <ul>
-<li>Build an image from ghcr.io/flant/shell-operator:latest (or use a specific tag).</li>
+<li>Build an image from <code>ghcr.io/flant/shell-operator:latest</code> (or use a specific tag).</li>
 <li>Copy your hooks to <code>/hooks</code> directory.</li>
 <li>Apply RBAC manifests.</li>
 <li>Apply Pod or Deployment manifest with the built image.</li>
 </ul>
-<p>More detailed explanation is available in <a href="README.html#quickstart">README</a>, also see installing with Helm in the <a href="/examples/201-install-with-helm-chart">example</a>.</p>
-<h3 id="run-outside-of-a-cluster"><a class="header" href="#run-outside-of-a-cluster">Run outside of a cluster</a></h3>
+<p>More detailed explanation is available in <a href="QUICK_START.html">Quick Start</a>, also see installing with Helm in the <a href="https://github.com/flant/shell-operator/tree/main/examples/210-conversion-webhook">example</a>.</p>
+<h3 id="run-outside-a-cluster"><a class="header" href="#run-outside-a-cluster">Run outside a cluster</a></h3>
 <ul>
 <li>Setup kube context,</li>
 <li>Prepare hooks directory,</li>
 <li>Run shell-operator with context and path to hooks directory.</li>
 </ul>
 <p>It is not recommended for production but can be useful while debugging hooks. A scenario can be like this:</p>
-<pre><code># Start local cluster
+<pre><code class="language-sh"># Start local cluster
 kind create cluster
 
 # Start Shell-operator from outside the cluster
 shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type color
-
 </code></pre>
 <h3 id="environment-variables-and-flags"><a class="header" href="#environment-variables-and-flags">Environment variables and flags</a></h3>
 <p>You can configure the operator with the following environment variables and cli flags:</p>
@@ -216,7 +215,7 @@ shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type co
 <li>Analysis of logs of a Shell-operator’s pod (enter <code>kubectl logs -f po/POD_NAME</code> in terminal),</li>
 <li>The environment variable can be set to <code>LOG_LEVEL=debug</code> to include the detailed debugging information into logs,</li>
 <li>You can view the contents of the working queues with cli command from inside a Pod:
-<pre><code>kubectl exec -ti po/shell-operator /bin/bash
+<pre><code class="language-sh">kubectl exec -ti po/shell-operator /bin/bash
 shell-operator queue list
 </code></pre>
 </li>

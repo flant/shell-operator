@@ -159,7 +159,7 @@
 </code></pre>
 <p>Labels are not required, but Shell-operator adds a <code>hook</code> label with a path to a hook script relative to hooks directory.</p>
 <p>Several metrics can be exported at once. For example, this script will create 2 metrics:</p>
-<pre><code>echo '{&quot;name&quot;:&quot;hook_metric_count&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;name&quot;:&quot;hook_metric_count&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;name&quot;:&quot;hook_metrics_items&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p>The metric name is used as-is, so several hooks can export the same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.</p>
@@ -170,7 +170,7 @@ echo '{&quot;name&quot;:&quot;hook_metrics_items&quot;,&quot;action&quot;:&quot;
 <h3 id="grouped-metrics"><a class="header" href="#grouped-metrics">Grouped metrics</a></h3>
 <p>The common cause to expire a metric is a removed object. It means that the object is no longer in the snapshot, and the hook can’t identify the metric that should be expired.</p>
 <p>To solve this, use the “group” field in metric operations. When Shell-operator receives operations with the “group” field, it expires previous metrics with the same group and applies new metric values. This grouping works across hooks and label values.</p>
-<pre><code>echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metric_count&quot;,  &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metric_count&quot;,  &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metrics_items&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p>To expire all metrics in a group, use action “expire”:</p>
@@ -179,7 +179,7 @@ echo '{&quot;group&quot;:&quot;group1&quot;, &quot;name&quot;:&quot;hook_metrics
 <p><strong>WARNING</strong>: “observe” is currently an unsupported <em>action</em> for grouped metrics</p>
 <h3 id="example"><a class="header" href="#example">Example</a></h3>
 <p><code>hook1.sh</code> returns these metrics:</p>
-<pre><code>echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;replicaset&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;deployment&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook1_special_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:12, &quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
@@ -187,7 +187,7 @@ echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;common_metric
 echo '{&quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:100, &quot;labels&quot;:{&quot;source&quot;:&quot;source1&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p><code>hook2.sh</code> returns these metrics:</p>
-<pre><code>echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;configmap&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;configmap&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook_metric&quot;,&quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;secret&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;name&quot;:&quot;hook2_special_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:42}' &gt;&gt; $METRICS_PATH
 echo '{&quot;name&quot;:&quot;common_metric&quot;, &quot;action&quot;:&quot;set&quot;, &quot;value&quot;:200, &quot;labels&quot;:{&quot;source&quot;:&quot;source2&quot;}}' &gt;&gt; $METRICS_PATH
@@ -213,7 +213,7 @@ common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 -------
 common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 ---------------'
 </code></pre>
 <p>On next execution of <code>hook1.sh</code> values for <code>hook_metric{kind=&quot;replicaset&quot;}</code>, <code>hook_metric{kind=&quot;deployment&quot;}</code>, <code>common_metric{source=&quot;source3&quot;}</code> and <code>hook1_special_metric</code> are expired and hook returns only one metric:</p>
-<pre><code>echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;hook1&quot;, &quot;name&quot;:&quot;hook_metric&quot;, &quot;action&quot;:&quot;add&quot;, &quot;value&quot;:1, &quot;labels&quot;:{&quot;kind&quot;:&quot;pod&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p>Shell-operator expires previous values for group “hook1” and updates value for <code>hook_metric{hook=&quot;hook1.sh&quot;, kind=&quot;pod&quot;}</code>. Values for group <code>hook2</code> and <code>common_metric</code> without group are left intact. Now Prometheus scrapes these metrics:</p>
 <pre><code># HELP hook_metric hook_metric
@@ -230,7 +230,7 @@ common_metric{hook=&quot;hook1.sh&quot;, source=&quot;source1&quot;} 100 --+-- n
 common_metric{hook=&quot;hook2.sh&quot;, source=&quot;source2&quot;} 200 --'
 </code></pre>
 <p>Next execution of <code>hook2.sh</code> expires all metrics in group ‘hook2’:</p>
-<pre><code>echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;action&quot;:&quot;expire&quot;}' &gt;&gt; $METRICS_PATH
+<pre><code class="language-sh">echo '{&quot;group&quot;:&quot;hook2&quot;, &quot;action&quot;:&quot;expire&quot;}' &gt;&gt; $METRICS_PATH
 </code></pre>
 <p>Shell-operator expires previous values for group “hook2” but leaves <code>common_metrics</code> for “hook2.sh” as is. Now Prometheus scrapes these metrics:</p>
 <pre><code># HELP hook_metric hook_metric
