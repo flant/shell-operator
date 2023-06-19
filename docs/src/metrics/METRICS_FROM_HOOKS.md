@@ -24,7 +24,7 @@ Labels are not required, but Shell-operator adds a `hook` label with a path to a
 
 Several metrics can be exported at once. For example, this script will create 2 metrics:
 
-```
+```sh
 echo '{"name":"hook_metric_count","action":"add","value":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
 echo '{"name":"hook_metrics_items","action":"add","value":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
 ```
@@ -45,7 +45,7 @@ The common cause to expire a metric is a removed object. It means that the objec
 
 To solve this, use the "group" field in metric operations. When Shell-operator receives operations with the "group" field, it expires previous metrics with the same group and applies new metric values. This grouping works across hooks and label values.
 
-```
+```sh
 echo '{"group":"group1", "name":"hook_metric_count",  "action":"add", "value":1, "labels":{"label1":"value1"}}' >> $METRICS_PATH
 echo '{"group":"group1", "name":"hook_metrics_items", "action":"add", "value":1, "labels":{"label1":"value1"}}' >> $METRICS_PATH
 ```
@@ -62,7 +62,7 @@ To expire all metrics in a group, use action "expire":
 
 `hook1.sh` returns these metrics:
 
-```
+```sh
 echo '{"group":"hook1", "name":"hook_metric", "action":"add", "value":1, "labels":{"kind":"pod"}}' >> $METRICS_PATH
 echo '{"group":"hook1", "name":"hook_metric", "action":"add", "value":1, "labels":{"kind":"replicaset"}}' >> $METRICS_PATH
 echo '{"group":"hook1", "name":"hook_metric", "action":"add", "value":1, "labels":{"kind":"deployment"}}' >> $METRICS_PATH
@@ -73,7 +73,7 @@ echo '{"name":"common_metric", "action":"set", "value":100, "labels":{"source":"
 
 `hook2.sh` returns these metrics:
 
-```
+```sh
 echo '{"group":"hook2", "name":"hook_metric","action":"add", "value":1, "labels":{"kind":"configmap"}}' >> $METRICS_PATH
 echo '{"group":"hook2", "name":"hook_metric","action":"add", "value":1, "labels":{"kind":"secret"}}' >> $METRICS_PATH
 echo '{"group":"hook2", "name":"hook2_special_metric", "action":"set", "value":42}' >> $METRICS_PATH
@@ -105,7 +105,7 @@ common_metric{hook="hook2.sh", source="source2"} 200 ---------------'
 
 On next execution of `hook1.sh` values for `hook_metric{kind="replicaset"}`, `hook_metric{kind="deployment"}`, `common_metric{source="source3"}` and `hook1_special_metric` are expired and hook returns only one metric:
 
-```
+```sh
 echo '{"group":"hook1", "name":"hook_metric", "action":"add", "value":1, "labels":{"kind":"pod"}}' >> $METRICS_PATH
 ```
 
@@ -128,7 +128,7 @@ common_metric{hook="hook2.sh", source="source2"} 200 --'
 
 Next execution of `hook2.sh` expires all metrics in group 'hook2':
 
-```
+```sh
 echo '{"group":"hook2", "action":"expire"}' >> $METRICS_PATH
 ```
 

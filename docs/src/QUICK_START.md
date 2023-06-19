@@ -37,11 +37,11 @@ fi
 
 Make the `pods-hook.sh` executable:
 
-```shell
+```sh
 chmod +x pods-hook.sh
 ```
 
-You can use a prebuilt image [ghcr.io/flant/shell-operator:latest](https://github.com/flant/shell-operator/pkgs/container/shell-operator) with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to `ADD` your hook into `/hooks` directory in the `Dockerfile`.
+You can use a prebuilt image [ghcr.io/flant/shell-operator:latest][shell-operator-container-image] with `bash`, `kubectl`, `jq` and `shell-operator` binaries to build you own image. You just need to `ADD` your hook into `/hooks` directory in the `Dockerfile`.
 
 Create the following `Dockerfile` in the directory where you created the `pods-hook.sh` file:
 
@@ -52,13 +52,13 @@ ADD pods-hook.sh /hooks
 
 Build an image (change image tag according to your Docker registry):
 
-```shell
+```sh
 docker build -t "registry.mycompany.com/shell-operator:monitor-pods" .
 ```
 
 Push image to the Docker registry accessible by the Kubernetes cluster:
 
-```shell
+```sh
 docker push registry.mycompany.com/shell-operator:monitor-pods
 ```
 
@@ -66,7 +66,7 @@ docker push registry.mycompany.com/shell-operator:monitor-pods
 
 We need to watch for Pods in all Namespaces. That means that we need specific RBAC definitions for shell-operator:
 
-```shell
+```sh
 kubectl create namespace example-monitor-pods
 kubectl create serviceaccount monitor-pods-acc --namespace example-monitor-pods
 kubectl create clusterrole monitor-pods --verb=get,watch,list --resource=pods
@@ -92,15 +92,15 @@ spec:
 
 Start shell-operator by applying a `shell-operator-pod.yaml` file:
 
-```shell
+```sh
 kubectl -n example-monitor-pods apply -f shell-operator-pod.yaml
 ```
 
 ## It all comes together
 
-Let's deploy a [kubernetes-dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) to trigger  `kubernetes` binding defined in our hook:
+Let's deploy a [kubernetes-dashboard][kubernetes-dashboard] to trigger `kubernetes` binding defined in our hook:
 
-```shell
+```sh
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
 ```
 
@@ -119,10 +119,14 @@ INFO[0030] Hook executed successfully                    binding=kubernetes hook
 
 To clean up a cluster, delete namespace and RBAC objects:
 
-```shell
+```sh
 kubectl delete ns example-monitor-pods
 kubectl delete clusterrole monitor-pods
 kubectl delete clusterrolebinding monitor-pods
 ```
 
-This example is also available in /examples: [monitor-pods](examples/101-monitor-pods).
+This example is also available in /examples: [monitor-pods][pods-example].
+
+[kubernetes-dashboard]: https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/
+[pods-example]: https://github.com/flant/shell-operator/tree/main/examples/101-monitor-pods
+[shell-operator-container-image]: https://github.com/flant/shell-operator/pkgs/container/shell-operator

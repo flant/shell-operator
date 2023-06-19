@@ -1,6 +1,6 @@
 # kubernetesValidating
 
-This binding transforms a hook into a handler for ValidatingWebhookConfiguration. The Shell-operator creates ValidatingWebhookConfiguration, starts HTTPS server, and runs hooks to handle [AdmissionReview requests](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#request).
+This binding transforms a hook into a handler for ValidatingWebhookConfiguration. The Shell-operator creates ValidatingWebhookConfiguration, starts HTTPS server, and runs hooks to handle [AdmissionReview requests][admission-request].
 
 > Note: shell-operator use `admissionregistration.k8s.io/v1`, so Kubernetes 1.16+ is needed.
 
@@ -56,25 +56,25 @@ kubernetesValidating:
 
 - `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the `snapshots` field.
 
-- `group` — a key to include snapshots from a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group).
+- `group` — a key to include snapshots from a group of `schedule` and `kubernetes` bindings. See [grouping](HOOKS.md#binding-context-of-grouped-bindings).
 
-- `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)). See [objectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector).
+- `labelSelector` — [standard][label-selector] selector of objects by labels (examples [of use][labels]). See [objectSelector][object-selector].
 
-- `namespace.labelSelector` — this filter works like `labelSelector` but for namespaces. See [namespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector).
+- `namespace.labelSelector` — this filter works like `labelSelector` but for namespaces. See [namespaceSelector][namespace-selector].
 
-- `rules` — a required list of rules used to determine if a request to the Kubernetes API server should be sent to the hook. See [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules).
+- `rules` — a required list of rules used to determine if a request to the Kubernetes API server should be sent to the hook. See [Rules][matching-rules].
 
-- `failurePolicy` — defines how errors from the hook are handled. See [Failure policy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy). Default is `Fail`.
+- `failurePolicy` — defines how errors from the hook are handled. See [Failure policy][failure-policy]. Default is `Fail`.
 
-- `sideEffects` — determine whether the hook is `dryRun`-aware. See [side effects](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#side-effects) documentation. Default is `None`.
+- `sideEffects` — determine whether the hook is `dryRun`-aware. See [side effects][side-effect] documentation. Default is `None`.
 
-- `timeoutSeconds` — a seconds API server should wait for a hook to respond before treating the call as a failure. See [timeouts](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#timeouts). Default is 10 (seconds).
+- `timeoutSeconds` — a seconds API server should wait for a hook to respond before treating the call as a failure. See [timeouts][timeouts]. Default is 10 (seconds).
 
-As you can see, it is the close copy of a [Webhook configuration](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#webhook-configuration). Differences are:
+As you can see, it is the close copy of a [Webhook configuration][webhook-configuration]. Differences are:
 - `objectSelector` is a `labelSelector` as in the `kubernetes` binding.
 - `namespaceSelector` is a `namespace.labelSelector` as in the `kubernetes` binding.
-- `clientConfig` is managed by the Shell-operator. You should provide a Service for the Shell-operator HTTPS endpoint. See example [204-validating-webhook](./examples/204-validating-webhook) for possible solution.
-- `matchPolicy` is always "Equivalent". See [Matching requests: matchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy).
+- `clientConfig` is managed by the Shell-operator. You should provide a Service for the Shell-operator HTTPS endpoint. See example [204-validating-webhook][validating-webhook-example] for possible solution.
+- `matchPolicy` is always "Equivalent". See [Matching requests: matchPolicy][matching-policy].
 - there are additional fields `group` and `includeSnapshotsFrom` to include snapshots in the binding context.
 
 ## Example
@@ -214,7 +214,7 @@ Empty or invalid $VALIDATING_RESPONSE_PATH file is considered as `"allowed": fal
 
 Shell-operator should create an HTTP endpoint with TLS support and register endpoints in the ValidatingWebhookConfiguration resource.
 
-There should be a Service for shell-operator (see [Availability](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#availability)).
+There should be a Service for shell-operator (see [Availability][availability]).
 
 Command line options:
 
@@ -240,3 +240,17 @@ Command line options:
                                  A path to a server certificate for ValidatingWebhookConfiguration. Can be
                                  set with $VALIDATING_WEBHOOK_CLIENT_CA.
 ```
+
+[admission-request]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#request
+[availability]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#availability
+[failure-policy]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy
+[label-selector]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta
+[labels]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
+[matching-policy]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy
+[matching-rules]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules
+[namespace-selector]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
+[object-selector]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector
+[side-effect]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#side-effects
+[timeouts]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#timeouts
+[validating-webhook-example]: https://github.com/flant/shell-operator/tree/main/examples/204-validating-webhook
+[webhook-configuration]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#webhook-configuration

@@ -12,32 +12,32 @@ When the secret with labeled `secret-copier: yes` is deleted from the `default` 
 ### Using
 
 Build shell-operator image and push it to your Docker registry (replace the repository URL):
-```shell
+```sh
 docker build -t "registry.mycompany.com/shell-operator:secret-copier" . &&
 docker push registry.mycompany.com/shell-operator:secret-copier
 ```
 
 Edit image in shell-operator-pod.yaml and apply manifests:
 
-```shell
+```sh
 kubectl create ns secret-copier &&
 kubectl -n secret-copier apply -f shell-operator-rbac.yaml &&
 kubectl -n secret-copier apply -f shell-operator-pod.yaml
 ```
 
 Create a secret in the `default` namespace, for example, the secret `myregistrysecret` with access to your private Docker registry (replace necessary values):
-```shell
+```sh
 kubectl create secret docker-registry myregistrysecret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER \
 --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
 ```
 
 Label the `myregistrysecret` secret with the label `secret-copier: yes`:
-```shell
+```sh
 kubectl label secret myregistrysecret secret-copier=yes
 ```
 
 Check the secret `myregistrysecret` was copied to other namespaces:
-```shell
+```sh
 kubectl get secret  --all-namespaces | grep myregistrysecret
 ```
 

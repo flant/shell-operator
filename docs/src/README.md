@@ -11,7 +11,7 @@
 
 This operator is not an operator for a _particular software product_ such as `prometheus-operator` or `kafka-operator`. Shell-operator provides an integration layer between Kubernetes cluster events and shell scripts by treating scripts as hooks triggered by events. Think of it as an `operator-sdk` but for scripts.
 
-Shell-operator is used as a base for more advanced [addon-operator](https://github.com/flant/addon-operator) that supports Helm charts and value storages.
+Shell-operator is used as a base for more advanced [addon-operator][addon-operator] that supports Helm charts and value storages.
 
 Shell-operator provides:
 
@@ -43,10 +43,15 @@ Other languages:
 
 # Community
 
-Please feel free to reach developers/maintainers and users via [GitHub Discussions](https://github.com/flant/shell-operator/discussions) for any questions regarding shell-operator.
+Please feel free to reach developers/maintainers and users via [GitHub Discussions][discussions] for any questions regarding shell-operator.
 
-You're also welcome to follow [@flant_com](https://twitter.com/flant_com) to stay informed about all our Open Source initiatives.
+You're also welcome to follow [@flant_com][twitter] to stay informed about all our Open Source initiatives.
 
 # License
 
-Apache License 2.0, see [LICENSE](LICENSE).
+Apache License 2.0, see [LICENSE][license].
+
+[addon-operator]: https://github.com/flant/addon-operator
+[discussions]: https://github.com/flant/shell-operator/discussions
+[license]: https://github.com/flant/shell-operator/blob/main/LICENSE
+[twitter]: https://twitter.com/flant_com

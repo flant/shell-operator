@@ -1,6 +1,6 @@
 # Hooks
 
-A hook is an executable file that Shell-operator runs when some event occurs. It can be a script or a compiled program written in any programming language. For illustrative purposes, we will use bash scripts. An example with a hook in the form of a Python script is available here: [002-startup-python](examples/002-startup-python).
+A hook is an executable file that Shell-operator runs when some event occurs. It can be a script or a compiled program written in any programming language. For illustrative purposes, we will use bash scripts. An example with a hook in the form of a Python script is available here: [002-startup-python][startup-example].
 
 The hook receives the data and returns the result via files. Paths to files are passed to the hook via environment variables.
 
@@ -14,12 +14,12 @@ At startup Shell-operator initializes the hooks:
 - If hook's configuration is successful, the working queue named "main" is filled with `onStartup` hooks.
 - Then, the "main" queue is filled with `kubernetes` hooks with `Synchronization` [binding context](#binding-context) type, so that each hook receives all existing objects described in hook's configuration.
 - After executing `kubernetes` hook with `Synchronization` binding context, Shell-operator starts a monitor of Kubernetes events according to configured `kubernetes` binding.
-  - Each monitor stores a *snapshot* — a refreshable list of all Kubernetes objects that match a binding definition.
+  - Each monitor stores a *snapshot* - a refreshable list of all Kubernetes objects that match a binding definition.
 
 Next, the main cycle is started:
 
 - Event handler adds hooks to the named queues on events:
-  - `kubernetes` hooks are added to the queue when desired [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.16/#watchevent-v1-meta) is received from Kubernetes,
+  - `kubernetes` hooks are added to the queue when desired [WatchEvent][watch-event] is received from Kubernetes,
   - `schedule` hooks are added according to the schedule,
   - `kubernetes` and `schedule` hooks are added to the "main" queue or the named queue if `queue` field was specified.
 
@@ -33,7 +33,7 @@ Next, the main cycle is started:
 - If there is a sequence of hook executions in a queue, then hook is executed once with array of binding contexts.
   - If binding contains `group` key, then a sequence of binding context with similar `group` key is compacted into one binding context.
 
-- Several metrics are available for monitoring the activity of the queues and hooks: queues size, number of execution errors for specific hooks, etc. See [METRICS](METRICS.md) for more details.
+- Several metrics are available for monitoring the activity of the queues and hooks: queues size, number of execution errors for specific hooks, etc. See [METRICS](metrics/ROOT.md) for more details.
 
 ## Hook configuration
 
@@ -131,7 +131,7 @@ schedule:
 
 - `name` — is an optional identifier. It is used to distinguish between multiple schedules during runtime. For more information see [binding context](#binding-context).
 
-- `crontab` – is a mandatory schedule with a regular crontab syntax with 5 fields. 6 fields style crontab also supported, for more information see [documentation on robfig/cron.v2 library](https://godoc.org/gopkg.in/robfig/cron.v2).
+- `crontab` – is a mandatory schedule with a regular crontab syntax with 5 fields. 6 fields style crontab also supported, for more information see [documentation on robfig/cron.v2 library][cron-lib-doc].
 
 - `allowFailure` — if ‘true’, Shell-operator skips the hook execution errors. If ‘false’ or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
@@ -139,7 +139,7 @@ schedule:
 
 - `includeSnapshotsFrom` — a list of names of `kubernetes` bindings. When specified, all monitored objects will be added to the binding context in a `snapshots` field.
 
-- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group).
+- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#binding-context-of-grouped-bindings).
 
 ### kubernetes
 
@@ -217,13 +217,13 @@ kubernetes:
   "kind": "ds"
   ```
 
-- `executeHookOnEvent` — the list of events which led to a hook's execution. By default, all events are used to execute a hook: "Added", "Modified" and "Deleted". Docs: [Using API](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#watchevent-v1-meta). Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.
+- `executeHookOnEvent` — the list of events which led to a hook's execution. By default, all events are used to execute a hook: "Added", "Modified" and "Deleted". Docs: [Using API][changes-detection] [WatchEvent][watch-event]. Empty array can be used to prevent hook execution, it is useful when binding is used only to define a snapshot.
 
 - `executeHookOnSynchronization` — if `false`, Shell-operator skips the hook execution with Synchronization binding context. See [binding context](#binding-context).
 
 - `nameSelector` — selector of objects by their name. If this selector is not set, then all objects of a specified Kind are monitored.
 
-- `labelSelector` — [standard](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta) selector of objects by labels (examples [of use](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels)).
+- `labelSelector` — [standard][label-selector] selector of objects by labels (examples [of use][labels]).
   If the selector is not set, then all objects of a specified kind are monitored.
 
 - `fieldSelector` — selector of objects by their fields, works like `--field-selector=''` flag of `kubectl`. Supported operators are Equals (or `=`, `==`) and NotEquals (or `!=`) and all expressions are combined with AND. Also, note that fieldSelector with 'metadata.name' the field is mutually exclusive with nameSelector. There are limits on fields, see [Note](#fieldselector).
@@ -234,7 +234,7 @@ kubernetes:
 
 - `namespace.labelSelector` — this filter works like `labelSelector` but for namespaces and Shell-operator dynamically subscribes to events from matched namespaces.
 
-- `jqFilter` —  an optional parameter that specifies event **filtering** using [jq syntax](https://stedolan.github.io/jq/manual/). The hook will be triggered on the "Modified" event only if the filter result is *changed* after the last event. See example [102-monitor-namespaces](examples/102-monitor-namespaces).
+- `jqFilter` —  an optional parameter that specifies event **filtering** using [jq syntax][jq-syntax]. The hook will be triggered on the "Modified" event only if the filter result is *changed* after the last event. See example [102-monitor-namespaces][namespaces-example].
 
 - `allowFailure` — if `true`, Shell-operator skips the hook execution errors. If `false` or the parameter is not set, the hook is restarted after a 5 seconds delay in case of an error.
 
@@ -244,7 +244,7 @@ kubernetes:
 
 - `keepFullObjectsInMemory` — if not set or `true`, dumps of Kubernetes resources are cached for this binding, and the snapshot includes them as `object` fields. Set to `false` if the hook does not rely on full objects to reduce the memory footprint.
 
-- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#an-example-of-a-binding-context-with-group).
+- `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#binding-context-of-grouped-bindings).
 
 #### Example
 
@@ -280,7 +280,7 @@ Unlike `kubectl` you should explicitly define `namespace.nameSelector` to monito
 
 ##### RBAC is required
 
-Shell-operator requires a ServiceAccount with the appropriate [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) permissions. See examples with RBAC: [monitor-pods](examples/101-monitor-pods) and [monitor-namespaces](examples/102-monitor-namespaces).
+Shell-operator requires a ServiceAccount with the appropriate [RBAC][rbac] permissions. See examples with RBAC: [monitor-pods][pods-example] and [monitor-namespaces][namespaces-example].
 
 ##### jqFilter
 
@@ -292,23 +292,23 @@ You can use `JQ_LIBRARY_PATH` environment variable to set a path with `jq` modul
 
 ##### Added != Object created
 
-Consider that the "Added" event is not always equal to "Object created" if `labelSelector`, `fieldSelector` or `namespace.labelSelector` is specified in the `binding`. If objects and/or namespace are updated in Kubernetes, the `binding` may suddenly start matching them, with the "Added" event. The same with "Deleted" event: "Deleted" is not always equal to "Object removed", the object can just move out of a scope of selectors.
+Consider that the "Added" event is not always equal to "Object created" if `labelSelector`, `fieldSelector` or `namespace.labelSelector` is specified in the `binding`. If objects and/or namespace are updated in Kubernetes, the `binding` may suddenly start matching them, with the "Added" event. The same with "Deleted", event "Deleted" is not always equal to "Object removed", the object can just move out of a scope of selectors.
 
 ##### fieldSelector
 
-There is no support for filtering by arbitrary field neither for core resources nor for custom resources (see [issue#53459](https://github.com/kubernetes/kubernetes/issues/53459)). Only `metadata.name` and `metadata.namespace` fields are commonly supported.
+There is no support for filtering by arbitrary field neither for core resources nor for custom resources (see [issue#53459][custom-resource-issue]). Only `metadata.name` and `metadata.namespace` fields are commonly supported.
 
 However fieldSelector can be useful for some resources with extended set of supported fields:
 
-| kind       | fieldSelector | src url |
-|------------|---------------|---------|
-| Pod        | spec.nodeName<br>spec.restartPolicy<br>spec.schedulerName<br>spec.serviceAccountName<br>status.phase<br>status.podIP<br>status.nominatedNodeName              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/pod/strategy.go#L219-L230)        |
-| Event      | involvedObject.kind<br>involvedObject.namespace<br>involvedObject.name<br>involvedObject.uid<br>involvedObject.apiVersion<br>involvedObject.resourceVersion<br>involvedObject.fieldPath<br>reason<br>source<br>type                | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/event/strategy.go#L102-L112)        |
-| Secret     | type              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/secret/strategy.go#L128)        |
-| Namespace  | status.phase              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/namespace/strategy.go#L163)        |
-| ReplicaSet | status.replicas              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/apps/replicaset/strategy.go#L)        |
-| Job        | status.successful              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/batch/job/strategy.go#L205)        |
-| Node       | spec.unschedulable              | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/node/strategy.go#L204)        |
+| kind       | fieldSelector                                                                                                                                                                                                       | src url                                                                                                     |
+|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| Pod        | spec.nodeName<br>spec.restartPolicy<br>spec.schedulerName<br>spec.serviceAccountName<br>status.phase<br>status.podIP<br>status.nominatedNodeName                                                                    | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/pod/strategy.go#L219-L230)   |
+| Event      | involvedObject.kind<br>involvedObject.namespace<br>involvedObject.name<br>involvedObject.uid<br>involvedObject.apiVersion<br>involvedObject.resourceVersion<br>involvedObject.fieldPath<br>reason<br>source<br>type | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/event/strategy.go#L102-L112) |
+| Secret     | type                                                                                                                                                                                                                | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/secret/strategy.go#L128)     |
+| Namespace  | status.phase                                                                                                                                                                                                        | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/namespace/strategy.go#L163)  |
+| ReplicaSet | status.replicas                                                                                                                                                                                                     | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/apps/replicaset/strategy.go#L)    |
+| Job        | status.successful                                                                                                                                                                                                   | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/batch/job/strategy.go#L205)       |
+| Node       | spec.unschedulable                                                                                                                                                                                                  | [1.16](https://github.com/kubernetes/kubernetes/blob/v1.16.1/pkg/registry/core/node/strategy.go#L204)       |
 
 Example of selecting Pods by 'Running' phase:
 
@@ -327,13 +327,13 @@ Objects should match all expressions defined in `fieldSelector` and `labelSelect
 
 ### kubernetesValidating
 
-Use a hook as handler for [ValidationWebhookConfiguration](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers).
+Use a hook as handler for [ValidationWebhookConfiguration][admission-controllers].
 
 See syntax and parameters in [BINDING_VALIDATING.md](BINDING_VALIDATING.md)
 
 ### kubernetesCustomResourceConversion
 
-Use a hook as handler for [custom resource conversion](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning).
+Use a hook as handler for [custom resource conversion][crd-versioning].
 
 See syntax and parameters in [BINDING_CONVERSION.md](BINDING_CONVERSION.md)
 
@@ -350,7 +350,7 @@ Binging context is a JSON-array of structures with the following fields:
 
 The hook receives "Event"-type binding context on Kubernetes event and it contains more fields:
 - `watchEvent` — the possible value is one of the values you can use with `executeHookOnEvent` parameter: "Added", "Modified" or "Deleted".
-- `object` — a JSON dump of the full object related to the event. It contains an exact copy of the corresponding field in [WatchEvent](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta) response, so it's the object state **at the moment of the event** (not at the moment of the hook execution).
+- `object` — a JSON dump of the full object related to the event. It contains an exact copy of the corresponding field in [WatchEvent][watch-event] response, so it's the object state **at the moment of the event** (not at the moment of the hook execution).
 - `filterResult` — the result of `jq` execution with specified `jqFilter` on the above mentioned object. If `jqFilter` is not specified, then `filterResult` is omitted.
 
 The hook receives existed objects on startup for each binding with "Synchronization"-type binding context:
@@ -806,3 +806,17 @@ settings:
 ```
 
 If the Shell-operator will receive a lot of events for the "all-pods-in-ns" binding, the hook will be executed no more than once in 3 seconds.
+
+[admission-controllers]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers
+[changes-detection]: https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+[crd-versioning]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning
+[cron-lib-doc]: https://godoc.org/gopkg.in/robfig/cron.v2
+[custom-resource-issue]: https://github.com/kubernetes/kubernetes/issues/53459
+[jq-syntax]: https://stedolan.github.io/jq/manual/
+[label-selector]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#labelselector-v1-meta
+[labels]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
+[namespaces-example]: https://github.com/flant/shell-operator/tree/main/examples/102-monitor-namespaces
+[pods-example]: https://github.com/flant/shell-operator/tree/main/examples/101-monitor-pods
+[rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+[startup-example]: https://github.com/flant/shell-operator/tree/main/examples/002-startup-python
+[watch-event]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#watchevent-v1-meta

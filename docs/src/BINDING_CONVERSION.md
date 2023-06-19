@@ -1,6 +1,6 @@
 # kubernetesCustomResourceConversion
 
-This binding transforms a hook into a handler for conversions defined in CustomResourceDefinition. The Shell-operator updates a CRD with .spec.conversion, starts HTTPS server, and runs hooks to handle [ConversionReview requests](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#conversionreview-request-0).
+This binding transforms a hook into a handler for conversions defined in CustomResourceDefinition. The Shell-operator updates a CRD with .spec.conversion, starts HTTPS server, and runs hooks to handle [ConversionReview requests][conversion-request].
 
 > Note: shell-operator use `apiextensions.k8s.io/v1`, so Kubernetes 1.16+ is required.
 
@@ -32,7 +32,7 @@ kubernetesCustomResourceConversion:
 
 - `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from these bindings will be added to the binding context in the `snapshots` field.
 
-- `group` — a key to include snapshots from a group of `schedule` and `kubernetes` bindings. See [grouping](HOOKS.md#an-example-of-a-binding-context-with-group).
+- `group` — a key to include snapshots from a group of `schedule` and `kubernetes` bindings. See [grouping](HOOKS.md#binding-context-of-grouped-bindings).
 
 - `crdName` — a required name of a CRD.
 
@@ -61,7 +61,7 @@ kubernetesCustomResourceConversion:
 
 The Shell-operator will execute this hook to convert custom resources 'crontabs.stable.example.com' from unstable.crontab.io/v1beta1 to stable.example.com/v1beta1, from stable.example.com/v1beta1 to stable.example.com/v1beta2, from unstable.crontab.io/v1beta1 to stable.example.com/v1 and so on.
 
-See example [210-conversion-webhook](./examples/210-conversion-webhook).
+See example [210-conversion-webhook][conversion-webhook-example].
 
 ## Hook input and output
 
@@ -167,7 +167,7 @@ Empty or invalid $CONVERSION_RESPONSE_PATH file is considered as a fail with a s
 
 Shell-operator should create an HTTP endpoint with TLS support and register an endpoint in the CustomResourceDefinition resource.
 
-There should be a Service for shell-operator (see [Service Reference](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#service-reference)).
+There should be a Service for shell-operator (see [Service Reference][service-reference]).
 
 There are command line options and corresponding environment variables to setup TLS certificates and a service name:
 
@@ -188,3 +188,7 @@ There are command line options and corresponding environment variables to setup 
                                  A path to a server certificate for CRD.spec.conversion.webhook. Can be set
                                  with $CONVERSION_WEBHOOK_CLIENT_CA.
 ```
+
+[conversion-request]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#conversionreview-request-0
+[conversion-webhook-example]: https://github.com/flant/shell-operator/tree/main/examples/210-conversion-webhook
+[service-reference]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#service-reference
