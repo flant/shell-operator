@@ -7,10 +7,11 @@ import (
 	"context"
 	"testing"
 
-	. "github.com/flant/shell-operator/test/integration/suite"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	. "github.com/flant/shell-operator/test/integration/suite"
 )
 
 func Test(t *testing.T) {
