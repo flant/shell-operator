@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"runtime"
 	"runtime/trace"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,7 +32,7 @@ func ApplyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) 
 	if filterFn != nil {
 		filteredObj, err := filterFn(obj)
 		if err != nil {
-			return nil, fmt.Errorf("filterFn: %v", err)
+			return nil, fmt.Errorf("filterFn (%s) contains an error: %v", runtime.FuncForPC(reflect.ValueOf(filterFn).Pointer()).Name(), err)
 		}
 
 		filteredBytes, err := json.Marshal(filteredObj)
