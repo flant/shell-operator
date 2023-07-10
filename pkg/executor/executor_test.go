@@ -6,14 +6,14 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/flant/shell-operator/pkg/app"
 )
 
 func TestRunAndLogLines(t *testing.T) {
@@ -92,31 +92,4 @@ func randStringRunes(n int) string {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
 	return string(b)
-}
-
-type buffer struct {
-	b bytes.Buffer
-	m sync.Mutex
-}
-
-func (b *buffer) Read(p []byte) (n int, err error) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.Read(p)
-}
-func (b *buffer) Write(p []byte) (n int, err error) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.Write(p)
-}
-func (b *buffer) String() string {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.String()
-}
-
-func (b *buffer) Reset() {
-	b.m.Lock()
-	defer b.m.Unlock()
-	b.b.Reset()
 }
