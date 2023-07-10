@@ -1,12 +1,9 @@
 package executor
 
 import (
-	"bufio"
 	"encoding/json"
-	"io"
 	"os/exec"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -38,51 +35,20 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 
 	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
-	var wg sync.WaitGroup
+	if app.LogProxyHookJSON {
+		plo := &proxyJSONLogger{stdoutLogEntry, make([]byte, 0)}
+		ple := &proxyJSONLogger{stderrLogEntry, make([]byte, 0)}
+		cmd.Stdout = plo
+		cmd.Stderr = ple
+	} else {
+		cmd.Stdout = stdoutLogEntry.Writer()
+		cmd.Stderr = stderrLogEntry.Writer()
+	}
 
-	stdout, err := cmd.StdoutPipe()
+	err := cmd.Run()
 	if err != nil {
 		return nil, err
 	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		if app.LogProxyHookJSON {
-			proxyJSONLogs(stdout, stdoutLogEntry)
-		} else {
-			scanner := bufio.NewScanner(stdout)
-			for scanner.Scan() {
-				stdoutLogEntry.Info(scanner.Text())
-			}
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if app.LogProxyHookJSON {
-			proxyJSONLogs(stderr, stderrLogEntry)
-		} else {
-			scanner := bufio.NewScanner(stderr)
-			for scanner.Scan() {
-				stderrLogEntry.Info(scanner.Text())
-			}
-		}
-	}()
-
-	wg.Wait()
-
-	err = cmd.Wait()
 
 	var usage *CmdUsage
 	if cmd.ProcessState != nil {
@@ -101,39 +67,43 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 	return usage, err
 }
 
-func proxyJSONLogs(r io.ReadCloser, logEntry *log.Entry) {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		var line interface{}
-		if err := json.Unmarshal([]byte(scanner.Text()), &line); err != nil {
-			logEntry.Debugf("unmarshal json log line: %v", err)
-			// fall back to using the logger
-			logEntry.Info(scanner.Text())
-			continue
-		}
-		logMap, ok := line.(map[string]interface{})
-		if !ok {
-			logEntry.Debugf("json log line not map[string]interface{}: %v", line)
-			// fall back to using the logger
-			logEntry.Info(scanner.Text())
-			continue
-		}
+type proxyJSONLogger struct {
+	*log.Entry
 
-		for k, v := range logEntry.Data {
-			logMap[k] = v
+	buf []byte
+}
+
+func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
+	pj.buf = append(pj.buf, p...)
+
+	var line interface{}
+	err = json.Unmarshal(pj.buf, &line)
+	if err != nil {
+		if err.Error() == "unexpected end of JSON input" {
+			return len(p), nil
 		}
-		logLine, err := json.Marshal(logMap)
-		if err != nil {
-			logEntry.Debugf("marshal json log line: %v", err)
-			// fall back to using the logger
-			logEntry.Info(scanner.Text())
-			continue
-		}
-		// Mark this log entry as one that is json that needs to be proxied
-		logEntry := logEntry.WithField(app.ProxyJsonLogKey, true)
-		// Log the line via the same centralized logger; the formatter should make sure it's "proxied"
-		logEntry.Log(log.FatalLevel, string(logLine))
+		return len(p), err
 	}
+
+	logMap, ok := line.(map[string]interface{})
+	if !ok {
+		pj.Debugf("json log line not map[string]interface{}: %v", line)
+		// fall back to using the logger
+		pj.Info(string(p))
+		return len(p), err
+	}
+
+	for k, v := range pj.Data {
+		logMap[k] = v
+	}
+
+	logLine, _ := json.Marshal(logMap)
+
+	logEntry := pj.WithField(app.ProxyJsonLogKey, true)
+
+	logEntry.Log(log.FatalLevel, string(logLine))
+
+	return len(p), nil
 }
 
 func Output(cmd *exec.Cmd) (output []byte, err error) {
