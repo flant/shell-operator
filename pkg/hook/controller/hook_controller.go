@@ -322,6 +322,13 @@ func (hc *hookController) getIncludeSnapshotsFrom(bindingType BindingType, bindi
 				break
 			}
 		}
+	case KubernetesMutating:
+		for _, binding := range hc.mutatingBindings {
+			if bindingName == binding.BindingName {
+				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
+				break
+			}
+		}
 	case KubernetesConversion:
 		for _, binding := range hc.conversionBindings {
 			if bindingName == binding.BindingName {

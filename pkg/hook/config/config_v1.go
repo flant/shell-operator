@@ -296,6 +296,15 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	}
 	c.KubernetesValidating = newValidating
 
+	newMutating := make([]MutatingConfig, 0)
+	for _, cfg := range c.KubernetesMutating {
+		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
+			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
+		}
+		newMutating = append(newMutating, cfg)
+	}
+	c.KubernetesMutating = newMutating
+
 	newConversion := make([]ConversionConfig, 0)
 	for _, cfg := range c.KubernetesConversion {
 		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
