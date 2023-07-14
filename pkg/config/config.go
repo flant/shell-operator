@@ -126,6 +126,23 @@ func (c *Config) Has(name string) bool {
 	return c.has(name)
 }
 
+// IsValid validates runtime config parameter
+func (c *Config) IsValid(name, value string) error {
+	// maybe we should register it together with a parameter
+	switch name {
+	case "log.level":
+		_, err := log.ParseLevel(value)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return nil
+	}
+
+	return nil
+}
+
 func (c *Config) has(name string) bool {
 	_, registered := c.params[name]
 	return registered
