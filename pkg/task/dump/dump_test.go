@@ -7,9 +7,8 @@ import (
 	"sort"
 	"testing"
 
-	"sigs.k8s.io/yaml"
-
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/yaml"
 
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/task"
