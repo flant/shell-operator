@@ -6,8 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"sigs.k8s.io/yaml"
-
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -46,7 +44,8 @@ func TaskQueueMainToText(tqs *queue.TaskQueueSet) string {
 }
 
 // TaskQueues dumps all queues.
-func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) string {
+// returns empty interface because we have a formatter on the router level, which will marshal data or return it as a string
+func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interface{} {
 	result := dumpTaskQueues{
 		Empty:  make([]dumpQueue, 0),
 		Active: make([]dumpQueue, 0),
@@ -122,7 +121,7 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) string {
 		}
 	}
 
-	return result.Format(format, showEmpty)
+	return result.format(format, showEmpty)
 }
 
 func pluralize(n int, zero, one, many string) string {
@@ -227,26 +226,16 @@ func (dtq dumpTaskQueues) SortByName() {
 	sort.Sort(asQueueNames(dtq.Empty))
 }
 
-func (dtq dumpTaskQueues) Format(format string, showEmpty bool) string {
+func (dtq dumpTaskQueues) format(format string, showEmpty bool) interface{} {
 	switch format {
 	case "text":
 		return dtq.asText(showEmpty)
 
-	case "json":
+	case "json", "yaml":
 		if !showEmpty {
 			dtq.Empty = make([]dumpQueue, 0)
 		}
-		res, _ := json.Marshal(dtq)
-
-		return string(res)
-
-	case "yaml":
-		if !showEmpty {
-			dtq.Empty = make([]dumpQueue, 0)
-		}
-		res, _ := yaml.Marshal(dtq)
-
-		return string(res)
+		return dtq
 	}
 
 	return ""

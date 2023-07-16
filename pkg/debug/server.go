@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	utils "github.com/flant/shell-operator/pkg/utils/file"
-	"github.com/flant/shell-operator/pkg/utils/structured-logger"
+	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type Server struct {
@@ -87,7 +87,7 @@ func (s *Server) Route(pattern string, handler func(request *http.Request) (inte
 		return
 	}
 	s.Router.Get(pattern, func(writer http.ResponseWriter, request *http.Request) {
-		HandleFormattedOutput(writer, request, handler)
+		handleFormattedOutput(writer, request, handler)
 	})
 }
 
@@ -105,22 +105,25 @@ func (s *Server) RoutePOST(pattern string, handler func(request *http.Request) (
 			return
 		}
 
-		HandleFormattedOutput(writer, request, handler)
+		handleFormattedOutput(writer, request, handler)
 	})
 }
 
-func HandleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
+func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
 	out, err := handler(request)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		_, _ = fmt.Fprintf(writer, "Error: %s", err)
 		return
 	}
+	if out == nil && err == nil {
+		return
+	}
 
 	format := FormatFromRequest(request)
 	structured_logger.GetLogEntry(request).Debugf("use format '%s'", format)
 
-	outBytes, err := TransformUsingFormat(out, format)
+	outBytes, err := transformUsingFormat(out, format)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		_, _ = fmt.Fprintf(writer, "Error '%s' transform: %s", format, err)
@@ -130,7 +133,7 @@ func HandleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	_, _ = writer.Write(outBytes)
 }
 
-func TransformUsingFormat(val interface{}, format string) ([]byte, error) {
+func transformUsingFormat(val interface{}, format string) ([]byte, error) {
 	var outBytes []byte
 	var err error
 

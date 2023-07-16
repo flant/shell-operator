@@ -85,6 +85,10 @@ func RegisterDebugConfigRoutes(dbgSrv *debug.Server, runtimeConfig *config.Confi
 			return nil, fmt.Errorf("'value' parameter is required")
 		}
 
+		if err := runtimeConfig.IsValid(name, value); err != nil {
+			return nil, fmt.Errorf("'value' parameter is invalid: %w", err)
+		}
+
 		var duration time.Duration
 		var err error
 		durationStr := r.PostForm.Get("duration")
