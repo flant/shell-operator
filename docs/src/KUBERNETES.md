@@ -12,11 +12,11 @@ The path to the file is found in the `$KUBERNETES_PATCH_PATH` environment variab
 ### Create
 
 * `operation` — specifies an operation's type.
-    * `CreateOrUpdate` — accept a Kubernetes object.
+  * `CreateOrUpdate` — accept a Kubernetes object.
       It retrieves an object, and if it already exists, computes a JSON Merge Patch and applies it (will not update .status field).
       If it does not exist, we create the object.
-    * `Create` — will fail if an object already exists
-    * `CreateIfNotExists` — create an object if such an object does not already
+  * `Create` — will fail if an object already exists
+  * `CreateIfNotExists` — create an object if such an object does not already
       exist by namespace/name.
 * `object` — full object specification including "apiVersion", "kind" and all necessary metadata. Can be a normal JSON or YAML object or a stringified JSON or YAML object.
 
@@ -25,6 +25,54 @@ The path to the file is found in the `$KUBERNETES_PATCH_PATH` environment variab
 ```json
 {
   "operation": "CreateOrUpdate",
+  "oldObject": {
+    "apiVersion": "apps/v1",
+    "kind": "DaemonSet",
+    "metadata": {
+      "name": "flannel",
+      "namespace": "d8-flannel"
+    },
+    "spec": {
+      "selector": {
+        "matchLabels": {
+          "app": "flannel"
+        }
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app": "flannel",
+            "tier": "old-node"
+          }
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "--ip-masq",
+                "--kube-subnet-mgr"
+              ],
+              "image": "flannel:v0.11",
+              "name": "kube-flannel",
+              "securityContext": {
+                "privileged": true
+              }
+            }
+          ],
+          "hostNetwork": true,
+          "imagePullSecrets": [
+            {
+              "name": "registry"
+            }
+          ],
+          "terminationGracePeriodSeconds": 5
+        }
+      },
+      "updateStrategy": {
+        "type": "RollingUpdate"
+      }
+    }
+  },
   "object": {
     "apiVersion": "apps/v1",
     "kind": "DaemonSet",
@@ -123,7 +171,7 @@ object: |
 
 ### Patch
 
-Use `JQPatch` for almost everything. Consider using `MergePatch` or `JSONPatch` if you are attempting to modify 
+Use `JQPatch` for almost everything. Consider using `MergePatch` or `JSONPatch` if you are attempting to modify
 rapidly changing object, for example `status` field with many concurrent changes (and incrementing `resourceVersion`).
 
 Be careful, when updating a `.status` field. If a `/status` subresource is enabled on a resource,
@@ -140,6 +188,7 @@ More info [here][spec-and-status].
 * `name` — object's name.
 * `jqFilter` — describes transformations to perform on an object.
 * `subresource` — a subresource name if subresource is to be transformed. For example, `status`.
+
 ##### Example
 
 ```json

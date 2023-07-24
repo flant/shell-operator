@@ -266,22 +266,22 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 }
 
 func (ei *resourceInformer) OnAdd(obj interface{}) {
-	ei.HandleWatchEvent(obj, WatchEventAdded)
+	ei.HandleWatchEvent(nil, obj, WatchEventAdded)
 }
 
-func (ei *resourceInformer) OnUpdate(_, newObj interface{}) {
-	ei.HandleWatchEvent(newObj, WatchEventModified)
+func (ei *resourceInformer) OnUpdate(oldObj, newObj interface{}) {
+	ei.HandleWatchEvent(oldObj, newObj, WatchEventModified)
 }
 
 func (ei *resourceInformer) OnDelete(obj interface{}) {
-	ei.HandleWatchEvent(obj, WatchEventDeleted)
+	ei.HandleWatchEvent(nil, obj, WatchEventDeleted)
 }
 
 // HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 // func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
-func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType WatchEventType) {
+func (ei *resourceInformer) HandleWatchEvent(oldObject, object interface{}, eventType WatchEventType) {
 	// check if stop
 	if ei.stopped {
 		return
@@ -296,6 +296,7 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 		object = staleObj.Obj
 	}
 	obj := object.(*unstructured.Unstructured)
+	oldObj := object.(*unstructured.Unstructured)
 
 	resourceId := ResourceId(obj)
 
@@ -308,6 +309,7 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 		})()
 		objFilterRes, err = ApplyFilter(ei.Monitor.JqFilter, ei.Monitor.FilterFunc, obj)
+		objFilterRes.OldObject = oldObj
 	}()
 	if err != nil {
 		log.Errorf("%s: WATCH %s: %s",
