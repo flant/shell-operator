@@ -309,7 +309,6 @@ func (ei *resourceInformer) HandleWatchEvent(oldObject, object interface{}, even
 			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 		})()
 		objFilterRes, err = ApplyFilter(ei.Monitor.JqFilter, ei.Monitor.FilterFunc, obj)
-		objFilterRes.OldObject = oldObj
 	}()
 	if err != nil {
 		log.Errorf("%s: WATCH %s: %s",
@@ -321,6 +320,10 @@ func (ei *resourceInformer) HandleWatchEvent(oldObject, object interface{}, even
 
 	if !ei.Monitor.KeepFullObjectsInMemory {
 		objFilterRes.RemoveFullObject()
+	} else {
+		if oldObj != nil {
+			objFilterRes.OldObject = oldObj
+		}
 	}
 
 	// Do not fire Added or Modified if object is in cache and its checksum is equal to the newChecksum.
