@@ -296,7 +296,7 @@ func (ei *resourceInformer) HandleWatchEvent(oldObject, object interface{}, even
 		object = staleObj.Obj
 	}
 	obj := object.(*unstructured.Unstructured)
-	oldObj := object.(*unstructured.Unstructured)
+	oldObj := oldObject.(*unstructured.Unstructured)
 
 	resourceId := ResourceId(obj)
 
