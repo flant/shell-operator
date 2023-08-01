@@ -320,7 +320,7 @@ func (ei *resourceInformer) HandleWatchEvent(oldObject, object interface{}, even
 
 	if !ei.Monitor.KeepFullObjectsInMemory {
 		objFilterRes.RemoveFullObject()
-	} else {
+	} else if ei.Monitor.KeepFullObjectsInMemory {
 		if oldObj != nil {
 			objFilterRes.OldObject = oldObj
 		}
