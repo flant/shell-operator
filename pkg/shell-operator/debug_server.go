@@ -18,6 +18,7 @@ func DefaultDebugServer() *debug.Server {
 	dbgSrv := debug.NewServer()
 	dbgSrv.WithPrefix("/debug")
 	dbgSrv.WithSocketPath(app.DebugUnixSocket)
+	dbgSrv.WithHttpPort(app.DebugHttpPort)
 	return dbgSrv
 }
 

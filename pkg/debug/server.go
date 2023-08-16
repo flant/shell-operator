@@ -20,6 +20,7 @@ import (
 type Server struct {
 	SocketPath string
 	Prefix     string
+	HttpPort   string
 
 	Router chi.Router
 }
@@ -34,6 +35,10 @@ func (s *Server) WithSocketPath(path string) {
 
 func (s *Server) WithPrefix(prefix string) {
 	s.Prefix = prefix
+}
+
+func (s *Server) WithHttpPort(port string) {
+	s.HttpPort = port
 }
 
 func (s *Server) Init() (err error) {
@@ -73,10 +78,21 @@ func (s *Server) Init() (err error) {
 
 	go func() {
 		if err := http.Serve(listener, s.Router); err != nil {
-			log.Errorf("Error starting Debug HTTP server: %s", err)
+			log.Errorf("Error starting Debug socket server: %s", err)
 			os.Exit(1)
 		}
 	}()
+
+	if s.HttpPort != "" {
+		port := fmt.Sprintf("127.0.0.1:%s", s.HttpPort)
+
+		go func() {
+			if err := http.ListenAndServe(port, s.Router); err != nil {
+				log.Errorf("Error starting Debug HTTP server: %s", err)
+				os.Exit(1)
+			}
+		}()
+	}
 
 	return nil
 }

@@ -8,6 +8,8 @@ import (
 
 var DebugUnixSocket = "/var/run/shell-operator/debug.socket"
 
+var DebugHttpPort = ""
+
 var DebugKeepTmpFiles = "no"
 
 var DebugKubernetesAPI = false
@@ -74,4 +76,12 @@ func DefineDebugUnixSocketFlag(cmd *kingpin.CmdClause) {
 		Hidden().
 		Default(DebugUnixSocket).
 		StringVar(&DebugUnixSocket)
+}
+
+func DefineDebugHttpPortFlag(cmd *kingpin.CmdClause) {
+	cmd.Flag("debug-http-port", "http port for a debug endpoint").
+		Envar("DEBUG_HTTP_PORT").
+		Hidden().
+		Default(DebugHttpPort).
+		StringVar(&DebugHttpPort)
 }
