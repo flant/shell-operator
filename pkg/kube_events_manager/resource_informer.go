@@ -324,10 +324,9 @@ func (ei *resourceInformer) HandleWatchEvent(oldObject, object interface{}, even
 
 	if !ei.Monitor.KeepFullObjectsInMemory {
 		objFilterRes.RemoveFullObject()
-	} else if ei.Monitor.KeepFullObjectsInMemory {
-		if oldObj != nil {
-			objFilterRes.OldObject = oldObj
-		}
+	} else if oldObj != nil {
+		objFilterRes.OldObject = oldObj
+	}
 	}
 
 	// Do not fire Added or Modified if object is in cache and its checksum is equal to the newChecksum.
