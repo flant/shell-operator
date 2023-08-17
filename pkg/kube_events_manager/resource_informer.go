@@ -299,7 +299,7 @@ func (ei *resourceInformer) HandleWatchEvent(oldObject, object interface{}, even
 
 	var oldObj *unstructured.Unstructured
 	if oldObject != nil {
-	  oldObj = oldObject.(*unstructured.Unstructured)
+		oldObj = oldObject.(*unstructured.Unstructured)
   }
 
 	resourceId := ResourceId(obj)
