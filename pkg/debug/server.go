@@ -18,27 +18,19 @@ import (
 )
 
 type Server struct {
-	SocketPath string
 	Prefix     string
+	SocketPath string
 	HttpPort   string
 
 	Router chi.Router
 }
 
-func NewServer() *Server {
-	return &Server{}
-}
-
-func (s *Server) WithSocketPath(path string) {
-	s.SocketPath = path
-}
-
-func (s *Server) WithPrefix(prefix string) {
-	s.Prefix = prefix
-}
-
-func (s *Server) WithHttpPort(port string) {
-	s.HttpPort = port
+func NewServer(prefix, socketPath, httpPort string) *Server {
+	return &Server{
+		Prefix:     prefix,
+		SocketPath: socketPath,
+		HttpPort:   httpPort,
+	}
 }
 
 func (s *Server) Init() (err error) {
