@@ -76,7 +76,6 @@ func (s *Server) Init() (err error) {
 	}()
 
 	if s.HttpAddr != "" {
-
 		go func() {
 			if err := http.ListenAndServe(s.HttpAddr, s.Router); err != nil {
 				log.Errorf("Error starting Debug HTTP server: %s", err)
