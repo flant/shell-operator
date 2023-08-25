@@ -18,22 +18,19 @@ import (
 )
 
 type Server struct {
-	SocketPath string
 	Prefix     string
+	SocketPath string
+	HttpAddr   string
 
 	Router chi.Router
 }
 
-func NewServer() *Server {
-	return &Server{}
-}
-
-func (s *Server) WithSocketPath(path string) {
-	s.SocketPath = path
-}
-
-func (s *Server) WithPrefix(prefix string) {
-	s.Prefix = prefix
+func NewServer(prefix, socketPath, httpAddr string) *Server {
+	return &Server{
+		Prefix:     prefix,
+		SocketPath: socketPath,
+		HttpAddr:   httpAddr,
+	}
 }
 
 func (s *Server) Init() (err error) {
@@ -73,10 +70,19 @@ func (s *Server) Init() (err error) {
 
 	go func() {
 		if err := http.Serve(listener, s.Router); err != nil {
-			log.Errorf("Error starting Debug HTTP server: %s", err)
+			log.Errorf("Error starting Debug socket server: %s", err)
 			os.Exit(1)
 		}
 	}()
+
+	if s.HttpAddr != "" {
+		go func() {
+			if err := http.ListenAndServe(s.HttpAddr, s.Router); err != nil {
+				log.Errorf("Error starting Debug HTTP server: %s", err)
+				os.Exit(1)
+			}
+		}()
+	}
 
 	return nil
 }
