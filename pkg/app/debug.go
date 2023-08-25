@@ -8,7 +8,7 @@ import (
 
 var DebugUnixSocket = "/var/run/shell-operator/debug.socket"
 
-var DebugHttpPort = ""
+var DebugHttpServerAddr = ""
 
 var DebugKeepTmpFiles = "no"
 
@@ -80,8 +80,8 @@ func DefineDebugUnixSocketFlag(cmd *kingpin.CmdClause) {
 
 func DefineDebugHttpPortFlag(cmd *kingpin.CmdClause) {
 	cmd.Flag("debug-http-port", "http port for a debug endpoint").
-		Envar("DEBUG_HTTP_PORT").
+		Envar("DEBUG_HTTP_SERVER_ADDR").
 		Hidden().
-		Default(DebugHttpPort).
-		StringVar(&DebugHttpPort)
+		Default(DebugHttpServerAddr).
+		StringVar(&DebugHttpServerAddr)
 }

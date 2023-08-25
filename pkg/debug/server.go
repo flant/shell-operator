@@ -20,16 +20,16 @@ import (
 type Server struct {
 	Prefix     string
 	SocketPath string
-	HttpPort   string
+	HttpAddr   string
 
 	Router chi.Router
 }
 
-func NewServer(prefix, socketPath, httpPort string) *Server {
+func NewServer(prefix, socketPath, httpAddr string) *Server {
 	return &Server{
 		Prefix:     prefix,
 		SocketPath: socketPath,
-		HttpPort:   httpPort,
+		HttpAddr:   httpAddr,
 	}
 }
 
@@ -75,11 +75,10 @@ func (s *Server) Init() (err error) {
 		}
 	}()
 
-	if s.HttpPort != "" {
-		port := fmt.Sprintf("127.0.0.1:%s", s.HttpPort)
+	if s.HttpAddr != "" {
 
 		go func() {
-			if err := http.ListenAndServe(port, s.Router); err != nil {
+			if err := http.ListenAndServe(s.HttpAddr, s.Router); err != nil {
 				log.Errorf("Error starting Debug HTTP server: %s", err)
 				os.Exit(1)
 			}

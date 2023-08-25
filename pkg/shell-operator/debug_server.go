@@ -15,7 +15,7 @@ import (
 )
 
 func DefaultDebugServer() *debug.Server {
-	dbgSrv := debug.NewServer("/debug", app.DebugUnixSocket, app.DebugHttpPort)
+	dbgSrv := debug.NewServer("/debug", app.DebugUnixSocket, app.DebugHttpServerAddr)
 
 	return dbgSrv
 }
