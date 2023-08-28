@@ -18,6 +18,12 @@ var DebugKubernetesAPI = false
 func DefineDebugFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
 	DefineDebugUnixSocketFlag(cmd)
 
+	cmd.Flag("debug-http-addr", "http addr for a debug endpoint").
+		Envar("DEBUG_HTTP_SERVER_ADDR").
+		Hidden().
+		Default(DebugHttpServerAddr).
+		StringVar(&DebugHttpServerAddr)
+
 	cmd.Flag("debug-keep-tmp-files", "set to yes to disable cleanup of temporary files").
 		Envar("DEBUG_KEEP_TMP_FILES").
 		Hidden().
@@ -76,12 +82,4 @@ func DefineDebugUnixSocketFlag(cmd *kingpin.CmdClause) {
 		Hidden().
 		Default(DebugUnixSocket).
 		StringVar(&DebugUnixSocket)
-}
-
-func DefineDebugHttpPortFlag(cmd *kingpin.CmdClause) {
-	cmd.Flag("debug-http-port", "http port for a debug endpoint").
-		Envar("DEBUG_HTTP_SERVER_ADDR").
-		Hidden().
-		Default(DebugHttpServerAddr).
-		StringVar(&DebugHttpServerAddr)
 }
