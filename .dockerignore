@@ -6,7 +6,6 @@ test
 
 .git
 .gitignore
-Dockerfile
 LICENSE
 *.md
 *.png
