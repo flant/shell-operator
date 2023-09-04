@@ -14,7 +14,7 @@ jobs:
           go-version: "1.20"
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Restore Go modules
         id: go-modules-cache
@@ -51,7 +51,7 @@ jobs:
 #    name: Darwin binary
 #    runs-on: macos-10.15
 #    steps:
-#      - uses: actions/checkout@v3
+#      - uses: actions/checkout@v4
 #
 #      - name: install jq
 #        run: |
@@ -71,7 +71,7 @@ jobs:
 #    name: Windows binary
 #    runs-on: windows-2019
 #    steps:
-#      - uses: actions/checkout@v3
+#      - uses: actions/checkout@v4
 #
 #      - name: build shell-operator binary
 #        run: |
