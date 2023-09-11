@@ -275,6 +275,8 @@ properties:
                   enum:
                   - "CREATE"
                   - "UPDATE"
+                  - "DELETE"
+                  - "CONNECT"
                   - "*"
               scope:
                 type: string
