@@ -16,7 +16,7 @@ jobs:
           go-version: "1.20"
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Restore Go modules
         id: go-modules-cache
@@ -49,7 +49,7 @@ jobs:
           python-version: 3.8
 
       - name: Check out addon-operator code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Run codespell
         run: |
