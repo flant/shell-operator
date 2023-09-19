@@ -290,6 +290,32 @@ The result of applying the filter to the event's object is passed to the hook in
 
 You can use `JQ_LIBRARY_PATH` environment variable to set a path with `jq` modules.
 
+In case you need to filter by multiple fields, you can use the form of an object or an array:
+
+- `jqFilter: "{nodeName: .spec.nodeName, name: .metadata.labels}"` returns filterResult as object:
+  
+  ```json
+  "filterResult": {
+    "labels": {
+      "app": "proxy",
+      "pod-template-hash": "cfdbfcbb8"
+    },
+    "nodeName": "node-01"
+  }
+  ```
+
+- `jqFilter: "[.spec.nodeName, .metadata.labels]"` returns filterResult as array:
+
+  ```json
+  "filterResult": [
+    "node-01",
+    {
+      "app": "proxy",
+      "pod-template-hash": "cfdbfcbb8"
+    }
+  ]
+  ```
+
 ##### Added != Object created
 
 Consider that the "Added" event is not always equal to "Object created" if `labelSelector`, `fieldSelector` or `namespace.labelSelector` is specified in the `binding`. If objects and/or namespace are updated in Kubernetes, the `binding` may suddenly start matching them, with the "Added" event. The same with "Deleted", event "Deleted" is not always equal to "Object removed", the object can just move out of a scope of selectors.
