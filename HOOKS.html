@@ -436,6 +436,31 @@ kubernetes:
 <p>This filter is used to <em>ignore</em> superfluous “Modified” events, <em>and</em> to <em>exclude</em> object from event subscription. For example, if the hook should track changes of object’s labels, <code>jqFilter: &quot;.metadata.labels&quot;</code> can be used to ignore changes in other properties (<code>.status</code>,<code>.metadata.annotations</code>, etc.).</p>
 <p>The result of applying the filter to the event’s object is passed to the hook in a <code>filterResult</code> field of a <a href="#binding-context">binding context</a>.</p>
 <p>You can use <code>JQ_LIBRARY_PATH</code> environment variable to set a path with <code>jq</code> modules.</p>
+<p>In case you need to filter by multiple fields, you can use the form of an object or an array:</p>
+<ul>
+<li>
+<p><code>jqFilter: &quot;{nodeName: .spec.nodeName, name: .metadata.labels}&quot;</code> returns filterResult as object:</p>
+<pre><code class="language-json">&quot;filterResult&quot;: {
+  &quot;labels&quot;: {
+    &quot;app&quot;: &quot;proxy&quot;,
+    &quot;pod-template-hash&quot;: &quot;cfdbfcbb8&quot;
+  },
+  &quot;nodeName&quot;: &quot;node-01&quot;
+}
+</code></pre>
+</li>
+<li>
+<p><code>jqFilter: &quot;[.spec.nodeName, .metadata.labels]&quot;</code> returns filterResult as array:</p>
+<pre><code class="language-json">&quot;filterResult&quot;: [
+  &quot;node-01&quot;,
+  {
+    &quot;app&quot;: &quot;proxy&quot;,
+    &quot;pod-template-hash&quot;: &quot;cfdbfcbb8&quot;
+  }
+]
+</code></pre>
+</li>
+</ul>
 <h5 id="added--object-created"><a class="header" href="#added--object-created">Added != Object created</a></h5>
 <p>Consider that the “Added” event is not always equal to “Object created” if <code>labelSelector</code>, <code>fieldSelector</code> or <code>namespace.labelSelector</code> is specified in the <code>binding</code>. If objects and/or namespace are updated in Kubernetes, the <code>binding</code> may suddenly start matching them, with the “Added” event. The same with “Deleted”, event “Deleted” is not always equal to “Object removed”, the object can just move out of a scope of selectors.</p>
 <h5 id="fieldselector"><a class="header" href="#fieldselector">fieldSelector</a></h5>
