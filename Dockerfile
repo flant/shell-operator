@@ -20,19 +20,14 @@ RUN CGO_ENABLED=1 \
     CGO_LDFLAGS="-L/libjq/lib" \
     GOOS=linux \
     go build -ldflags="-linkmode external -extldflags '-static' -s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" \
-             -tags use_libjq \
-             -o shell-operator \
-             ./cmd/shell-operator
+            -tags use_libjq \
+            -o shell-operator \
+            ./cmd/shell-operator
 
 # Final image
 FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.18
 ARG TARGETPLATFORM
-RUN apk --no-cache add ca-certificates bash sed tini && \
-    kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
-    echo "Download kubectl for ${kubectlArch}" && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.21.10/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
-    chmod +x /bin/kubectl && \
-    mkdir /hooks
+RUN mkdir /hooks
 ADD frameworks/shell /frameworks/shell
 ADD shell_lib.sh /
 COPY --from=libjq /bin/jq /usr/bin
