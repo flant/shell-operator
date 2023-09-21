@@ -266,22 +266,22 @@ func (ei *resourceInformer) LoadExistedObjects() error {
 }
 
 func (ei *resourceInformer) OnAdd(obj interface{}) {
-	ei.HandleWatchEvent(obj, WatchEventAdded)
+	ei.HandleWatchEvent(nil, obj, WatchEventAdded)
 }
 
-func (ei *resourceInformer) OnUpdate(_, newObj interface{}) {
-	ei.HandleWatchEvent(newObj, WatchEventModified)
+func (ei *resourceInformer) OnUpdate(oldObj, newObj interface{}) {
+	ei.HandleWatchEvent(oldObj, newObj, WatchEventModified)
 }
 
 func (ei *resourceInformer) OnDelete(obj interface{}) {
-	ei.HandleWatchEvent(obj, WatchEventDeleted)
+	ei.HandleWatchEvent(nil, obj, WatchEventDeleted)
 }
 
 // HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 // func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
-func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType WatchEventType) {
+func (ei *resourceInformer) HandleWatchEvent(oldObject, object interface{}, eventType WatchEventType) {
 	// check if stop
 	if ei.stopped {
 		return
@@ -296,6 +296,11 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 		object = staleObj.Obj
 	}
 	obj := object.(*unstructured.Unstructured)
+
+	var oldObj *unstructured.Unstructured
+	if oldObject != nil {
+		oldObj = oldObject.(*unstructured.Unstructured)
+	}
 
 	resourceId := ResourceId(obj)
 
@@ -319,6 +324,8 @@ func (ei *resourceInformer) HandleWatchEvent(object interface{}, eventType Watch
 
 	if !ei.Monitor.KeepFullObjectsInMemory {
 		objFilterRes.RemoveFullObject()
+	} else if oldObj != nil {
+		objFilterRes.OldObject = oldObj
 	}
 
 	// Do not fire Added or Modified if object is in cache and its checksum is equal to the newChecksum.

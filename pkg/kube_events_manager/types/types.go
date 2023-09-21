@@ -41,6 +41,7 @@ type ObjectAndFilterResult struct {
 		RemoveObject bool
 	}
 	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
+	OldObject    *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver and also it's nullable for some events
 	FilterResult interface{}
 }
 
