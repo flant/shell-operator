@@ -50,7 +50,7 @@ jobs:
           kind_node_image: "kindest/node:v1.23.13"
           cluster_name: "kube-1-23"
         - k8s_version: "1.24"
-          kind_node_image: "kindest/node:v1.24."
+          kind_node_image: "kindest/node:v1.24.7"
           cluster_name: "kube-1-24"
         - k8s_version: "1.25"
           kind_node_image: "kindest/node:v1.25.12"
