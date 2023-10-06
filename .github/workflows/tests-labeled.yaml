@@ -47,19 +47,19 @@ jobs:
       matrix:
         include:
         - k8s_version: "1.23"
-          kind_node_image: "kindest/node:v1.23.13"
+          kind_node_image: "kindest/node:v1.23.17"
           cluster_name: "kube-1-23"
         - k8s_version: "1.24"
-          kind_node_image: "kindest/node:v1.24.7"
+          kind_node_image: "kindest/node:v1.24.15"
           cluster_name: "kube-1-24"
         - k8s_version: "1.25"
-          kind_node_image: "kindest/node:v1.25.12"
+          kind_node_image: "kindest/node:v1.25.11"
           cluster_name: "kube-1-25"
         - k8s_version: "1.26"
-          kind_node_image: "kindest/node:v1.26.9"
+          kind_node_image: "kindest/node:v1.26.6"
           cluster_name: "kube-1-26"
         - k8s_version: "1.27"
-          kind_node_image: "kindest/node:v1.27.6"
+          kind_node_image: "kindest/node:v1.27.3"
           cluster_name: "kube-1-27"
     runs-on: ubuntu-latest
     steps:
