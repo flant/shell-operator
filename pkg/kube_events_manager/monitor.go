@@ -238,7 +238,6 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []*re
 	}
 
 	for _, objName := range objNames {
-
 		informer := newResourceInformer(namespace, objName, cfg)
 
 		err := informer.createSharedInformer()

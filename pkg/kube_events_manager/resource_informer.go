@@ -61,8 +61,6 @@ type resourceInformer struct {
 }
 
 // resourceInformer should implement ResourceInformer
-//var _ ResourceInformer = &resourceInformer{}
-
 type resourceInformerConfig struct {
 	client  klient.Client
 	mstor   *metric_storage.MetricStorage

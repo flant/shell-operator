@@ -46,7 +46,6 @@ func NewNamespaceInformer(ctx context.Context, client klient.Client, monitor *Mo
 
 func (ni *namespaceInformer) withContext(ctx context.Context) {
 	ni.ctx, ni.cancel = context.WithCancel(ctx)
-
 }
 
 func (ni *namespaceInformer) createSharedInformer(addFn func(string), delFn func(string)) error {

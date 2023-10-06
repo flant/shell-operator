@@ -13,7 +13,6 @@ import (
 )
 
 func JqEqual(t *testing.T, input []byte, program string, expected string) {
-	//nolint:typecheck // Ignore false positive: undeclared name: `Jq`.
 	res, err := Jq().Program(program).Run(string(input))
 	if assert.NoError(t, err) {
 		assert.Equal(t, expected, res, "jq: '%s', json was '%s'", program, string(input))

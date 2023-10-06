@@ -81,7 +81,7 @@ func (c *MonitorConfig) WithFieldSelector(fieldSel *FieldSelector) {
 	}
 }
 
-//func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, value string) {
+// func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, value string) {
 //	if c.FieldSelector == nil {
 //		c.FieldSelector = &FieldSelector{
 //			MatchExpressions: []FieldSelectorRequirement{},
@@ -110,7 +110,7 @@ func (c *MonitorConfig) WithLabelSelector(labelSel *metav1.LabelSelector) {
 	}
 }
 
-//func (c *MonitorConfig) IsAnyNamespace() bool {
+// func (c *MonitorConfig) IsAnyNamespace() bool {
 //	return c.NamespaceSelector == nil ||
 //		(c.NamespaceSelector.NameSelector == nil && c.NamespaceSelector.LabelSelector == nil) ||
 //		(c.NamespaceSelector.NameSelector != nil && len(c.NamespaceSelector.NameSelector.MatchNames) == 0)
