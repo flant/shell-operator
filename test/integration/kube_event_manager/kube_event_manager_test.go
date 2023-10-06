@@ -26,9 +26,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 	var KubeEventsManager kube_events_manager.KubeEventsManager
 
 	BeforeEach(func() {
-		KubeEventsManager = kube_events_manager.NewKubeEventsManager()
-		KubeEventsManager.WithContext(context.Background())
-		KubeEventsManager.WithKubeClient(KubeClient)
+		KubeEventsManager = kube_events_manager.NewKubeEventsManager(context.Background(), KubeClient)
 	})
 
 	Context("with configVersion: v1", func() {
