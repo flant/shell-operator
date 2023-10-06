@@ -34,15 +34,9 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 			},
 		},
 	}
-
-	mon := NewMonitor()
-	mon.WithContext(context.TODO())
-	mon.WithKubeClient(fc.Client)
-	mon.WithConfig(monitorCfg)
-
-	// Catch resource IDs from monitor events.
 	objsFromEvents := make([]string, 0)
-	mon.WithKubeEventCb(func(ev KubeEvent) {
+
+	mon := NewMonitor(context.Background(), fc.Client, nil, monitorCfg, func(ev KubeEvent) {
 		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
 	})
 
@@ -60,7 +54,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	createNsWithLabels(fc, "test-ns-1", map[string]string{"test-label": ""})
 
 	// Wait until informers appears.
-	g.Eventually(mon.(*monitor).VaryingInformers, "5s", "10ms").
+	g.Eventually(mon.VaryingInformers, "5s", "10ms").
 		Should(HaveKey("test-ns-1"), "Should create informer for new namespace")
 
 	createCM(fc, "test-ns-1", testCM("cm-1"))
@@ -84,7 +78,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 		Should(SatisfyAll(
 			ContainElement("test-ns-1/ConfigMap/cm-2"),
 			ContainElement("test-ns-1/ConfigMap/cm-3"),
-		), "Should fire cached KubeEvents after EnableKubeEventCb")
+		), "Should fire cached KubeEvents after enableKubeEventCb")
 
 	g.Expect(snapshotResourceIDs(mon.Snapshot())).
 		Should(SatisfyAll(
@@ -98,7 +92,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	createNsWithLabels(fc, "test-ns-2", map[string]string{"test-label": ""})
 
 	// Monitor should create new configmap informer for new namespace.
-	g.Eventually(mon.(*monitor).VaryingInformers, "5s", "10ms").
+	g.Eventually(mon.VaryingInformers, "5s", "10ms").
 		Should(HaveKey("test-ns-2"), "Should create informer for ns/test-ns-2")
 
 	// Create new ConfigMap after Synchronization.
@@ -117,7 +111,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	createNsWithLabels(fc, "test-ns-non-matched", map[string]string{"non-matched-label": ""})
 
 	// Monitor should create new configmap informer for new namespace.
-	g.Eventually(mon.(*monitor).VaryingInformers, "5s", "10ms").
+	g.Eventually(mon.VaryingInformers, "5s", "10ms").
 		ShouldNot(HaveKey("test-ns-non-matched"), "Should not create informer for non-mathed Namespace")
 }
 

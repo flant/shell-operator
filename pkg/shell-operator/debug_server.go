@@ -14,14 +14,14 @@ import (
 	"github.com/flant/shell-operator/pkg/task/dump"
 )
 
-func DefaultDebugServer() *debug.Server {
+func newDebugServer() *debug.Server {
 	dbgSrv := debug.NewServer("/debug", app.DebugUnixSocket, app.DebugHttpServerAddr)
 
 	return dbgSrv
 }
 
-func InitDefaultDebugServer() (*debug.Server, error) {
-	dbgSrv := DefaultDebugServer()
+func initDefaultDebugServer() (*debug.Server, error) {
+	dbgSrv := newDebugServer()
 	err := dbgSrv.Init()
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func InitDefaultDebugServer() (*debug.Server, error) {
 	return dbgSrv, nil
 }
 
-func RegisterDebugQueueRoutes(dbgSrv *debug.Server, op *ShellOperator) {
+func registerDebugQueueRoutes(dbgSrv *debug.Server, op *ShellOperator) {
 	dbgSrv.Route("/queue/main.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		return dump.TaskQueueMainToText(op.TaskQueues), nil
 	})
@@ -48,7 +48,7 @@ func RegisterDebugQueueRoutes(dbgSrv *debug.Server, op *ShellOperator) {
 	})
 }
 
-func RegisterDebugHookRoutes(dbgSrv *debug.Server, op *ShellOperator) {
+func registerDebugHookRoutes(dbgSrv *debug.Server, op *ShellOperator) {
 	dbgSrv.Route("/hook/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		return op.HookManager.GetHookNames(), nil
 	})
@@ -60,8 +60,8 @@ func RegisterDebugHookRoutes(dbgSrv *debug.Server, op *ShellOperator) {
 	})
 }
 
-// RegisterDebugConfigRoutes registers routes to manage runtime configuration.
-func RegisterDebugConfigRoutes(dbgSrv *debug.Server, runtimeConfig *config.Config) {
+// registerDebugConfigRoutes registers routes to manage runtime configuration.
+func registerDebugConfigRoutes(dbgSrv *debug.Server, runtimeConfig *config.Config) {
 	dbgSrv.Route("/config/list.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
 		format := debug.FormatFromRequest(r)
 		if format == "text" {

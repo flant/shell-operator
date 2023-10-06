@@ -7,7 +7,7 @@ import (
 )
 
 func Test_Manager_AddWebhook(t *testing.T) {
-	m := NewWebhookManager()
+	m := NewWebhookManager(nil)
 	m.Namespace = "default"
 	vs := &WebhookSettings{}
 	vs.ConfigurationName = "webhook-configuration"

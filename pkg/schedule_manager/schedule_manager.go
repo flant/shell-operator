@@ -10,7 +10,6 @@ import (
 )
 
 type ScheduleManager interface {
-	WithContext(ctx context.Context)
 	Stop()
 	Start()
 	Add(entry ScheduleEntry)
@@ -33,17 +32,16 @@ type scheduleManager struct {
 
 var _ ScheduleManager = &scheduleManager{}
 
-var NewScheduleManager = func() *scheduleManager {
+func NewScheduleManager(ctx context.Context) *scheduleManager {
+	cctx, cancel := context.WithCancel(ctx)
 	sm := &scheduleManager{
+		ctx:        cctx,
+		cancel:     cancel,
 		ScheduleCh: make(chan string, 1),
 		cron:       cron.New(),
 		Entries:    make(map[string]CronEntry),
 	}
 	return sm
-}
-
-func (sm *scheduleManager) WithContext(ctx context.Context) {
-	sm.ctx, sm.cancel = context.WithCancel(ctx)
 }
 
 func (sm *scheduleManager) Stop() {

@@ -98,7 +98,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 	}
 	g.Expect(TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
 
-	combineResult := CombineBindingContextForHook(TaskQueues, TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+	combineResult := combineBindingContextForHook(TaskQueues, TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
 
 	// Should combine binding contexts from 4 tasks.
 	g.Expect(combineResult).ShouldNot(BeNil())
@@ -158,7 +158,7 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 	}
 	g.Expect(TaskQueues.GetByName("test_no_combine").Length()).Should(Equal(len(tasks)))
 
-	combineResult := CombineBindingContextForHook(TaskQueues, TaskQueues.GetByName("test_no_combine"), tasks[0], nil)
+	combineResult := combineBindingContextForHook(TaskQueues, TaskQueues.GetByName("test_no_combine"), tasks[0], nil)
 	// Should return nil if no combine
 	g.Expect(combineResult).Should(BeNil())
 	// Should not delete tasks
@@ -257,7 +257,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 	}
 	g.Expect(TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
 
-	combineResult := CombineBindingContextForHook(TaskQueues, TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+	combineResult := combineBindingContextForHook(TaskQueues, TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
 	// Should compact 4 tasks into 4 binding context and combine 3 binding contexts into one.
 	g.Expect(combineResult).ShouldNot(BeNil())
 	g.Expect(combineResult.BindingContexts).Should(HaveLen(2))
@@ -406,7 +406,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	}
 	g.Expect(TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(len(tasks)))
 
-	combineResult := CombineBindingContextForHook(TaskQueues, TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
+	combineResult := combineBindingContextForHook(TaskQueues, TaskQueues.GetByName("test_multiple_hooks"), tasks[0], nil)
 	// Should leave 3 tasks in queue.
 	g.Expect(combineResult).ShouldNot(BeNil())
 	g.Expect(TaskQueues.GetByName("test_multiple_hooks").Length()).Should(Equal(3))

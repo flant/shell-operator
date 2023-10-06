@@ -19,9 +19,7 @@ func Test_UpdateSnapshots(t *testing.T) {
 	g := NewWithT(t)
 
 	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
-	mgr := kube_events_manager.NewKubeEventsManager()
-	mgr.WithContext(context.Background())
-	mgr.WithKubeClient(fc.Client)
+	mgr := kube_events_manager.NewKubeEventsManager(context.Background(), fc.Client)
 
 	testHookConfig := `
 configVersion: v1

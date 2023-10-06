@@ -13,9 +13,7 @@ import (
 )
 
 type KubeEventsManager interface {
-	WithContext(ctx context.Context)
 	WithMetricStorage(mstor *metric_storage.MetricStorage)
-	WithKubeClient(client klient.Client)
 	AddMonitor(monitorConfig *MonitorConfig) error
 	HasMonitor(monitorID string) bool
 	GetMonitor(monitorID string) Monitor
@@ -45,8 +43,12 @@ type kubeEventsManager struct {
 var _ KubeEventsManager = &kubeEventsManager{}
 
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
-var NewKubeEventsManager = func() *kubeEventsManager {
+func NewKubeEventsManager(ctx context.Context, client klient.Client) *kubeEventsManager {
+	cctx, cancel := context.WithCancel(ctx)
 	em := &kubeEventsManager{
+		ctx:         cctx,
+		cancel:      cancel,
+		KubeClient:  client,
 		m:           sync.RWMutex{},
 		Monitors:    make(map[string]Monitor),
 		KubeEventCh: make(chan KubeEvent, 1),
@@ -54,16 +56,8 @@ var NewKubeEventsManager = func() *kubeEventsManager {
 	return em
 }
 
-func (mgr *kubeEventsManager) WithContext(ctx context.Context) {
-	mgr.ctx, mgr.cancel = context.WithCancel(ctx)
-}
-
 func (mgr *kubeEventsManager) WithMetricStorage(mstor *metric_storage.MetricStorage) {
 	mgr.metricStorage = mstor
-}
-
-func (mgr *kubeEventsManager) WithKubeClient(client klient.Client) {
-	mgr.KubeClient = client
 }
 
 // AddMonitor creates a monitor with informers and return a KubeEvent with existing objects.
@@ -71,15 +65,15 @@ func (mgr *kubeEventsManager) WithKubeClient(client klient.Client) {
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	log.Debugf("Add MONITOR %+v", monitorConfig)
-	monitor := NewMonitor()
-	monitor.WithContext(mgr.ctx)
-	monitor.WithKubeClient(mgr.KubeClient)
-	monitor.WithMetricStorage(mgr.metricStorage)
-	monitor.WithConfig(monitorConfig)
-	monitor.WithKubeEventCb(func(ev KubeEvent) {
-		defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
-		mgr.KubeEventCh <- ev
-	})
+	monitor := NewMonitor(
+		mgr.ctx,
+		mgr.KubeClient,
+		mgr.metricStorage,
+		monitorConfig,
+		func(ev KubeEvent) {
+			defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
+			mgr.KubeEventCh <- ev
+		})
 
 	err := monitor.CreateInformers()
 	if err != nil {

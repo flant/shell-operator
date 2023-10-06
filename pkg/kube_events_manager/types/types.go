@@ -131,7 +131,7 @@ type KubeEvent struct {
 }
 
 func (k KubeEvent) String() string {
-	msgs := []string{}
+	msgs := make([]string, 0)
 	switch k.Type {
 	case TypeSynchronization:
 		if len(k.Objects) > 0 {

@@ -1,13 +1,14 @@
 package schedule_manager
 
 import (
+	"context"
 	"testing"
 
 	"github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
 func Test_ScheduleManager_Add(t *testing.T) {
-	sm := NewScheduleManager()
+	sm := NewScheduleManager(context.Background())
 
 	expectations := []struct {
 		testName string

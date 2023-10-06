@@ -18,7 +18,7 @@ type WatchErrorHandler struct {
 	metricStorage *metric_storage.MetricStorage
 }
 
-func NewWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage *metric_storage.MetricStorage) *WatchErrorHandler {
+func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage *metric_storage.MetricStorage) *WatchErrorHandler {
 	return &WatchErrorHandler{
 		description:   description,
 		kind:          kind,
@@ -28,7 +28,7 @@ func NewWatchErrorHandler(description string, kind string, logLabels map[string]
 }
 
 // Handler is the implementation of WatchErrorHandler that is aware of monitors and metricStorage
-func (weh *WatchErrorHandler) Handler(_ *cache.Reflector, err error) {
+func (weh *WatchErrorHandler) handler(_ *cache.Reflector, err error) {
 	errorType := "nil"
 
 	switch {

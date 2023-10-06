@@ -11,7 +11,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 )
 
-func StartHttpServer(ip string, port string, mux *http.ServeMux) error {
+func startHttpServer(ip string, port string, mux *http.ServeMux) error {
 	address := fmt.Sprintf("%s:%s", ip, port)
 
 	// Check if port is available
@@ -32,7 +32,7 @@ func StartHttpServer(ip string, port string, mux *http.ServeMux) error {
 	return nil
 }
 
-func RegisterDefaultRoutes(op *ShellOperator) {
+func registerDefaultRoutes(op *ShellOperator) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = fmt.Fprintf(writer, `<html>
     <head><title>Shell operator</title></head>

@@ -19,7 +19,7 @@ const TestTaskType task.TaskType = "TestTask"
 // TestQueueName is a name of the queue created by ContextCombiner.
 const TestQueueName string = "test-queue"
 
-// ContextCombiner is used to bring logic behind the CombineBindingContextForHook method
+// ContextCombiner is used to bring logic behind the combineBindingContextForHook method
 // into tests. This method requires a ShellOperator instance with at least one queue
 // with tasks.
 type ContextCombiner struct {

@@ -14,18 +14,17 @@ import (
 func Test_Operator_startup_tasks(t *testing.T) {
 	g := NewWithT(t)
 
-	hooksDir, err := RequireExistingDirectory("testdata/startup_tasks/hooks")
+	hooksDir, err := requireExistingDirectory("testdata/startup_tasks/hooks")
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	op := NewShellOperator()
-	op.WithContext(context.Background())
-	SetupEventManagers(op)
-	SetupHookManagers(op, hooksDir, "")
+	op := NewShellOperator(context.Background())
+	setupEventManagers(op)
+	setupHookManagers(op, hooksDir, "")
 
-	err = op.InitHookManager()
+	err = op.initHookManager()
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	op.BootstrapMainQueue(op.TaskQueues)
+	op.bootstrapMainQueue(op.TaskQueues)
 
 	expectTasks := []struct {
 		taskType    task.TaskType

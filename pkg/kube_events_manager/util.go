@@ -15,7 +15,7 @@ import (
 // ResourceId describes object with namespace, kind and name
 //
 // Change with caution, as this string is used for sorting objects and snapshots.
-func ResourceId(obj *unstructured.Unstructured) string {
+func resourceId(obj *unstructured.Unstructured) string {
 	return fmt.Sprintf("%s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 }
 
@@ -56,8 +56,8 @@ const (
 	ResyncPeriodJitterGranularity = time.Duration(15) * time.Second
 )
 
-// RandomizedResyncPeriod returns a time.Duration between 2 hours and 4 hours with jitter and granularity
-func RandomizedResyncPeriod() time.Duration {
+// randomizedResyncPeriod returns a time.Duration between 2 hours and 4 hours with jitter and granularity
+func randomizedResyncPeriod() time.Duration {
 	spreadCount := ResyncPeriodSpread.Nanoseconds() / ResyncPeriodGranularity.Nanoseconds()
 	rndSpreadDelta := time.Duration(rand.Int63n(spreadCount)) * ResyncPeriodGranularity
 	jitterCount := ResyncPeriodGranularity.Nanoseconds() / ResyncPeriodJitterGranularity.Nanoseconds()
@@ -75,7 +75,7 @@ type CachedObjectsInfo struct {
 	Cleaned  uint64 `json:"cleaned"`
 }
 
-func (c *CachedObjectsInfo) Add(in CachedObjectsInfo) {
+func (c *CachedObjectsInfo) add(in CachedObjectsInfo) {
 	c.Count += in.Count
 	c.Added += in.Added
 	c.Deleted += in.Deleted

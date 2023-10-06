@@ -14,11 +14,6 @@ import (
 )
 
 type Monitor interface {
-	WithContext(ctx context.Context)
-	WithKubeClient(client klient.Client)
-	WithMetricStorage(mstor *metric_storage.MetricStorage)
-	WithConfig(config *MonitorConfig)
-	WithKubeEventCb(eventCb func(KubeEvent))
 	CreateInformers() error
 	Start(context.Context)
 	Stop()
@@ -35,11 +30,11 @@ type monitor struct {
 	Config     *MonitorConfig
 	KubeClient klient.Client
 	// Static list of informers
-	ResourceInformers []ResourceInformer
+	ResourceInformers []*resourceInformer
 	// Namespace informer to get new namespaces
-	NamespaceInformer NamespaceInformer
+	NamespaceInformer *namespaceInformer
 	// map of dynamically starting informers
-	VaryingInformers map[string][]ResourceInformer
+	VaryingInformers map[string][]*resourceInformer
 
 	eventCb       func(KubeEvent)
 	eventsEnabled bool
@@ -53,37 +48,25 @@ type monitor struct {
 	metricStorage *metric_storage.MetricStorage
 }
 
-var NewMonitor = func() Monitor {
+func NewMonitor(ctx context.Context, client klient.Client, mstor *metric_storage.MetricStorage, config *MonitorConfig, eventCb func(KubeEvent)) *monitor {
+	cctx, cancel := context.WithCancel(ctx)
+
 	return &monitor{
-		ResourceInformers: make([]ResourceInformer, 0),
-		VaryingInformers:  make(map[string][]ResourceInformer),
+		ctx:               cctx,
+		cancel:            cancel,
+		KubeClient:        client,
+		metricStorage:     mstor,
+		Config:            config,
+		eventCb:           eventCb,
+		ResourceInformers: make([]*resourceInformer, 0),
+		VaryingInformers:  make(map[string][]*resourceInformer),
 		cancelForNs:       make(map[string]context.CancelFunc),
 		staticNamespaces:  make(map[string]bool),
 	}
 }
 
-func (m *monitor) WithContext(ctx context.Context) {
-	m.ctx, m.cancel = context.WithCancel(ctx)
-}
-
-func (m *monitor) WithKubeClient(client klient.Client) {
-	m.KubeClient = client
-}
-
-func (m *monitor) WithMetricStorage(mstor *metric_storage.MetricStorage) {
-	m.metricStorage = mstor
-}
-
-func (m *monitor) WithConfig(config *MonitorConfig) {
-	m.Config = config
-}
-
 func (m *monitor) GetConfig() *MonitorConfig {
 	return m.Config
-}
-
-func (m *monitor) WithKubeEventCb(eventCb func(KubeEvent)) {
-	m.eventCb = eventCb
 }
 
 // CreateInformers creates all informers and
@@ -102,7 +85,7 @@ func (m *monitor) CreateInformers() error {
 	}
 
 	logEntry.Debugf("Create Informers Config: %+v", m.Config)
-	nsNames := m.Config.Namespaces()
+	nsNames := m.Config.namespaces()
 	if len(nsNames) > 0 {
 		logEntry.Debugf("create static ResourceInformers")
 
@@ -122,10 +105,8 @@ func (m *monitor) CreateInformers() error {
 
 	if m.Config.NamespaceSelector != nil && m.Config.NamespaceSelector.LabelSelector != nil {
 		logEntry.Debugf("Create NamespaceInformer for namespace.labelSelector")
-		m.NamespaceInformer = NewNamespaceInformer(m.Config)
-		m.NamespaceInformer.WithContext(m.ctx)
-		m.NamespaceInformer.WithKubeClient(m.KubeClient)
-		err := m.NamespaceInformer.CreateSharedInformer(
+		m.NamespaceInformer = NewNamespaceInformer(m.ctx, m.KubeClient, m.Config)
+		err := m.NamespaceInformer.createSharedInformer(
 			func(nsName string) {
 				// Added/Modified event: check, create and run informers for Ns
 				// ignore event if namespace is already has static ResourceInformers
@@ -150,11 +131,11 @@ func (m *monitor) CreateInformers() error {
 				ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
 
 				for _, informer := range m.VaryingInformers[nsName] {
-					informer.WithContext(ctx)
+					informer.withContext(ctx)
 					if m.eventsEnabled {
-						informer.EnableKubeEventCb()
+						informer.enableKubeEventCb()
 					}
-					informer.Start()
+					informer.start()
 				}
 			},
 			func(nsName string) {
@@ -183,7 +164,7 @@ func (m *monitor) CreateInformers() error {
 		if err != nil {
 			return fmt.Errorf("create namespace informer: %v", err)
 		}
-		for nsName := range m.NamespaceInformer.GetExistedObjects() {
+		for nsName := range m.NamespaceInformer.getExistedObjects() {
 			logEntry.Infof("got ns/%s, create dynamic ResourceInformers", nsName)
 
 			// ignore event if namespace is already has static ResourceInformers
@@ -207,12 +188,12 @@ func (m *monitor) Snapshot() []ObjectAndFilterResult {
 	objects := make([]ObjectAndFilterResult, 0)
 
 	for _, informer := range m.ResourceInformers {
-		objects = append(objects, informer.CachedObjects()...)
+		objects = append(objects, informer.getCachedObjects()...)
 	}
 
 	for nsName := range m.VaryingInformers {
 		for _, informer := range m.VaryingInformers[nsName] {
-			objects = append(objects, informer.CachedObjects()...)
+			objects = append(objects, informer.getCachedObjects()...)
 		}
 	}
 
@@ -226,11 +207,11 @@ func (m *monitor) Snapshot() []ObjectAndFilterResult {
 // Also executes eventCb for events accumulated during "Synchronization" phase.
 func (m *monitor) EnableKubeEventCb() {
 	for _, informer := range m.ResourceInformers {
-		informer.EnableKubeEventCb()
+		informer.enableKubeEventCb()
 	}
 	for nsName := range m.VaryingInformers {
 		for _, informer := range m.VaryingInformers[nsName] {
-			informer.EnableKubeEventCb()
+			informer.enableKubeEventCb()
 		}
 	}
 	// Enable events for future VaryingInformers.
@@ -241,24 +222,26 @@ func (m *monitor) EnableKubeEventCb() {
 // it is only one informer. If matchName is specified, then multiple informers are created.
 //
 // If namespace is empty, then informer is bounded to all namespaces.
-func (m *monitor) CreateInformersForNamespace(namespace string) (informers []ResourceInformer, err error) {
-	informers = make([]ResourceInformer, 0)
+func (m *monitor) CreateInformersForNamespace(namespace string) (informers []*resourceInformer, err error) {
+	informers = make([]*resourceInformer, 0)
+	cfg := &resourceInformerConfig{
+		client:  m.KubeClient,
+		mstor:   m.metricStorage,
+		eventCb: m.eventCb,
+		monitor: m.Config,
+	}
 
 	objNames := []string{""}
 
-	if len(m.Config.Names()) > 0 {
-		objNames = m.Config.Names()
+	if len(m.Config.names()) > 0 {
+		objNames = m.Config.names()
 	}
 
 	for _, objName := range objNames {
-		informer := NewResourceInformer(m.Config)
-		informer.WithKubeClient(m.KubeClient)
-		informer.WithMetricStorage(m.metricStorage)
-		informer.WithNamespace(namespace)
-		informer.WithName(objName)
-		informer.WithKubeEventCb(m.eventCb)
 
-		err := informer.CreateSharedInformer()
+		informer := newResourceInformer(namespace, objName, cfg)
+
+		err := informer.createSharedInformer()
 		if err != nil {
 			return nil, err
 		}
@@ -273,22 +256,22 @@ func (m *monitor) Start(parentCtx context.Context) {
 	m.ctx, m.cancel = context.WithCancel(parentCtx)
 
 	for _, informer := range m.ResourceInformers {
-		informer.WithContext(m.ctx)
-		informer.Start()
+		informer.withContext(m.ctx)
+		informer.start()
 	}
 
 	for nsName := range m.VaryingInformers {
 		var ctx context.Context
 		ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
 		for _, informer := range m.VaryingInformers[nsName] {
-			informer.WithContext(ctx)
-			informer.Start()
+			informer.withContext(ctx)
+			informer.start()
 		}
 	}
 
 	if m.NamespaceInformer != nil {
-		m.NamespaceInformer.WithContext(m.ctx)
-		m.NamespaceInformer.Start()
+		m.NamespaceInformer.withContext(m.ctx)
+		m.NamespaceInformer.start()
 	}
 }
 
@@ -304,17 +287,17 @@ func (m *monitor) Stop() {
 // Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
 func (m *monitor) PauseHandleEvents() {
 	for _, informer := range m.ResourceInformers {
-		informer.PauseHandleEvents()
+		informer.pauseHandleEvents()
 	}
 
 	for _, informers := range m.VaryingInformers {
 		for _, informer := range informers {
-			informer.PauseHandleEvents()
+			informer.pauseHandleEvents()
 		}
 	}
 
 	if m.NamespaceInformer != nil {
-		m.NamespaceInformer.PauseHandleEvents()
+		m.NamespaceInformer.pauseHandleEvents()
 	}
 }
 
@@ -323,14 +306,14 @@ func (m *monitor) SnapshotOperations() (total *CachedObjectsInfo, last *CachedOb
 	last = &CachedObjectsInfo{}
 
 	for _, informer := range m.ResourceInformers {
-		total.Add(informer.CachedObjectsInfo())
-		last.Add(informer.CachedObjectsInfoIncrement())
+		total.add(informer.getCachedObjectsInfo())
+		last.add(informer.getCachedObjectsInfoIncrement())
 	}
 
 	for nsName := range m.VaryingInformers {
 		for _, informer := range m.VaryingInformers[nsName] {
-			total.Add(informer.CachedObjectsInfo())
-			last.Add(informer.CachedObjectsInfoIncrement())
+			total.add(informer.getCachedObjectsInfo())
+			last.add(informer.getCachedObjectsInfoIncrement())
 		}
 	}
 

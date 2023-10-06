@@ -10,33 +10,33 @@ import (
 )
 
 var (
-	DefaultMainKubeClientMetricLabels          = map[string]string{"component": "main"}
-	DefaultObjectPatcherKubeClientMetricLabels = map[string]string{"component": "object_patcher"}
+	defaultMainKubeClientMetricLabels          = map[string]string{"component": "main"}
+	defaultObjectPatcherKubeClientMetricLabels = map[string]string{"component": "object_patcher"}
 )
 
-func DefaultIfEmpty(m map[string]string, def map[string]string) map[string]string {
+func defaultIfEmpty(m map[string]string, def map[string]string) map[string]string {
 	if len(m) == 0 {
 		return def
 	}
 	return m
 }
 
-// DefaultMainKubeClient creates a Kubernetes client for hooks. No timeout specified, because
+// defaultMainKubeClient creates a Kubernetes client for hooks. No timeout specified, because
 // timeout will reset connections for Watchers.
-func DefaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) klient.Client {
+func defaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) klient.Client {
 	client := klient.New()
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
 	client.WithRateLimiterSettings(app.KubeClientQps, app.KubeClientBurst)
 	client.WithMetricStorage(metricStorage)
-	client.WithMetricLabels(DefaultIfEmpty(metricLabels, DefaultMainKubeClientMetricLabels))
+	client.WithMetricLabels(defaultIfEmpty(metricLabels, defaultMainKubeClientMetricLabels))
 	return client
 }
 
-func InitDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage) (klient.Client, error) {
+func initDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage) (klient.Client, error) {
 	//nolint:staticcheck
-	klient.RegisterKubernetesClientMetrics(metricStorage, DefaultMainKubeClientMetricLabels)
-	kubeClient := DefaultMainKubeClient(metricStorage, DefaultMainKubeClientMetricLabels)
+	klient.RegisterKubernetesClientMetrics(metricStorage, defaultMainKubeClientMetricLabels)
+	kubeClient := defaultMainKubeClient(metricStorage, defaultMainKubeClientMetricLabels)
 	err := kubeClient.Init()
 	if err != nil {
 		return nil, fmt.Errorf("initialize 'main' Kubernetes client: %s\n", err)
@@ -44,20 +44,20 @@ func InitDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage) (kli
 	return kubeClient, nil
 }
 
-// DefaultObjectPatcherKubeClient initializes a Kubernetes client for ObjectPatcher. Timeout is specified here.
-func DefaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) klient.Client {
+// defaultObjectPatcherKubeClient initializes a Kubernetes client for ObjectPatcher. Timeout is specified here.
+func defaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) klient.Client {
 	client := klient.New()
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
 	client.WithRateLimiterSettings(app.ObjectPatcherKubeClientQps, app.ObjectPatcherKubeClientBurst)
 	client.WithMetricStorage(metricStorage)
-	client.WithMetricLabels(DefaultIfEmpty(metricLabels, DefaultObjectPatcherKubeClientMetricLabels))
+	client.WithMetricLabels(defaultIfEmpty(metricLabels, defaultObjectPatcherKubeClientMetricLabels))
 	client.WithTimeout(app.ObjectPatcherKubeClientTimeout)
 	return client
 }
 
-func InitDefaultObjectPatcher(metricStorage *metric_storage.MetricStorage) (*object_patch.ObjectPatcher, error) {
-	patcherKubeClient := DefaultObjectPatcherKubeClient(metricStorage, DefaultObjectPatcherKubeClientMetricLabels)
+func initDefaultObjectPatcher(metricStorage *metric_storage.MetricStorage) (*object_patch.ObjectPatcher, error) {
+	patcherKubeClient := defaultObjectPatcherKubeClient(metricStorage, defaultObjectPatcherKubeClientMetricLabels)
 	err := patcherKubeClient.Init()
 	if err != nil {
 		return nil, fmt.Errorf("initialize Kubernetes client for Object patcher: %s\n", err)

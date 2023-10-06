@@ -16,17 +16,17 @@ import (
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 )
 
-// ApplyFilter filters object json representation with jq expression, calculate checksum
+// applyFilter filters object json representation with jq expression, calculate checksum
 // over result and return ObjectAndFilterResult. If jqFilter is empty, no filter
 // is required and checksum is calculated over full json representation of the object.
-func ApplyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*ObjectAndFilterResult, error) {
+func applyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*ObjectAndFilterResult, error) {
 	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
 
 	res := &ObjectAndFilterResult{
 		Object: obj,
 	}
 	res.Metadata.JqFilter = jqFilter
-	res.Metadata.ResourceId = ResourceId(obj)
+	res.Metadata.ResourceId = resourceId(obj)
 
 	// If filterFn is passed, run it and return result.
 	if filterFn != nil {

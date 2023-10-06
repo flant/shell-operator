@@ -7,31 +7,28 @@ import (
 	"github.com/flant/shell-operator/pkg/metric_storage"
 )
 
-func DefaultMetricStorage(ctx context.Context) *metric_storage.MetricStorage {
-	metricStorage := metric_storage.NewMetricStorage()
-	metricStorage.WithContext(ctx)
-	metricStorage.WithPrefix(app.PrometheusMetricsPrefix)
-	metricStorage.Start()
+func defaultMetricStorage(ctx context.Context) *metric_storage.MetricStorage {
+	metricStorage := metric_storage.NewMetricStorage(ctx, app.PrometheusMetricsPrefix, false)
 	return metricStorage
 }
 
-// RegisterShellOperatorMetrics register all metrics needed for the ShellOperator.
-func RegisterShellOperatorMetrics(metricStorage *metric_storage.MetricStorage) {
-	RegisterCommonMetrics(metricStorage)
-	RegisterTaskQueueMetrics(metricStorage)
-	RegisterKubeEventsManagerMetrics(metricStorage, map[string]string{
+// registerShellOperatorMetrics register all metrics needed for the ShellOperator.
+func registerShellOperatorMetrics(metricStorage *metric_storage.MetricStorage) {
+	registerCommonMetrics(metricStorage)
+	registerTaskQueueMetrics(metricStorage)
+	registerKubeEventsManagerMetrics(metricStorage, map[string]string{
 		"hook":    "",
 		"binding": "",
 		"queue":   "",
 	})
-	RegisterHookMetrics(metricStorage)
+	registerHookMetrics(metricStorage)
 }
 
-func RegisterCommonMetrics(metricStorage *metric_storage.MetricStorage) {
+func registerCommonMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterCounter("{PREFIX}live_ticks", map[string]string{})
 }
 
-func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
+func registerTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterHistogram(
 		"{PREFIX}tasks_queue_action_duration_seconds",
 		map[string]string{
@@ -50,8 +47,8 @@ func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterGauge("{PREFIX}tasks_queue_length", map[string]string{"queue": ""})
 }
 
-// metrics for kube_event_manager
-func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorage, labels map[string]string) {
+// registerKubeEventsManagerMetrics registers metrics for kube_event_manager
+func registerKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorage, labels map[string]string) {
 	// Count of objects in snapshot for one kubernets bindings.
 	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
 	// Duration of jqFilter applying.
@@ -84,7 +81,7 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 }
 
 // Shell-operator specific metrics for HookManager
-func RegisterHookMetrics(metricStorage *metric_storage.MetricStorage) {
+func registerHookMetrics(metricStorage *metric_storage.MetricStorage) {
 	// Metrics for enable kubernetes bindings.
 	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", map[string]string{"hook": ""})
 	metricStorage.RegisterCounter("{PREFIX}hook_enable_kubernetes_bindings_errors_total", map[string]string{"hook": ""})

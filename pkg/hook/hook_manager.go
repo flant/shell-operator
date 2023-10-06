@@ -25,11 +25,6 @@ import (
 type HookManager interface {
 	Init() error
 	Run()
-	WithDirectories(workingDir string, tempDir string)
-	WithKubeEventManager(kube_events_manager.KubeEventsManager)
-	WithScheduleManager(schedule_manager.ScheduleManager)
-	WithConversionWebhookManager(*conversion.WebhookManager)
-	WithAdmissionWebhookManager(*admission.WebhookManager)
 	WorkingDir() string
 	TempDir() string
 	GetHook(name string) *Hook
@@ -67,34 +62,30 @@ type hookManager struct {
 // hookManager should implement HookManager
 var _ HookManager = &hookManager{}
 
-func NewHookManager() *hookManager {
+// HookManagerConfig sets configuration for HookManager
+type HookManagerConfig struct {
+	WorkingDir string
+	TempDir    string
+	Kmgr       kube_events_manager.KubeEventsManager
+	Smgr       schedule_manager.ScheduleManager
+	Wmgr       *admission.WebhookManager
+	Cmgr       *conversion.WebhookManager
+}
+
+func NewHookManager(config *HookManagerConfig) *hookManager {
 	return &hookManager{
 		hooksByName:      make(map[string]*Hook),
 		hookNamesInOrder: make([]string, 0),
 		hooksInOrder:     make(map[BindingType][]*Hook),
 		conversionChains: conversion.NewChainStorage(),
+
+		workingDir:               config.WorkingDir,
+		tempDir:                  config.TempDir,
+		kubeEventsManager:        config.Kmgr,
+		scheduleManager:          config.Smgr,
+		admissionWebhookManager:  config.Wmgr,
+		conversionWebhookManager: config.Cmgr,
 	}
-}
-
-func (hm *hookManager) WithDirectories(workingDir string, tempDir string) {
-	hm.workingDir = workingDir
-	hm.tempDir = tempDir
-}
-
-func (hm *hookManager) WithKubeEventManager(mgr kube_events_manager.KubeEventsManager) {
-	hm.kubeEventsManager = mgr
-}
-
-func (hm *hookManager) WithScheduleManager(mgr schedule_manager.ScheduleManager) {
-	hm.scheduleManager = mgr
-}
-
-func (hm *hookManager) WithAdmissionWebhookManager(mgr *admission.WebhookManager) {
-	hm.admissionWebhookManager = mgr
-}
-
-func (hm *hookManager) WithConversionWebhookManager(mgr *conversion.WebhookManager) {
-	hm.conversionWebhookManager = mgr
 }
 
 func (hm *hookManager) WorkingDir() string {

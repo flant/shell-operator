@@ -16,16 +16,6 @@ import (
 	klient "github.com/flant/kube-client/client"
 )
 
-type NamespaceInformer interface {
-	WithContext(ctx context.Context)
-	WithKubeClient(client klient.Client)
-	CreateSharedInformer(addFn func(string), delFn func(string)) error
-	GetExistedObjects() map[string]bool
-	Start()
-	Stop()
-	PauseHandleEvents()
-}
-
 type namespaceInformer struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -41,28 +31,27 @@ type namespaceInformer struct {
 	delFn func(string)
 }
 
-// namespaceInformer implements NamespaceInformer interface
-var _ NamespaceInformer = &namespaceInformer{}
+func NewNamespaceInformer(ctx context.Context, client klient.Client, monitor *MonitorConfig) *namespaceInformer {
+	cctx, cancel := context.WithCancel(ctx)
 
-var NewNamespaceInformer = func(monitor *MonitorConfig) NamespaceInformer {
 	informer := &namespaceInformer{
+		ctx:            cctx,
+		cancel:         cancel,
+		KubeClient:     client,
 		Monitor:        monitor,
 		ExistedObjects: make(map[string]bool),
 	}
 	return informer
 }
 
-func (ni *namespaceInformer) WithContext(ctx context.Context) {
+func (ni *namespaceInformer) withContext(ctx context.Context) {
 	ni.ctx, ni.cancel = context.WithCancel(ctx)
+
 }
 
-func (ni *namespaceInformer) WithKubeClient(client klient.Client) {
-	ni.KubeClient = client
-}
-
-func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func(string)) error {
+func (ni *namespaceInformer) createSharedInformer(addFn func(string), delFn func(string)) error {
 	// define resyncPeriod for informer
-	resyncPeriod := RandomizedResyncPeriod()
+	resyncPeriod := randomizedResyncPeriod()
 
 	// define indexers for informer
 	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
@@ -98,7 +87,7 @@ func (ni *namespaceInformer) CreateSharedInformer(addFn func(string), delFn func
 	return nil
 }
 
-func (ni *namespaceInformer) GetExistedObjects() map[string]bool {
+func (ni *namespaceInformer) getExistedObjects() map[string]bool {
 	return ni.ExistedObjects
 }
 
@@ -131,10 +120,10 @@ func (ni *namespaceInformer) OnDelete(obj interface{}) {
 	}
 }
 
-func (ni *namespaceInformer) Start() {
+func (ni *namespaceInformer) start() {
 	log.Debugf("%s: Run namespace informer", ni.Monitor.Metadata.DebugName)
 	if ni.SharedInformer == nil {
-		log.Errorf("%s: Possible BUG!!! Start called before CreateSharedInformer, ShredInformer is nil", ni.Monitor.Metadata.DebugName)
+		log.Errorf("%s: Possible BUG!!! Start called before createSharedInformer, ShredInformer is nil", ni.Monitor.Metadata.DebugName)
 		return
 	}
 	stopCh := make(chan struct{}, 1)
@@ -154,13 +143,6 @@ func (ni *namespaceInformer) Start() {
 	log.Debugf("%s: informer is ready", ni.Monitor.Metadata.DebugName)
 }
 
-func (ni *namespaceInformer) Stop() {
-	if ni.cancel != nil {
-		ni.cancel()
-	}
-	ni.stopped = true
-}
-
-func (ni *namespaceInformer) PauseHandleEvents() {
+func (ni *namespaceInformer) pauseHandleEvents() {
 	ni.stopped = true
 }

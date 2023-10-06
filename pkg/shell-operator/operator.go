@@ -53,13 +53,15 @@ type ShellOperator struct {
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
-func NewShellOperator() *ShellOperator {
-	return &ShellOperator{}
-}
-
-func (op *ShellOperator) WithContext(ctx context.Context) *ShellOperator {
-	op.ctx, op.cancel = context.WithCancel(ctx)
-	return op
+func NewShellOperator(ctx context.Context) *ShellOperator {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cctx, cancel := context.WithCancel(ctx)
+	return &ShellOperator{
+		ctx:    cctx,
+		cancel: cancel,
+	}
 }
 
 func (op *ShellOperator) Stop() {
@@ -68,16 +70,8 @@ func (op *ShellOperator) Stop() {
 	}
 }
 
-func (op *ShellOperator) WithKubernetesClient(klient klient.Client) {
-	op.KubeClient = klient
-}
-
-func (op *ShellOperator) WithMetricStorage(metricStorage *metric_storage.MetricStorage) {
-	op.MetricStorage = metricStorage
-}
-
-// InitHookManager load hooks from HooksDir and defines event handlers that emit tasks.
-func (op *ShellOperator) InitHookManager() (err error) {
+// initHookManager load hooks from HooksDir and defines event handlers that emit tasks.
+func (op *ShellOperator) initHookManager() (err error) {
 	if op.HookManager == nil {
 		return
 	}
@@ -89,7 +83,7 @@ func (op *ShellOperator) InitHookManager() (err error) {
 	}
 
 	// Define event handlers for schedule event and kubernetes event.
-	op.ManagerEventsHandler.WithKubeEventHandler(func(kubeEvent KubeEvent) []task.Task {
+	op.ManagerEventsHandler.withKubeEventHandler(func(kubeEvent KubeEvent) []task.Task {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
 			"binding":  string(OnKubernetesEvent),
@@ -118,7 +112,7 @@ func (op *ShellOperator) InitHookManager() (err error) {
 
 		return tasks
 	})
-	op.ManagerEventsHandler.WithScheduleEventHandler(func(crontab string) []task.Task {
+	op.ManagerEventsHandler.withScheduleEventHandler(func(crontab string) []task.Task {
 		logLabels := map[string]string{
 			"event.id": uuid.NewV4().String(),
 			"binding":  string(Schedule),
@@ -151,9 +145,9 @@ func (op *ShellOperator) InitHookManager() (err error) {
 	return nil
 }
 
-// InitValidatingWebhookManager adds kubernetesValidating hooks
+// initValidatingWebhookManager adds kubernetesValidating hooks
 // to a WebhookManager and set a validating event handler.
-func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
+func (op *ShellOperator) initValidatingWebhookManager() (err error) {
 	if op.HookManager == nil || op.AdmissionWebhookManager == nil {
 		return
 	}
@@ -216,7 +210,7 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 			logEntry.Errorf("Possible bug!!! %d hooks found for '%s' event '%s' '%s'", len(tasks), string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
 		}
 
-		res := op.TaskHandler(tasks[0])
+		res := op.taskHandler(tasks[0])
 
 		if res.Status == "Fail" {
 			return &AdmissionResponse{
@@ -241,8 +235,8 @@ func (op *ShellOperator) InitValidatingWebhookManager() (err error) {
 	return err
 }
 
-// InitConversionWebhookManager creates and starts a conversion webhook manager.
-func (op *ShellOperator) InitConversionWebhookManager() (err error) {
+// initConversionWebhookManager creates and starts a conversion webhook manager.
+func (op *ShellOperator) initConversionWebhookManager() (err error) {
 	if op.HookManager == nil || op.ConversionWebhookManager == nil {
 		return
 	}
@@ -254,7 +248,7 @@ func (op *ShellOperator) InitConversionWebhookManager() (err error) {
 	}
 
 	// This handler is called when Kubernetes requests a conversion.
-	op.ConversionWebhookManager.EventHandlerFn = op.ConversionEventHandler
+	op.ConversionWebhookManager.EventHandlerFn = op.conversionEventHandler
 
 	err = op.ConversionWebhookManager.Init()
 	if err != nil {
@@ -274,8 +268,8 @@ func (op *ShellOperator) InitConversionWebhookManager() (err error) {
 	return err
 }
 
-// ConversionEventHandler is called when Kubernetes requests a conversion.
-func (op *ShellOperator) ConversionEventHandler(event conversion.Event) (*conversion.Response, error) {
+// conversionEventHandler is called when Kubernetes requests a conversion.
+func (op *ShellOperator) conversionEventHandler(event conversion.Event) (*conversion.Response, error) {
 	logLabels := map[string]string{
 		"event.id": uuid.NewV4().String(),
 		"binding":  string(KubernetesConversion),
@@ -322,7 +316,7 @@ func (op *ShellOperator) ConversionEventHandler(event conversion.Event) (*conver
 				logEntry.Errorf("Possible bug!!! %d hooks found for '%s' event for crd/%s", len(tasks), string(KubernetesValidating), event.CrdName)
 			}
 
-			res := op.TaskHandler(tasks[0])
+			res := op.taskHandler(tasks[0])
 
 			if res.Status == "Fail" {
 				return &conversion.Response{
@@ -373,34 +367,34 @@ func (op *ShellOperator) Start() {
 	log.Info("start shell-operator")
 
 	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
-	op.BootstrapMainQueue(op.TaskQueues)
+	op.bootstrapMainQueue(op.TaskQueues)
 	// Start main task queue handler
 	op.TaskQueues.StartMain()
-	op.InitAndStartHookQueues()
+	op.initAndStartHookQueues()
 
 	// Start emit "live" metrics
-	op.RunMetrics()
+	op.runMetrics()
 
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
-	op.ManagerEventsHandler.Start()
+	op.ManagerEventsHandler.start()
 
 	// Unlike KubeEventsManager, ScheduleManager has one go-routine.
 	op.ScheduleManager.Start()
 }
 
-// TaskHandler
-func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
+// taskHandler
+func (op *ShellOperator) taskHandler(t task.Task) queue.TaskResult {
 	logEntry := log.WithField("operator.component", "taskRunner")
 	hookMeta := HookMetadataAccessor(t)
 	var res queue.TaskResult
 
 	switch t.GetType() {
 	case HookRun:
-		res = op.TaskHandleHookRun(t)
+		res = op.taskHandleHookRun(t)
 
 	case EnableKubernetesBindings:
-		res = op.TaskHandleEnableKubernetesBindings(t)
+		res = op.taskHandleEnableKubernetesBindings(t)
 
 	case EnableScheduleBindings:
 		hookLogLabels := map[string]string{}
@@ -420,8 +414,8 @@ func (op *ShellOperator) TaskHandler(t task.Task) queue.TaskResult {
 	return res
 }
 
-// TaskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
-func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.TaskResult {
+// taskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
+func (op *ShellOperator) taskHandleEnableKubernetesBindings(t task.Task) queue.TaskResult {
 	hookMeta := HookMetadataAccessor(t)
 
 	metricLabels := map[string]string{
@@ -444,7 +438,7 @@ func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.T
 
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
-	hookRunTasks := []task.Task{}
+	hookRunTasks := make([]task.Task, 0)
 
 	// Run hook for each binding with Synchronization binding context. Ignore queue name here, execute in main queue.
 	err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
@@ -489,7 +483,7 @@ func (op *ShellOperator) TaskHandleEnableKubernetesBindings(t task.Task) queue.T
 }
 
 // TODO use Context to pass labels and a queue name
-func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
+func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
 	hookMeta := HookMetadataAccessor(t)
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
@@ -545,7 +539,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 			}
 		}
 		if shouldCombine {
-			combineResult := CombineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
+			combineResult := combineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
 			if combineResult != nil {
 				hookMeta.BindingContext = combineResult.BindingContexts
 				// Extra monitor IDs can be returned if several Synchronization for Group are combined.
@@ -567,7 +561,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 		success := 0.0
 		errors := 0.0
 		allowed := 0.0
-		err = op.HandleRunHook(t, taskHook, hookMeta, taskLogEntry, hookLogLabels, metricLabels)
+		err = op.handleRunHook(t, taskHook, hookMeta, taskLogEntry, hookLogLabels, metricLabels)
 		if err != nil {
 			if hookMeta.AllowFailure {
 				allowed = 1.0
@@ -601,7 +595,7 @@ func (op *ShellOperator) TaskHandleHookRun(t task.Task) queue.TaskResult {
 	return res
 }
 
-func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMeta HookMetadata, taskLogEntry *log.Entry, hookLogLabels map[string]string, metricLabels map[string]string) error {
+func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMeta HookMetadata, taskLogEntry *log.Entry, hookLogLabels map[string]string, metricLabels map[string]string) error {
 	for _, info := range taskHook.HookController.SnapshotsInfo() {
 		taskLogEntry.Debugf("snapshot info: %s", info)
 	}
@@ -653,7 +647,7 @@ func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 	return nil
 }
 
-// CombineBindingContextForHook combines binding contexts from a sequence of task with similar
+// combineBindingContextForHook combines binding contexts from a sequence of task with similar
 // hook name and task type into array of binding context and delete excess tasks from queue.
 //
 // Also, sequences of binding contexts with similar group are compacted in one binding context.
@@ -764,14 +758,14 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	return res
 }
 
-// BootstrapMainQueue adds tasks to run hooks with OnStartup bindings
+// bootstrapMainQueue adds tasks to run hooks with OnStartup bindings
 // and tasks to enable kubernetes bindings.
-func (op *ShellOperator) BootstrapMainQueue(tqs *queue.TaskQueueSet) {
+func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 	logEntry := log.WithField("operator.component", "initMainQueue")
 
 	// Prepopulate main queue with 'onStartup' tasks and 'enable kubernetes bindings' tasks.
 	tqs.WithMainName("main")
-	tqs.NewNamedQueue("main", op.TaskHandler)
+	tqs.NewNamedQueue("main", op.taskHandler)
 
 	mainQueue := tqs.GetMain()
 
@@ -827,14 +821,14 @@ func (op *ShellOperator) BootstrapMainQueue(tqs *queue.TaskQueueSet) {
 	}
 }
 
-// InitAndStartHookQueues create all queues defined in hooks
-func (op *ShellOperator) InitAndStartHookQueues() {
+// initAndStartHookQueues create all queues defined in hooks
+func (op *ShellOperator) initAndStartHookQueues() {
 	schHooks, _ := op.HookManager.GetHooksInOrder(Schedule)
 	for _, hookName := range schHooks {
 		h := op.HookManager.GetHook(hookName)
 		for _, hookBinding := range h.Config.Schedules {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
-				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.TaskHandler)
+				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler)
 				op.TaskQueues.GetByName(hookBinding.Queue).Start()
 			}
 		}
@@ -845,14 +839,14 @@ func (op *ShellOperator) InitAndStartHookQueues() {
 		h := op.HookManager.GetHook(hookName)
 		for _, hookBinding := range h.Config.OnKubernetesEvents {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
-				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.TaskHandler)
+				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler)
 				op.TaskQueues.GetByName(hookBinding.Queue).Start()
 			}
 		}
 	}
 }
 
-func (op *ShellOperator) RunMetrics() {
+func (op *ShellOperator) runMetrics() {
 	if op.MetricStorage == nil {
 		return
 	}

@@ -12,6 +12,12 @@ import (
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
 
+type managerEventsHandlerConfig struct {
+	tqs  *queue.TaskQueueSet
+	mgr  kube_events_manager.KubeEventsManager
+	smgr schedule_manager.ScheduleManager
+}
+
 type ManagerEventsHandler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -25,41 +31,30 @@ type ManagerEventsHandler struct {
 	taskQueues *queue.TaskQueueSet
 }
 
-func NewManagerEventsHandler() *ManagerEventsHandler {
-	return &ManagerEventsHandler{}
-}
+func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfig) *ManagerEventsHandler {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cctx, cancel := context.WithCancel(ctx)
 
-func (m *ManagerEventsHandler) WithTaskQueueSet(tqs *queue.TaskQueueSet) {
-	m.taskQueues = tqs
-}
-
-func (m *ManagerEventsHandler) WithKubeEventsManager(mgr kube_events_manager.KubeEventsManager) {
-	m.kubeEventsManager = mgr
-}
-
-func (m *ManagerEventsHandler) WithKubeEventHandler(fn func(kubeEvent KubeEvent) []task.Task) {
-	m.kubeEventCb = fn
-}
-
-func (m *ManagerEventsHandler) WithScheduleManager(mgr schedule_manager.ScheduleManager) {
-	m.scheduleManager = mgr
-}
-
-func (m *ManagerEventsHandler) WithScheduleEventHandler(fn func(crontab string) []task.Task) {
-	m.scheduleCb = fn
-}
-
-func (m *ManagerEventsHandler) WithContext(ctx context.Context) {
-	m.ctx, m.cancel = context.WithCancel(ctx)
-}
-
-func (m *ManagerEventsHandler) Stop() {
-	if m.cancel != nil {
-		m.cancel()
+	return &ManagerEventsHandler{
+		ctx:               cctx,
+		cancel:            cancel,
+		scheduleManager:   cfg.smgr,
+		kubeEventsManager: cfg.mgr,
+		taskQueues:        cfg.tqs,
 	}
 }
 
-func (m *ManagerEventsHandler) Start() {
+func (m *ManagerEventsHandler) withKubeEventHandler(fn func(kubeEvent KubeEvent) []task.Task) {
+	m.kubeEventCb = fn
+}
+
+func (m *ManagerEventsHandler) withScheduleEventHandler(fn func(crontab string) []task.Task) {
+	m.scheduleCb = fn
+}
+
+func (m *ManagerEventsHandler) start() {
 	go func() {
 		for {
 			var tailTasks []task.Task
