@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	uuid "github.com/gofrs/uuid/v5"
 	log "github.com/sirupsen/logrus"
-	uuid "gopkg.in/satori/go.uuid.v1"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/hook"
@@ -83,9 +83,9 @@ func (op *ShellOperator) initHookManager() (err error) {
 	}
 
 	// Define event handlers for schedule event and kubernetes event.
-	op.ManagerEventsHandler.withKubeEventHandler(func(kubeEvent KubeEvent) []task.Task {
+	op.ManagerEventsHandler.WithKubeEventHandler(func(kubeEvent KubeEvent) []task.Task {
 		logLabels := map[string]string{
-			"event.id": uuid.NewV4().String(),
+			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"binding":  string(OnKubernetesEvent),
 		}
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
@@ -112,9 +112,9 @@ func (op *ShellOperator) initHookManager() (err error) {
 
 		return tasks
 	})
-	op.ManagerEventsHandler.withScheduleEventHandler(func(crontab string) []task.Task {
+	op.ManagerEventsHandler.WithScheduleEventHandler(func(crontab string) []task.Task {
 		logLabels := map[string]string{
-			"event.id": uuid.NewV4().String(),
+			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"binding":  string(Schedule),
 		}
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
@@ -179,7 +179,7 @@ func (op *ShellOperator) initValidatingWebhookManager() (err error) {
 	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
 		eventBindingType := op.HookManager.DetectAdmissionEventType(event)
 		logLabels := map[string]string{
-			"event.id": uuid.NewV4().String(),
+			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"event":    string(eventBindingType),
 		}
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
@@ -271,7 +271,7 @@ func (op *ShellOperator) initConversionWebhookManager() (err error) {
 // conversionEventHandler is called when Kubernetes requests a conversion.
 func (op *ShellOperator) conversionEventHandler(event conversion.Event) (*conversion.Response, error) {
 	logLabels := map[string]string{
-		"event.id": uuid.NewV4().String(),
+		"event.id": uuid.Must(uuid.NewV4()).String(),
 		"binding":  string(KubernetesConversion),
 	}
 	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
@@ -377,7 +377,7 @@ func (op *ShellOperator) Start() {
 
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
-	op.ManagerEventsHandler.start()
+	op.ManagerEventsHandler.Start()
 
 	// Unlike KubeEventsManager, ScheduleManager has one go-routine.
 	op.ScheduleManager.Start()

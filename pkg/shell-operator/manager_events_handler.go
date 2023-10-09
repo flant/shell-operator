@@ -46,15 +46,20 @@ func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfi
 	}
 }
 
-func (m *ManagerEventsHandler) withKubeEventHandler(fn func(kubeEvent KubeEvent) []task.Task) {
+// WithKubeEventHandler sets custom function for event handling.
+// This function is used inside addon-operator.
+func (m *ManagerEventsHandler) WithKubeEventHandler(fn func(kubeEvent KubeEvent) []task.Task) {
 	m.kubeEventCb = fn
 }
 
-func (m *ManagerEventsHandler) withScheduleEventHandler(fn func(crontab string) []task.Task) {
+// WithScheduleEventHandler sets custom scheduler function.
+// This function is used inside addon-operator.
+func (m *ManagerEventsHandler) WithScheduleEventHandler(fn func(crontab string) []task.Task) {
 	m.scheduleCb = fn
 }
 
-func (m *ManagerEventsHandler) start() {
+// Start runs events handler. This function is used in addon-operator
+func (m *ManagerEventsHandler) Start() {
 	go func() {
 		for {
 			var tailTasks []task.Task

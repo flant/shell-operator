@@ -8,31 +8,28 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/task/dump"
 )
 
-func newDebugServer() *debug.Server {
-	dbgSrv := debug.NewServer("/debug", app.DebugUnixSocket, app.DebugHttpServerAddr)
+// RunDefaultDebugServer initialized and run default debug server on unix and http sockets
+// This method is also used in addon-operator
+func RunDefaultDebugServer(unixSocket, httpServerAddress string) (*debug.Server, error) {
+	dbgSrv := debug.NewServer("/debug", unixSocket, httpServerAddress)
 
-	return dbgSrv
-}
-
-func initDefaultDebugServer() (*debug.Server, error) {
-	dbgSrv := newDebugServer()
-	err := dbgSrv.Init()
-	if err != nil {
-		return nil, err
-	}
 	dbgSrv.Route("/", func(_ *http.Request) (interface{}, error) {
 		return "debug endpoint is alive", nil
 	})
-	return dbgSrv, nil
+
+	err := dbgSrv.Init()
+
+	return dbgSrv, err
 }
 
-func registerDebugQueueRoutes(dbgSrv *debug.Server, op *ShellOperator) {
+// RegisterDebugQueueRoutes register routes for dumping main queue
+// this method is also used in addon-operator
+func (op *ShellOperator) RegisterDebugQueueRoutes(dbgSrv *debug.Server) {
 	dbgSrv.Route("/queue/main.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		return dump.TaskQueueMainToText(op.TaskQueues), nil
 	})
@@ -48,7 +45,8 @@ func registerDebugQueueRoutes(dbgSrv *debug.Server, op *ShellOperator) {
 	})
 }
 
-func registerDebugHookRoutes(dbgSrv *debug.Server, op *ShellOperator) {
+// RegisterDebugHookRoutes register routes for dumping queues
+func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 	dbgSrv.Route("/hook/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		return op.HookManager.GetHookNames(), nil
 	})
@@ -60,8 +58,9 @@ func registerDebugHookRoutes(dbgSrv *debug.Server, op *ShellOperator) {
 	})
 }
 
-// registerDebugConfigRoutes registers routes to manage runtime configuration.
-func registerDebugConfigRoutes(dbgSrv *debug.Server, runtimeConfig *config.Config) {
+// RegisterDebugConfigRoutes registers routes to manage runtime configuration.
+// This method is also used in addon-operator
+func (op *ShellOperator) RegisterDebugConfigRoutes(dbgSrv *debug.Server, runtimeConfig *config.Config) {
 	dbgSrv.Route("/config/list.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
 		format := debug.FormatFromRequest(r)
 		if format == "text" {

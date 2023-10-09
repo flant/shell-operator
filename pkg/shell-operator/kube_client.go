@@ -7,19 +7,13 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
 	"github.com/flant/shell-operator/pkg/metric_storage"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 var (
 	defaultMainKubeClientMetricLabels          = map[string]string{"component": "main"}
 	defaultObjectPatcherKubeClientMetricLabels = map[string]string{"component": "object_patcher"}
 )
-
-func defaultIfEmpty(m map[string]string, def map[string]string) map[string]string {
-	if len(m) == 0 {
-		return def
-	}
-	return m
-}
 
 // defaultMainKubeClient creates a Kubernetes client for hooks. No timeout specified, because
 // timeout will reset connections for Watchers.
@@ -29,7 +23,7 @@ func defaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLa
 	client.WithConfigPath(app.KubeConfig)
 	client.WithRateLimiterSettings(app.KubeClientQps, app.KubeClientBurst)
 	client.WithMetricStorage(metricStorage)
-	client.WithMetricLabels(defaultIfEmpty(metricLabels, defaultMainKubeClientMetricLabels))
+	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultMainKubeClientMetricLabels))
 	return client
 }
 
@@ -51,7 +45,7 @@ func defaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage,
 	client.WithConfigPath(app.KubeConfig)
 	client.WithRateLimiterSettings(app.ObjectPatcherKubeClientQps, app.ObjectPatcherKubeClientBurst)
 	client.WithMetricStorage(metricStorage)
-	client.WithMetricLabels(defaultIfEmpty(metricLabels, defaultObjectPatcherKubeClientMetricLabels))
+	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultObjectPatcherKubeClientMetricLabels))
 	client.WithTimeout(app.ObjectPatcherKubeClientTimeout)
 	return client
 }

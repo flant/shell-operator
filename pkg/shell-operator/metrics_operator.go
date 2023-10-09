@@ -14,9 +14,9 @@ func defaultMetricStorage(ctx context.Context) *metric_storage.MetricStorage {
 
 // registerShellOperatorMetrics register all metrics needed for the ShellOperator.
 func registerShellOperatorMetrics(metricStorage *metric_storage.MetricStorage) {
-	registerCommonMetrics(metricStorage)
-	registerTaskQueueMetrics(metricStorage)
-	registerKubeEventsManagerMetrics(metricStorage, map[string]string{
+	RegisterCommonMetrics(metricStorage)
+	RegisterTaskQueueMetrics(metricStorage)
+	RegisterKubeEventsManagerMetrics(metricStorage, map[string]string{
 		"hook":    "",
 		"binding": "",
 		"queue":   "",
@@ -24,11 +24,15 @@ func registerShellOperatorMetrics(metricStorage *metric_storage.MetricStorage) {
 	registerHookMetrics(metricStorage)
 }
 
-func registerCommonMetrics(metricStorage *metric_storage.MetricStorage) {
+// RegisterCommonMetrics register base metric
+// This function is used in the addon-operator
+func RegisterCommonMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterCounter("{PREFIX}live_ticks", map[string]string{})
 }
 
-func registerTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
+// RegisterTaskQueueMetrics
+// This function is used in the addon-operator
+func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterHistogram(
 		"{PREFIX}tasks_queue_action_duration_seconds",
 		map[string]string{
@@ -47,8 +51,9 @@ func registerTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterGauge("{PREFIX}tasks_queue_length", map[string]string{"queue": ""})
 }
 
-// registerKubeEventsManagerMetrics registers metrics for kube_event_manager
-func registerKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorage, labels map[string]string) {
+// RegisterKubeEventsManagerMetrics registers metrics for kube_event_manager
+// This function is used in the addon-operator
+func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorage, labels map[string]string) {
 	// Count of objects in snapshot for one kubernets bindings.
 	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
 	// Duration of jqFilter applying.

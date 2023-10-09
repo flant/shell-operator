@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 
@@ -17,7 +15,7 @@ import (
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
-	utils_file "github.com/flant/shell-operator/pkg/utils/file"
+	utils "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -32,13 +30,13 @@ func Init() (*ShellOperator, error) {
 	log.Infof(app.AppStartMessage)
 	log.Debug(jq.FilterInfo())
 
-	hooksDir, err := requireExistingDirectory(app.HooksDir)
+	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
 	if err != nil {
 		log.Errorf("Fatal: hooks directory is required: %s", err)
 		return nil, err
 	}
 
-	tempDir, err := ensureTempDirectory(app.TempDir)
+	tempDir, err := utils.EnsureTempDirectory(app.TempDir)
 	if err != nil {
 		log.Errorf("Fatal: temp directory: %s", err)
 		return nil, err
@@ -47,19 +45,19 @@ func Init() (*ShellOperator, error) {
 	op := NewShellOperator(context.Background())
 
 	// Debug server.
-	debugServer, err := initDefaultDebugServer()
+	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr)
 	if err != nil {
 		log.Errorf("Fatal: start Debug server: %s", err)
 		return nil, err
 	}
 
-	err = AssembleCommonOperator(op)
+	err = op.AssembleCommonOperator()
 	if err != nil {
 		log.Errorf("Fatal: %s", err)
 		return nil, err
 	}
 
-	err = assembleShellOperator(op, hooksDir, tempDir, debugServer, runtimeConfig)
+	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
 	if err != nil {
 		log.Errorf("Fatal: %s", err)
 		return nil, err
@@ -68,50 +66,9 @@ func Init() (*ShellOperator, error) {
 	return op, nil
 }
 
-func requireExistingDirectory(inDir string) (dir string, err error) {
-	if inDir == "" {
-		return "", fmt.Errorf("path is required but not set")
-	}
-
-	dir, err = filepath.Abs(inDir)
-	if err != nil {
-		return "", fmt.Errorf("get absolute path: %v", err)
-	}
-	if exists, _ := utils_file.DirExists(dir); !exists {
-		return "", fmt.Errorf("path '%s' not exist", dir)
-	}
-
-	return dir, nil
-}
-
-func ensureTempDirectory(inDir string) (string, error) {
-	// No path to temporary dir, use default temporary dir.
-	if inDir == "" {
-		tmpPath := app.AppName + "-*"
-		dir, err := os.MkdirTemp("", tmpPath)
-		if err != nil {
-			return "", fmt.Errorf("create tmp dir in '%s': %s", tmpPath, err)
-		}
-		return dir, nil
-	}
-
-	// Get absolute path for temporary directory and create if needed.
-	dir, err := filepath.Abs(inDir)
-	if err != nil {
-		return "", fmt.Errorf("get absolute path: %v", err)
-	}
-	if exists, _ := utils_file.DirExists(dir); !exists {
-		err := os.Mkdir(dir, os.FileMode(0o777))
-		if err != nil {
-			return "", fmt.Errorf("create tmp dir '%s': %s", dir, err)
-		}
-	}
-	return dir, nil
-}
-
 // AssembleCommonOperator instantiate common dependencies. These dependencies
 // may be used for shell-operator derivatives, like addon-operator.
-func AssembleCommonOperator(op *ShellOperator) (err error) {
+func (op *ShellOperator) AssembleCommonOperator() (err error) {
 	err = startHttpServer(app.ListenAddress, app.ListenPort, http.DefaultServeMux)
 	if err != nil {
 		return fmt.Errorf("start HTTP server: %s", err)
@@ -140,7 +97,7 @@ func AssembleCommonOperator(op *ShellOperator) (err error) {
 		return err
 	}
 
-	setupEventManagers(op)
+	op.SetupEventManagers()
 
 	return nil
 }
@@ -157,17 +114,17 @@ func AssembleCommonOperator(op *ShellOperator) (err error) {
 //   - hook manager
 //   - kubernetes events manager
 //   - schedule manager
-func assembleShellOperator(op *ShellOperator, hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) (err error) {
+func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) (err error) {
 	registerDefaultRoutes(op)
 
-	registerDebugQueueRoutes(debugServer, op)
-	registerDebugHookRoutes(debugServer, op)
-	registerDebugConfigRoutes(debugServer, runtimeConfig)
+	op.RegisterDebugQueueRoutes(debugServer)
+	op.RegisterDebugHookRoutes(debugServer)
+	op.RegisterDebugConfigRoutes(debugServer, runtimeConfig)
 
 	registerShellOperatorMetrics(op.MetricStorage)
 
 	// Create webhookManagers with dependencies.
-	setupHookManagers(op, hooksDir, tempDir)
+	op.setupHookManagers(hooksDir, tempDir)
 
 	// Search and configure all hooks.
 	err = op.initHookManager()
@@ -190,8 +147,9 @@ func assembleShellOperator(op *ShellOperator, hooksDir string, tempDir string, d
 	return nil
 }
 
-// setupEventManagers instantiate queues and managers for schedule and Kubernetes events.
-func setupEventManagers(op *ShellOperator) {
+// SetupEventManagers instantiate queues and managers for schedule and Kubernetes events.
+// This function is also used in the addon-operator
+func (op *ShellOperator) SetupEventManagers() {
 	// Initialize the task queues set with the "main" queue.
 	op.TaskQueues = queue.NewTaskQueueSet()
 	op.TaskQueues.WithContext(op.ctx)
@@ -214,7 +172,7 @@ func setupEventManagers(op *ShellOperator) {
 }
 
 // setupHookManagers instantiates different hook managers.
-func setupHookManagers(op *ShellOperator, hooksDir string, tempDir string) {
+func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 	// Initialize admission webhooks manager.
 	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient)
 	op.AdmissionWebhookManager.Settings = app.ValidatingWebhookSettings
