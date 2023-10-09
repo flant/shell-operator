@@ -18,7 +18,7 @@ import (
 func RunDefaultDebugServer(unixSocket, httpServerAddress string) (*debug.Server, error) {
 	dbgSrv := debug.NewServer("/debug", unixSocket, httpServerAddress)
 
-	dbgSrv.Route("/", func(_ *http.Request) (interface{}, error) {
+	dbgSrv.RegisterHandler(http.MethodGet, "/", func(_ *http.Request) (interface{}, error) {
 		return "debug endpoint is alive", nil
 	})
 
@@ -30,11 +30,12 @@ func RunDefaultDebugServer(unixSocket, httpServerAddress string) (*debug.Server,
 // RegisterDebugQueueRoutes register routes for dumping main queue
 // this method is also used in addon-operator
 func (op *ShellOperator) RegisterDebugQueueRoutes(dbgSrv *debug.Server) {
-	dbgSrv.Route("/queue/main.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
-		return dump.TaskQueueMainToText(op.TaskQueues), nil
+	dbgSrv.RegisterHandler(http.MethodGet, "/queue/main.{format:(json|yaml|text)}", func(req *http.Request) (interface{}, error) {
+		format := debug.FormatFromRequest(req)
+		return dump.TaskMainQueue(op.TaskQueues, format), nil
 	})
 
-	dbgSrv.Route("/queue/list.{format:(json|yaml|text)}", func(req *http.Request) (interface{}, error) {
+	dbgSrv.RegisterHandler(http.MethodGet, "/queue/list.{format:(json|yaml|text)}", func(req *http.Request) (interface{}, error) {
 		showEmptyStr := req.URL.Query().Get("showEmpty")
 		showEmpty, err := strconv.ParseBool(showEmptyStr)
 		if err != nil {
@@ -47,11 +48,11 @@ func (op *ShellOperator) RegisterDebugQueueRoutes(dbgSrv *debug.Server) {
 
 // RegisterDebugHookRoutes register routes for dumping queues
 func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
-	dbgSrv.Route("/hook/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
+	dbgSrv.RegisterHandler(http.MethodGet, "/hook/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		return op.HookManager.GetHookNames(), nil
 	})
 
-	dbgSrv.Route("/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
+	dbgSrv.RegisterHandler(http.MethodGet, "/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
 		hookName := chi.URLParam(r, "name")
 		h := op.HookManager.GetHook(hookName)
 		return h.HookController.SnapshotsDump(), nil
@@ -61,7 +62,7 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 // RegisterDebugConfigRoutes registers routes to manage runtime configuration.
 // This method is also used in addon-operator
 func (op *ShellOperator) RegisterDebugConfigRoutes(dbgSrv *debug.Server, runtimeConfig *config.Config) {
-	dbgSrv.Route("/config/list.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
+	dbgSrv.RegisterHandler(http.MethodGet, "/config/list.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
 		format := debug.FormatFromRequest(r)
 		if format == "text" {
 			return runtimeConfig.String(), nil
@@ -69,31 +70,35 @@ func (op *ShellOperator) RegisterDebugConfigRoutes(dbgSrv *debug.Server, runtime
 		return runtimeConfig.List(), nil
 	})
 
-	dbgSrv.RoutePOST("/config/set", func(r *http.Request) (interface{}, error) {
+	dbgSrv.RegisterHandler(http.MethodPost, "/config/set", func(r *http.Request) (interface{}, error) {
+		err := r.ParseForm()
+		if err != nil {
+			return nil, err
+		}
+
 		name := r.PostForm.Get("name")
 		if name == "" {
-			return nil, fmt.Errorf("'name' parameter is required")
+			return nil, &debug.BadRequestError{Msg: "'name' parameter is required"}
 		}
 		if !runtimeConfig.Has(name) {
-			return nil, fmt.Errorf("unknown runtime parameter '%s'", name)
+			return nil, &debug.BadRequestError{Msg: fmt.Sprintf("unknown runtime parameter %q", name)}
 		}
 
 		value := r.PostForm.Get("value")
 		if name == "" {
-			return nil, fmt.Errorf("'value' parameter is required")
+			return nil, &debug.BadRequestError{Msg: "'value' parameter is required"}
 		}
 
-		if err := runtimeConfig.IsValid(name, value); err != nil {
-			return nil, fmt.Errorf("'value' parameter is invalid: %w", err)
+		if err = runtimeConfig.IsValid(name, value); err != nil {
+			return nil, &debug.BadRequestError{Msg: fmt.Sprintf("'value' parameter is invalid: %s", err)}
 		}
 
 		var duration time.Duration
-		var err error
 		durationStr := r.PostForm.Get("duration")
 		if durationStr != "" {
 			duration, err = time.ParseDuration(durationStr)
 			if err != nil {
-				return nil, fmt.Errorf("parse duration: %v", err)
+				return nil, &debug.BadRequestError{Msg: fmt.Sprintf("parse duration %q failed: %s", durationStr, err)}
 			}
 		}
 		if duration == 0 {
@@ -101,6 +106,7 @@ func (op *ShellOperator) RegisterDebugConfigRoutes(dbgSrv *debug.Server, runtime
 		} else {
 			runtimeConfig.SetTemporarily(name, value, duration)
 		}
+
 		return nil, runtimeConfig.LastError(name)
 	})
 }

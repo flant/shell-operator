@@ -3,6 +3,7 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -11,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
@@ -26,10 +27,15 @@ type Server struct {
 }
 
 func NewServer(prefix, socketPath, httpAddr string) *Server {
+	router := chi.NewRouter()
+	router.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "debugEndpoint"))
+	router.Use(middleware.Recoverer)
+
 	return &Server{
 		Prefix:     prefix,
 		SocketPath: socketPath,
 		HttpAddr:   httpAddr,
+		Router:     router,
 	}
 }
 
@@ -64,10 +70,6 @@ func (s *Server) Init() (err error) {
 
 	log.Infof("Debug endpoint listen on %s", address)
 
-	s.Router = chi.NewRouter()
-	s.Router.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "debugEndpoint"))
-	s.Router.Use(middleware.Recoverer)
-
 	go func() {
 		if err := http.Serve(listener, s.Router); err != nil {
 			log.Errorf("Error starting Debug socket server: %s", err)
@@ -87,85 +89,90 @@ func (s *Server) Init() (err error) {
 	return nil
 }
 
-func (s *Server) Route(pattern string, handler func(request *http.Request) (interface{}, error)) {
-	// Should not happen.
+// RegisterHandler registers http handler for unix/http debug server
+func (s *Server) RegisterHandler(method, pattern string, handler func(request *http.Request) (interface{}, error)) {
+	if method == "" {
+		return
+	}
+	if pattern == "" {
+		return
+	}
 	if handler == nil {
 		return
 	}
-	s.Router.Get(pattern, func(writer http.ResponseWriter, request *http.Request) {
-		handleFormattedOutput(writer, request, handler)
-	})
-}
 
-func (s *Server) RoutePOST(pattern string, handler func(request *http.Request) (interface{}, error)) {
-	// Should not happen.
-	if handler == nil {
-		return
+	switch method {
+	case http.MethodGet:
+		s.Router.Get(pattern, func(writer http.ResponseWriter, request *http.Request) {
+			handleFormattedOutput(writer, request, handler)
+		})
+
+	case http.MethodPost:
+		s.Router.Post(pattern, func(writer http.ResponseWriter, request *http.Request) {
+			handleFormattedOutput(writer, request, handler)
+		})
 	}
-	s.Router.Post(pattern, func(writer http.ResponseWriter, request *http.Request) {
-		//
-		err := request.ParseForm()
-		if err != nil {
-			writer.WriteHeader(http.StatusInternalServerError)
-			_, _ = fmt.Fprintf(writer, "Error: %s", err)
-			return
-		}
-
-		handleFormattedOutput(writer, request, handler)
-	})
 }
 
 func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
 	out, err := handler(request)
 	if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		_, _ = fmt.Fprintf(writer, "Error: %s", err)
+		if _, ok := err.(*BadRequestError); ok {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if out == nil && err == nil {
+	if out == nil {
+		writer.WriteHeader(http.StatusOK)
 		return
 	}
 
 	format := FormatFromRequest(request)
 	structured_logger.GetLogEntry(request).Debugf("use format '%s'", format)
 
-	outBytes, err := transformUsingFormat(out, format)
-	if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		_, _ = fmt.Fprintf(writer, "Error '%s' transform: %s", format, err)
-		return
+	switch format {
+	case "text":
+		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	case "json":
+		writer.Header().Set("Content-Type", "application/json")
+	case "yaml":
+		writer.Header().Set("Content-Type", "application/yaml")
 	}
+	writer.WriteHeader(http.StatusOK)
 
-	_, _ = writer.Write(outBytes)
+	err = transformUsingFormat(writer, out, format)
+	if err != nil {
+		http.Error(writer, fmt.Sprintf("Error '%s' transform: %s", format, err), http.StatusInternalServerError)
+	}
 }
 
-func transformUsingFormat(val interface{}, format string) ([]byte, error) {
-	var outBytes []byte
-	var err error
-
+func transformUsingFormat(w io.Writer, val interface{}, format string) (err error) {
 	switch format {
 	case "yaml":
-		outBytes, err = yaml.Marshal(val)
+		err = yaml.NewEncoder(w).Encode(val)
 	case "text":
 		switch v := val.(type) {
 		case string:
-			outBytes = []byte(v)
+			_, err = w.Write([]byte(v))
 		case fmt.Stringer:
-			outBytes = []byte(v.String())
+			_, err = w.Write([]byte(v.String()))
 		case []byte:
-			outBytes = v
+			_, err = w.Write(v)
 		}
-		if outBytes != nil {
+		if err == nil {
 			break
 		}
 		fallthrough
 	case "json":
 		fallthrough
 	default:
-		outBytes, err = json.Marshal(val)
+		err = json.NewEncoder(w).Encode(val)
 	}
 
-	return outBytes, err
+	return err
 }
 
 func FormatFromRequest(request *http.Request) string {
@@ -174,4 +181,12 @@ func FormatFromRequest(request *http.Request) string {
 		format = "text"
 	}
 	return format
+}
+
+type BadRequestError struct {
+	Msg string
+}
+
+func (be *BadRequestError) Error() string {
+	return be.Msg
 }
