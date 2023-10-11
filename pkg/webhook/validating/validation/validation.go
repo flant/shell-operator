@@ -66,22 +66,13 @@ func ValidateValidatingWebhook(hook *v1.ValidatingWebhook, fldPath *field.Path) 
 	}
 
 	if hook.NamespaceSelector != nil {
-		allErrors = AppendFieldList(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector")))
+		allErrors = AppendFieldList(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, metav1validation.LabelSelectorValidationOptions{}, fldPath.Child("namespaceSelector")))
 	}
 
 	if hook.ObjectSelector != nil {
-		allErrors = AppendFieldList(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, fldPath.Child("objectSelector")))
+		allErrors = AppendFieldList(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, metav1validation.LabelSelectorValidationOptions{}, fldPath.Child("objectSelector")))
 	}
 
-	// cc := hook.ClientConfig
-	// switch {
-	// case (cc.URL == nil) == (cc.Service == nil):
-	//	allErrors = multierror.Append(allErrors, field.Required(fldPath.Child("clientConfig"), "exactly one of url or service is required"))
-	// case cc.URL != nil:
-	//	allErrors = multierror.Append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
-	// case cc.Service != nil:
-	//	allErrors = multierror.Append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
-	//}
 	return allErrors
 }
 

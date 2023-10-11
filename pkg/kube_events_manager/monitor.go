@@ -48,13 +48,13 @@ type monitor struct {
 	metricStorage *metric_storage.MetricStorage
 }
 
-func NewMonitor(ctx context.Context, client klient.Client, mstor *metric_storage.MetricStorage, config *MonitorConfig, eventCb func(KubeEvent)) *monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor *metric_storage.MetricStorage, config *MonitorConfig, eventCb func(KubeEvent)) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{
 		ctx:               cctx,
 		cancel:            cancel,
-		KubeClient:        client,
+		KubeClient:        *client,
 		metricStorage:     mstor,
 		Config:            config,
 		eventCb:           eventCb,

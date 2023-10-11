@@ -67,7 +67,7 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	log.Debugf("Add MONITOR %+v", monitorConfig)
 	monitor := NewMonitor(
 		mgr.ctx,
-		*mgr.KubeClient,
+		mgr.KubeClient,
 		mgr.metricStorage,
 		monitorConfig,
 		func(ev KubeEvent) {
