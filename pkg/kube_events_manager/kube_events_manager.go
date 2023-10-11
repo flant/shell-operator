@@ -29,7 +29,7 @@ type kubeEventsManager struct {
 	// channel to emit KubeEvent objects
 	KubeEventCh chan KubeEvent
 
-	KubeClient klient.Client
+	KubeClient *klient.Client
 
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -43,7 +43,7 @@ type kubeEventsManager struct {
 var _ KubeEventsManager = &kubeEventsManager{}
 
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
-func NewKubeEventsManager(ctx context.Context, client klient.Client) *kubeEventsManager {
+func NewKubeEventsManager(ctx context.Context, client *klient.Client) *kubeEventsManager {
 	cctx, cancel := context.WithCancel(ctx)
 	em := &kubeEventsManager{
 		ctx:         cctx,
@@ -67,7 +67,7 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	log.Debugf("Add MONITOR %+v", monitorConfig)
 	monitor := NewMonitor(
 		mgr.ctx,
-		mgr.KubeClient,
+		*mgr.KubeClient,
 		mgr.metricStorage,
 		monitorConfig,
 		func(ev KubeEvent) {

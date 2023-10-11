@@ -17,7 +17,7 @@ var (
 
 // defaultMainKubeClient creates a Kubernetes client for hooks. No timeout specified, because
 // timeout will reset connections for Watchers.
-func defaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) klient.Client {
+func defaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) *klient.Client {
 	client := klient.New()
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
@@ -27,7 +27,7 @@ func defaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLa
 	return client
 }
 
-func initDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage) (klient.Client, error) {
+func initDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage) (*klient.Client, error) {
 	//nolint:staticcheck
 	klient.RegisterKubernetesClientMetrics(metricStorage, defaultMainKubeClientMetricLabels)
 	kubeClient := defaultMainKubeClient(metricStorage, defaultMainKubeClientMetricLabels)
@@ -39,7 +39,7 @@ func initDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage) (kli
 }
 
 // defaultObjectPatcherKubeClient initializes a Kubernetes client for ObjectPatcher. Timeout is specified here.
-func defaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) klient.Client {
+func defaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) *klient.Client {
 	client := klient.New()
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)

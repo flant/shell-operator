@@ -17,7 +17,7 @@ import (
 var (
 	ClusterName   string
 	ContextName   string
-	KubeClient    klient.Client
+	KubeClient    *klient.Client
 	ObjectPatcher *object_patch.ObjectPatcher
 )
 

@@ -152,6 +152,8 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 func transformUsingFormat(w io.Writer, val interface{}, format string) (err error) {
 	switch format {
 	case "yaml":
+		enc := yaml.NewEncoder(w)
+		enc.SetIndent(2)
 		err = yaml.NewEncoder(w).Encode(val)
 	case "text":
 		switch v := val.(type) {
