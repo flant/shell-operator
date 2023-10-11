@@ -20,7 +20,7 @@ import (
 )
 
 type resourceInformer struct {
-	KubeClient klient.Client
+	KubeClient *klient.Client
 	Monitor    *MonitorConfig
 	// Filter by namespace
 	Namespace string
@@ -62,7 +62,7 @@ type resourceInformer struct {
 
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
-	client  klient.Client
+	client  *klient.Client
 	mstor   *metric_storage.MetricStorage
 	eventCb func(KubeEvent)
 	monitor *MonitorConfig

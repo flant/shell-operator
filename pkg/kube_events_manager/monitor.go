@@ -28,7 +28,7 @@ type Monitor interface {
 type monitor struct {
 	Name       string
 	Config     *MonitorConfig
-	KubeClient klient.Client
+	KubeClient *klient.Client
 	// Static list of informers
 	ResourceInformers []*resourceInformer
 	// Namespace informer to get new namespaces
@@ -54,7 +54,7 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor *metric_storag
 	return &monitor{
 		ctx:               cctx,
 		cancel:            cancel,
-		KubeClient:        *client,
+		KubeClient:        client,
 		metricStorage:     mstor,
 		Config:            config,
 		eventCb:           eventCb,

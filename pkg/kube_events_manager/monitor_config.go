@@ -8,7 +8,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
-// KubeEventMonitorConfig is a config that suits the latest
+// MonitorConfig is a config that suits the latest
 // version of OnKubernetesEventConfig.
 type MonitorConfig struct {
 	Metadata struct {
@@ -45,7 +45,7 @@ func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
 	return c
 }
 
-// WithNamespaceSelector copies input NamespaceSelector into monitor.NamespaceSelector
+// WithNameSelector copies input NameSelector into monitor.NameSelector
 func (c *MonitorConfig) WithNameSelector(nSel *NameSelector) {
 	if nSel != nil {
 		c.NameSelector = &NameSelector{

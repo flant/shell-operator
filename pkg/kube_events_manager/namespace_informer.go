@@ -21,7 +21,7 @@ type namespaceInformer struct {
 	cancel  context.CancelFunc
 	stopped bool
 
-	KubeClient     klient.Client
+	KubeClient     *klient.Client
 	Monitor        *MonitorConfig
 	SharedInformer cache.SharedInformer
 
@@ -31,7 +31,7 @@ type namespaceInformer struct {
 	delFn func(string)
 }
 
-func NewNamespaceInformer(ctx context.Context, client klient.Client, monitor *MonitorConfig) *namespaceInformer {
+func NewNamespaceInformer(ctx context.Context, client *klient.Client, monitor *MonitorConfig) *namespaceInformer {
 	cctx, cancel := context.WithCancel(ctx)
 
 	informer := &namespaceInformer{

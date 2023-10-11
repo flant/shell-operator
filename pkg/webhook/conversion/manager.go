@@ -24,7 +24,7 @@ type EventHandlerFn func(event Event) (*Response, error)
 //   - Start server loop.
 //   - Update clientConfig in each registered CRD.
 type WebhookManager struct {
-	KubeClient klient.Client
+	KubeClient *klient.Client
 
 	EventHandlerFn EventHandlerFn
 	Settings       *WebhookSettings

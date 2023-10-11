@@ -12,7 +12,7 @@ import (
 )
 
 type WebhookResourceOptions struct {
-	KubeClient        klient.Client
+	KubeClient        *klient.Client
 	Namespace         string
 	ConfigurationName string
 	ServiceName       string

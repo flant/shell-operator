@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	uuid "github.com/gofrs/uuid/v5"
+	"github.com/gofrs/uuid/v5"
 	log "github.com/sirupsen/logrus"
 
 	klient "github.com/flant/kube-client/client"
@@ -37,7 +37,7 @@ type ShellOperator struct {
 	MetricStorage *metric_storage.MetricStorage
 	// separate metric storage for hook metrics if separate listen port is configured
 	HookMetricStorage *metric_storage.MetricStorage
-	KubeClient        klient.Client
+	KubeClient        *klient.Client
 	ObjectPatcher     *object_patch.ObjectPatcher
 
 	ScheduleManager   schedule_manager.ScheduleManager

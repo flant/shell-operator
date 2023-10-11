@@ -13,7 +13,7 @@ import (
 
 // A clientConfig for a particular CRD.
 type CrdClientConfig struct {
-	KubeClient  klient.Client
+	KubeClient  *klient.Client
 	CrdName     string
 	Namespace   string
 	ServiceName string
