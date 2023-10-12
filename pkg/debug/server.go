@@ -163,6 +163,8 @@ func transformUsingFormat(w io.Writer, val interface{}, format string) (err erro
 			_, err = w.Write([]byte(v.String()))
 		case []byte:
 			_, err = w.Write(v)
+		default:
+			err = json.NewEncoder(w).Encode(val)
 		}
 		if err == nil {
 			break
