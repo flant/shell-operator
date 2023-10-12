@@ -154,7 +154,7 @@ func transformUsingFormat(w io.Writer, val interface{}, format string) (err erro
 	case "yaml":
 		enc := yaml.NewEncoder(w)
 		enc.SetIndent(2)
-		err = yaml.NewEncoder(w).Encode(val)
+		err = enc.Encode(val)
 	case "text":
 		switch v := val.(type) {
 		case string:
