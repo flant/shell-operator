@@ -180,15 +180,15 @@ type dumpTaskQueues struct {
 }
 
 type dumpQueue struct {
-	Name       string     `json:"name"`
-	TasksCount int        `json:"tasksCount"`
-	Status     string     `json:"status,omitempty"`
-	Tasks      []dumpTask `json:"tasks,omitempty"`
+	Name       string     `json:"name" yaml:"name"`
+	TasksCount int        `json:"tasksCount" yaml:"tasksCount"`
+	Status     string     `json:"status,omitempty" yaml:"status,omitempty"`
+	Tasks      []dumpTask `json:"tasks,omitempty" yaml:"tasks,omitempty"`
 }
 
 type dumpTask struct {
-	Index       int    `json:"index"`
-	Description string `json:"description"`
+	Index       int    `json:"index" yaml:"index"`
+	Description string `json:"description" yaml:"description"`
 }
 
 type dumpSummary struct {
