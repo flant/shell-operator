@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/flant/shell-operator/pkg/app"
