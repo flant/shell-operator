@@ -25,6 +25,7 @@ type OperationSpec struct {
 	JSONPatch  interface{} `json:"jsonPatch,omitempty" yaml:"jsonPatch,omitempty"`
 
 	IgnoreMissingObject bool `json:"ignoreMissingObject" yaml:"ignoreMissingObject"`
+	IgnoreHookError     bool `json:"ignoreHookError" yaml:"ignoreHookError"`
 }
 
 type OperationType string
@@ -42,6 +43,26 @@ const (
 	MergePatch OperationType = "MergePatch"
 	JSONPatch  OperationType = "JSONPatch"
 )
+
+// GetPatchStatusOperationsOnHookError returns list of Patch/Filter operations eligible for execution on Hook Error
+func GetPatchStatusOperationsOnHookError(operations []Operation) []Operation {
+	patchStatusOperations := make([]Operation, 0)
+	for _, op := range operations {
+		switch operation := op.(type) {
+		case *filterOperation:
+			if operation.subresource == "/status" && operation.ignoreHookError {
+				patchStatusOperations = append(patchStatusOperations, operation)
+			}
+		case *patchOperation:
+			if operation.subresource == "/status" && operation.ignoreHookError {
+				patchStatusOperations = append(patchStatusOperations, operation)
+			}
+		default:
+		}
+	}
+
+	return patchStatusOperations
+}
 
 func ParseOperations(specBytes []byte) ([]Operation, error) {
 	log.Debugf("parsing patcher operations:\n%s", specBytes)
@@ -120,6 +141,7 @@ type patchOperation struct {
 	patchType           types.PatchType
 	patch               interface{}
 	ignoreMissingObject bool
+	ignoreHookError     bool
 }
 
 func (op *patchOperation) Description() string {
@@ -137,6 +159,7 @@ type filterOperation struct {
 	// Patch options.
 	filterFunc          func(*unstructured.Unstructured) (*unstructured.Unstructured, error)
 	ignoreMissingObject bool
+	ignoreHookError     bool
 }
 
 func (op *filterOperation) Description() string {
@@ -175,18 +198,21 @@ func NewFromOperationSpec(spec OperationSpec) Operation {
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
 			WithIgnoreMissingObject(spec.IgnoreMissingObject),
+			WithIgnoreHookError(spec.IgnoreHookError),
 		)
 	case MergePatch:
 		return NewMergePatchOperation(spec.MergePatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
 			WithIgnoreMissingObject(spec.IgnoreMissingObject),
+			WithIgnoreHookError(spec.IgnoreHookError),
 		)
 	case JSONPatch:
 		return NewJSONPatchOperation(spec.JSONPatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
 			WithIgnoreMissingObject(spec.IgnoreMissingObject),
+			WithIgnoreHookError(spec.IgnoreHookError),
 		)
 	}
 

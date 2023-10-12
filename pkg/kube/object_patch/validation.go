@@ -56,6 +56,8 @@ definitions:
         type: string
       ignoreMissingObject:
         type: boolean
+      ignoreHookError:
+        type: boolean
 
 type: object
 additionalProperties: false
@@ -71,6 +73,7 @@ properties:
   jqFilter: {}
   mergePatch: {}
   ignoreMissingObject: {}
+  ignoreHookError: {}
 
 oneOf:
 - allOf:

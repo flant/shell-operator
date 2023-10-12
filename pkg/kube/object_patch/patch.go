@@ -152,6 +152,7 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 // Other options:
 // - WithSubresource — a subresource argument for Patch or Update API call.
 // - IgnoreMissingObject — do not return error if the specified object is missing.
+// - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
 func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 	if op.patchType == types.MergePatchType {
 		log.Debug("Started MergePatchObject")
@@ -190,6 +191,11 @@ func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 
 // executeFilterOperation retrieves a specified object, modified it with
 // filterFunc and calls update.
+
+// Other options:
+// - WithSubresource — a subresource argument for Patch or Update API call.
+// - IgnoreMissingObject — do not return error if the specified object is missing.
+// - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
 func (o *ObjectPatcher) executeFilterOperation(op *filterOperation) error {
 	var err error
 

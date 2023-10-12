@@ -608,6 +608,17 @@ func (op *ShellOperator) HandleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 
 	result, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
 	if err != nil {
+		if result != nil && len(result.KubernetesPatchBytes) > 0 {
+			operations, patchStatusErr := object_patch.ParseOperations(result.KubernetesPatchBytes)
+			if patchStatusErr != nil {
+				return fmt.Errorf("%s: couldn't patch status: %s", err, patchStatusErr)
+			}
+
+			patchStatusErr = op.ObjectPatcher.ExecuteOperations(object_patch.GetPatchStatusOperationsOnHookError(operations))
+			if patchStatusErr != nil {
+				return fmt.Errorf("%s: couldn't patch status: %s", err, patchStatusErr)
+			}
+		}
 		return err
 	}
 
