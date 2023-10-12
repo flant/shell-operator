@@ -3,7 +3,6 @@ package shell_operator
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	log "github.com/sirupsen/logrus"
 
@@ -51,7 +50,7 @@ func Init() (*ShellOperator, error) {
 		return nil, err
 	}
 
-	err = op.AssembleCommonOperator()
+	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort)
 	if err != nil {
 		log.Errorf("Fatal: %s", err)
 		return nil, err
@@ -68,15 +67,13 @@ func Init() (*ShellOperator, error) {
 
 // AssembleCommonOperator instantiate common dependencies. These dependencies
 // may be used for shell-operator derivatives, like addon-operator.
-func (op *ShellOperator) AssembleCommonOperator() (err error) {
-	err = startHttpServer(app.ListenAddress, app.ListenPort, http.DefaultServeMux)
-	if err != nil {
-		return fmt.Errorf("start HTTP server: %s", err)
-	}
+// requires listenAddress, listenPort to run http server for operator APIs
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string) (err error) {
+	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	op.MetricStorage = defaultMetricStorage(op.ctx)
 
-	op.HookMetricStorage, err = setupHookMetricStorageAndServer(op.ctx)
+	op.setupHookMetricStorage()
 	if err != nil {
 		return fmt.Errorf("start HTTP server for hook metrics: %s", err)
 	}

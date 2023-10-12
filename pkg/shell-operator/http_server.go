@@ -1,39 +1,88 @@
 package shell_operator
 
 import (
+	"context"
 	"fmt"
-	"net"
 	"net/http"
-	"os"
+	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/flant/shell-operator/pkg/app"
 )
 
-func startHttpServer(ip string, port string, mux *http.ServeMux) error {
-	address := fmt.Sprintf("%s:%s", ip, port)
+type baseHTTPServer struct {
+	router chi.Router
 
-	// Check if port is available
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		return fmt.Errorf("listen on '%s' fails: %v", address, err)
+	address string
+	port    string
+}
+
+// Start runs http server
+func (bhs *baseHTTPServer) Start(ctx context.Context) {
+	srv := &http.Server{
+		Addr:         bhs.address + ":" + bhs.port,
+		Handler:      bhs.router,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
 	}
 
-	log.Infof("Listen on %s", address)
-
 	go func() {
-		if err := http.Serve(listener, mux); err != nil {
-			log.Errorf("Fatal: error starting HTTP server: %s", err)
-			os.Exit(1)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("base http server listen: %s\n", err)
 		}
 	}()
+	log.Infof("base http server started at %s:%s", bhs.address, bhs.port)
 
-	return nil
+	go func() {
+		<-ctx.Done()
+		log.Info("base http server stopped")
+
+		cctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer func() {
+			// extra handling here
+			cancel()
+		}()
+
+		if err := srv.Shutdown(cctx); err != nil {
+			log.Fatalf("base http server shutdown failed:%+v", err)
+		}
+	}()
+}
+
+// RegisterRoute register http.HandlerFunc
+func (bhs *baseHTTPServer) RegisterRoute(method, pattern string, h http.HandlerFunc) {
+	switch method {
+	case http.MethodGet:
+		bhs.router.Get(pattern, h)
+
+	case http.MethodPost:
+		bhs.router.Post(pattern, h)
+
+	case http.MethodPut:
+		bhs.router.Put(pattern, h)
+
+	case http.MethodDelete:
+		bhs.router.Delete(pattern, h)
+	}
+}
+
+func newBaseHTTPServer(address, port string) *baseHTTPServer {
+	router := chi.NewRouter()
+
+	srv := &baseHTTPServer{
+		router:  router,
+		address: address,
+		port:    port,
+	}
+
+	return srv
 }
 
 func registerDefaultRoutes(op *ShellOperator) {
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+	op.APIServer.RegisterRoute(http.MethodGet, "/", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = fmt.Fprintf(writer, `<html>
     <head><title>Shell operator</title></head>
     <body>
@@ -43,7 +92,7 @@ func registerDefaultRoutes(op *ShellOperator) {
     </html>`, app.ListenPort)
 	})
 
-	http.HandleFunc("/metrics", func(writer http.ResponseWriter, request *http.Request) {
+	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", func(writer http.ResponseWriter, request *http.Request) {
 		if op.MetricStorage != nil {
 			op.MetricStorage.Handler().ServeHTTP(writer, request)
 		}

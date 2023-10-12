@@ -34,6 +34,9 @@ type ShellOperator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	// APIServer common http server for liveness and metrics endpoints
+	APIServer *baseHTTPServer
+
 	MetricStorage *metric_storage.MetricStorage
 	// separate metric storage for hook metrics if separate listen port is configured
 	HookMetricStorage *metric_storage.MetricStorage
@@ -62,6 +65,29 @@ func NewShellOperator(ctx context.Context) *ShellOperator {
 		ctx:    cctx,
 		cancel: cancel,
 	}
+}
+
+// Start run the operator
+func (op *ShellOperator) Start() {
+	log.Info("start shell-operator")
+
+	op.APIServer.Start(op.ctx)
+
+	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
+	op.bootstrapMainQueue(op.TaskQueues)
+	// Start main task queue handler
+	op.TaskQueues.StartMain()
+	op.initAndStartHookQueues()
+
+	// Start emit "live" metrics
+	op.runMetrics()
+
+	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
+	// Start it before start all informers to catch all kubernetes events (#42)
+	op.ManagerEventsHandler.Start()
+
+	// Unlike KubeEventsManager, ScheduleManager has one go-routine.
+	op.ScheduleManager.Start()
 }
 
 func (op *ShellOperator) Stop() {
@@ -360,27 +386,6 @@ func (op *ShellOperator) conversionEventHandler(event conversion.Event) (*conver
 	return &conversion.Response{
 		FailedMessage: fmt.Sprintf("Conversion to %s was not successuful", event.Review.Request.DesiredAPIVersion),
 	}, nil
-}
-
-// Start
-func (op *ShellOperator) Start() {
-	log.Info("start shell-operator")
-
-	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
-	op.bootstrapMainQueue(op.TaskQueues)
-	// Start main task queue handler
-	op.TaskQueues.StartMain()
-	op.initAndStartHookQueues()
-
-	// Start emit "live" metrics
-	op.runMetrics()
-
-	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
-	// Start it before start all informers to catch all kubernetes events (#42)
-	op.ManagerEventsHandler.Start()
-
-	// Unlike KubeEventsManager, ScheduleManager has one go-routine.
-	op.ScheduleManager.Start()
 }
 
 // taskHandler

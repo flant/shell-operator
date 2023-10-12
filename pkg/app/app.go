@@ -20,10 +20,9 @@ var (
 )
 
 var (
-	Namespace             = ""
-	ListenAddress         = "0.0.0.0"
-	ListenPort            = "9115"
-	HookMetricsListenPort = ""
+	Namespace     = ""
+	ListenAddress = "0.0.0.0"
+	ListenPort    = "9115"
 )
 
 var PrometheusMetricsPrefix = "shell_operator_"
@@ -122,14 +121,6 @@ func DefineStartCommandFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause)
 			Envar(flag.Envar).
 			Default(PrometheusMetricsPrefix).
 			StringVar(&PrometheusMetricsPrefix)
-	}
-
-	flag = CommonFlagsInfo["hook-metrics-listen-port"]
-	if flag.Define {
-		cmd.Flag(flag.Name, flag.Help).
-			Envar(flag.Envar).
-			Default(HookMetricsListenPort).
-			StringVar(&HookMetricsListenPort)
 	}
 
 	flag = CommonFlagsInfo["namespace"]
