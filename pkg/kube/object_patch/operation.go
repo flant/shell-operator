@@ -57,7 +57,6 @@ func GetPatchStatusOperationsOnHookError(operations []Operation) []Operation {
 			if operation.subresource == "/status" && operation.ignoreHookError {
 				patchStatusOperations = append(patchStatusOperations, operation)
 			}
-		default:
 		}
 	}
 
