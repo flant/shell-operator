@@ -81,25 +81,6 @@ func (c *MonitorConfig) WithFieldSelector(fieldSel *FieldSelector) {
 	}
 }
 
-// func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, value string) {
-//	if c.FieldSelector == nil {
-//		c.FieldSelector = &FieldSelector{
-//			MatchExpressions: []FieldSelectorRequirement{},
-//		}
-//	}
-//	if c.FieldSelector.MatchExpressions == nil {
-//		c.FieldSelector.MatchExpressions = make([]FieldSelectorRequirement, 0)
-//	}
-//
-//	req := FieldSelectorRequirement{
-//		Field:    field,
-//		Operator: op,
-//		Value:    value,
-//	}
-//
-//	c.FieldSelector.MatchExpressions = append(c.FieldSelector.MatchExpressions, req)
-//}
-
 // WithLabelSelector copies input LabelSelector into monitor.LabelSelector
 func (c *MonitorConfig) WithLabelSelector(labelSel *metav1.LabelSelector) {
 	if labelSel != nil {
@@ -109,12 +90,6 @@ func (c *MonitorConfig) WithLabelSelector(labelSel *metav1.LabelSelector) {
 		}
 	}
 }
-
-// func (c *MonitorConfig) IsAnyNamespace() bool {
-//	return c.NamespaceSelector == nil ||
-//		(c.NamespaceSelector.NameSelector == nil && c.NamespaceSelector.LabelSelector == nil) ||
-//		(c.NamespaceSelector.NameSelector != nil && len(c.NamespaceSelector.NameSelector.MatchNames) == 0)
-//}
 
 // names returns names of monitored objects if nameSelector.matchNames is defined in config.
 func (c *MonitorConfig) names() []string {
