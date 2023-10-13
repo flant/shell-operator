@@ -43,6 +43,7 @@ func (dop *PatchCollector) Delete(apiVersion, kind, namespace, name string, opti
 // Options:
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
+//   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
 func (dop *PatchCollector) MergePatch(mergePatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) {
 	dop.add(NewMergePatchOperation(mergePatch, apiVersion, kind, namespace, name, options...))
 }
@@ -52,6 +53,7 @@ func (dop *PatchCollector) MergePatch(mergePatch interface{}, apiVersion, kind, 
 // Options:
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
+//   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
 func (dop *PatchCollector) JSONPatch(jsonPatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) {
 	dop.add(NewJSONPatchOperation(jsonPatch, apiVersion, kind, namespace, name, options...))
 }
@@ -62,6 +64,7 @@ func (dop *PatchCollector) JSONPatch(jsonPatch interface{}, apiVersion, kind, na
 // Options:
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
+//   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
 //
 // Note: do not modify and return argument in filterFunc,
 // use FromUnstructured to instantiate a concrete type or modify after DeepCopy.

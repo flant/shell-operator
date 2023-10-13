@@ -45,8 +45,29 @@ func (s *subresourceHolder) applyToFilter(operation *filterOperation) {
 	operation.subresource = s.subresource
 }
 
+type ignoreHookError struct {
+	ignoreError bool
+}
+
+// IgnoreHookError allows applying patches for a Status subresource even if the hook fails
+func IgnoreHookError() *ignoreHookError {
+	return WithIgnoreHookError(true)
+}
+
+func WithIgnoreHookError(ignoreError bool) *ignoreHookError {
+	return &ignoreHookError{ignoreError: ignoreError}
+}
+
 type ignoreMissingObject struct {
 	ignore bool
+}
+
+func (i *ignoreHookError) applyToPatch(operation *patchOperation) {
+	operation.ignoreHookError = i.ignoreError
+}
+
+func (i *ignoreHookError) applyToFilter(operation *filterOperation) {
+	operation.ignoreHookError = i.ignoreError
 }
 
 // IgnoreMissingObject do not return error if object exists for Patch and Filter operations.
