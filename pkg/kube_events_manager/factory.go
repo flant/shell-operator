@@ -61,7 +61,7 @@ func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory
 	}
 
 	// define resyncPeriod for informer
-	resyncPeriod := RandomizedResyncPeriod()
+	resyncPeriod := randomizedResyncPeriod()
 
 	tweakListOptions := func(options *metav1.ListOptions) {
 		if index.FieldSelector != "" {
@@ -88,7 +88,7 @@ func (c *FactoryStore) Start(client dynamic.Interface, index FactoryIndex, handl
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
 	// Add error handler, ignore "already started" error.
-	_ = informer.SetWatchErrorHandler(errorHandler.Handler)
+	_ = informer.SetWatchErrorHandler(errorHandler.handler)
 	// TODO(nabokihms): think about what will happen if we stop and then start the monitor
 	informer.AddEventHandler(handler)
 

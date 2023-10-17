@@ -16,18 +16,23 @@ import (
 )
 
 func newHookManager(t *testing.T, testdataDir string) *hookManager {
-	hm := NewHookManager()
-
 	hooksDir, _ := filepath.Abs(testdataDir)
-	hm.WithDirectories(hooksDir, t.TempDir())
 
 	conversionManager := conversion.NewWebhookManager()
 	conversionManager.Settings = app.ConversionWebhookSettings
-	hm.WithConversionWebhookManager(conversionManager)
 
-	admissionManager := admission.NewWebhookManager()
+	admissionManager := admission.NewWebhookManager(nil)
 	admissionManager.Settings = app.ValidatingWebhookSettings
-	hm.WithAdmissionWebhookManager(admissionManager)
+
+	cfg := &HookManagerConfig{
+		WorkingDir: hooksDir,
+		TempDir:    t.TempDir(),
+		Kmgr:       nil,
+		Smgr:       nil,
+		Wmgr:       admissionManager,
+		Cmgr:       conversionManager,
+	}
+	hm := NewHookManager(cfg)
 
 	return hm
 }

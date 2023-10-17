@@ -32,9 +32,9 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 	}
 
 	// */x
-	resourcesWithWildcardSubresoures := sets.String{}
+	resourcesWithWildcardSubresoures := sets.Set[string]{}
 	// x/*
-	subResourcesWithWildcardResource := sets.String{}
+	subResourcesWithWildcardResource := sets.Set[string]{}
 	// */*
 	hasDoubleWildcard := false
 	// *

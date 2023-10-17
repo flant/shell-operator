@@ -43,8 +43,13 @@ type MetricStorage struct {
 	Registerer prometheus.Registerer
 }
 
-func NewMetricStorage() *MetricStorage {
+func NewMetricStorage(ctx context.Context, prefix string, newRegistry bool) *MetricStorage {
+	cctx, cancel := context.WithCancel(ctx)
 	m := &MetricStorage{
+		ctx:    cctx,
+		cancel: cancel,
+
+		Prefix:           prefix,
 		Gauges:           make(map[string]*prometheus.GaugeVec),
 		Counters:         make(map[string]*prometheus.CounterVec),
 		Histograms:       make(map[string]*prometheus.HistogramVec),
@@ -54,38 +59,18 @@ func NewMetricStorage() *MetricStorage {
 		Registerer:       prometheus.DefaultRegisterer,
 	}
 	m.GroupedVault.Registerer = m.Registerer
+
+	if newRegistry {
+		m.Registry = prometheus.NewRegistry()
+		m.Gatherer = m.Registry
+		m.Registerer = m.Registry
+		m.GroupedVault.Registerer = m.Registry
+	}
+
 	return m
 }
 
-func (m *MetricStorage) WithContext(ctx context.Context) {
-	m.ctx, m.cancel = context.WithCancel(ctx)
-}
-
-func (m *MetricStorage) WithPrefix(prefix string) {
-	m.Prefix = prefix
-}
-
-func (m *MetricStorage) WithNewRegistry() {
-	m.Registry = prometheus.NewRegistry()
-	m.Gatherer = m.Registry
-	m.Registerer = m.Registry
-	m.GroupedVault.Registerer = m.Registry
-}
-
-func (m *MetricStorage) Stop() {
-	if m.cancel != nil {
-		m.cancel()
-	}
-}
-
-func (m *MetricStorage) Start() {
-	// go func() {
-	//	<-m.ctx.Done()
-	//	return
-	// }()
-}
-
-func (m *MetricStorage) ResolveMetricName(name string) string {
+func (m *MetricStorage) resolveMetricName(name string) string {
 	if strings.Contains(name, PrefixTemplate) {
 		return strings.Replace(name, PrefixTemplate, m.Prefix, 1)
 	}
@@ -101,7 +86,7 @@ func (m *MetricStorage) GaugeSet(metric string, value float64, labels map[string
 	defer func() {
 		if r := recover(); r != nil {
 			log.WithField("operator.component", "metricsStorage").
-				Errorf("Metric gauge set %s %v with %v: %v", m.ResolveMetricName(metric), LabelNames(labels), labels, r)
+				Errorf("Metric gauge set %s %v with %v: %v", m.resolveMetricName(metric), LabelNames(labels), labels, r)
 		}
 	}()
 
@@ -115,7 +100,7 @@ func (m *MetricStorage) GaugeAdd(metric string, value float64, labels map[string
 	defer func() {
 		if r := recover(); r != nil {
 			log.WithField("operator.component", "metricsStorage").
-				Errorf("Metric gauge add %s %v with %v: %v", m.ResolveMetricName(metric), LabelNames(labels), labels, r)
+				Errorf("Metric gauge add %s %v with %v: %v", m.resolveMetricName(metric), LabelNames(labels), labels, r)
 		}
 	}()
 
@@ -136,7 +121,7 @@ func (m *MetricStorage) Gauge(metric string, labels map[string]string) *promethe
 
 // RegisterGauge registers a gauge.
 func (m *MetricStorage) RegisterGauge(metric string, labels map[string]string) *prometheus.GaugeVec {
-	metricName := m.ResolveMetricName(metric)
+	metricName := m.resolveMetricName(metric)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -176,7 +161,7 @@ func (m *MetricStorage) CounterAdd(metric string, value float64, labels map[stri
 	defer func() {
 		if r := recover(); r != nil {
 			log.WithField("operator.component", "metricsStorage").
-				Errorf("Metric counter add %s %v with %v: %v", m.ResolveMetricName(metric), LabelNames(labels), labels, r)
+				Errorf("Metric counter add %s %v with %v: %v", m.resolveMetricName(metric), LabelNames(labels), labels, r)
 		}
 	}()
 	m.Counter(metric, labels).With(labels).Add(value)
@@ -196,7 +181,7 @@ func (m *MetricStorage) Counter(metric string, labels map[string]string) *promet
 
 // RegisterCounter registers a counter.
 func (m *MetricStorage) RegisterCounter(metric string, labels map[string]string) *prometheus.CounterVec {
-	metricName := m.ResolveMetricName(metric)
+	metricName := m.resolveMetricName(metric)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -235,7 +220,7 @@ func (m *MetricStorage) HistogramObserve(metric string, value float64, labels ma
 	defer func() {
 		if r := recover(); r != nil {
 			log.WithField("operator.component", "metricsStorage").
-				Errorf("Metric histogram observe %s %v with %v: %v", m.ResolveMetricName(metric), LabelNames(labels), labels, r)
+				Errorf("Metric histogram observe %s %v with %v: %v", m.resolveMetricName(metric), LabelNames(labels), labels, r)
 		}
 	}()
 	m.Histogram(metric, labels, buckets).With(labels).Observe(value)
@@ -252,7 +237,7 @@ func (m *MetricStorage) Histogram(metric string, labels map[string]string, bucke
 }
 
 func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]string, buckets []float64) *prometheus.HistogramVec {
-	metricName := m.ResolveMetricName(metric)
+	metricName := m.resolveMetricName(metric)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -294,7 +279,7 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 
 // Batch operations for metrics from hooks
 
-func (m *MetricStorage) SendBatchV0(ops []operation.MetricOperation, labels map[string]string) error {
+func (m *MetricStorage) sendBatchV0(ops []operation.MetricOperation, labels map[string]string) error {
 	if m == nil {
 		return nil
 	}
@@ -346,11 +331,11 @@ func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[st
 
 	// Expire each group and apply new metric operations.
 	for group, ops := range groupedOps {
-		m.ApplyGroupOperations(group, ops, labels)
+		m.applyGroupOperations(group, ops, labels)
 	}
 
 	// Send non-grouped metrics.
-	err = m.SendBatchV0(nonGroupedOps, labels)
+	err = m.sendBatchV0(nonGroupedOps, labels)
 	if err != nil {
 		return err
 	}
@@ -384,8 +369,8 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 	}
 }
 
-// ApplyGroupOperations set metrics for group to a new state defined by ops.
-func (m *MetricStorage) ApplyGroupOperations(group string, ops []operation.MetricOperation, commonLabels map[string]string) {
+// applyGroupOperations set metrics for group to a new state defined by ops.
+func (m *MetricStorage) applyGroupOperations(group string, ops []operation.MetricOperation, commonLabels map[string]string) {
 	// Implicitly expire all metrics for group.
 	m.GroupedVault.ExpireGroupMetrics(group)
 

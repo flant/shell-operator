@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	uuid "gopkg.in/satori/go.uuid.v1"
+	uuid "github.com/gofrs/uuid/v5"
 
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
@@ -46,7 +46,7 @@ type BaseTask struct {
 }
 
 func NewTask(taskType TaskType) *BaseTask {
-	taskId := uuid.NewV4().String()
+	taskId := uuid.Must(uuid.NewV4()).String()
 	return &BaseTask{
 		Id:           taskId,
 		FailureCount: 0,

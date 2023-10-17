@@ -9,23 +9,23 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/task"
+	utils "github.com/flant/shell-operator/pkg/utils/file"
 )
 
 func Test_Operator_startup_tasks(t *testing.T) {
 	g := NewWithT(t)
 
-	hooksDir, err := RequireExistingDirectory("testdata/startup_tasks/hooks")
+	hooksDir, err := utils.RequireExistingDirectory("testdata/startup_tasks/hooks")
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	op := NewShellOperator()
-	op.WithContext(context.Background())
-	SetupEventManagers(op)
-	SetupHookManagers(op, hooksDir, "")
+	op := NewShellOperator(context.Background())
+	op.SetupEventManagers()
+	op.setupHookManagers(hooksDir, "")
 
-	err = op.InitHookManager()
+	err = op.initHookManager()
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	op.BootstrapMainQueue(op.TaskQueues)
+	op.bootstrapMainQueue(op.TaskQueues)
 
 	expectTasks := []struct {
 		taskType    task.TaskType

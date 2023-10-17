@@ -120,16 +120,16 @@ func Test_ExponentialBackoff(t *testing.T) {
 
 	q.Start()
 
-	// Expect TaskHandler returns Success result.
+	// Expect taskHandler returns Success result.
 	g.Eventually(queueStopCh, "5s", "20ms").Should(BeClosed(), "Should handle first task in queue successfully")
 
-	// Expect TaskHandler called 'fails' times.
+	// Expect taskHandler called 'fails' times.
 	g.Expect(Task.GetFailureCount()).Should(Equal(fails), "task should fail %d times.", fails)
 
 	prev := failureCounts[0]
 	for i := 1; i < len(failureCounts); i++ {
 		cur := failureCounts[i]
-		g.Expect(cur > prev).Should(BeTrue(), "TaskHandler should receive task with growing FailureCount. Got %d after %d", cur, prev)
+		g.Expect(cur > prev).Should(BeTrue(), "taskHandler should receive task with growing FailureCount. Got %d after %d", cur, prev)
 	}
 
 	// Expect mean delay is greater than mocked delay.
@@ -208,7 +208,7 @@ func Test_CancelDelay(t *testing.T) {
 	// Start handling 'erroneous' task.
 	q.Start()
 
-	// Expect TaskHandler returns Success result.
+	// Expect taskHandler returns Success result.
 	g.Eventually(delayStartsCh, "5s", "20ms").Should(BeClosed(), "Should handle failed task and starts a delay")
 
 	// Add healing task and cancel delay in parallel.

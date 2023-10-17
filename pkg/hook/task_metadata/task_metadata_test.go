@@ -1,6 +1,8 @@
 package task_metadata
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -8,7 +10,6 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/task"
-	"github.com/flant/shell-operator/pkg/task/dump"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
 
@@ -70,11 +71,27 @@ func Test_HookMetadata_QueueDump_Task_Description(t *testing.T) {
 		WithLogLabels(logLabels).
 		WithQueueName("main"))
 
-	queueDump := dump.TaskQueueToText(q)
+	queueDump := taskQueueToText(q)
 
 	g.Expect(queueDump).Should(ContainSubstring("hook1.sh"), "Queue dump should reveal a hook name.")
 	g.Expect(queueDump).Should(ContainSubstring("EnableKubernetesBindings"), "Queue dump should reveal EnableKubernetesBindings.")
 	g.Expect(queueDump).Should(ContainSubstring(":kubernetes:"), "Queue dump should show kubernetes binding.")
 	g.Expect(queueDump).Should(ContainSubstring(":schedule:"), "Queue dump should show schedule binding.")
 	g.Expect(queueDump).Should(ContainSubstring("group=monitor_pods"), "Queue dump should show group name.")
+}
+
+func taskQueueToText(q *queue.TaskQueue) string {
+	var buf strings.Builder
+	buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", q.Name, q.Length(), q.Status))
+	buf.WriteString("\n")
+
+	index := 1
+	q.Iterate(func(task task.Task) {
+		buf.WriteString(fmt.Sprintf("%2d. ", index))
+		buf.WriteString(task.GetDescription())
+		buf.WriteString("\n")
+		index++
+	})
+
+	return buf.String()
 }

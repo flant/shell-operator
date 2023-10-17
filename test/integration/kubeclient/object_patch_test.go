@@ -7,9 +7,9 @@ import (
 	"context"
 	"encoding/json"
 
+	uuid "github.com/gofrs/uuid/v5"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	uuid "gopkg.in/satori/go.uuid.v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -208,7 +208,7 @@ func ensureNamespace(name string) error {
 	return ObjectPatcher.ExecuteOperation(object_patch.NewCreateOperation(unstructuredNS, object_patch.UpdateIfExists()))
 }
 
-func ensureTestObject(namespace string, obj interface{}) error {
+func ensureTestObject(_ string, obj interface{}) error {
 	unstructuredObj, err := generateUnstructured(obj)
 	if err != nil {
 		panic(err)
@@ -233,5 +233,5 @@ func generateUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 }
 
 func randomSuffix() string {
-	return uuid.NewV4().String()[0:8]
+	return uuid.Must(uuid.NewV4()).String()[0:8]
 }

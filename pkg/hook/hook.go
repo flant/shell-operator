@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	uuid "github.com/gofrs/uuid/v5"
 	"github.com/kennygrant/sanitize"
 	"golang.org/x/time/rate"
-	uuid "gopkg.in/satori/go.uuid.v1"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
@@ -261,7 +261,7 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 		return "", err
 	}
 
-	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context-%s.json", h.SafeName(), uuid.NewV4().String()))
+	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
 
 	err = os.WriteFile(bindingContextPath, data, 0o644)
 	if err != nil {
@@ -272,7 +272,7 @@ func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string
 }
 
 func (h *Hook) prepareMetricsFile() (string, error) {
-	metricsPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-metrics-%s.json", h.SafeName(), uuid.NewV4().String()))
+	metricsPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-metrics-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
 
 	err := os.WriteFile(metricsPath, []byte{}, 0o644)
 	if err != nil {
@@ -284,7 +284,7 @@ func (h *Hook) prepareMetricsFile() (string, error) {
 
 // prepareAdmissionResponseFile create file to store response from validating and mutating hooks.
 func (h *Hook) prepareAdmissionResponseFile() (string, error) {
-	filePath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-admission-response-%s.json", h.SafeName(), uuid.NewV4().String()))
+	filePath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-admission-response-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
 
 	err := os.WriteFile(filePath, []byte{}, 0o644)
 	if err != nil {
@@ -295,7 +295,7 @@ func (h *Hook) prepareAdmissionResponseFile() (string, error) {
 }
 
 func (h *Hook) prepareConversionResponseFile() (string, error) {
-	conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.NewV4().String()))
+	conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
 
 	err := os.WriteFile(conversionPath, []byte{}, 0o644)
 	if err != nil {
@@ -321,7 +321,7 @@ func CreateRateLimiter(cfg *config.HookConfig) *rate.Limiter {
 }
 
 func (h *Hook) prepareObjectPatchFile() (string, error) {
-	objectPatchPath := filepath.Join(h.TmpDir, fmt.Sprintf("%s-object-patch-%s", h.SafeName(), uuid.NewV4().String()))
+	objectPatchPath := filepath.Join(h.TmpDir, fmt.Sprintf("%s-object-patch-%s", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
 
 	err := os.WriteFile(objectPatchPath, []byte{}, 0o644)
 	if err != nil {

@@ -37,6 +37,16 @@ linters-settings:
       - prefix(github.com/flant/)
   goimports:
     local-prefixes: github.com/flant/
+  nolintlint:
+    allow-unused: true
+  depguard:
+    rules:
+      Main:
+        files:
+          - $all
+        deny:
+          - pkg: "gopkg.in/satori/go.uuid.v1"
+            desc: "Use https://github.com/gofrs/uuid instead. Satori/go.uuid is no longer maintained and has critical vulnerabilities."
 issues:
   exclude:
     # Using underscores is a common practice, refactor in the future

@@ -16,7 +16,7 @@ type CombineResult struct {
 	MonitorIDs      []string
 }
 
-// CombineBindingContextForHook combines binding contexts from a sequence of task with similar
+// combineBindingContextForHook combines binding contexts from a sequence of task with similar
 // hook name and task type into array of binding context and delete excess tasks from queue.
 //
 // Also, sequences of binding contexts with similar group are compacted in one binding context.
@@ -24,7 +24,7 @@ type CombineResult struct {
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func CombineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
+func combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
 	if q == nil {
 		return nil
 	}

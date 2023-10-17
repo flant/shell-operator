@@ -59,14 +59,11 @@ func NewBindingContextController(config string, version ...fake.ClusterVersion) 
 		fakeCluster: fc,
 	}
 
-	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager()
-	b.KubeEventsManager.WithContext(ctx)
-	b.KubeEventsManager.WithKubeClient(b.fakeCluster.Client)
+	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client)
 	// Re-create factory to drop informers created using different b.fakeCluster.Client.
 	kubeeventsmanager.DefaultFactoryStore = kubeeventsmanager.NewFactoryStore()
 
-	b.ScheduleManager = schedulemanager.NewScheduleManager()
-	b.ScheduleManager.WithContext(ctx)
+	b.ScheduleManager = schedulemanager.NewScheduleManager(ctx)
 
 	b.Controller = NewStateController(fc, b.KubeEventsManager)
 

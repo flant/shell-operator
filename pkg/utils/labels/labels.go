@@ -46,3 +46,10 @@ func LabelValues(labels map[string]string, labelNames []string) []string {
 	}
 	return values
 }
+
+func DefaultIfEmpty(m map[string]string, def map[string]string) map[string]string {
+	if len(m) == 0 {
+		return def
+	}
+	return m
+}

@@ -20,15 +20,6 @@ func FileExists(path string) (bool, error) {
 	return true, nil
 }
 
-func DirExists(path string) (bool, error) {
-	fileInfo, err := os.Stat(path)
-	if err != nil && os.IsNotExist(err) {
-		return false, nil
-	}
-
-	return fileInfo.IsDir(), nil
-}
-
 func IsFileExecutable(f os.FileInfo) bool {
 	return f.Mode()&0o111 != 0
 }

@@ -29,18 +29,39 @@ func (a asQueueNames) Less(i, j int) bool {
 	return p.Name < q.Name
 }
 
-// TaskQueueMainToText dumps only the 'main' queue.
-func TaskQueueMainToText(tqs *queue.TaskQueueSet) string {
-	var buf strings.Builder
+// TaskMainQueue dumps 'main' queue with the given
+func TaskMainQueue(tqs *queue.TaskQueueSet, format string) interface{} {
+	var dq dumpQueue
 
 	q := tqs.GetMain()
 	if q == nil {
-		buf.WriteString(fmt.Sprintf("Queue '%s' is not created\n", queue.MainQueueName))
+		dq.Name = queue.MainQueueName
+		dq.Status = "Queue is not created"
 	} else {
-		buf.WriteString(TaskQueueToText(q))
+		tasks := getTasksForQueue(q)
+		dq = dumpQueue{
+			Name:       q.Name,
+			TasksCount: q.Length(),
+			Status:     q.Status,
+			Tasks:      tasks,
+		}
 	}
 
-	return buf.String()
+	if format == "text" {
+		var buf strings.Builder
+		buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", dq.Name, dq.TasksCount, dq.Status))
+		buf.WriteString("\n")
+
+		for _, ts := range dq.Tasks {
+			buf.WriteString(fmt.Sprintf("%2d. ", ts.Index))
+			buf.WriteString(ts.Description)
+			buf.WriteString("\n")
+		}
+
+		return buf.String()
+	}
+
+	return dq
 }
 
 // TaskQueues dumps all queues.
@@ -135,23 +156,6 @@ func pluralize(n int, zero, one, many string) string {
 	return fmt.Sprintf("%d %s", n, description)
 }
 
-// TaskQueueToText dumps all tasks in queue.
-func TaskQueueToText(q *queue.TaskQueue) string {
-	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", q.Name, q.Length(), q.Status))
-	buf.WriteString("\n")
-
-	index := 1
-	q.Iterate(func(task task.Task) {
-		buf.WriteString(fmt.Sprintf("%2d. ", index))
-		buf.WriteString(task.GetDescription())
-		buf.WriteString("\n")
-		index++
-	})
-
-	return buf.String()
-}
-
 func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
 	tasks := make([]dumpTask, 0, q.Length())
 
@@ -176,15 +180,15 @@ type dumpTaskQueues struct {
 }
 
 type dumpQueue struct {
-	Name       string     `json:"name"`
-	TasksCount int        `json:"tasksCount"`
-	Status     string     `json:"status,omitempty"`
-	Tasks      []dumpTask `json:"tasks,omitempty"`
+	Name       string     `json:"name" yaml:"name"`
+	TasksCount int        `json:"tasksCount" yaml:"tasksCount"`
+	Status     string     `json:"status,omitempty" yaml:"status,omitempty"`
+	Tasks      []dumpTask `json:"tasks,omitempty" yaml:"tasks,omitempty"`
 }
 
 type dumpTask struct {
-	Index       int    `json:"index"`
-	Description string `json:"description"`
+	Index       int    `json:"index" yaml:"index"`
+	Description string `json:"description" yaml:"description"`
 }
 
 type dumpSummary struct {

@@ -8,7 +8,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
-// KubeEventMonitorConfig is a config that suits the latest
+// MonitorConfig is a config that suits the latest
 // version of OnKubernetesEventConfig.
 type MonitorConfig struct {
 	Metadata struct {
@@ -45,7 +45,7 @@ func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
 	return c
 }
 
-// WithNamespaceSelector copies input NamespaceSelector into monitor.NamespaceSelector
+// WithNameSelector copies input NameSelector into monitor.NameSelector
 func (c *MonitorConfig) WithNameSelector(nSel *NameSelector) {
 	if nSel != nil {
 		c.NameSelector = &NameSelector{
@@ -81,25 +81,6 @@ func (c *MonitorConfig) WithFieldSelector(fieldSel *FieldSelector) {
 	}
 }
 
-func (c *MonitorConfig) AddFieldSelectorRequirement(field string, op string, value string) {
-	if c.FieldSelector == nil {
-		c.FieldSelector = &FieldSelector{
-			MatchExpressions: []FieldSelectorRequirement{},
-		}
-	}
-	if c.FieldSelector.MatchExpressions == nil {
-		c.FieldSelector.MatchExpressions = make([]FieldSelectorRequirement, 0)
-	}
-
-	req := FieldSelectorRequirement{
-		Field:    field,
-		Operator: op,
-		Value:    value,
-	}
-
-	c.FieldSelector.MatchExpressions = append(c.FieldSelector.MatchExpressions, req)
-}
-
 // WithLabelSelector copies input LabelSelector into monitor.LabelSelector
 func (c *MonitorConfig) WithLabelSelector(labelSel *metav1.LabelSelector) {
 	if labelSel != nil {
@@ -110,15 +91,9 @@ func (c *MonitorConfig) WithLabelSelector(labelSel *metav1.LabelSelector) {
 	}
 }
 
-func (c *MonitorConfig) IsAnyNamespace() bool {
-	return c.NamespaceSelector == nil ||
-		(c.NamespaceSelector.NameSelector == nil && c.NamespaceSelector.LabelSelector == nil) ||
-		(c.NamespaceSelector.NameSelector != nil && len(c.NamespaceSelector.NameSelector.MatchNames) == 0)
-}
-
-// Names returns names of monitored objects if nameSelector.matchNames is defined in config.
-func (c *MonitorConfig) Names() []string {
-	res := []string{}
+// names returns names of monitored objects if nameSelector.matchNames is defined in config.
+func (c *MonitorConfig) names() []string {
+	res := make([]string, 0)
 
 	if c.NameSelector != nil {
 		res = c.NameSelector.MatchNames
@@ -135,7 +110,7 @@ func (c *MonitorConfig) Names() []string {
 // then empty string is returned to monitor all namespaces.
 //
 // If namespace.labelSelector is specified, then return empty array.
-func (c *MonitorConfig) Namespaces() (nsNames []string) {
+func (c *MonitorConfig) namespaces() (nsNames []string) {
 	if c.NamespaceSelector == nil {
 		return []string{""}
 	}

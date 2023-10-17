@@ -49,9 +49,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 		},
 	}
 
-	mgr := NewKubeEventsManager()
-	mgr.WithContext(context.Background())
-	mgr.WithKubeClient(kubeClient)
+	mgr := NewKubeEventsManager(context.Background(), kubeClient)
 
 	// monitor with 3 namespaces and 4 object names
 	monitor := &MonitorConfig{
@@ -139,9 +137,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
 
 	// Init() replacement
-	mgr := NewKubeEventsManager()
-	mgr.WithKubeClient(kubeClient)
-	mgr.WithContext(ctx)
+	mgr := NewKubeEventsManager(ctx, kubeClient)
 	mgr.KubeEventCh = make(chan KubeEvent, 10)
 
 	// monitor with 3 namespaces and 4 object names and all event types
@@ -317,8 +313,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
 
 	//// Init() replacement
-	mgr := NewKubeEventsManager()
-	mgr.WithContext(ctx)
+	mgr := NewKubeEventsManager(ctx, nil)
 
 	// monitor with 3 namespaces and 4 object names and all event types
 	monitor := &MonitorConfig{

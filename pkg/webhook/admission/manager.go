@@ -20,7 +20,7 @@ const DefaultConfigurationId = "hooks"
 //   - Call AddWebhook for every binding in hooks
 //   - Start() to run server and create ValidatingWebhookConfiguration/MutatingWebhookConfiguration
 type WebhookManager struct {
-	KubeClient klient.Client
+	KubeClient *klient.Client
 
 	Settings  *WebhookSettings
 	Namespace string
@@ -33,15 +33,12 @@ type WebhookManager struct {
 	Handler             *WebhookHandler
 }
 
-func NewWebhookManager() *WebhookManager {
+func NewWebhookManager(kubeClient *klient.Client) *WebhookManager {
 	return &WebhookManager{
 		ValidatingResources: make(map[string]*ValidatingWebhookResource),
 		MutatingResources:   make(map[string]*MutatingWebhookResource),
+		KubeClient:          kubeClient,
 	}
-}
-
-func (m *WebhookManager) WithKubeClient(kubeClient klient.Client) {
-	m.KubeClient = kubeClient
 }
 
 func (m *WebhookManager) WithAdmissionEventHandler(handler AdmissionEventHandlerFn) {

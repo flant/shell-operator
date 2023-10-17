@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	uuid "gopkg.in/satori/go.uuid.v1"
+	uuid "github.com/gofrs/uuid/v5"
 )
 
 func ConvertFloatForBinding(value interface{}, bindingName string) (*float64, error) {
@@ -45,7 +45,7 @@ func MonitorDebugName(configName string, configIndex int) string {
 
 // TODO uuid is not a good choice here. Make it more readable.
 func MonitorConfigID() string {
-	return uuid.NewV4().String()
+	return uuid.Must(uuid.NewV4()).String()
 	// ei.DebugName = uuid.NewV4().String()
 	// if ei.Monitor.ConfigIdPrefix != "" {
 	//	ei.DebugName = ei.Monitor.ConfigIdPrefix + "-" + ei.DebugName[len(ei.Monitor.ConfigIdPrefix)+1:]
@@ -55,5 +55,5 @@ func MonitorConfigID() string {
 
 // TODO uuid is not a good choice here. Make it more readable.
 func ScheduleID() string {
-	return uuid.NewV4().String()
+	return uuid.Must(uuid.NewV4()).String()
 }
