@@ -1,12 +1,15 @@
 package shell_operator
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -71,6 +74,32 @@ func (bhs *baseHTTPServer) RegisterRoute(method, pattern string, h http.HandlerF
 func newBaseHTTPServer(address, port string) *baseHTTPServer {
 	router := chi.NewRouter()
 
+	// inject pprof
+	router.Mount("/debug", middleware.Profiler())
+
+	router.Get("/discovery", func(writer http.ResponseWriter, request *http.Request) {
+		buf := bytes.NewBuffer(nil)
+		walkFn := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+			// skip pprof routes
+			if strings.HasPrefix(route, "/debug/") {
+				return nil
+			}
+			_, _ = fmt.Fprintf(buf, "%s %s\n", method, route)
+			return nil
+		}
+
+		err := chi.Walk(router, walkFn)
+		if err != nil {
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		buf.WriteString("GET /debug/pprof/*\n")
+
+		writer.WriteHeader(http.StatusOK)
+		_, _ = writer.Write(buf.Bytes())
+	})
+
 	srv := &baseHTTPServer{
 		router:  router,
 		address: address,
@@ -83,12 +112,18 @@ func newBaseHTTPServer(address, port string) *baseHTTPServer {
 func registerDefaultRoutes(op *ShellOperator) {
 	op.APIServer.RegisterRoute(http.MethodGet, "/", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = fmt.Fprintf(writer, `<html>
-    <head><title>Shell operator</title></head>
-    <body>
+  <head><title>Shell operator</title></head>
+  <body>
     <h1>Shell operator</h1>
-    <pre>go tool pprof goprofex http://&lt;SHELL_OPERATOR_IP&gt;:%s/debug/pprof/profile</pre>
-    </body>
-    </html>`, app.ListenPort)
+    <dl>
+      <dt>Show all possible routes</dt>
+      <dd>- curl http://SHELL_OPERATOR_IP:%[1]s/discovery</dd>
+      <br>
+      <dt>Run golang profiling</dt>
+      <dd>- go tool pprof http://SHELL_OPERATOR_IP:%[1]s/debug/pprof/profile</dd>
+    </dl>
+  </body>
+</html>`, app.ListenPort)
 	})
 
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", func(writer http.ResponseWriter, request *http.Request) {
