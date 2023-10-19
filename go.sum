@@ -52,6 +52,8 @@ github.com/flant/kube-client v1.0.1-0.20231019201736-b93cba3745fd h1:YPZdcSaosV7
 github.com/flant/kube-client v1.0.1-0.20231019201736-b93cba3745fd/go.mod h1:YVcJ8PxomM0iYsK7nj2I3lmog2D0j/GloJfLYnhjlls=
 github.com/flant/kube-client v1.0.1-0.20231019204616-288469f08a18 h1:xKTr/cz7kyC2pMZmKE0yxoFkw/OH83ND2Jdi5Ct3B+o=
 github.com/flant/kube-client v1.0.1-0.20231019204616-288469f08a18/go.mod h1:YVcJ8PxomM0iYsK7nj2I3lmog2D0j/GloJfLYnhjlls=
+github.com/flant/kube-client v1.0.1-0.20231019212415-a70cd6641913 h1:iQpON1gKRUsSrc+2I+N6evGDnQrftVUYhvSFctKV2N0=
+github.com/flant/kube-client v1.0.1-0.20231019212415-a70cd6641913/go.mod h1:YVcJ8PxomM0iYsK7nj2I3lmog2D0j/GloJfLYnhjlls=
 github.com/flant/libjq-go v1.6.3-0.20201126171326-c46a40ff22ee h1:evii83J+/6QGNvyf6tjQ/p27DPY9iftxIBb37ALJRTg=
 github.com/flant/libjq-go v1.6.3-0.20201126171326-c46a40ff22ee/go.mod h1:f+REaGl/+pZR97rbTcwHEka/MAipoQQ2Mc0iQUj4ak0=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
