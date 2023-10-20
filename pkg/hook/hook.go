@@ -172,6 +172,7 @@ func (h *Hook) SafeName() string {
 
 func (h *Hook) GetConfigDescription() string {
 	msgs := make([]string, 0)
+	fmt.Println("DESCR", h.Name, h.Path, h.Config)
 	if h.Config.OnStartup != nil {
 		msgs = append(msgs, fmt.Sprintf("OnStartup:%d", int64(h.Config.OnStartup.Order)))
 	}
