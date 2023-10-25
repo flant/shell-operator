@@ -47,6 +47,12 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 			return nil
 		}
 
+		// ignore .yaml, .json, .txt, .md files
+		switch filepath.Ext(f.Name()) {
+		case ".yaml", ".json", ".md", ".txt":
+			return nil
+		}
+
 		if !IsFileExecutable(f) {
 			log.Warnf("File '%s' is skipped: no executable permissions, chmod +x is required to run this hook", path)
 			return nil
