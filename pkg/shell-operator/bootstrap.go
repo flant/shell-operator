@@ -50,17 +50,15 @@ func Init() (*ShellOperator, error) {
 		return nil, err
 	}
 
-	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort)
-	if err != nil {
-		log.Errorf("Fatal: %s", err)
-		return nil, err
-	}
-
-	op.SetupMetricStorages(map[string]string{
+	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, map[string]string{
 		"hook":    "",
 		"binding": "",
 		"queue":   "",
 	})
+	if err != nil {
+		log.Errorf("Fatal: %s", err)
+		return nil, err
+	}
 
 	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
 	if err != nil {
@@ -74,8 +72,14 @@ func Init() (*ShellOperator, error) {
 // AssembleCommonOperator instantiate common dependencies. These dependencies
 // may be used for shell-operator derivatives, like addon-operator.
 // requires listenAddress, listenPort to run http server for operator APIs
-func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string) (err error) {
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels map[string]string) (err error) {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
+
+	// built-in metrics
+	op.setupMetricStorage(kubeEventsManagerLabels)
+
+	// metrics from user's hooks
+	op.setupHookMetricStorage()
 
 	// 'main' Kubernetes client.
 	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage)
@@ -92,16 +96,6 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	op.SetupEventManagers()
 
 	return nil
-}
-
-// SetupMetricStorages creates and setup storages for built-in metrics and hooks metrics
-func (op *ShellOperator) SetupMetricStorages(kubeEventsManagerLabels map[string]string) {
-	// built-in metrics
-	op.setupMetricStorage(kubeEventsManagerLabels)
-
-	// metrics from user's hooks
-	op.setupHookMetricStorage()
-
 }
 
 // assembleShellOperator uses settings in app package to create all
