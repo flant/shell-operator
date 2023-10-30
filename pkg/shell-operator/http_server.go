@@ -27,8 +27,8 @@ func (bhs *baseHTTPServer) Start(ctx context.Context) {
 	srv := &http.Server{
 		Addr:         bhs.address + ":" + bhs.port,
 		Handler:      bhs.router,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  90 * time.Second,
+		WriteTimeout: 90 * time.Second,
 	}
 
 	go func() {

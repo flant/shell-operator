@@ -56,6 +56,12 @@ func Init() (*ShellOperator, error) {
 		return nil, err
 	}
 
+	op.SetupMetricStorages(map[string]string{
+		"hook":    "",
+		"binding": "",
+		"queue":   "",
+	})
+
 	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
 	if err != nil {
 		log.Errorf("Fatal: %s", err)
@@ -70,17 +76,6 @@ func Init() (*ShellOperator, error) {
 // requires listenAddress, listenPort to run http server for operator APIs
 func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string) (err error) {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
-
-	op.MetricStorage = defaultMetricStorage(op.ctx)
-
-	op.setupHookMetricStorage()
-	if err != nil {
-		return fmt.Errorf("start HTTP server for hook metrics: %s", err)
-	}
-	// Set to common metric storage if separate port is not set.
-	if op.HookMetricStorage == nil {
-		op.HookMetricStorage = op.MetricStorage
-	}
 
 	// 'main' Kubernetes client.
 	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage)
@@ -97,6 +92,16 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	op.SetupEventManagers()
 
 	return nil
+}
+
+// SetupMetricStorages creates and setup storages for built-in metrics and hooks metrics
+func (op *ShellOperator) SetupMetricStorages(kubeEventsManagerLabels map[string]string) {
+	// built-in metrics
+	op.setupMetricStorage(kubeEventsManagerLabels)
+
+	// metrics from user's hooks
+	op.setupHookMetricStorage()
+
 }
 
 // assembleShellOperator uses settings in app package to create all
