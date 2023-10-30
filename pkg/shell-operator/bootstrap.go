@@ -119,8 +119,6 @@ func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, 
 	op.RegisterDebugHookRoutes(debugServer)
 	op.RegisterDebugConfigRoutes(debugServer, runtimeConfig)
 
-	registerShellOperatorMetrics(op.MetricStorage)
-
 	// Create webhookManagers with dependencies.
 	op.setupHookManagers(hooksDir, tempDir)
 

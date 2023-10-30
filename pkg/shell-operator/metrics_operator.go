@@ -14,24 +14,11 @@ func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels map[string]s
 	registerCommonMetrics(metricStorage)
 	registerTaskQueueMetrics(metricStorage)
 	registerKubeEventsManagerMetrics(metricStorage, kubeEventsManagerLabels)
-	registerHookMetrics(metricStorage)
 
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", metricStorage.Handler().ServeHTTP)
 	// create new metric storage for hooks
 	// register scrape handler
 	op.MetricStorage = metricStorage
-}
-
-// registerShellOperatorMetrics register all metrics needed for the ShellOperator.
-func registerShellOperatorMetrics(metricStorage *metric_storage.MetricStorage) {
-	registerCommonMetrics(metricStorage)
-	registerTaskQueueMetrics(metricStorage)
-	registerKubeEventsManagerMetrics(metricStorage, map[string]string{
-		"hook":    "",
-		"binding": "",
-		"queue":   "",
-	})
-	registerHookMetrics(metricStorage)
 }
 
 // registerCommonMetrics register base metric
