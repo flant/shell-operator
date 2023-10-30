@@ -3,6 +3,7 @@ package hook
 import (
 	"context"
 	"fmt"
+	"github.com/flant/shell-operator/internal/app"
 	"os"
 	"path"
 	"path/filepath"
@@ -12,7 +13,6 @@ import (
 	"github.com/kennygrant/sanitize"
 	"golang.org/x/time/rate"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/config"

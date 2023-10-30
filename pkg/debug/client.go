@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/flant/shell-operator/internal/app"
 	"io"
 	"net"
 	"net/http"
 
-	"github.com/flant/shell-operator/pkg/app"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 )
 

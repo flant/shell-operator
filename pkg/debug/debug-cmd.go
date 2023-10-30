@@ -2,11 +2,10 @@ package debug
 
 import (
 	"fmt"
+	app2 "github.com/flant/shell-operator/internal/app"
 	"time"
 
 	"gopkg.in/alecthomas/kingpin.v2"
-
-	"github.com/flant/shell-operator/pkg/app"
 )
 
 var (
@@ -16,7 +15,7 @@ var (
 
 func DefineDebugCommands(kpApp *kingpin.Application) {
 	// Queue dump commands.
-	queueCmd := app.CommandWithDefaultUsageTemplate(kpApp, "queue", "Dump queues.")
+	queueCmd := app2.CommandWithDefaultUsageTemplate(kpApp, "queue", "Dump queues.")
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(c *kingpin.ParseContext) error {
@@ -31,7 +30,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 		Default("false").
 		BoolVar(&showEmpty)
 	AddOutputJsonYamlTextFlag(queueListCmd)
-	app.DefineDebugUnixSocketFlag(queueListCmd)
+	app2.DefineDebugUnixSocketFlag(queueListCmd)
 
 	queueMainCmd := queueCmd.Command("main", "Dump tasks in the main queue.").
 		Action(func(c *kingpin.ParseContext) error {
@@ -43,10 +42,10 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 			return nil
 		})
 	AddOutputJsonYamlTextFlag(queueMainCmd)
-	app.DefineDebugUnixSocketFlag(queueMainCmd)
+	app2.DefineDebugUnixSocketFlag(queueMainCmd)
 
 	// Runtime config command.
-	configCmd := app.CommandWithDefaultUsageTemplate(kpApp, "config", "Manage runtime parameters.")
+	configCmd := app2.CommandWithDefaultUsageTemplate(kpApp, "config", "Manage runtime parameters.")
 
 	configListCmd := configCmd.Command("list", "List available runtime parameters.").
 		Action(func(c *kingpin.ParseContext) error {
@@ -58,7 +57,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 			return nil
 		})
 	AddOutputJsonYamlTextFlag(configListCmd)
-	app.DefineDebugUnixSocketFlag(configListCmd)
+	app2.DefineDebugUnixSocketFlag(configListCmd)
 
 	var paramName string
 	var paramValue string
@@ -75,11 +74,11 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 	configSetCmd.Arg("name", "A name of runtime parameter").Required().StringVar(&paramName)
 	configSetCmd.Arg("value", "A new value for the runtime parameter").Required().StringVar(&paramValue)
 	configSetCmd.Arg("duration", "Set value for a period of time, then return a previous value. Use Go notation: 10s, 15m30s, etc.").DurationVar(&paramDuration)
-	app.DefineDebugUnixSocketFlag(configSetCmd)
+	app2.DefineDebugUnixSocketFlag(configSetCmd)
 
 	// Raw request command
 	var rawUrl string
-	rawCommand := app.CommandWithDefaultUsageTemplate(kpApp, "raw", "Make a raw request to debug endpoint.").
+	rawCommand := app2.CommandWithDefaultUsageTemplate(kpApp, "raw", "Make a raw request to debug endpoint.").
 		Action(func(c *kingpin.ParseContext) error {
 			url := fmt.Sprintf("http://unix%s", rawUrl)
 			resp, err := DefaultClient().Get(url)
@@ -90,12 +89,12 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 			return nil
 		})
 	rawCommand.Arg("urlpath", "An url to send to debug endpoint. Example: /queue/list.json").StringVar(&rawUrl)
-	app.DefineDebugUnixSocketFlag(rawCommand)
+	app2.DefineDebugUnixSocketFlag(rawCommand)
 }
 
 func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
 	// Get hook names
-	hookCmd := app.CommandWithDefaultUsageTemplate(kpApp, "hook", "Actions for hooks")
+	hookCmd := app2.CommandWithDefaultUsageTemplate(kpApp, "hook", "Actions for hooks")
 	hookListCmd := hookCmd.Command("list", "List all hooks.").
 		Action(func(c *kingpin.ParseContext) error {
 			outBytes, err := Hook(DefaultClient()).List(outputFormat)
@@ -106,7 +105,7 @@ func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
 			return nil
 		})
 	AddOutputJsonYamlTextFlag(hookListCmd)
-	app.DefineDebugUnixSocketFlag(hookListCmd)
+	app2.DefineDebugUnixSocketFlag(hookListCmd)
 
 	// Get hook snapshots
 	var hookName string
@@ -121,7 +120,7 @@ func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
 		})
 	hookSnapshotCmd.Arg("hook_name", "").Required().StringVar(&hookName)
 	AddOutputJsonYamlTextFlag(hookSnapshotCmd)
-	app.DefineDebugUnixSocketFlag(hookSnapshotCmd)
+	app2.DefineDebugUnixSocketFlag(hookSnapshotCmd)
 }
 
 func AddOutputJsonYamlTextFlag(cmd *kingpin.CmdClause) {

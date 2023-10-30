@@ -2,9 +2,9 @@ package shell_operator
 
 import (
 	"fmt"
+	"github.com/flant/shell-operator/internal/app"
 
 	klient "github.com/flant/kube-client/client"
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
 	"github.com/flant/shell-operator/pkg/metric_storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"

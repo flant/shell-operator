@@ -2,6 +2,7 @@ package executor
 
 import (
 	"bytes"
+	"github.com/flant/shell-operator/internal/app"
 	"io"
 	"math/rand"
 	"os"
@@ -12,8 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/flant/shell-operator/pkg/app"
 )
 
 func TestRunAndLogLines(t *testing.T) {

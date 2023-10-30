@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/flant/shell-operator/internal/app"
 	"io"
 
 	"gopkg.in/yaml.v3"
@@ -12,7 +13,6 @@ import (
 	k8yaml "sigs.k8s.io/yaml"
 
 	"github.com/flant/kube-client/manifest"
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/jq"
 )
 

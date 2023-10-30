@@ -2,10 +2,9 @@ package utils
 
 import (
 	"fmt"
+	"github.com/flant/shell-operator/internal/app"
 	"os"
 	"path/filepath"
-
-	"github.com/flant/shell-operator/pkg/app"
 )
 
 func RequireExistingDirectory(inDir string) (dir string, err error) {

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"encoding/json"
+	"github.com/flant/shell-operator/internal/app"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -9,7 +10,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/flant/shell-operator/pkg/app"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	app2 "github.com/flant/shell-operator/internal/app"
 	"math/rand"
 	"os"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/kube-client/klogtologrus"
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/jq"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
@@ -17,20 +17,20 @@ import (
 )
 
 func main() {
-	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
+	kpApp := kingpin.New(app2.AppName, fmt.Sprintf("%s %s: %s", app2.AppName, app2.Version, app2.AppDescription))
 
 	// override usage template to reveal additional commands with information about start command
-	kpApp.UsageTemplate(app.OperatorUsageTemplate(app.AppName))
+	kpApp.UsageTemplate(app2.OperatorUsageTemplate(app2.AppName))
 
 	// Initialize klog wrapper when all values are parsed
 	kpApp.Action(func(c *kingpin.ParseContext) error {
-		klogtologrus.InitAdapter(app.DebugKubernetesAPI)
+		klogtologrus.InitAdapter(app2.DebugKubernetesAPI)
 		return nil
 	})
 
 	// print version
 	kpApp.Command("version", "Show version.").Action(func(c *kingpin.ParseContext) error {
-		fmt.Printf("%s %s\n", app.AppName, app.Version)
+		fmt.Printf("%s %s\n", app2.AppName, app2.Version)
 		fmt.Println(jq.FilterInfo())
 		return nil
 	})
@@ -39,7 +39,7 @@ func main() {
 	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
 		Action(func(c *kingpin.ParseContext) error {
-			app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
+			app2.AppStartMessage = fmt.Sprintf("%s %s", app2.AppName, app2.Version)
 
 			// Init rand generator.
 			rand.Seed(time.Now().UnixNano())
@@ -59,7 +59,7 @@ func main() {
 
 			return nil
 		})
-	app.DefineStartCommandFlags(kpApp, startCmd)
+	app2.DefineStartCommandFlags(kpApp, startCmd)
 
 	debug.DefineDebugCommands(kpApp)
 	debug.DefineDebugCommandsSelf(kpApp)

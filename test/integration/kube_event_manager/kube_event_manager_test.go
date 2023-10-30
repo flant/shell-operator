@@ -6,12 +6,12 @@ package kube_event_manager_test
 import (
 	"context"
 	"fmt"
+	"github.com/flant/shell-operator/internal/app"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	. "github.com/flant/shell-operator/test/integration/suite"

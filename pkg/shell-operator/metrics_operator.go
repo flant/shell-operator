@@ -2,8 +2,8 @@ package shell_operator
 
 import (
 	"context"
+	"github.com/flant/shell-operator/internal/app"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/metric_storage"
 )
 

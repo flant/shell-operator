@@ -1,9 +1,9 @@
 package shell_operator
 
 import (
+	"github.com/flant/shell-operator/internal/app"
 	"net/http"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/metric_storage"
 )
 

@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/flant/shell-operator/internal/app"
 	"reflect"
 	"runtime"
 	"runtime/trace"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/jq"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"

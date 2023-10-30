@@ -1,13 +1,13 @@
 package hook
 
 import (
+	"github.com/flant/shell-operator/internal/app"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"

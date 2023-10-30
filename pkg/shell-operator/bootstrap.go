@@ -3,10 +3,10 @@ package shell_operator
 import (
 	"context"
 	"fmt"
+	app2 "github.com/flant/shell-operator/internal/app"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/hook"
@@ -24,18 +24,18 @@ import (
 func Init() (*ShellOperator, error) {
 	runtimeConfig := config.NewConfig()
 	// Init logging subsystem.
-	app.SetupLogging(runtimeConfig)
+	app2.SetupLogging(runtimeConfig)
 	// Log version and jq filtering implementation.
-	log.Infof(app.AppStartMessage)
+	log.Infof(app2.AppStartMessage)
 	log.Debug(jq.FilterInfo())
 
-	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
+	hooksDir, err := utils.RequireExistingDirectory(app2.HooksDir)
 	if err != nil {
 		log.Errorf("Fatal: hooks directory is required: %s", err)
 		return nil, err
 	}
 
-	tempDir, err := utils.EnsureTempDirectory(app.TempDir)
+	tempDir, err := utils.EnsureTempDirectory(app2.TempDir)
 	if err != nil {
 		log.Errorf("Fatal: temp directory: %s", err)
 		return nil, err
@@ -44,13 +44,13 @@ func Init() (*ShellOperator, error) {
 	op := NewShellOperator(context.Background())
 
 	// Debug server.
-	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr)
+	debugServer, err := RunDefaultDebugServer(app2.DebugUnixSocket, app2.DebugHttpServerAddr)
 	if err != nil {
 		log.Errorf("Fatal: start Debug server: %s", err)
 		return nil, err
 	}
 
-	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort)
+	err = op.AssembleCommonOperator(app2.ListenAddress, app2.ListenPort)
 	if err != nil {
 		log.Errorf("Fatal: %s", err)
 		return nil, err
@@ -172,14 +172,14 @@ func (op *ShellOperator) SetupEventManagers() {
 func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 	// Initialize admission webhooks manager.
 	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient)
-	op.AdmissionWebhookManager.Settings = app.ValidatingWebhookSettings
-	op.AdmissionWebhookManager.Namespace = app.Namespace
+	op.AdmissionWebhookManager.Settings = app2.ValidatingWebhookSettings
+	op.AdmissionWebhookManager.Namespace = app2.Namespace
 
 	// Initialize conversion webhooks manager.
 	op.ConversionWebhookManager = conversion.NewWebhookManager()
 	op.ConversionWebhookManager.KubeClient = op.KubeClient
-	op.ConversionWebhookManager.Settings = app.ConversionWebhookSettings
-	op.ConversionWebhookManager.Namespace = app.Namespace
+	op.ConversionWebhookManager.Settings = app2.ConversionWebhookSettings
+	op.ConversionWebhookManager.Namespace = app2.Namespace
 
 	// Initialize Hook manager.
 	cfg := &hook.HookManagerConfig{
