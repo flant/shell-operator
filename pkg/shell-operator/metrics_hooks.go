@@ -10,15 +10,13 @@ import (
 func (op *ShellOperator) setupHookMetricStorage() {
 	metricStorage := metric_storage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, true)
 
-	registerHookMetrics(metricStorage)
-
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics/hooks", metricStorage.Handler().ServeHTTP)
 	// create new metric storage for hooks
 	// register scrape handler
 	op.HookMetricStorage = metricStorage
 }
 
-// specific metrics for HookManager
+// specific metrics for shell-operator HookManager
 func registerHookMetrics(metricStorage *metric_storage.MetricStorage) {
 	// Metrics for enable kubernetes bindings.
 	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", map[string]string{"hook": ""})

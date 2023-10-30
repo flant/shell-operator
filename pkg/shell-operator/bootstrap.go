@@ -111,7 +111,9 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 //   - kubernetes events manager
 //   - schedule manager
 func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) (err error) {
-	registerDefaultRoutes(op)
+	registerRootRoute(op)
+	// for shell-operator only
+	registerHookMetrics(op.HookMetricStorage)
 
 	op.RegisterDebugQueueRoutes(debugServer)
 	op.RegisterDebugHookRoutes(debugServer)

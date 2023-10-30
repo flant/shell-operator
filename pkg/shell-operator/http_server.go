@@ -109,7 +109,7 @@ func newBaseHTTPServer(address, port string) *baseHTTPServer {
 	return srv
 }
 
-func registerDefaultRoutes(op *ShellOperator) {
+func registerRootRoute(op *ShellOperator) {
 	op.APIServer.RegisterRoute(http.MethodGet, "/", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = fmt.Fprintf(writer, `<html>
   <head><title>Shell operator</title></head>
@@ -124,11 +124,5 @@ func registerDefaultRoutes(op *ShellOperator) {
     </dl>
   </body>
 </html>`, app.ListenPort)
-	})
-
-	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", func(writer http.ResponseWriter, request *http.Request) {
-		if op.MetricStorage != nil {
-			op.MetricStorage.Handler().ServeHTTP(writer, request)
-		}
 	})
 }
