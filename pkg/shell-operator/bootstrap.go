@@ -50,7 +50,11 @@ func Init() (*ShellOperator, error) {
 		return nil, err
 	}
 
-	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort)
+	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, map[string]string{
+		"hook":    "",
+		"binding": "",
+		"queue":   "",
+	})
 	if err != nil {
 		log.Errorf("Fatal: %s", err)
 		return nil, err
@@ -68,19 +72,14 @@ func Init() (*ShellOperator, error) {
 // AssembleCommonOperator instantiate common dependencies. These dependencies
 // may be used for shell-operator derivatives, like addon-operator.
 // requires listenAddress, listenPort to run http server for operator APIs
-func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string) (err error) {
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels map[string]string) (err error) {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
-	op.MetricStorage = defaultMetricStorage(op.ctx)
+	// built-in metrics
+	op.setupMetricStorage(kubeEventsManagerLabels)
 
+	// metrics from user's hooks
 	op.setupHookMetricStorage()
-	if err != nil {
-		return fmt.Errorf("start HTTP server for hook metrics: %s", err)
-	}
-	// Set to common metric storage if separate port is not set.
-	if op.HookMetricStorage == nil {
-		op.HookMetricStorage = op.MetricStorage
-	}
 
 	// 'main' Kubernetes client.
 	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage)
@@ -112,13 +111,13 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 //   - kubernetes events manager
 //   - schedule manager
 func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) (err error) {
-	registerDefaultRoutes(op)
+	registerRootRoute(op)
+	// for shell-operator only
+	registerHookMetrics(op.HookMetricStorage)
 
 	op.RegisterDebugQueueRoutes(debugServer)
 	op.RegisterDebugHookRoutes(debugServer)
 	op.RegisterDebugConfigRoutes(debugServer, runtimeConfig)
-
-	registerShellOperatorMetrics(op.MetricStorage)
 
 	// Create webhookManagers with dependencies.
 	op.setupHookManagers(hooksDir, tempDir)

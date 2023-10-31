@@ -27,8 +27,8 @@ func (bhs *baseHTTPServer) Start(ctx context.Context) {
 	srv := &http.Server{
 		Addr:         bhs.address + ":" + bhs.port,
 		Handler:      bhs.router,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  90 * time.Second,
+		WriteTimeout: 90 * time.Second,
 	}
 
 	go func() {
@@ -109,7 +109,7 @@ func newBaseHTTPServer(address, port string) *baseHTTPServer {
 	return srv
 }
 
-func registerDefaultRoutes(op *ShellOperator) {
+func registerRootRoute(op *ShellOperator) {
 	op.APIServer.RegisterRoute(http.MethodGet, "/", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = fmt.Fprintf(writer, `<html>
   <head><title>Shell operator</title></head>
@@ -124,11 +124,5 @@ func registerDefaultRoutes(op *ShellOperator) {
     </dl>
   </body>
 </html>`, app.ListenPort)
-	})
-
-	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", func(writer http.ResponseWriter, request *http.Request) {
-		if op.MetricStorage != nil {
-			op.MetricStorage.Handler().ServeHTTP(writer, request)
-		}
 	})
 }

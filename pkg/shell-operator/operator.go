@@ -37,8 +37,9 @@ type ShellOperator struct {
 	// APIServer common http server for liveness and metrics endpoints
 	APIServer *baseHTTPServer
 
+	// MetricStorage collects and store metrics for built-in operator primitives, hook execution
 	MetricStorage *metric_storage.MetricStorage
-	// separate metric storage for hook metrics if separate listen port is configured
+	// HookMetricStorage separate metric storage for metrics, which are returned by user hooks
 	HookMetricStorage *metric_storage.MetricStorage
 	KubeClient        *klient.Client
 	ObjectPatcher     *object_patch.ObjectPatcher

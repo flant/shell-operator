@@ -1,38 +1,35 @@
 package shell_operator
 
 import (
-	"context"
+	"net/http"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/metric_storage"
 )
 
-func defaultMetricStorage(ctx context.Context) *metric_storage.MetricStorage {
-	metricStorage := metric_storage.NewMetricStorage(ctx, app.PrometheusMetricsPrefix, false)
-	return metricStorage
+// setupMetricStorage creates and initializes metrics storage for built-in operator metrics
+func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels map[string]string) {
+	metricStorage := metric_storage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, false)
+
+	registerCommonMetrics(metricStorage)
+	registerTaskQueueMetrics(metricStorage)
+	registerKubeEventsManagerMetrics(metricStorage, kubeEventsManagerLabels)
+
+	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", metricStorage.Handler().ServeHTTP)
+	// create new metric storage for hooks
+	// register scrape handler
+	op.MetricStorage = metricStorage
 }
 
-// registerShellOperatorMetrics register all metrics needed for the ShellOperator.
-func registerShellOperatorMetrics(metricStorage *metric_storage.MetricStorage) {
-	RegisterCommonMetrics(metricStorage)
-	RegisterTaskQueueMetrics(metricStorage)
-	RegisterKubeEventsManagerMetrics(metricStorage, map[string]string{
-		"hook":    "",
-		"binding": "",
-		"queue":   "",
-	})
-	registerHookMetrics(metricStorage)
-}
-
-// RegisterCommonMetrics register base metric
+// registerCommonMetrics register base metric
 // This function is used in the addon-operator
-func RegisterCommonMetrics(metricStorage *metric_storage.MetricStorage) {
+func registerCommonMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterCounter("{PREFIX}live_ticks", map[string]string{})
 }
 
-// RegisterTaskQueueMetrics
+// registerTaskQueueMetrics
 // This function is used in the addon-operator
-func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
+func registerTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterHistogram(
 		"{PREFIX}tasks_queue_action_duration_seconds",
 		map[string]string{
@@ -51,9 +48,9 @@ func RegisterTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 	metricStorage.RegisterGauge("{PREFIX}tasks_queue_length", map[string]string{"queue": ""})
 }
 
-// RegisterKubeEventsManagerMetrics registers metrics for kube_event_manager
+// registerKubeEventsManagerMetrics registers metrics for kube_event_manager
 // This function is used in the addon-operator
-func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorage, labels map[string]string) {
+func registerKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorage, labels map[string]string) {
 	// Count of objects in snapshot for one kubernets bindings.
 	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
 	// Duration of jqFilter applying.
@@ -83,67 +80,4 @@ func RegisterKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorag
 
 	// Count of watch errors.
 	metricStorage.RegisterCounter("{PREFIX}kubernetes_client_watch_errors_total", map[string]string{"error_type": ""})
-}
-
-// Shell-operator specific metrics for HookManager
-func registerHookMetrics(metricStorage *metric_storage.MetricStorage) {
-	// Metrics for enable kubernetes bindings.
-	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", map[string]string{"hook": ""})
-	metricStorage.RegisterCounter("{PREFIX}hook_enable_kubernetes_bindings_errors_total", map[string]string{"hook": ""})
-	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_success", map[string]string{"hook": ""})
-
-	// Metrics for hook executions.
-	labels := map[string]string{
-		"hook":    "",
-		"binding": "",
-		"queue":   "",
-	}
-	// Duration of hook execution.
-	metricStorage.RegisterHistogram(
-		"{PREFIX}hook_run_seconds",
-		labels,
-		[]float64{
-			0.0,
-			0.02, 0.05, // 20,50 milliseconds
-			0.1, 0.2, 0.5, // 100,200,500 milliseconds
-			1, 2, 5, // 1,2,5 seconds
-			10, 20, 50, // 10,20,50 seconds
-			100, 200, 500, // 100,200,500 seconds
-		},
-	)
-
-	// System CPU usage.
-	metricStorage.RegisterHistogram(
-		"{PREFIX}hook_run_user_cpu_seconds",
-		labels,
-		[]float64{
-			0.0,
-			0.02, 0.05, // 20,50 milliseconds
-			0.1, 0.2, 0.5, // 100,200,500 milliseconds
-			1, 2, 5, // 1,2,5 seconds
-			10, 20, 50, // 10,20,50 seconds
-			100, 200, 500, // 100,200,500 seconds
-		},
-	)
-	// User CPU usage.
-	metricStorage.RegisterHistogram(
-		"{PREFIX}hook_run_sys_cpu_seconds",
-		labels,
-		[]float64{
-			0.0,
-			0.02, 0.05, // 20,50 milliseconds
-			0.1, 0.2, 0.5, // 100,200,500 milliseconds
-			1, 2, 5, // 1,2,5 seconds
-			10, 20, 50, // 10,20,50 seconds
-			100, 200, 500, // 100,200,500 seconds
-		},
-	)
-	// Max RSS in bytes.
-	metricStorage.RegisterGauge("{PREFIX}hook_run_max_rss_bytes", labels)
-
-	metricStorage.RegisterCounter("{PREFIX}hook_run_errors_total", labels)
-	metricStorage.RegisterCounter("{PREFIX}hook_run_allowed_errors_total", labels)
-	metricStorage.RegisterCounter("{PREFIX}hook_run_success_total", labels)
-	// hook_run task waiting time
-	metricStorage.RegisterCounter("{PREFIX}task_wait_in_queue_seconds_total", labels)
 }

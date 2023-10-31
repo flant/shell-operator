@@ -155,6 +155,10 @@ func (c *kubernetesBindingsController) UnlockEvents() {
 // UnlockEventsFor turns on eventCb for matched monitor to emit events after Synchronization.
 func (c *kubernetesBindingsController) UnlockEventsFor(monitorID string) {
 	m := c.kubeEventsManager.GetMonitor(monitorID)
+	if m == nil {
+		log.Warnf("monitor %q was not found", monitorID)
+		return
+	}
 	m.EnableKubeEventCb()
 }
 
