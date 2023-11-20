@@ -27,7 +27,7 @@ jobs:
       image_tag: ${{ steps.check.outputs.image_tag }}
       additional_tag: ${{ steps.check.outputs.additional_tag }}
     steps:
-      - uses: actions/github-script@v6
+      - uses: actions/github-script@v7
         id: check
         with:
           script: |
