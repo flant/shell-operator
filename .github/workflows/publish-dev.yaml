@@ -20,7 +20,7 @@ jobs:
       run_publish: ${{ steps.check.outputs.run_publish }}
       build_multi_arch: ${{ steps.check.outputs.build_multi_arch }}
     steps:
-      - uses: actions/github-script@v6
+      - uses: actions/github-script@v7
         id: check
         with:
           script: |
