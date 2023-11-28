@@ -433,7 +433,7 @@ func (ei *resourceInformer) start() {
 
 	// TODO: separate handler and informer
 	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage)
-	err := DefaultFactoryStore.Start(ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
+	err := DefaultFactoryStore.Start(ei.ctx, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
 		ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
 		return
