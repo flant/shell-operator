@@ -237,7 +237,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 	return nil
 }
 
-func (ei *resourceInformer) OnAdd(obj interface{}) {
+func (ei *resourceInformer) OnAdd(obj interface{}, _ bool) {
 	ei.handleWatchEvent(obj, WatchEventAdded)
 }
 

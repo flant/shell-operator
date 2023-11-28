@@ -90,7 +90,7 @@ func (ni *namespaceInformer) getExistedObjects() map[string]bool {
 	return ni.ExistedObjects
 }
 
-func (ni *namespaceInformer) OnAdd(obj interface{}) {
+func (ni *namespaceInformer) OnAdd(obj interface{}, _ bool) {
 	if ni.stopped {
 		return
 	}
