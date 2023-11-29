@@ -90,7 +90,7 @@ func (ni *namespaceInformer) getExistedObjects() map[string]bool {
 	return ni.ExistedObjects
 }
 
-func (ni *namespaceInformer) OnAdd(obj interface{}) {
+func (ni *namespaceInformer) OnAdd(obj interface{}, _ bool) {
 	if ni.stopped {
 		return
 	}
@@ -125,17 +125,18 @@ func (ni *namespaceInformer) start() {
 		log.Errorf("%s: Possible BUG!!! Start called before createSharedInformer, ShredInformer is nil", ni.Monitor.Metadata.DebugName)
 		return
 	}
-	stopCh := make(chan struct{}, 1)
+	cctx, cancel := context.WithCancel(ni.ctx)
 	go func() {
 		<-ni.ctx.Done()
 		ni.stopped = true
-		close(stopCh)
+		cancel()
 	}()
 
-	go ni.SharedInformer.Run(stopCh)
-	if err := wait.PollImmediateUntil(DefaultSyncTime, func() (bool, error) {
+	go ni.SharedInformer.Run(cctx.Done())
+
+	if err := wait.PollUntilContextCancel(cctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 		return ni.SharedInformer.HasSynced(), nil
-	}, stopCh); err != nil {
+	}); err != nil {
 		ni.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ni.Monitor.Metadata.DebugName)
 	}
 
