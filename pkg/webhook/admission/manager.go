@@ -1,10 +1,10 @@
 package admission
 
 import (
-	v1 "k8s.io/api/admissionregistration/v1"
 	"os"
 
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/admissionregistration/v1"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"

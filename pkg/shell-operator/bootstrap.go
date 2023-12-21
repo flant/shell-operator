@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/admissionregistration/v1"
-
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/admissionregistration/v1"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
