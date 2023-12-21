@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"fmt"
 	"os"
 
 	klient "github.com/flant/kube-client/client"
@@ -94,6 +95,7 @@ func (m *WebhookManager) AddValidatingWebhook(config *ValidatingWebhookConfig) {
 		m.ValidatingResources[confId] = r
 	}
 
+	fmt.Printf("POLICY %q\n", config.FailurePolicy)
 	r.Set(config)
 }
 

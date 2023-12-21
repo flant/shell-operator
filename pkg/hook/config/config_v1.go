@@ -449,8 +449,10 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, err
 		webhook.ObjectSelector = cfgV1.LabelSelector
 	}
 	if cfgV1.FailurePolicy != nil {
+		fmt.Println("HAS POLICY", *cfgV1.FailurePolicy)
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
+		fmt.Println("SET DEFAULT POLICY", defaultFailurePolicy)
 		webhook.FailurePolicy = &defaultFailurePolicy
 	}
 	if cfgV1.SideEffects != nil {
