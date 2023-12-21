@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/admissionregistration/v1"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
@@ -173,6 +174,7 @@ func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient)
 	op.AdmissionWebhookManager.Settings = app.ValidatingWebhookSettings
 	op.AdmissionWebhookManager.Namespace = app.Namespace
+	op.AdmissionWebhookManager.DefaultFailurePolicy = v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
 
 	// Initialize conversion webhooks manager.
 	op.ConversionWebhookManager = conversion.NewWebhookManager()

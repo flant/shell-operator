@@ -4,6 +4,7 @@ import (
 	"os"
 
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/admissionregistration/v1"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"
@@ -26,6 +27,7 @@ type WebhookManager struct {
 	Namespace string
 
 	DefaultConfigurationId string
+	DefaultFailurePolicy   v1.FailurePolicyType
 
 	Server              *server.WebhookServer
 	ValidatingResources map[string]*ValidatingWebhookResource
@@ -93,6 +95,9 @@ func (m *WebhookManager) AddValidatingWebhook(config *ValidatingWebhookConfig) {
 			},
 		)
 		m.ValidatingResources[confId] = r
+	}
+	if config.FailurePolicy == nil {
+		config.FailurePolicy = &m.DefaultFailurePolicy
 	}
 	r.Set(config)
 }
