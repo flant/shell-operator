@@ -57,5 +57,4 @@ func Test_Manager_AddWebhook(t *testing.T) {
 		}
 		assert.Equal(t, v1.Fail, *v.hooks[""].FailurePolicy)
 	}
-
 }

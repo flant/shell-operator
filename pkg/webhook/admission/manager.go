@@ -1,12 +1,12 @@
 package admission
 
 import (
-	"fmt"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"
-	log "github.com/sirupsen/logrus"
 )
 
 // DefaultConfigurationId is a ConfigurationId for ValidatingWebhookConfiguration/MutatingWebhookConfiguration
@@ -95,7 +95,6 @@ func (m *WebhookManager) AddValidatingWebhook(config *ValidatingWebhookConfig) {
 		m.ValidatingResources[confId] = r
 	}
 
-	fmt.Printf("POLICY %q\n", config.FailurePolicy)
 	r.Set(config)
 }
 

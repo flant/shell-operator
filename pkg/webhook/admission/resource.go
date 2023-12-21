@@ -2,7 +2,6 @@ package admission
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -91,7 +90,6 @@ func createWebhookPath(webhook IWebhookConfig) *string {
 
 func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfiguration) error {
 	client := w.opts.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations()
-	fmt.Println("SUBMIT", conf.Webhooks)
 
 	listOpts := metav1.ListOptions{
 		FieldSelector: "metadata.name=" + conf.Name,

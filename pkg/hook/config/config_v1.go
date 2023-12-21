@@ -5,14 +5,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/flant/shell-operator/pkg/app"
-
 	"github.com/hashicorp/go-multierror"
 	"gopkg.in/robfig/cron.v2"
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/flant/shell-operator/pkg/app"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -445,11 +444,9 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, err
 		webhook.ObjectSelector = cfgV1.LabelSelector
 	}
 	if cfgV1.FailurePolicy != nil {
-		fmt.Println("HAS POLICY", *cfgV1.FailurePolicy)
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
 		defaultFailurePolicy := v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
-		fmt.Println("SET DEFAULT POLICY", defaultFailurePolicy)
 		webhook.FailurePolicy = &defaultFailurePolicy
 	}
 	if cfgV1.SideEffects != nil {
