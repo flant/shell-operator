@@ -424,10 +424,6 @@ func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []OnKubernetesEventConfig, c
 	return allErr
 }
 
-var (
-	defaultFailurePolicy = v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
-)
-
 func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, error) {
 	cfg := ValidatingConfig{}
 
@@ -452,6 +448,7 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, err
 		fmt.Println("HAS POLICY", *cfgV1.FailurePolicy)
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
+		defaultFailurePolicy := v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
 		fmt.Println("SET DEFAULT POLICY", defaultFailurePolicy)
 		webhook.FailurePolicy = &defaultFailurePolicy
 	}
