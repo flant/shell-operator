@@ -59,9 +59,9 @@ func DefineValidatingWebhookFlags(cmd *kingpin.CmdClause) {
 	cmd.Flag("validating-webhook-client-ca", "A path to a server certificate for ValidatingWebhookConfiguration. Can be set with $VALIDATING_WEBHOOK_CLIENT_CA.").
 		Envar("VALIDATING_WEBHOOK_CLIENT_CA").
 		StringsVar(&ValidatingWebhookSettings.ClientCAPaths)
-	cmd.Flag("validating-failure-policy", "Defines default FailurePolicy for ValidatingWebhookConfiguration.").
+	cmd.Flag("validating-webhook-failure-policy", "Defines default FailurePolicy for ValidatingWebhookConfiguration.").
 		Default("Fail").
-		Envar("VALIDATING_FAILURE_POLICY").
+		Envar("VALIDATING_WEBHOOK_FAILURE_POLICY").
 		EnumVar(&ValidatingWebhookSettings.DefaultFailurePolicy, "Fail", "Ignore")
 }
 

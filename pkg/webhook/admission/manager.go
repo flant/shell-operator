@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"fmt"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -56,6 +57,7 @@ func (m *WebhookManager) WithAdmissionEventHandler(handler AdmissionEventHandler
 // Init creates dependencies
 func (m *WebhookManager) Init() error {
 	log.Info("Initialize admission webhooks manager. Load certificates.")
+	log.Infof("Admission webhooks manager: default FailurePolicy set to: %q", m.DefaultFailurePolicy)
 
 	if m.DefaultConfigurationId == "" {
 		m.DefaultConfigurationId = DefaultConfigurationId
@@ -96,6 +98,9 @@ func (m *WebhookManager) AddValidatingWebhook(config *ValidatingWebhookConfig) {
 		)
 		m.ValidatingResources[confId] = r
 	}
+	fmt.Println("SET CONFIG", config.ValidatingWebhook.Name, config.Metadata.Name)
+	fmt.Println("POLICY", config.FailurePolicy)
+	fmt.Println("DEFAULT POLICY", m.DefaultFailurePolicy)
 	if config.FailurePolicy == nil {
 		config.FailurePolicy = &m.DefaultFailurePolicy
 	}
