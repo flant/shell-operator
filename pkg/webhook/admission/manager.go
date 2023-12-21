@@ -1,6 +1,7 @@
 package admission
 
 import (
+	v1 "k8s.io/api/admissionregistration/v1"
 	"os"
 
 	log "github.com/sirupsen/logrus"
