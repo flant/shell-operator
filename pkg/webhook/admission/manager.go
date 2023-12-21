@@ -1,14 +1,11 @@
 package admission
 
 import (
-	"fmt"
 	"os"
-
-	log "github.com/sirupsen/logrus"
-	v1 "k8s.io/api/admissionregistration/v1"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"
+	log "github.com/sirupsen/logrus"
 )
 
 // DefaultConfigurationId is a ConfigurationId for ValidatingWebhookConfiguration/MutatingWebhookConfiguration
@@ -28,7 +25,6 @@ type WebhookManager struct {
 	Namespace string
 
 	DefaultConfigurationId string
-	DefaultFailurePolicy   v1.FailurePolicyType
 
 	Server              *server.WebhookServer
 	ValidatingResources map[string]*ValidatingWebhookResource
@@ -57,7 +53,6 @@ func (m *WebhookManager) WithAdmissionEventHandler(handler AdmissionEventHandler
 // Init creates dependencies
 func (m *WebhookManager) Init() error {
 	log.Info("Initialize admission webhooks manager. Load certificates.")
-	log.Infof("Admission webhooks manager: default FailurePolicy set to: %q", m.DefaultFailurePolicy)
 
 	if m.DefaultConfigurationId == "" {
 		m.DefaultConfigurationId = DefaultConfigurationId
@@ -98,12 +93,7 @@ func (m *WebhookManager) AddValidatingWebhook(config *ValidatingWebhookConfig) {
 		)
 		m.ValidatingResources[confId] = r
 	}
-	fmt.Println("SET CONFIG", config.ValidatingWebhook.Name, config.Metadata.Name)
-	fmt.Println("POLICY", config.FailurePolicy)
-	fmt.Println("DEFAULT POLICY", m.DefaultFailurePolicy)
-	if config.FailurePolicy == nil {
-		config.FailurePolicy = &m.DefaultFailurePolicy
-	}
+
 	r.Set(config)
 }
 

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/flant/shell-operator/pkg/app"
+
 	"github.com/hashicorp/go-multierror"
 	"gopkg.in/robfig/cron.v2"
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -422,6 +424,10 @@ func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []OnKubernetesEventConfig, c
 	return allErr
 }
 
+var (
+	defaultFailurePolicy = v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
+)
+
 func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, error) {
 	cfg := ValidatingConfig{}
 
@@ -429,7 +435,6 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, err
 	cfg.IncludeSnapshotsFrom = cfgV1.IncludeSnapshotsFrom
 	cfg.BindingName = cfgV1.Name
 
-	DefaultFailurePolicy := v1.Fail
 	DefaultSideEffects := v1.SideEffectClassNone
 	DefaultTimeoutSeconds := int32(10)
 
@@ -446,7 +451,7 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, err
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
-		webhook.FailurePolicy = &DefaultFailurePolicy
+		webhook.FailurePolicy = &defaultFailurePolicy
 	}
 	if cfgV1.SideEffects != nil {
 		webhook.SideEffects = cfgV1.SideEffects
