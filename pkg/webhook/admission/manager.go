@@ -1,6 +1,7 @@
 package admission
 
 import (
+	v1 "k8s.io/api/admissionregistration/v1"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -26,6 +27,7 @@ type WebhookManager struct {
 	Namespace string
 
 	DefaultConfigurationId string
+	DefaultFailurePolicy   v1.FailurePolicyType
 
 	Server              *server.WebhookServer
 	ValidatingResources map[string]*ValidatingWebhookResource
@@ -93,6 +95,9 @@ func (m *WebhookManager) AddValidatingWebhook(config *ValidatingWebhookConfig) {
 			},
 		)
 		m.ValidatingResources[confId] = r
+	}
+	if config.FailurePolicy == nil {
+		config.FailurePolicy = &m.DefaultFailurePolicy
 	}
 	r.Set(config)
 }
