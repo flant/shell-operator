@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/flant/shell-operator/pkg/app"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -429,7 +430,6 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, err
 	cfg.IncludeSnapshotsFrom = cfgV1.IncludeSnapshotsFrom
 	cfg.BindingName = cfgV1.Name
 
-	DefaultFailurePolicy := v1.Fail
 	DefaultSideEffects := v1.SideEffectClassNone
 	DefaultTimeoutSeconds := int32(10)
 
@@ -446,7 +446,8 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, err
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
-		webhook.FailurePolicy = &DefaultFailurePolicy
+		defaultFailurePolicy := v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
+		webhook.FailurePolicy = &defaultFailurePolicy
 	}
 	if cfgV1.SideEffects != nil {
 		webhook.SideEffects = cfgV1.SideEffects
