@@ -15,6 +15,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
+	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 
 	pkg "github.com/flant/shell-operator/pkg"
 )
@@ -45,7 +46,10 @@ func NewWebhookServer(settings *Settings, namespace string, router chi.Router, l
 // means the server failed to bind or load TLS material. Once Start returns nil,
 // the only way the server stops is via Shutdown.
 func (s *WebhookServer) Start() error {
-	keyPair, err := tls.LoadX509KeyPair(
+	// certWatcher reloads the certificate/key pair from disk whenever they
+	// change (e.g. cert-manager renewing the Secret), so the webhook server
+	// never needs a restart to pick up a renewed certificate.
+	certWatcher, err := certwatcher.New(
 		s.Settings.ServerCertPath,
 		s.Settings.ServerKeyPath,
 	)
@@ -53,14 +57,21 @@ func (s *WebhookServer) Start() error {
 		return fmt.Errorf("load TLS certs: %v", err)
 	}
 
+	go func() {
+		if err := certWatcher.Start(context.Background()); err != nil {
+			s.Logger.Error("unable to watch cert", log.Err(err))
+			os.Exit(1)
+		}
+	}()
+
 	host := fmt.Sprintf("%s.%s",
 		s.Settings.ServiceName,
 		s.Namespace,
 	)
 
 	tlsConf := &tls.Config{
-		Certificates: []tls.Certificate{keyPair},
-		ServerName:   host,
+		GetCertificate: certWatcher.GetCertificate,
+		ServerName:     host,
 	}
 
 	if len(s.Settings.ClientCAPaths) > 0 {
