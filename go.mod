@@ -8,7 +8,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-openapi/spec v0.19.8
 	github.com/go-openapi/strfmt v0.19.5
-	github.com/go-openapi/swag v0.22.5
+	github.com/go-openapi/swag v0.22.10
 	github.com/go-openapi/validate v0.19.12
 	github.com/gofrs/uuid/v5 v5.0.0
 	github.com/hashicorp/go-multierror v1.1.1
