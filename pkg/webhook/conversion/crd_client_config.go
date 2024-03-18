@@ -7,7 +7,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 
 	klient "github.com/flant/kube-client/client"
 )
@@ -41,7 +40,7 @@ tryToGetCRD:
 	}
 
 	if len(crdList.Items) == 0 {
-		klog.Errorf("crd/%s not found", c.CrdName)
+		log.Warnf("crd/%s not found. Will try to find it later", c.CrdName)
 		time.Sleep(retryTimeout)
 		goto tryToGetCRD
 	}
