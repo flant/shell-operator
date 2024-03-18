@@ -2,7 +2,7 @@ package conversion
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -24,8 +24,12 @@ type CrdClientConfig struct {
 var SupportedConversionReviewVersions = []string{"v1", "v1beta1"}
 
 func (c *CrdClientConfig) Update() error {
-	client := c.KubeClient
+	var (
+		retryTimeout = 15 * time.Second
+		client       = c.KubeClient
+	)
 
+tryToGetCRD:
 	listOpts := metav1.ListOptions{
 		FieldSelector: "metadata.name=" + c.CrdName,
 	}
@@ -36,7 +40,9 @@ func (c *CrdClientConfig) Update() error {
 	}
 
 	if len(crdList.Items) == 0 {
-		return fmt.Errorf("crd/%s not found", c.CrdName)
+		log.Warnf("crd/%s not found. Will try to find it later", c.CrdName)
+		time.Sleep(retryTimeout)
+		goto tryToGetCRD
 	}
 
 	crd := crdList.Items[0]
