@@ -66,6 +66,11 @@ func (m *WebhookManager) Init() error {
 
 // Start webhook server and update spec.conversion in CRDs.
 func (m *WebhookManager) Start() error {
+	// var (
+	// 	wg     sync.WaitGroup
+	// 	errors []error
+	// )
+
 	log.Info("Start conversion webhooks manager. Load certificates.")
 
 	err := m.Server.Start()
@@ -79,6 +84,23 @@ func (m *WebhookManager) Start() error {
 			return err
 		}
 	}
+
+	// for _, ccfg := range m.ClientConfigs {
+	// 	clientCfg := *ccfg
+	// 	wg.Add(1)
+	// 	go func() {
+	// 		defer wg.Done()
+	// 		err := clientCfg.Update()
+	// 		if err != nil {
+	// 			errors = append(errors, err)
+	// 		}
+	// 	}()
+	// }
+
+	// wg.Wait()
+	// if len(errors) > 0 {
+	// 	return errors[0]
+	// }
 
 	return nil
 }
