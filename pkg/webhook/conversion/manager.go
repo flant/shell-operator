@@ -1,6 +1,7 @@
 package conversion
 
 import (
+	"context"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -66,6 +67,7 @@ func (m *WebhookManager) Init() error {
 
 // Start webhook server and update spec.conversion in CRDs.
 func (m *WebhookManager) Start() error {
+	ctx := context.Background()
 	log.Info("Start conversion webhooks manager. Load certificates.")
 
 	err := m.Server.Start()
@@ -74,7 +76,7 @@ func (m *WebhookManager) Start() error {
 	}
 
 	for _, clientCfg := range m.ClientConfigs {
-		err = clientCfg.Update()
+		err = clientCfg.Update(ctx)
 		if err != nil {
 			return err
 		}

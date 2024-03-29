@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -23,43 +22,34 @@ type CrdClientConfig struct {
 
 var SupportedConversionReviewVersions = []string{"v1", "v1beta1"}
 
-func (c *CrdClientConfig) Update() error {
+func (c *CrdClientConfig) Update(ctx context.Context) error {
 	var (
 		retryTimeout = 15 * time.Second
+		retryBudget  = 12 // 12 times * 15 sec = 3 min
 		client       = c.KubeClient
 	)
 
 tryToGetCRD:
-	listOpts := metav1.ListOptions{
-		FieldSelector: "metadata.name=" + c.CrdName,
-	}
-
-	crdList, err := client.ApiExt().CustomResourceDefinitions().List(context.TODO(), listOpts)
+	crd, err := client.ApiExt().CustomResourceDefinitions().Get(ctx, c.CrdName, metav1.GetOptions{})
 	if err != nil {
+		if retryBudget > 0 {
+			retryBudget--
+			time.Sleep(retryTimeout)
+			goto tryToGetCRD
+		}
+
 		return err
 	}
-
-	if len(crdList.Items) == 0 {
-		log.Warnf("crd/%s not found. Will try to find it later", c.CrdName)
-		time.Sleep(retryTimeout)
-		goto tryToGetCRD
-	}
-
-	crd := crdList.Items[0]
 
 	if crd.Spec.Conversion == nil {
 		crd.Spec.Conversion = new(extv1.CustomResourceConversion)
 	}
-	conv := crd.Spec.Conversion
+	crd.Spec.Conversion.Strategy = extv1.WebhookConverter
 
-	conv.Strategy = extv1.WebhookConverter
-	if conv.Webhook == nil {
-		conv.Webhook = new(extv1.WebhookConversion)
+	if crd.Spec.Conversion.Webhook == nil {
+		crd.Spec.Conversion.Webhook = new(extv1.WebhookConversion)
 	}
-
-	webhook := conv.Webhook
-
-	webhook.ClientConfig = &extv1.WebhookClientConfig{
+	crd.Spec.Conversion.Webhook.ClientConfig = &extv1.WebhookClientConfig{
 		URL: nil,
 		Service: &extv1.ServiceReference{
 			Namespace: c.Namespace,
@@ -68,15 +58,12 @@ tryToGetCRD:
 		},
 		CABundle: c.CABundle,
 	}
+	crd.Spec.Conversion.Webhook.ConversionReviewVersions = SupportedConversionReviewVersions
 
-	webhook.ConversionReviewVersions = SupportedConversionReviewVersions
-
-	_, err = client.ApiExt().CustomResourceDefinitions().Update(context.TODO(), &crd, metav1.UpdateOptions{})
+	_, err = client.ApiExt().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
-
-	log.Infof("crd/%s spec.conversion is updated to a webhook behind %s/%s", c.CrdName, c.ServiceName, c.Path)
 
 	return nil
 }
