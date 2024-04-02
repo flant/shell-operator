@@ -130,6 +130,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	b.HookCtrl.UnlockKubernetesEvents()
 	b.started = true
 
+	time.Sleep(50 * time.Millisecond)
 	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
