@@ -10,7 +10,7 @@ require (
 	github.com/go-openapi/strfmt v0.19.5
 	github.com/go-openapi/swag v0.22.5
 	github.com/go-openapi/validate v0.19.12
-	github.com/gofrs/uuid/v5 v5.0.0
+	github.com/gofrs/uuid/v5 v5.0.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/onsi/ginkgo v1.16.5
