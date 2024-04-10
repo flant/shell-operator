@@ -25,7 +25,7 @@ var SupportedConversionReviewVersions = []string{"v1", "v1beta1"}
 func (c *CrdClientConfig) Update(ctx context.Context) error {
 	var (
 		retryTimeout = 15 * time.Second
-		retryBudget  = 12 // 12 times * 15 sec = 3 min
+		retryBudget  = 60 // 60 times * 15 sec = 15 min
 		client       = c.KubeClient
 	)
 
