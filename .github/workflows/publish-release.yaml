@@ -16,7 +16,7 @@ env:
   QEMU_PLATFORMS: arm64,arm
   BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/arm/v7"
   DOCKER_HUB_REPO: flant/shell-operator
-  GHCR_IO_REPO: ghcr.io/flant/shell-operator
+  GHCR_IO_REPO: ghcr.io/koxt/shell-operator
 
 jobs:
   check:
