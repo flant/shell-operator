@@ -17,7 +17,7 @@ func RequireExistingDirectory(inDir string) (dir string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("get absolute path: %v", err)
 	}
-	if exists, _ := DirExists(dir); !exists {
+	if exists := DirExists(dir); !exists {
 		return "", fmt.Errorf("path '%s' not exist", dir)
 	}
 
@@ -40,7 +40,7 @@ func EnsureTempDirectory(inDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("get absolute path: %v", err)
 	}
-	if exists, _ := DirExists(dir); !exists {
+	if exists := DirExists(dir); !exists {
 		err := os.Mkdir(dir, os.FileMode(0o777))
 		if err != nil {
 			return "", fmt.Errorf("create tmp dir '%s': %s", dir, err)
@@ -49,11 +49,13 @@ func EnsureTempDirectory(inDir string) (string, error) {
 	return dir, nil
 }
 
-func DirExists(path string) (bool, error) {
+// DirExists checking for directory existence
+// return bool value
+func DirExists(path string) bool {
 	fileInfo, err := os.Stat(path)
 	if err != nil && os.IsNotExist(err) {
-		return false, nil
+		return false
 	}
 
-	return fileInfo.IsDir(), nil
+	return fileInfo.IsDir()
 }
