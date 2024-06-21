@@ -9,7 +9,7 @@ The hook receives the data and returns the result via files. Paths to files are 
 At startup Shell-operator initializes the hooks:
 
 - The recursive search for hook files is performed in the hooks directory. You can specify it with `--hooks-dir` command-line argument or with the `SHELL_OPERATOR_HOOKS_DIR` environment variable (the default path is `/hooks`).
-  - Every executable file found in the path is considered a hook.
+  - Every executable file found in the path is considered a hook (please note, `lib` subdirectory ignored).
 - Found hooks are sorted alphabetically according to the directories’ and hooks’ names. Then they are executed with the `--config` flag to get bindings to events in YAML or JSON format.
 - If hook's configuration is successful, the working queue named "main" is filled with `onStartup` hooks.
 - Then, the "main" queue is filled with `kubernetes` hooks with `Synchronization` [binding context](#binding-context) type, so that each hook receives all existing objects described in hook's configuration.
