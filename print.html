@@ -361,7 +361,7 @@ shell-operator queue list
 <ul>
 <li>The recursive search for hook files is performed in the hooks directory. You can specify it with <code>--hooks-dir</code> command-line argument or with the <code>SHELL_OPERATOR_HOOKS_DIR</code> environment variable (the default path is <code>/hooks</code>).
 <ul>
-<li>Every executable file found in the path is considered a hook.</li>
+<li>Every executable file found in the path is considered a hook (please note, <code>lib</code> subdirectory ignored).</li>
 </ul>
 </li>
 <li>Found hooks are sorted alphabetically according to the directories’ and hooks’ names. Then they are executed with the <code>--config</code> flag to get bindings to events in YAML or JSON format.</li>
