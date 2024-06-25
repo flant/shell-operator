@@ -42,20 +42,8 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 			return nil
 		}
 
-		// ignore hidden files
-		if strings.HasPrefix(f.Name(), ".") {
-			return nil
-		}
-
-		// ignore .yaml, .json, .txt, .md files
-		switch filepath.Ext(f.Name()) {
-		case ".yaml", ".json", ".md", ".txt":
-			return nil
-		}
-
-		if !IsFileExecutable(f) {
+		if !isExecutableHookFile(f) {
 			log.Warnf("File '%s' is skipped: no executable permissions, chmod +x is required to run this hook", path)
-
 			return nil
 		}
 
@@ -90,22 +78,8 @@ func RecursiveCheckLibDirectory(dir string) error {
 
 			return nil
 		}
-
-		// ignore hidden files
-		if strings.HasPrefix(f.Name(), ".") {
-			return nil
-		}
-
-		// ignore .yaml, .json, .txt, .md files
-		switch filepath.Ext(f.Name()) {
-		case ".yaml", ".json", ".md", ".txt":
-			return nil
-		}
-
-		if IsFileExecutable(f) {
+		if isExecutableHookFile(f) {
 			log.Warnf("File '%s' has executable permissions and is located in the ignored 'lib' directory", strings.TrimPrefix(path, dir))
-
-			return nil
 		}
 
 		return nil
@@ -116,4 +90,19 @@ func RecursiveCheckLibDirectory(dir string) error {
 	}
 
 	return nil
+}
+
+func isExecutableHookFile(f os.FileInfo) bool {
+	// ignore hidden files
+	if strings.HasPrefix(f.Name(), ".") {
+		return false
+	}
+
+	// ignore .yaml, .json, .txt, .md files
+	switch filepath.Ext(f.Name()) {
+	case ".yaml", ".json", ".md", ".txt":
+		return false
+	}
+
+	return IsFileExecutable(f)
 }
