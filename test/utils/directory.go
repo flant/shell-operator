@@ -33,7 +33,7 @@ func ChooseExistedDirectoryPath(paths ...string) (path string, err error) {
 		return
 	}
 
-	if exists, _ := utils_file.DirExists(path); !exists {
+	if exists := utils_file.DirExists(path); !exists {
 		return "", fmt.Errorf("no working dir")
 	}
 

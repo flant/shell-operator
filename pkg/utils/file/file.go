@@ -34,8 +34,8 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 		}
 
 		if f.IsDir() {
-			// Skip hidden directories inside initial directory
-			if strings.HasPrefix(f.Name(), ".") {
+			// Skip hidden and lib directories inside initial directory
+			if strings.HasPrefix(f.Name(), ".") || f.Name() == "lib" {
 				return filepath.SkipDir
 			}
 
@@ -55,6 +55,7 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 
 		if !IsFileExecutable(f) {
 			log.Warnf("File '%s' is skipped: no executable permissions, chmod +x is required to run this hook", path)
+
 			return nil
 		}
 
@@ -66,4 +67,53 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 	}
 
 	return paths, nil
+}
+
+// RecursiveCheckLibDirectory finds recursively all executable files
+// inside a lib directory. And will log warning with these files.
+func RecursiveCheckLibDirectory(dir string) error {
+	dir = filepath.Join(dir, "lib")
+	if exist := DirExists(dir); !exist {
+		return nil
+	}
+
+	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if f.IsDir() {
+			// Skip hidden directory inside initial directory
+			if strings.HasPrefix(f.Name(), ".") {
+				return filepath.SkipDir
+			}
+
+			return nil
+		}
+
+		// ignore hidden files
+		if strings.HasPrefix(f.Name(), ".") {
+			return nil
+		}
+
+		// ignore .yaml, .json, .txt, .md files
+		switch filepath.Ext(f.Name()) {
+		case ".yaml", ".json", ".md", ".txt":
+			return nil
+		}
+
+		if IsFileExecutable(f) {
+			log.Warnf("File '%s' has executable permissions and is located in the ignored 'lib' directory", strings.TrimPrefix(path, dir))
+
+			return nil
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

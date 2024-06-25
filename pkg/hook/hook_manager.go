@@ -103,6 +103,10 @@ func (hm *hookManager) Init() error {
 	hm.hooksInOrder = make(map[BindingType][]*Hook)
 	hm.hooksByName = make(map[string]*Hook)
 
+	if err := utils_file.RecursiveCheckLibDirectory(hm.workingDir); err != nil {
+		log.Errorf("failed to check lib directory %s: %v", hm.workingDir, err)
+	}
+
 	hooksRelativePaths, err := utils_file.RecursiveGetExecutablePaths(hm.workingDir)
 	if err != nil {
 		return err
