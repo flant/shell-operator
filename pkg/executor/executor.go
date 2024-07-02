@@ -1,7 +1,10 @@
 package executor
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -29,6 +32,7 @@ func Run(cmd *exec.Cmd) error {
 
 func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, error) {
 	// TODO observability
+	stdErr := bytes.NewBuffer(nil)
 	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 	stdoutLogEntry := logEntry.WithField("output", "stdout")
 	stderrLogEntry := logEntry.WithField("output", "stderr")
@@ -39,14 +43,17 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 		plo := &proxyJSONLogger{stdoutLogEntry, make([]byte, 0)}
 		ple := &proxyJSONLogger{stderrLogEntry, make([]byte, 0)}
 		cmd.Stdout = plo
-		cmd.Stderr = ple
+		cmd.Stderr = io.MultiWriter(ple, stdErr)
 	} else {
 		cmd.Stdout = stdoutLogEntry.Writer()
-		cmd.Stderr = stderrLogEntry.Writer()
+		cmd.Stderr = io.MultiWriter(stderrLogEntry.Writer(), stdErr)
 	}
 
 	err := cmd.Run()
 	if err != nil {
+		if len(stdErr.Bytes()) > 0 {
+			return nil, fmt.Errorf("%s", stdErr.String())
+		}
 		return nil, err
 	}
 
