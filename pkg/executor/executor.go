@@ -2,6 +2,7 @@ package executor
 
 import (
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -45,9 +46,9 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 		cmd.Stderr = stderrLogEntry.Writer()
 	}
 
-	err := cmd.Run()
+	output, err := Output(cmd)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%v: %s", err, output)
 	}
 
 	var usage *CmdUsage
