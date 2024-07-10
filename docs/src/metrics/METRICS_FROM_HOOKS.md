@@ -29,7 +29,7 @@ echo '{"name":"hook_metric_count","action":"add","value":1,"labels":{"label1":"v
 echo '{"name":"hook_metrics_items","action":"add","value":1,"labels":{"label1":"value1"}}' >> $METRICS_PATH
 ```
 
-The metric name is used as-is, so several hooks can export the same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.
+The metric name is used as-is, so several hooks can export the same metric name. It is advisable for a hooks‘ developer to maintain consistent label cardinality.
 
 There are fields "add" and "set" that can be used as shortcuts for action and value. This feature may be deprecated in future releases.
 
