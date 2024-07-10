@@ -84,8 +84,8 @@ func (c *ConstCounterCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *ConstCounterCollector) Collect(ch chan<- prometheus.Metric) {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
 
 	for _, s := range c.collection {
 		ch <- prometheus.MustNewConstMetric(c.desc, prometheus.CounterValue, float64(s.Value), s.LabelValues...)
@@ -199,8 +199,8 @@ func (c *ConstGaugeCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *ConstGaugeCollector) Collect(ch chan<- prometheus.Metric) {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
 
 	for _, s := range c.collection {
 		ch <- prometheus.MustNewConstMetric(c.desc, prometheus.GaugeValue, s.Value, s.LabelValues...)
