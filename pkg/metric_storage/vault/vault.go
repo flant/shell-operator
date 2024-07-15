@@ -41,7 +41,7 @@ func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []str
 			return nil, fmt.Errorf("counter '%s' %v registration: %v", name, labelNames, err)
 		}
 		v.collectors[name] = collector
-	} else if !LabelNamesEqual(collector.LabelNames(), labelNames) {
+	} else if !IsSubset(collector.LabelNames(), labelNames) {
 		collector.UpdateLabels(labelNames)
 	}
 	if counter, ok := collector.(*ConstCounterCollector); ok {
@@ -60,7 +60,7 @@ func (v *GroupedVault) GetOrCreateGaugeCollector(name string, labelNames []strin
 			return nil, fmt.Errorf("gauge '%s' %v registration: %v", name, labelNames, err)
 		}
 		v.collectors[name] = collector
-	} else if !LabelNamesEqual(collector.LabelNames(), labelNames) {
+	} else if !IsSubset(collector.LabelNames(), labelNames) {
 		collector.UpdateLabels(labelNames)
 	}
 

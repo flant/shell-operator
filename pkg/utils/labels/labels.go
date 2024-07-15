@@ -54,13 +54,15 @@ func DefaultIfEmpty(m map[string]string, def map[string]string) map[string]strin
 	return m
 }
 
-func LabelNamesEqual(a, b[]string) bool {
-	if len(a) != len(b) {
-		return false
+// IsSubset checks if a set contains b subset
+func IsSubset(a, b []string) bool {
+	aMap := make(map[string]struct{}, len(a))
+	for _, v := range a {
+		aMap[v] = struct{}{}
 	}
 
-	for i := range a {
-		if a[i] != b[i] {
+	for _, v := range b {
+		if _, found := aMap[v]; !found {
 			return false
 		}
 	}
