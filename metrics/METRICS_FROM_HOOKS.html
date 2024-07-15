@@ -162,7 +162,7 @@
 <pre><code class="language-sh">echo '{&quot;name&quot;:&quot;hook_metric_count&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 echo '{&quot;name&quot;:&quot;hook_metrics_items&quot;,&quot;action&quot;:&quot;add&quot;,&quot;value&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}' &gt;&gt; $METRICS_PATH
 </code></pre>
-<p>The metric name is used as-is, so several hooks can export the same metric name. It is responsibility of hooks‘ developer to maintain consistent label cardinality.</p>
+<p>The metric name is used as-is, so several hooks can export the same metric name. It is advisable for a hooks‘ developer to maintain consistent label cardinality.</p>
 <p>There are fields “add” and “set” that can be used as shortcuts for action and value. This feature may be deprecated in future releases.</p>
 <pre><code>{&quot;name&quot;:&quot;metric_name&quot;,&quot;add&quot;:1,&quot;labels&quot;:{&quot;label1&quot;:&quot;value1&quot;}}
 </code></pre>
