@@ -123,6 +123,8 @@ metric2_total{lbl="val222"} 2
 	v.CounterAdd("group3", "metric_total4", 19.0, map[string]string{"c": "c2"})
 	v.CounterAdd("group3", "metric_total4", 29.0, map[string]string{})
 	v.CounterAdd("group3", "metric_total4", 39.0, map[string]string{"j": "j1"})
+	v.CounterAdd("group3", "metric_total4", 1.0, map[string]string{"j": "j1"})
+	v.CounterAdd("group3", "metric_total4", 1.0, map[string]string{"a": "", "b": "", "c": "", "d": "", "j": "j1"})
 
 	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occurred in log: %s", buf.String())
 
@@ -148,7 +150,7 @@ metric_total4{a="", b="", c="", d="d1", j=""} 9
 metric_total4{a="a1", b="b1", c="c1", d="d1", j=""} 99
 metric_total4{a="", b="", c="c2", d="", j=""} 19
 metric_total4{a="", b="", c="", d="", j=""} 29
-metric_total4{a="", b="", c="", d="", j="j1"} 39
+metric_total4{a="", b="", c="", d="", j="j1"} 41
 `
 
 	err = promtest.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expect), "metric_total1", "metric_total2", "metric_total3", "metric_total4")
