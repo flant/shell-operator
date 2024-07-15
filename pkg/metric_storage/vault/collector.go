@@ -17,6 +17,7 @@ type ConstMetricCollector interface {
 	LabelNames() []string
 	Name() string
 	ExpireGroupMetrics(group string)
+	UpdateLabels([]string)
 }
 
 var (
@@ -115,6 +116,45 @@ func (c *ConstCounterCollector) ExpireGroupMetrics(group string) {
 	}
 }
 
+// UpdateLabels checks if any new labels are provided to the controller and updates its description, labelNames list and collection.
+// The collection is recalculated in accordance with new label list.
+func (c *ConstCounterCollector) UpdateLabels(labels []string) {
+	c.mtx.Lock()
+	var mustUpdate bool
+	labelsMap := make(map[string]struct{})
+	for _, label := range c.labelNames {
+		labelsMap[label] = struct{}{}
+	}
+
+	for _, label := range labels {
+		if _, found := labelsMap[label]; !found {
+			mustUpdate = true
+			c.labelNames = append(c.labelNames, label)
+		}
+	}
+	if mustUpdate {
+		c.desc = prometheus.NewDesc(c.name, c.name, c.labelNames, nil)
+		newCollection := make(map[uint64]GroupedCounterMetric)
+		for hash, metric := range c.collection {
+			if len(metric.LabelValues) != len(c.labelNames) {
+				padding := make([]string, len(c.labelNames)-len(metric.LabelValues))
+				newLabelValues := append(metric.LabelValues, padding...)
+				newLabelsHash := HashLabelValues(newLabelValues)
+				newCollection[newLabelsHash] = GroupedCounterMetric{
+					Value:       metric.Value,
+					LabelValues: newLabelValues,
+					Group:       metric.Group,
+				}
+			} else {
+				newCollection[hash] = c.collection[hash]
+			}
+
+		}
+		c.collection = newCollection
+	}
+	c.mtx.Unlock()
+}
+
 type ConstGaugeCollector struct {
 	mtx sync.RWMutex
 
@@ -189,6 +229,46 @@ func (c *ConstGaugeCollector) ExpireGroupMetrics(group string) {
 			delete(c.collection, hash)
 		}
 	}
+}
+
+// UpdateLabels checks if any new labels are provided to the controller and updates its description, labelNames list and collection.
+// The collection is recalculated in accordance with new label list.
+func (c *ConstGaugeCollector) UpdateLabels(labels []string) {
+	c.mtx.Lock()
+	var mustUpdate bool
+	labelsMap := make(map[string]struct{})
+	for _, label := range c.labelNames {
+		labelsMap[label] = struct{}{}
+	}
+
+	for _, label := range labels {
+		if _, found := labelsMap[label]; !found {
+			mustUpdate = true
+			c.labelNames = append(c.labelNames, label)
+		}
+	}
+
+	if mustUpdate {
+		c.desc = prometheus.NewDesc(c.name, c.name, c.labelNames, nil)
+		newCollection := make(map[uint64]GroupedGaugeMetric)
+		for hash, metric := range c.collection {
+			if len(metric.LabelValues) != len(c.labelNames) {
+				padding := make([]string, len(c.labelNames)-len(metric.LabelValues))
+				newLabelValues := append(metric.LabelValues, padding...)
+				newLabelsHash := HashLabelValues(newLabelValues)
+				newCollection[newLabelsHash] = GroupedGaugeMetric{
+					Value:       metric.Value,
+					LabelValues: newLabelValues,
+					Group:       metric.Group,
+				}
+			} else {
+				newCollection[hash] = c.collection[hash]
+			}
+
+		}
+		c.collection = newCollection
+	}
+	c.mtx.Unlock()
 }
 
 const labelsSeparator = byte(255)
