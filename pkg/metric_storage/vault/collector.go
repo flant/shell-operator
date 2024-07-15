@@ -2,6 +2,7 @@ package vault
 
 import (
 	"hash/fnv"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -121,28 +122,39 @@ func (c *ConstCounterCollector) ExpireGroupMetrics(group string) {
 func (c *ConstCounterCollector) UpdateLabels(labels []string) {
 	c.mtx.Lock()
 	var mustUpdate bool
-	labelsMap := make(map[string]struct{})
-	for _, label := range c.labelNames {
-		labelsMap[label] = struct{}{}
+	previousLabelsMap := make(map[string]int, len(c.labelNames))
+	for idx, label := range c.labelNames {
+		previousLabelsMap[label] = idx
 	}
 
+	previousLabelSet := make([]string, len(c.labelNames))
+	copy(previousLabelSet, c.labelNames)
+
 	for _, label := range labels {
-		if _, found := labelsMap[label]; !found {
+		if _, found := previousLabelsMap[label]; !found {
 			mustUpdate = true
 			c.labelNames = append(c.labelNames, label)
 		}
 	}
+	sort.Strings(c.labelNames)
+
 	if mustUpdate {
 		c.desc = prometheus.NewDesc(c.name, c.name, c.labelNames, nil)
 		newCollection := make(map[uint64]GroupedCounterMetric)
 		for hash, metric := range c.collection {
 			if len(metric.LabelValues) != len(c.labelNames) {
-				padding := make([]string, len(c.labelNames)-len(metric.LabelValues))
-				newLabelValues := append(metric.LabelValues, padding...)
-				newLabelsHash := HashLabelValues(newLabelValues)
+				newLabelsValues := make([]string, 0, len(c.labelNames))
+				for _, labelName := range c.labelNames {
+					if idx, found := previousLabelsMap[labelName]; found {
+						newLabelsValues = append(newLabelsValues, metric.LabelValues[idx])
+					} else {
+						newLabelsValues = append(newLabelsValues, "")
+					}
+				}
+				newLabelsHash := HashLabelValues(newLabelsValues)
 				newCollection[newLabelsHash] = GroupedCounterMetric{
 					Value:       metric.Value,
-					LabelValues: newLabelValues,
+					LabelValues: newLabelsValues,
 					Group:       metric.Group,
 				}
 			} else {
@@ -236,29 +248,39 @@ func (c *ConstGaugeCollector) ExpireGroupMetrics(group string) {
 func (c *ConstGaugeCollector) UpdateLabels(labels []string) {
 	c.mtx.Lock()
 	var mustUpdate bool
-	labelsMap := make(map[string]struct{})
-	for _, label := range c.labelNames {
-		labelsMap[label] = struct{}{}
+	previousLabelsMap := make(map[string]int, len(c.labelNames))
+	for idx, label := range c.labelNames {
+		previousLabelsMap[label] = idx
 	}
 
+	previousLabelSet := make([]string, len(c.labelNames))
+	copy(previousLabelSet, c.labelNames)
+
 	for _, label := range labels {
-		if _, found := labelsMap[label]; !found {
+		if _, found := previousLabelsMap[label]; !found {
 			mustUpdate = true
 			c.labelNames = append(c.labelNames, label)
 		}
 	}
+	sort.Strings(c.labelNames)
 
 	if mustUpdate {
 		c.desc = prometheus.NewDesc(c.name, c.name, c.labelNames, nil)
 		newCollection := make(map[uint64]GroupedGaugeMetric)
 		for hash, metric := range c.collection {
 			if len(metric.LabelValues) != len(c.labelNames) {
-				padding := make([]string, len(c.labelNames)-len(metric.LabelValues))
-				newLabelValues := append(metric.LabelValues, padding...)
-				newLabelsHash := HashLabelValues(newLabelValues)
+				newLabelsValues := make([]string, 0, len(c.labelNames))
+				for _, labelName := range c.labelNames {
+					if idx, found := previousLabelsMap[labelName]; found {
+						newLabelsValues = append(newLabelsValues, metric.LabelValues[idx])
+					} else {
+						newLabelsValues = append(newLabelsValues, "")
+					}
+				}
+				newLabelsHash := HashLabelValues(newLabelsValues)
 				newCollection[newLabelsHash] = GroupedGaugeMetric{
 					Value:       metric.Value,
-					LabelValues: newLabelValues,
+					LabelValues: newLabelsValues,
 					Group:       metric.Group,
 				}
 			} else {
