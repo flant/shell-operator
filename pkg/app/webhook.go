@@ -63,6 +63,18 @@ func DefineValidatingWebhookFlags(cmd *kingpin.CmdClause) {
 		Default("Fail").
 		Envar("VALIDATING_WEBHOOK_FAILURE_POLICY").
 		EnumVar(&ValidatingWebhookSettings.DefaultFailurePolicy, "Fail", "Ignore")
+	cmd.Flag("validating-webhook-listen-port",
+		"Defines default ListenPort for ValidatingWebhookConfiguration. "+
+			"Can be set with $VALIDATING_WEBHOOK_LISTEN_PORT.").
+		Default(ValidatingWebhookSettings.ListenPort).
+		Envar("VALIDATING_WEBHOOK_LISTEN_PORT").
+		StringVar(&ValidatingWebhookSettings.ListenPort)
+	cmd.Flag("validating-webhook-listen-address",
+		"Defines default ListenAddr for ValidatingWebhookConfiguration. "+
+			"Can be set with $VALIDATING_WEBHOOK_LISTEN_ADDRESS.").
+		Default(ValidatingWebhookSettings.ListenAddr).
+		Envar("VALIDATING_WEBHOOK_LISTEN_ADDRESS").
+		StringVar(&ValidatingWebhookSettings.ListenAddr)
 }
 
 // DefineConversionWebhookFlags defines flags for ConversionWebhook server.
@@ -86,4 +98,17 @@ func DefineConversionWebhookFlags(cmd *kingpin.CmdClause) {
 	cmd.Flag("conversion-webhook-client-ca", "A path to a server certificate for CRD.spec.conversion.webhook. Can be set with $CONVERSION_WEBHOOK_CLIENT_CA.").
 		Envar("CONVERSION_WEBHOOK_CLIENT_CA").
 		StringsVar(&ConversionWebhookSettings.ClientCAPaths)
+	cmd.Flag("conversion-webhook-listen-port",
+		"Defines default ListenPort for ConversionWebhookConfiguration. "+
+			"Can be set with $CONVERSION_WEBHOOK_LISTEN_PORT.").
+		Envar("CONVERSION_WEBHOOK_LISTEN_PORT").
+		Default(ConversionWebhookSettings.ListenPort).
+		StringVar(&ConversionWebhookSettings.ListenPort)
+	cmd.Flag("conversion-webhook-listen-address",
+		"Defines default ListenAddr for ConversionWebhookConfiguration. "+
+			"Can be set with $CONVERSION_WEBHOOK_LISTEN_ADDRESS.").
+		Default(ConversionWebhookSettings.ListenAddr).
+		Envar("CONVERSION_WEBHOOK_LISTEN_ADDRESS").
+		StringVar(&ConversionWebhookSettings.ListenAddr)
+
 }
