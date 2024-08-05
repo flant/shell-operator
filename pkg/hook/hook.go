@@ -92,6 +92,13 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		return nil, err
 	}
 
+	oldversionedContextList := ConvertBindingContextList("v2", freshBindingContext)
+
+	oldContextPath, err := h.prepareBindingContextJsonFile(oldversionedContextList)
+	if err != nil {
+		return nil, err
+	}
+
 	metricsPath, err := h.prepareMetricsFile()
 	if err != nil {
 		return nil, err
@@ -115,6 +122,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 	// remove tmp file on hook exit
 	defer func() {
 		if app.DebugKeepTmpFiles != "yes" {
+			_ = os.Remove(oldContextPath)
 			_ = os.Remove(contextPath)
 			_ = os.Remove(metricsPath)
 			_ = os.Remove(conversionPath)
@@ -126,6 +134,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 	envs := make([]string, 0)
 	envs = append(envs, os.Environ()...)
 	if contextPath != "" {
+		envs = append(envs, fmt.Sprintf("BINDING_OLD_CONTEXT_PATH=%s", oldContextPath))
 		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
 		envs = append(envs, fmt.Sprintf("METRICS_PATH=%s", metricsPath))
 		envs = append(envs, fmt.Sprintf("CONVERSION_RESPONSE_PATH=%s", conversionPath))

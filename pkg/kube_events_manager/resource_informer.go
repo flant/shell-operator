@@ -274,6 +274,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 	// Always calculate checksum and update cache, because we need an actual state in ei.cachedObjects.
 
 	var objFilterRes *ObjectAndFilterResult
+	var oldFilterRes *ObjectAndFilterResult
 	var err error
 	func() {
 		defer measure.Duration(func(d time.Duration) {
@@ -302,6 +303,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 		// Update object in cache
 		ei.cacheLock.Lock()
 		cachedObject, objectInCache := ei.cachedObjects[resourceId]
+		oldFilterRes = cachedObject
 		skipEvent := false
 		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
 			// update object in cache and do not send event
@@ -359,7 +361,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 			Type:        TypeEvent,
 			MonitorId:   ei.Monitor.Metadata.MonitorId,
 			WatchEvents: []WatchEventType{eventType},
-			Objects:     []ObjectAndFilterResult{*objFilterRes},
+			Objects:     []ObjectAndFilterResult{*objFilterRes, *oldFilterRes},
 		}
 
 		// fix race with enableKubeEventCb.

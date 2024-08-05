@@ -48,6 +48,8 @@ func (bc BindingContext) Map() map[string]interface{} {
 		return bc.MapV0()
 	case "v1":
 		return bc.MapV1()
+	case "v2":
+		return bc.MapV2()
 	default:
 		log.Errorf("Possible bug!!! Call Map for BindingContext without version.")
 		return make(map[string]interface{})
@@ -138,6 +140,38 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		}
 	}
 
+	return res
+}
+
+func (bc BindingContext) MapV2() map[string]interface{} {
+	res := make(map[string]interface{})
+	res["binding"] = bc.Binding
+	res["type"] = bc.Type
+	if bc.WatchEvent != "" {
+		res["watchEvent"] = string(bc.WatchEvent)
+	}
+	switch bc.Type {
+	case TypeSynchronization:
+		if len(bc.Objects) == 0 {
+			res["objects"] = make([]string, 0)
+		} else {
+			res["objects"] = bc.Objects
+		}
+	case TypeEvent:
+		if len(bc.Objects) == 0 {
+			res["object"] = nil
+			if bc.Metadata.JqFilter != "" {
+				res["filterResult"] = ""
+			}
+		} else if len(bc.Objects) > 1 {
+			obj := bc.Objects[1]
+			objMap := obj.Map()
+			for k, v := range objMap {
+				res[k] = v
+			}
+		}
+
+	}
 	return res
 }
 
