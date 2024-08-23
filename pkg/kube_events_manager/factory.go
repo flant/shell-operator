@@ -27,6 +27,7 @@ type FactoryIndex struct {
 	Namespace     string
 	FieldSelector string
 	LabelSelector string
+	MonitorId     string
 }
 
 type Factory struct {
