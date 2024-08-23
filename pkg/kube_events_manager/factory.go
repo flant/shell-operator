@@ -123,6 +123,7 @@ func (c *FactoryStore) Stop(index FactoryIndex) {
 	if f.score == 0 {
 		f.cancel()
 		delete(c.data, index)
+		return
 	}
 
 	c.data[index] = f
