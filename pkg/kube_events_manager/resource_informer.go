@@ -127,7 +127,6 @@ func (ei *resourceInformer) createSharedInformer() (err error) {
 		Namespace:     ei.Namespace,
 		FieldSelector: ei.ListOptions.FieldSelector,
 		LabelSelector: ei.ListOptions.LabelSelector,
-		MonitorId:     ei.Monitor.Metadata.MonitorId,
 	}
 
 	err = ei.loadExistedObjects()

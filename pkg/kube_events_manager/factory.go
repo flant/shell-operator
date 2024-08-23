@@ -27,7 +27,6 @@ type FactoryIndex struct {
 	Namespace     string
 	FieldSelector string
 	LabelSelector string
-	MonitorId     string
 }
 
 type Factory struct {
@@ -62,6 +61,7 @@ func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index 
 	f, ok := c.data[index]
 	if ok {
 		f.score++
+		c.data[index] = f
 		return f
 	}
 
@@ -122,7 +122,8 @@ func (c *FactoryStore) Stop(index FactoryIndex) {
 	f.score--
 	if f.score == 0 {
 		f.cancel()
+		delete(c.data, index)
 	}
 
-	delete(c.data, index)
+	c.data[index] = f
 }
