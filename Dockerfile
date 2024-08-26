@@ -1,8 +1,8 @@
 # Prebuilt libjq.
-FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl as libjq
+FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl@sha256:a896072d58d3992fd68cf0b80d75065c2452240419ddbdc869c598a21fca58ad as libjq
 
 # Go builder.
-FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.22-alpine3.19 AS builder
+FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.22-alpine3.19@sha256:1bad39361dd21f2f881ce10ff810e40e5be3eba89a0b61e762e05ec42f9bbaf2 AS builder
 
 ARG appVersion=latest
 RUN apk --no-cache add git ca-certificates gcc musl-dev libc-dev
@@ -25,7 +25,7 @@ RUN CGO_ENABLED=1 \
              ./cmd/shell-operator
 
 # Final image
-FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.20
+FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.20@sha256:0a4eaa0eecf5f8c050e5bba433f58c052be7587ee8af3e8b3910ef9ab5fbe9f5
 ARG TARGETPLATFORM
 RUN apk --no-cache add ca-certificates bash sed tini && \
     kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
