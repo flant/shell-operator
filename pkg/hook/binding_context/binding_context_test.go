@@ -329,7 +329,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 
 				// grouped binding context contains binding==group, type and snapshots
 				{`.[0] | length`, `3`}, // Only 3 fields
-				{`.[0].binding`, `"pods"`},
+				{`.[0].binding`, `"monitor_config_maps"`},
 				{`.[0].type`, `"Group"`},
 				{`.[0].snapshots | has("monitor_config_maps")`, `true`},
 				{`.[0].snapshots."monitor_config_maps" | length`, `1`},
