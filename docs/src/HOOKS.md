@@ -371,7 +371,7 @@ Temporary files have unique names to prevent collisions between queues and are d
 
 Binging context is a JSON-array of structures with the following fields:
 
-- `binding` — a string from the `name` or `group` parameters. If these parameters has not been set in the binding configuration, then strings "schedule" or "kubernetes" are used. For a hook executed at startup, this value is always "onStartup".
+- `binding` — a string from the `name` parameter. If this parameter has not been set in the binding configuration, then strings "schedule" or "kubernetes" are used. For a hook executed at startup, this value is always "onStartup".
 - `type` — "Schedule" for `schedule` bindings. "Synchronization" or "Event" for `kubernetes` bindings. "Group" if `group` is defined.
 
 The hook receives "Event"-type binding context on Kubernetes event and it contains more fields:
@@ -708,8 +708,8 @@ Adjacent tasks for `kubernetes` and `schedule` bindings with the same `group` an
 
 `group` parameter is compatible with `includeSnapshotsFrom` parameter. `includeSnapshotsFrom` can be used to include additional snapshots into binding context.
 
-Binding context for group contains:
-- `binding` field with the group name.
+Binding context for a group contains:
+- `binding` field with the original binding name or, if the name field wasn't set in the binding configuration, then strings "schedule" or "kubernetes" are used.
 - `type` field with the value "Group".
 - `snapshots` field if there is at least one `kubernetes` binding in the group or `includeSnapshotsFrom` is not empty.
 
@@ -752,12 +752,12 @@ Grouped bindings is used when only the occurrence of an event is important. So, 
 - Data field is changed in ConfigMap/settings-for-my-hook.
 - Every 3 hours.
 
-Binding context for these events will be the same:
+Binding contexts for these events will be pretty the same, except for the `binding` field, as it will be equal to the corresponding `name` field of the binding:
 
 ```yaml
 [
   {
-    "binding": "pods",
+    "binding": "monitor-pods",
     "type": "Group",
     "snapshots": {
       "monitor-pods": [

@@ -239,7 +239,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				{`.[0] | length`, `3`}, // Only 3 fields
 				{`.[0].snapshots | has("monitor_pods")`, `true`},
 				{`.[0].snapshots."monitor_pods" | length`, `1`},
-				{`.[0].binding`, `"pods"`},
+				{`.[0].binding`, `"monitor_pods"`},
 				{`.[0].type`, `"Group"`},
 
 				// JSON dump should has only 4 fields: binding, type, watchEvent and object.
@@ -311,7 +311,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 
 				g.Expect(bcList[0]).Should(HaveLen(3))
 				g.Expect(bcList[0]).Should(HaveKey("binding"))
-				g.Expect(bcList[0]["binding"]).Should(Equal("pods"))
+				g.Expect(bcList[0]["binding"]).Should(Equal("monitor_config_maps"))
 				g.Expect(bcList[0]).Should(HaveKey("type"))
 				g.Expect(bcList[0]["type"]).Should(Equal("Group"))
 				g.Expect(bcList[0]).Should(HaveKey("snapshots"))
@@ -329,7 +329,7 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 
 				// grouped binding context contains binding==group, type and snapshots
 				{`.[0] | length`, `3`}, // Only 3 fields
-				{`.[0].binding`, `"pods"`},
+				{`.[0].binding`, `"monitor_config_maps"`},
 				{`.[0].type`, `"Group"`},
 				{`.[0].snapshots | has("monitor_config_maps")`, `true`},
 				{`.[0].snapshots."monitor_config_maps" | length`, `1`},
