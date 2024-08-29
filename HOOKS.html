@@ -496,7 +496,7 @@ fieldSelector:
 <p>Temporary files have unique names to prevent collisions between queues and are deleted after the hook run.</p>
 <p>Binging context is a JSON-array of structures with the following fields:</p>
 <ul>
-<li><code>binding</code> — a string from the <code>name</code> or <code>group</code> parameters. If these parameters has not been set in the binding configuration, then strings “schedule” or “kubernetes” are used. For a hook executed at startup, this value is always “onStartup”.</li>
+<li><code>binding</code> — a string from the <code>name</code> parameter. If this parameter has not been set in the binding configuration, then strings “schedule” or “kubernetes” are used. For a hook executed at startup, this value is always “onStartup”.</li>
 <li><code>type</code> — “Schedule” for <code>schedule</code> bindings. “Synchronization” or “Event” for <code>kubernetes</code> bindings. “Group” if <code>group</code> is defined.</li>
 </ul>
 <p>The hook receives “Event”-type binding context on Kubernetes event and it contains more fields:</p>
@@ -778,9 +778,9 @@ kubernetes:
 <p>Adjacent tasks for <code>kubernetes</code> and <code>schedule</code> bindings with the same <code>group</code> and <code>queue</code> are “compacted”, and the hook is executed only once. So it is wise to use the same <code>queue</code> for all hooks in a group. This “compaction” mechanism is not available for <code>kubernetesValidating</code> and <code>kubernetesCustomResourceConversion</code> bindings as they’re not queued.</p>
 <p><code>executeHookOnSynchronization</code>, <code>executeHookOnEvent</code> and <code>keepFullObjectsInMemory</code> can be used  with <code>group</code>. Their effects are as described above for non-grouped bindings.</p>
 <p><code>group</code> parameter is compatible with <code>includeSnapshotsFrom</code> parameter. <code>includeSnapshotsFrom</code> can be used to include additional snapshots into binding context.</p>
-<p>Binding context for group contains:</p>
+<p>Binding context for a group contains:</p>
 <ul>
-<li><code>binding</code> field with the group name.</li>
+<li><code>binding</code> field with the original binding name or, if the name field wasn’t set in the binding configuration, then strings “schedule” or “kubernetes” are used.</li>
 <li><code>type</code> field with the value “Group”.</li>
 <li><code>snapshots</code> field if there is at least one <code>kubernetes</code> binding in the group or <code>includeSnapshotsFrom</code> is not empty.</li>
 </ul>
@@ -818,10 +818,10 @@ kubernetes:
 <li>Data field is changed in ConfigMap/settings-for-my-hook.</li>
 <li>Every 3 hours.</li>
 </ul>
-<p>Binding context for these events will be the same:</p>
+<p>Binding contexts for these events will be pretty the same, except for the <code>binding</code> field, as it will be equal to the corresponding <code>name</code> field of the binding:</p>
 <pre><code class="language-yaml">[
   {
-    &quot;binding&quot;: &quot;pods&quot;,
+    &quot;binding&quot;: &quot;monitor-pods&quot;,
     &quot;type&quot;: &quot;Group&quot;,
     &quot;snapshots&quot;: {
       &quot;monitor-pods&quot;: [
