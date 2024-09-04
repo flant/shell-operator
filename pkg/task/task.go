@@ -20,6 +20,7 @@ type Task interface {
 	GetId() string
 	GetType() TaskType
 	IncrementFailureCount()
+	GetFailureMessage() string
 	UpdateFailureMessage(msg string)
 	GetFailureCount() int
 	GetLogLabels() map[string]string
@@ -131,6 +132,10 @@ func (t *BaseTask) IncrementFailureCount() {
 
 func (t *BaseTask) UpdateFailureMessage(msg string) {
 	t.FailureMessage = msg
+}
+
+func (t *BaseTask) GetFailureMessage() string {
+	return t.FailureMessage
 }
 
 func (t *BaseTask) GetDescription() string {
