@@ -300,7 +300,7 @@ func (h *Hook) prepareAdmissionResponseFile() (string, error) {
 func (h *Hook) prepareConversionResponseFile() (string, error) {
 	if os.Getenv("USE_PIPE") != "" {
 		fmt.Println("USING PIPE")
-		convPath := fmt.Sprintf("hook-%s-conversion-response.json", h.SafeName())
+		convPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response.json", h.SafeName()))
 		// if file exists, use it
 		if _, err := os.Stat(convPath); err == nil {
 			fmt.Println("PIPE EXISTS", convPath)
