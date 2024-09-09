@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -43,7 +44,13 @@ type Response struct {
 
 func ResponseFromFile(filePath string) (*Response, error) {
 	fmt.Println("PIPE READ FROM FILE", filePath)
-	data, err := os.ReadFile(filePath)
+	pipe, err := os.OpenFile(filePath, os.O_RDONLY|syscall.O_NONBLOCK, os.ModeNamedPipe)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open %s: %s", filePath, err)
+	}
+	defer pipe.Close()
+
+	data, err := io.ReadAll(pipe)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
 	}
