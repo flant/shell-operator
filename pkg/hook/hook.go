@@ -117,10 +117,10 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		if app.DebugKeepTmpFiles != "yes" {
 			_ = os.Remove(contextPath)
 			_ = os.Remove(metricsPath)
-			if !strings.HasSuffix(conversionPath, "-conversion-response.json") {
-				_ = os.Remove(conversionPath)
-				fmt.Println("REMOVe", conversionPath)
-			}
+			//if !strings.HasSuffix(conversionPath, "-conversion-response.json") {
+			_ = os.Remove(conversionPath)
+			//fmt.Println("PIPE REMOVe", conversionPath)
+			//}
 			_ = os.Remove(admissionPath)
 			_ = os.Remove(kubernetesPatchPath)
 		}
@@ -300,14 +300,15 @@ func (h *Hook) prepareAdmissionResponseFile() (string, error) {
 func (h *Hook) prepareConversionResponseFile() (string, error) {
 	if os.Getenv("USE_PIPE") != "" {
 		fmt.Println("USING PIPE")
-		convPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response.json", h.SafeName()))
+		//convPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response.json", h.SafeName()))
+		convPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
 		// if file exists, use it
 		if _, err := os.Stat(convPath); err == nil {
 			fmt.Println("PIPE EXISTS", convPath)
 			return convPath, nil
 		}
 		fmt.Println("PIPE CReATE", convPath)
-		err := syscall.Mkfifo(convPath, 0777)
+		err := syscall.Mkfifo(convPath, 0666)
 		if err != nil {
 			return "", err
 		}
