@@ -42,17 +42,24 @@ type Response struct {
 }
 
 func ResponseFromFile(filePath string) (*Response, error) {
-	data, err := os.ReadFile(filePath)
+	fmt.Println("PIPE READ FROM FILE", filePath)
+	pipe, err := os.OpenFile(filePath, os.O_RDONLY, os.ModeNamedPipe)
 	if err != nil {
-		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
+		return nil, fmt.Errorf("cannot open %s: %s", filePath, err)
 	}
+	defer pipe.Close()
 
-	fmt.Println("READ FROM FILE", string(data))
+	buf := make([]byte, 1024)
+	_, err = pipe.Read(buf)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read from pipe: %v\n", err)
+	}
+	fmt.Println("PIPE READ, ", string(buf))
 
-	if len(data) == 0 {
+	if len(buf) == 0 {
 		return nil, nil
 	}
-	return ResponseFromBytes(data)
+	return ResponseFromBytes(buf)
 }
 
 func ResponseFromBytes(data []byte) (*Response, error) {
