@@ -140,11 +140,12 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
 	result := &HookResult{}
-
+	fmt.Println("RUN HOOK")
 	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels)
 	if err != nil {
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
+	fmt.Println("HOOK DONE")
 
 	result.Metrics, err = operation.MetricOperationsFromFile(metricsPath)
 	if err != nil {
@@ -308,10 +309,11 @@ func (h *Hook) prepareConversionResponseFile() (string, error) {
 			return convPath, nil
 		}
 		fmt.Println("PIPE CReATE", convPath)
-		err := syscall.Mkfifo(convPath, 0666)
+		err := syscall.Mkfifo(convPath, 0o644)
 		if err != nil {
 			return "", err
 		}
+		fmt.Println("PIPE CREATED", convPath)
 		return convPath, nil
 	} else {
 		conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
