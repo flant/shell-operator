@@ -117,7 +117,10 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		if app.DebugKeepTmpFiles != "yes" {
 			_ = os.Remove(contextPath)
 			_ = os.Remove(metricsPath)
-			//_ = os.Remove(conversionPath)
+			if !strings.HasSuffix(conversionPath, "-conversion-response.json") {
+				_ = os.Remove(conversionPath)
+				fmt.Println("REMOVe", conversionPath)
+			}
 			_ = os.Remove(admissionPath)
 			_ = os.Remove(kubernetesPatchPath)
 		}
@@ -303,21 +306,22 @@ func (h *Hook) prepareConversionResponseFile() (string, error) {
 			fmt.Println("PIPE EXISTS", convPath)
 			return convPath, nil
 		}
-		err := syscall.Mkfifo(convPath, 0666)
+		fmt.Println("PIPE CReATE", convPath)
+		err := syscall.Mkfifo(convPath, 0777)
 		if err != nil {
 			return "", err
 		}
 		return convPath, nil
+	} else {
+		conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
+
+		err := os.WriteFile(conversionPath, []byte{}, 0o644)
+		if err != nil {
+			return "", err
+		}
+
+		return conversionPath, nil
 	}
-
-	conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
-
-	err := os.WriteFile(conversionPath, []byte{}, 0o644)
-	if err != nil {
-		return "", err
-	}
-
-	return conversionPath, nil
 }
 
 func CreateRateLimiter(cfg *config.HookConfig) *rate.Limiter {
