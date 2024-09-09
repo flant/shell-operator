@@ -47,6 +47,8 @@ func ResponseFromFile(filePath string) (*Response, error) {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
 	}
 
+	fmt.Println("READ FROM FILE", string(data))
+
 	if len(data) == 0 {
 		return nil, nil
 	}

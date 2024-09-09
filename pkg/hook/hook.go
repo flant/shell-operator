@@ -7,10 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-
-	uuid "github.com/gofrs/uuid/v5"
-	"github.com/kennygrant/sanitize"
-	"golang.org/x/time/rate"
+	"syscall"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
@@ -21,6 +18,9 @@ import (
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
 	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
+	uuid "github.com/gofrs/uuid/v5"
+	"github.com/kennygrant/sanitize"
+	"golang.org/x/time/rate"
 )
 
 type CommonHook interface {
@@ -117,7 +117,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		if app.DebugKeepTmpFiles != "yes" {
 			_ = os.Remove(contextPath)
 			_ = os.Remove(metricsPath)
-			_ = os.Remove(conversionPath)
+			//_ = os.Remove(conversionPath)
 			_ = os.Remove(admissionPath)
 			_ = os.Remove(kubernetesPatchPath)
 		}
@@ -295,6 +295,21 @@ func (h *Hook) prepareAdmissionResponseFile() (string, error) {
 }
 
 func (h *Hook) prepareConversionResponseFile() (string, error) {
+	if os.Getenv("USE_PIPE") != "" {
+		fmt.Println("USING PIPE")
+		convPath := fmt.Sprintf("hook-%s-conversion-response.json", h.SafeName())
+		// if file exists, use it
+		if _, err := os.Stat(convPath); err == nil {
+			fmt.Println("PIPE EXISTS", convPath)
+			return convPath, nil
+		}
+		err := syscall.Mkfifo(convPath, 0666)
+		if err != nil {
+			return "", err
+		}
+		return convPath, nil
+	}
+
 	conversionPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-conversion-response-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
 
 	err := os.WriteFile(conversionPath, []byte{}, 0o644)
