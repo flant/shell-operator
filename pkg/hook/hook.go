@@ -40,7 +40,7 @@ type Hook struct {
 	Path   string // The absolute path to the executable file.
 	Config *config.HookConfig
 
-	HookController controller.HookController
+	HookController *controller.HookController
 	RateLimiter    *rate.Limiter
 
 	TmpDir string
@@ -77,7 +77,7 @@ func (h *Hook) RateLimitWait(ctx context.Context) error {
 	return h.RateLimiter.Wait(ctx)
 }
 
-func (h *Hook) WithHookController(hookController controller.HookController) {
+func (h *Hook) WithHookController(hookController *controller.HookController) {
 	h.HookController = hookController
 }
 

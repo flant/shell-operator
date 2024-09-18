@@ -110,5 +110,4 @@ func DefineConversionWebhookFlags(cmd *kingpin.CmdClause) {
 		Default(ConversionWebhookSettings.ListenAddr).
 		Envar("CONVERSION_WEBHOOK_LISTEN_ADDRESS").
 		StringVar(&ConversionWebhookSettings.ListenAddr)
-
 }

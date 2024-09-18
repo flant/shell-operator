@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
@@ -22,23 +23,7 @@ import (
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
-type HookManager interface {
-	Init() error
-	Run()
-	WorkingDir() string
-	TempDir() string
-	GetHook(name string) *Hook
-	GetHookNames() []string
-	GetHooksInOrder(bindingType BindingType) ([]string, error)
-	HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
-	HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo))
-	HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo))
-	DetectAdmissionEventType(event AdmissionEvent) BindingType
-	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo))
-	FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule
-}
-
-type hookManager struct {
+type Manager struct {
 	// dependencies
 	workingDir               string
 	tempDir                  string
@@ -59,11 +44,8 @@ type hookManager struct {
 	conversionChains *conversion.ChainStorage
 }
 
-// hookManager should implement HookManager
-var _ HookManager = &hookManager{}
-
-// HookManagerConfig sets configuration for HookManager
-type HookManagerConfig struct {
+// ManagerConfig sets configuration for Manager
+type ManagerConfig struct {
 	WorkingDir string
 	TempDir    string
 	Kmgr       kube_events_manager.KubeEventsManager
@@ -72,8 +54,8 @@ type HookManagerConfig struct {
 	Cmgr       *conversion.WebhookManager
 }
 
-func NewHookManager(config *HookManagerConfig) *hookManager {
-	return &hookManager{
+func NewHookManager(config *ManagerConfig) *Manager {
+	return &Manager{
 		hooksByName:      make(map[string]*Hook),
 		hookNamesInOrder: make([]string, 0),
 		hooksInOrder:     make(map[BindingType][]*Hook),
@@ -88,16 +70,16 @@ func NewHookManager(config *HookManagerConfig) *hookManager {
 	}
 }
 
-func (hm *hookManager) WorkingDir() string {
+func (hm *Manager) WorkingDir() string {
 	return hm.workingDir
 }
 
-func (hm *hookManager) TempDir() string {
+func (hm *Manager) TempDir() string {
 	return hm.tempDir
 }
 
 // Init finds executables in WorkingDir, execute them with --config argument and add them into indices.
-func (hm *hookManager) Init() error {
+func (hm *Manager) Init() error {
 	log.Info("Initialize hooks manager. Search for and load all hooks.")
 
 	hm.hooksInOrder = make(map[BindingType][]*Hook)
@@ -140,7 +122,7 @@ func (hm *hookManager) Init() error {
 }
 
 // TODO move --config execution to a Hook method
-func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
+func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 	hookName, err := filepath.Rel(hm.workingDir, hookPath)
 	if err != nil {
 		return nil, err
@@ -152,7 +134,7 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 
 	hookEntry.Infof("Load config from '%s'", hookPath)
 
-	envs := []string{}
+	envs := make([]string, 0)
 	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
 		hookEntry.Errorf("Hook config output:\n%s", string(configOutput))
@@ -221,7 +203,7 @@ func (hm *hookManager) loadHook(hookPath string) (hook *Hook, err error) {
 	return hook, nil
 }
 
-func (hm *hookManager) execCommandOutput(hookName string, dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
+func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
 	envs = append(os.Environ(), envs...)
 	cmd := executor.MakeCommand(dir, entrypoint, args, envs)
 	cmd.Stdout = nil
@@ -242,12 +224,7 @@ func (hm *hookManager) execCommandOutput(hookName string, dir string, entrypoint
 	return output, nil
 }
 
-// HookManager has no events for now.
-func (hm *hookManager) Run() {
-	panic("implement me")
-}
-
-func (hm *hookManager) GetHook(name string) *Hook {
+func (hm *Manager) GetHook(name string) *Hook {
 	hook, exists := hm.hooksByName[name]
 	if exists {
 		return hook
@@ -256,11 +233,11 @@ func (hm *hookManager) GetHook(name string) *Hook {
 	return nil
 }
 
-func (hm *hookManager) GetHookNames() []string {
+func (hm *Manager) GetHookNames() []string {
 	return hm.hookNamesInOrder
 }
 
-func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error) {
+func (hm *Manager) GetHooksInOrder(bindingType BindingType) ([]string, error) {
 	hooks, ok := hm.hooksInOrder[bindingType]
 	if !ok {
 		return []string{}, nil
@@ -288,7 +265,7 @@ func (hm *hookManager) GetHooksInOrder(bindingType BindingType) ([]string, error
 	return hooksNames, nil
 }
 
-func (hm *hookManager) HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	kubeHooks, _ := hm.GetHooksInOrder(OnKubernetesEvent)
 
 	for _, hookName := range kubeHooks {
@@ -304,7 +281,7 @@ func (hm *hookManager) HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*H
 	}
 }
 
-func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	schHooks, _ := hm.GetHooksInOrder(Schedule)
 	for _, hookName := range schHooks {
 		h := hm.GetHook(hookName)
@@ -318,7 +295,7 @@ func (hm *hookManager) HandleScheduleEvent(crontab string, createTaskFn func(*Ho
 	}
 }
 
-func (hm *hookManager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
@@ -344,7 +321,7 @@ func (hm *hookManager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn f
 	}
 }
 
-func (hm *hookManager) DetectAdmissionEventType(event AdmissionEvent) BindingType {
+func (hm *Manager) DetectAdmissionEventType(event AdmissionEvent) BindingType {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
@@ -366,13 +343,13 @@ func (hm *hookManager) DetectAdmissionEventType(event AdmissionEvent) BindingTyp
 }
 
 // HandleConversionEvent receives a crdName and calculates a sequence of hooks to run.
-func (hm *hookManager) HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleConversionEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesConversion)
 
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
-		if h.HookController.CanHandleConversionEvent(event, rule) {
-			h.HookController.HandleConversionEvent(event, rule, func(info controller.BindingExecutionInfo) {
+		if h.HookController.CanHandleConversionEvent(crdName, request, rule) {
+			h.HookController.HandleConversionEvent(crdName, request, rule, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
 				}
@@ -381,7 +358,7 @@ func (hm *hookManager) HandleConversionEvent(event conversion.Event, rule conver
 	}
 }
 
-func (hm *hookManager) UpdateConversionChains() error {
+func (hm *Manager) UpdateConversionChains() error {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesConversion)
 
 	// Update conversionChains.
@@ -400,6 +377,6 @@ func (hm *hookManager) UpdateConversionChains() error {
 	return nil
 }
 
-func (hm *hookManager) FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule {
+func (hm *Manager) FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule {
 	return hm.conversionChains.FindConversionChain(crdName, rule)
 }

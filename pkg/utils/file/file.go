@@ -84,7 +84,6 @@ func RecursiveCheckLibDirectory(dir string) error {
 
 		return nil
 	})
-
 	if err != nil {
 		return err
 	}

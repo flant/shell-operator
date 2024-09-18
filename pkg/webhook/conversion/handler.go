@@ -3,7 +3,6 @@ package conversion
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -12,7 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
@@ -48,105 +46,70 @@ func NewWebhookHandler() *WebhookHandler {
 func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	bodyBytes, err := io.ReadAll(r.Body)
+	crdName := detectCrdName(r.URL.Path)
+	log.Infof("Got ConversionReview request for crd/%s", crdName)
+
+	var convertReview v1.ConversionReview
+	err := json.NewDecoder(r.Body).Decode(&convertReview)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("Error reading request body"))
-		log.Errorf("Error reading request body: %v", err)
+		log.Errorf("failed to read conversion request: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	conversionResponse, err := h.handleReviewRequest(r.URL.Path, bodyBytes)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(err.Error()))
+	if convertReview.Request == nil {
+		log.Error("conversion request is nil")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	respBytes, err := json.Marshal(conversionResponse)
+	conversionResponse, err := h.handleReviewRequest(crdName, convertReview.Request)
+	if err != nil {
+		log.Error(err, "failed to convert", "request", convertReview.Request.UID)
+		convertReview.Response = errored(err)
+	} else {
+		convertReview.Response = conversionResponse
+	}
+
+	convertReview.Response.UID = convertReview.Request.UID
+	convertReview.Request = nil
+
+	w.Header().Set("Content-type", "application/json")
+	err = json.NewEncoder(w).Encode(convertReview)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error json encoding ConversionReview"))
 		log.Errorf("Error json encoding ConversionReview: %v", err)
 		return
 	}
-
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(respBytes)
 }
 
 // See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#write-a-conversion-webhook-server
 // This code always response with v1 ConversionReview: it works for 1.16+.
-func (h *WebhookHandler) handleReviewRequest(path string, body []byte) (*v1.ConversionReview, error) {
-	crdName := detectCrdName(path)
-	log.Infof("Got ConversionReview request for crd/%s", crdName)
-
-	var inReview v1.ConversionReview
-	err := json.Unmarshal(body, &inReview)
-	if err != nil {
-		log.Errorf("Error parsing ConversionReview: %v", err)
-		return nil, fmt.Errorf("fail to parse ConversionReview")
-	}
-
-	review := &v1.ConversionReview{
-		TypeMeta: inReview.TypeMeta,
-		Response: &v1.ConversionResponse{
-			UID: inReview.Request.UID,
-		},
-	}
-
+func (h *WebhookHandler) handleReviewRequest(crdName string, request *v1.ConversionRequest) (*v1.ConversionResponse, error) {
 	if h.Manager.EventHandlerFn == nil {
-		review.Response.Result = metav1.Status{
-			Status:  "Failed",
-			Message: "ConversionReview handler is not defined",
-		}
-		return review, nil
+		return nil, fmt.Errorf("ConversionReview handler is not defined")
 	}
 
-	event, err := prepareConversionEvent(crdName, &inReview)
+	conversionResponse, err := h.Manager.EventHandlerFn(crdName, request)
 	if err != nil {
 		return nil, err
 	}
 
-	conversionResponse, err := h.Manager.EventHandlerFn(event)
-	if err != nil {
-		review.Response.Result = metav1.Status{
-			Status:  "Failed",
-			Message: err.Error(),
-		}
-		return review, nil
-	}
-
 	if conversionResponse.FailedMessage != "" {
-		review.Response.Result = metav1.Status{
-			Status:  "Failed",
-			Message: conversionResponse.FailedMessage,
-		}
-		return review, nil
+		return nil, fmt.Errorf(conversionResponse.FailedMessage)
 	}
 
-	if len(inReview.Request.Objects) != len(conversionResponse.ConvertedObjects) {
-		review.Response.Result = metav1.Status{
-			Status:  "Failed",
-			Message: fmt.Sprintf("Hook returned %d objects instead of %d", len(conversionResponse.ConvertedObjects), len(review.Request.Objects)),
-		}
-		return review, nil
+	if len(request.Objects) != len(conversionResponse.ConvertedObjects) {
+		return nil, fmt.Errorf("hook returned %d objects instead of %d", len(conversionResponse.ConvertedObjects), len(request.Objects))
 	}
 
-	review.Response.Result = metav1.Status{
-		Status: "Success",
-	}
-
-	// Convert objects from hook into to array of runtime.RawExtension
-	rawObjects := make([]runtime.RawExtension, len(conversionResponse.ConvertedObjects))
-	for i, obj := range conversionResponse.ConvertedObjects {
-		tmpObj := obj
-		rawObjects[i] = runtime.RawExtension{Object: &tmpObj}
-	}
-	review.Response.ConvertedObjects = rawObjects
-
-	return review, nil
+	return &v1.ConversionResponse{
+		ConvertedObjects: conversionResponse.ConvertedObjects,
+		UID:              request.UID,
+		Result: metav1.Status{
+			Status: metav1.StatusSuccess,
+		}}, nil
 }
 
 // detectCrdName extracts crdName from the url path.
@@ -154,37 +117,30 @@ func detectCrdName(path string) string {
 	return strings.TrimPrefix(path, "/")
 }
 
-func prepareConversionEvent(crdName string, review *v1.ConversionReview) (event Event, err error) {
-	event.CrdName = crdName
-	event.Review = review
-	event.Objects, err = rawExtensionToUnstructured(review.Request.Objects)
-	return event, err
-}
-
-func ExtractAPIVersions(objs []unstructured.Unstructured) []string {
-	verMap := map[string]bool{}
-	for _, obj := range objs {
-		verMap[obj.GetAPIVersion()] = true
-	}
+func ExtractAPIVersions(objs []runtime.RawExtension) []string {
+	verMap := make(map[string]struct{})
 	res := make([]string, 0)
-	for ver := range verMap {
-		res = append(res, ver)
+
+	for _, obj := range objs {
+		var a metav1.TypeMeta
+		_ = json.Unmarshal(obj.Raw, &a)
+
+		if _, ok := verMap[a.APIVersion]; ok {
+			continue
+		}
+
+		verMap[a.APIVersion] = struct{}{}
+		res = append(res, a.APIVersion)
 	}
+
 	return res
 }
 
-func rawExtensionToUnstructured(objects []runtime.RawExtension) ([]unstructured.Unstructured, error) {
-	res := make([]unstructured.Unstructured, 0)
-
-	for _, obj := range objects {
-		cr := unstructured.Unstructured{}
-
-		if err := cr.UnmarshalJSON(obj.Raw); err != nil {
-			return nil, fmt.Errorf("failed to unmarshall object in conversion request with error: %v", err)
-		}
-
-		res = append(res, cr)
+func errored(err error) *v1.ConversionResponse {
+	return &v1.ConversionResponse{
+		Result: metav1.Status{
+			Status:  metav1.StatusFailure,
+			Message: err.Error(),
+		},
 	}
-
-	return res, nil
 }

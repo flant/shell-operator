@@ -181,7 +181,7 @@ func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 	op.ConversionWebhookManager.Namespace = app.Namespace
 
 	// Initialize Hook manager.
-	cfg := &hook.HookManagerConfig{
+	cfg := &hook.ManagerConfig{
 		WorkingDir: hooksDir,
 		TempDir:    tempDir,
 		Kmgr:       op.KubeEventsManager,
