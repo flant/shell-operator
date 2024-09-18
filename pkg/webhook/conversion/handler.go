@@ -104,7 +104,12 @@ func (h *WebhookHandler) handleReviewRequest(crdName string, request *v1.Convers
 		return nil, fmt.Errorf("hook returned %d objects instead of %d", len(conversionResponse.ConvertedObjects), len(request.Objects))
 	}
 
-	return &v1.ConversionResponse{ConvertedObjects: conversionResponse.ConvertedObjects}, nil
+	return &v1.ConversionResponse{
+		ConvertedObjects: conversionResponse.ConvertedObjects,
+		UID:              request.UID,
+		Result: metav1.Status{
+			Status: metav1.StatusSuccess,
+		}}, nil
 }
 
 // detectCrdName extracts crdName from the url path.
