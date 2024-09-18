@@ -349,6 +349,7 @@ func (hm *Manager) HandleConversionEvent(crdName string, event *v1.ConversionRev
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleConversionEvent(crdName, event, rule) {
+			fmt.Println("FOUND")
 			h.HookController.HandleConversionEvent(crdName, event, rule, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
