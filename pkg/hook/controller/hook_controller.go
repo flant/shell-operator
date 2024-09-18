@@ -35,43 +35,6 @@ type BindingExecutionInfo struct {
 // методом KubernetesSnapshots можно достать все кубовые объекты, чтобы добавить
 // их в какой-то свой binding context
 
-// type HookController interface {
-//	InitKubernetesBindings([]OnKubernetesEventConfig, kube_events_manager.KubeEventsManager)
-//	InitScheduleBindings([]ScheduleConfig, schedule_manager.ScheduleManager)
-//	InitAdmissionBindings([]ValidatingConfig, []MutatingConfig, *admission.WebhookManager)
-//	InitConversionBindings([]ConversionConfig, *conversion.WebhookManager)
-//
-//	CanHandleKubeEvent(kubeEvent KubeEvent) bool
-//	CanHandleScheduleEvent(crontab string) bool
-//	CanHandleAdmissionEvent(event AdmissionEvent) bool
-//	CanHandleConversionEvent(event conversion.Event, rule conversion.Rule) bool
-//
-//	// These method should call an underlying *Binding*Controller to get binding context
-//	// and then add Snapshots to binding context
-//	HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error
-//	HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo))
-//	HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo))
-//	HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo))
-//	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTasksFn func(BindingExecutionInfo))
-//
-//	UnlockKubernetesEvents()
-//	UnlockKubernetesEventsFor(monitorID string)
-//	StopMonitors()
-//	UpdateMonitor(monitorId string, kind, apiVersion string) error
-//
-//	EnableScheduleBindings()
-//	DisableScheduleBindings()
-//
-//	EnableAdmissionBindings()
-//
-//	EnableConversionBindings()
-//
-//	KubernetesSnapshots() map[string][]ObjectAndFilterResult
-//	UpdateSnapshots([]BindingContext) []BindingContext
-//	SnapshotsInfo() []string
-//	SnapshotsDump() map[string]interface{}
-//}
-
 func NewHookController() *HookController {
 	return &HookController{}
 }

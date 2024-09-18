@@ -305,7 +305,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 
 	sourceVersions := conversion.ExtractAPIVersions(request.Objects)
-	logEntry.Infof("Handle '%s' event for crd/%s: %d objects with version %v", string(KubernetesConversion), crdName, len(request.Objects), sourceVersions)
+	logEntry.Infof("Handle '%s' event for crd/%s: %d objects with versions %v", string(KubernetesConversion), crdName, len(request.Objects), sourceVersions)
 
 	done := false
 	for _, srcVer := range sourceVersions {

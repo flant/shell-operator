@@ -20,16 +20,6 @@ type ConversionBindingToWebhookLink struct {
 	Group            string
 }
 
-//// ScheduleBindingsController handles schedule bindings for one hook.
-// type ConversionBindingsController interface {
-//	WithBindings([]ConversionConfig)
-//	WithWebhookManager(manager *conversion.WebhookManager)
-//	EnableConversionBindings()
-//	DisableConversionBindings()
-//	CanHandleEvent(event conversion.Event, rule conversion.Rule) bool
-//	HandleEvent(event conversion.Event, rule conversion.Rule) BindingExecutionInfo
-//}
-
 // ConversionBindingsController holds validating bindings from one hook.
 type ConversionBindingsController struct {
 	// crdName -> conversionRule id -> link

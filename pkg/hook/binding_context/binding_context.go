@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/admission/v1"
-	v12 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apixv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -29,7 +29,7 @@ type BindingContext struct {
 	Objects          []ObjectAndFilterResult
 	Snapshots        map[string][]ObjectAndFilterResult
 	AdmissionReview  *v1.AdmissionReview
-	ConversionReview *v12.ConversionReview
+	ConversionReview *apixv1.ConversionReview
 	FromVersion      string
 	ToVersion        string
 }
