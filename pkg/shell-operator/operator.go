@@ -335,8 +335,6 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 				convTask = newTask
 			})
 
-			fmt.Println("TASK", convTask)
-
 			if convTask == nil {
 				return nil, fmt.Errorf("no hook found for '%s' event for crd/%s", string(KubernetesConversion), crdName)
 			}

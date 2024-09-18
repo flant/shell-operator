@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"fmt"
-
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -82,14 +80,11 @@ func (c *ConversionBindingsController) DisableConversionBindings() {
 }
 
 func (c *ConversionBindingsController) CanHandleEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule) bool {
-	fmt.Println("LINKS", c.Links)
 	_, has := c.Links[crdName]
-	fmt.Println("HAS1 ", has)
 	if !has {
 		return false
 	}
 	_, has = c.Links[crdName][rule]
-	fmt.Println("HAS2 ", has)
 	return has
 }
 
