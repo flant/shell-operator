@@ -335,6 +335,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, review *v1.Conve
 				convTask = newTask
 			})
 
+			fmt.Println("TASK", convTask)
 			res := op.taskHandler(convTask)
 
 			if res.Status == "Fail" {
