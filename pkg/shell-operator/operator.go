@@ -335,6 +335,10 @@ func (op *ShellOperator) conversionEventHandler(crdName string, review *v1.Conve
 				convTask = newTask
 			})
 
+			if convTask == nil {
+				return nil, fmt.Errorf("no hook found for '%s' event for crd/%s", string(KubernetesConversion), crdName)
+			}
+
 			fmt.Println("TASK", convTask)
 			res := op.taskHandler(convTask)
 
