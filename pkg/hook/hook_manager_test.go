@@ -11,7 +11,6 @@ import (
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -91,7 +90,7 @@ func TestHookController_HandleValidatingEvent(t *testing.T) {
 		t.Fatalf("Hook manager Init should not fail: %v", err)
 	}
 
-	ev := AdmissionEvent{
+	ev := admission.Event{
 		WebhookId:       "test-policy-example-com",
 		ConfigurationId: "hooks",
 		Request:         nil,
