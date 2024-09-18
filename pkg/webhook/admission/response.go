@@ -1,4 +1,4 @@
-package types
+package admission
 
 import (
 	"bytes"
@@ -10,14 +10,14 @@ import (
 	"strings"
 )
 
-type AdmissionResponse struct {
+type Response struct {
 	Allowed  bool     `json:"allowed"`
 	Message  string   `json:"message,omitempty"`
 	Warnings []string `json:"warnings,omitempty"`
 	Patch    []byte   `json:"patch,omitempty"`
 }
 
-func AdmissionResponseFromFile(filePath string) (*AdmissionResponse, error) {
+func ResponseFromFile(filePath string) (*Response, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
@@ -27,25 +27,24 @@ func AdmissionResponseFromFile(filePath string) (*AdmissionResponse, error) {
 		return nil, nil
 	}
 
-	return AdmissionResponseFromBytes(data)
+	return ResponseFromBytes(data)
 }
 
-func AdmissionResponseFromBytes(data []byte) (*AdmissionResponse, error) {
+func ResponseFromBytes(data []byte) (*Response, error) {
 	return FromReader(bytes.NewReader(data))
 }
 
-func FromReader(r io.Reader) (*AdmissionResponse, error) {
-	response := new(AdmissionResponse)
+func FromReader(r io.Reader) (*Response, error) {
+	response := new(Response)
 
-	dec := json.NewDecoder(r)
-	if err := dec.Decode(response); err != nil {
+	if err := json.NewDecoder(r).Decode(response); err != nil {
 		return nil, err
 	}
 
 	return response, nil
 }
 
-func (r *AdmissionResponse) Dump() string {
+func (r *Response) Dump() string {
 	b := new(strings.Builder)
 	b.WriteString("AdmissionResponse(allowed=")
 	b.WriteString(strconv.FormatBool(r.Allowed))

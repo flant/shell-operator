@@ -9,7 +9,6 @@ import (
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -42,7 +41,7 @@ func NewHookController() *HookController {
 type HookController struct {
 	KubernetesController KubernetesBindingsController
 	ScheduleController   ScheduleBindingsController
-	AdmissionController  AdmissionBindingsController
+	AdmissionController  *AdmissionBindingsController
 	ConversionController *ConversionBindingsController
 	kubernetesBindings   []OnKubernetesEventConfig
 	scheduleBindings     []ScheduleConfig
@@ -128,7 +127,7 @@ func (hc *HookController) CanHandleScheduleEvent(crontab string) bool {
 	return false
 }
 
-func (hc *HookController) CanHandleAdmissionEvent(event AdmissionEvent) bool {
+func (hc *HookController) CanHandleAdmissionEvent(event admission.Event) bool {
 	if hc.AdmissionController != nil {
 		return hc.AdmissionController.CanHandleEvent(event)
 	}
@@ -167,7 +166,7 @@ func (hc *HookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 	}
 }
 
-func (hc *HookController) HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleAdmissionEvent(event admission.Event, createTasksFn func(BindingExecutionInfo)) {
 	if hc.AdmissionController == nil {
 		return
 	}

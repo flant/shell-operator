@@ -94,7 +94,7 @@ func TestHookController_HandleValidatingEvent(t *testing.T) {
 	ev := AdmissionEvent{
 		WebhookId:       "test-policy-example-com",
 		ConfigurationId: "hooks",
-		Review:          nil,
+		Request:         nil,
 	}
 
 	h := hm.GetHook("hook.sh")

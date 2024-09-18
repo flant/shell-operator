@@ -25,7 +25,6 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -204,7 +203,7 @@ func (op *ShellOperator) initValidatingWebhookManager() (err error) {
 	}
 
 	// Define handler for AdmissionEvent
-	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event AdmissionEvent) (*AdmissionResponse, error) {
+	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event admission.Event) (*admission.Response, error) {
 		eventBindingType := op.HookManager.DetectAdmissionEventType(event)
 		logLabels := map[string]string{
 			"event.id": uuid.Must(uuid.NewV4()).String(),
@@ -213,7 +212,7 @@ func (op *ShellOperator) initValidatingWebhookManager() (err error) {
 		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 		logEntry.Debugf("Handle '%s' event '%s' '%s'", eventBindingType, event.ConfigurationId, event.WebhookId)
 
-		var tasks []task.Task
+		var admissionTask task.Task
 		op.HookManager.HandleAdmissionEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(HookRun).
 				WithMetadata(HookMetadata{
@@ -225,30 +224,26 @@ func (op *ShellOperator) initValidatingWebhookManager() (err error) {
 					Group:          info.Group,
 				}).
 				WithLogLabels(logLabels)
-			tasks = append(tasks, newTask)
+			admissionTask = newTask
 		})
 
 		// Assert exactly one task is created.
-		if len(tasks) == 0 {
+		if admissionTask == nil {
 			logEntry.Errorf("Possible bug!!! No hook found for '%s' event '%s' '%s'", string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
 			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
 		}
 
-		if len(tasks) > 1 {
-			logEntry.Errorf("Possible bug!!! %d hooks found for '%s' event '%s' '%s'", len(tasks), string(KubernetesValidating), event.ConfigurationId, event.WebhookId)
-		}
-
-		res := op.taskHandler(tasks[0])
+		res := op.taskHandler(admissionTask)
 
 		if res.Status == "Fail" {
-			return &AdmissionResponse{
+			return &admission.Response{
 				Allowed: false,
 				Message: "Hook failed",
 			}, nil
 		}
 
-		admissionProp := tasks[0].GetProp("admissionResponse")
-		admissionResponse, ok := admissionProp.(*AdmissionResponse)
+		admissionProp := admissionTask.GetProp("admissionResponse")
+		admissionResponse, ok := admissionProp.(*admission.Response)
 		if !ok {
 			logEntry.Errorf("'admissionResponse' task prop is not of type *AdmissionResponse: %T", admissionProp)
 			return nil, fmt.Errorf("hook task prop error")

@@ -3,7 +3,6 @@ package admission
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -14,14 +13,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 )
 
-type AdmissionEventHandlerFn func(event AdmissionEvent) (*AdmissionResponse, error)
+type EventHandlerFn func(event Event) (*Response, error)
 
 type WebhookHandler struct {
 	Router  chi.Router
-	Handler AdmissionEventHandlerFn
+	Handler EventHandlerFn
 }
 
 func NewWebhookHandler() *WebhookHandler {
@@ -49,91 +47,73 @@ func NewWebhookHandler() *WebhookHandler {
 func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	bodyBytes, err := io.ReadAll(r.Body)
+	var admissionReview v1.AdmissionReview
+	err := json.NewDecoder(r.Body).Decode(&admissionReview)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("Error reading request body"))
-		log.Errorf("Error reading request body: %v", err)
+		log.Errorf("failed to read admission request: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	admissionResponse, err := h.handleReviewRequest(r.URL.Path, bodyBytes)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(err.Error()))
+	if admissionReview.Request == nil {
+		log.Error("admission request is nil")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	respBytes, err := json.Marshal(admissionResponse)
+	admissionResponse, err := h.handleReviewRequest(r.URL.Path, admissionReview.Request)
+	if err != nil {
+		log.Error(err, "validation failed", "request", admissionReview.Request.UID)
+		admissionReview.Response = errored(err)
+	} else {
+		admissionReview.Response = admissionResponse
+	}
+
+	admissionReview.Response.UID = admissionReview.Request.UID
+	admissionReview.Request = nil
+
+	w.Header().Set("Content-type", "application/json")
+	err = json.NewEncoder(w).Encode(admissionReview)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error json encoding AdmissionReview"))
 		log.Errorf("Error json encoding AdmissionReview: %v", err)
 		return
 	}
-
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(respBytes)
 }
 
-func (h *WebhookHandler) handleReviewRequest(path string, body []byte) (*v1.AdmissionReview, error) {
+func (h *WebhookHandler) handleReviewRequest(path string, request *v1.AdmissionRequest) (*v1.AdmissionResponse, error) {
 	configurationID, webhookID := detectConfigurationAndWebhook(path)
 	log.Infof("Got AdmissionReview request for confId='%s' webhookId='%s'", configurationID, webhookID)
 
-	var review v1.AdmissionReview
-	err := json.Unmarshal(body, &review)
-	if err != nil {
-		log.Errorf("Error parsing AdmissionReview: %v", err)
-		return nil, fmt.Errorf("fail to parse AdmissionReview")
-	}
-
-	response := &v1.AdmissionReview{
-		TypeMeta: review.TypeMeta,
-		Response: &v1.AdmissionResponse{
-			UID: review.Request.UID,
-		},
-	}
-
 	if h.Handler == nil {
-		response.Response.Allowed = false
-		response.Response.Result = &metav1.Status{
-			Code:    http.StatusInternalServerError,
-			Message: "AdmissionReview handler is not defined",
-		}
-		return response, nil
+		return nil, fmt.Errorf("AdmissionReview handler is not defined")
 	}
 
-	event := AdmissionEvent{
+	event := Event{
 		WebhookId:       webhookID,
 		ConfigurationId: configurationID,
-		Review:          &review,
+		Request:         request,
 	}
 
 	admissionResponse, err := h.Handler(event)
 	if err != nil {
-		response.Response.Allowed = false
-		response.Response.Result = &metav1.Status{
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-		}
-		return response, nil
+		return nil, err
 	}
 
-	if len(admissionResponse.Warnings) > 0 {
-		response.Response.Warnings = admissionResponse.Warnings
+	response := &v1.AdmissionResponse{
+		UID:      request.UID,
+		Allowed:  admissionResponse.Allowed,
+		Warnings: admissionResponse.Warnings,
+		Patch:    admissionResponse.Patch,
 	}
 
 	if !admissionResponse.Allowed {
-		response.Response.Allowed = false
-		response.Response.Result = &metav1.Status{
+		response.Result = &metav1.Status{
 			Code:    http.StatusForbidden,
 			Message: admissionResponse.Message,
 		}
-		return response, nil
 	}
-
-	response.Response.Allowed = true
 
 	// When allowing a request, a mutating admission webhook may optionally modify the
 	// incoming object as well. This is done using the patch and patchType fields in the response.
@@ -141,9 +121,8 @@ func (h *WebhookHandler) handleReviewRequest(path string, body []byte) (*v1.Admi
 	// more details. For patchType: JSONPatch, the patch field contains a base64-encoded
 	// array of JSON patch operations.
 	if len(admissionResponse.Patch) > 0 {
-		response.Response.Patch = admissionResponse.Patch
 		patchType := v1.PatchTypeJSONPatch
-		response.Response.PatchType = &patchType
+		response.PatchType = &patchType
 	}
 
 	return response, nil
@@ -166,4 +145,14 @@ func detectConfigurationAndWebhook(path string) (configurationID string, webhook
 	webhookID = strings.Join(webhookParts, "/")
 
 	return
+}
+
+func errored(err error) *v1.AdmissionResponse {
+	return &v1.AdmissionResponse{
+		Allowed: false,
+		Result: &metav1.Status{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
+		},
+	}
 }
