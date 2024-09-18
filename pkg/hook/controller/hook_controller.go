@@ -1,6 +1,8 @@
 package controller
 
 import (
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -33,54 +35,52 @@ type BindingExecutionInfo struct {
 // методом KubernetesSnapshots можно достать все кубовые объекты, чтобы добавить
 // их в какой-то свой binding context
 
-type HookController interface {
-	InitKubernetesBindings([]OnKubernetesEventConfig, kube_events_manager.KubeEventsManager)
-	InitScheduleBindings([]ScheduleConfig, schedule_manager.ScheduleManager)
-	InitAdmissionBindings([]ValidatingConfig, []MutatingConfig, *admission.WebhookManager)
-	InitConversionBindings([]ConversionConfig, *conversion.WebhookManager)
+// type HookController interface {
+//	InitKubernetesBindings([]OnKubernetesEventConfig, kube_events_manager.KubeEventsManager)
+//	InitScheduleBindings([]ScheduleConfig, schedule_manager.ScheduleManager)
+//	InitAdmissionBindings([]ValidatingConfig, []MutatingConfig, *admission.WebhookManager)
+//	InitConversionBindings([]ConversionConfig, *conversion.WebhookManager)
+//
+//	CanHandleKubeEvent(kubeEvent KubeEvent) bool
+//	CanHandleScheduleEvent(crontab string) bool
+//	CanHandleAdmissionEvent(event AdmissionEvent) bool
+//	CanHandleConversionEvent(event conversion.Event, rule conversion.Rule) bool
+//
+//	// These method should call an underlying *Binding*Controller to get binding context
+//	// and then add Snapshots to binding context
+//	HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error
+//	HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo))
+//	HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo))
+//	HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo))
+//	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTasksFn func(BindingExecutionInfo))
+//
+//	UnlockKubernetesEvents()
+//	UnlockKubernetesEventsFor(monitorID string)
+//	StopMonitors()
+//	UpdateMonitor(monitorId string, kind, apiVersion string) error
+//
+//	EnableScheduleBindings()
+//	DisableScheduleBindings()
+//
+//	EnableAdmissionBindings()
+//
+//	EnableConversionBindings()
+//
+//	KubernetesSnapshots() map[string][]ObjectAndFilterResult
+//	UpdateSnapshots([]BindingContext) []BindingContext
+//	SnapshotsInfo() []string
+//	SnapshotsDump() map[string]interface{}
+//}
 
-	CanHandleKubeEvent(kubeEvent KubeEvent) bool
-	CanHandleScheduleEvent(crontab string) bool
-	CanHandleAdmissionEvent(event AdmissionEvent) bool
-	CanHandleConversionEvent(event conversion.Event, rule conversion.Rule) bool
-
-	// These method should call an underlying *Binding*Controller to get binding context
-	// and then add Snapshots to binding context
-	HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error
-	HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo))
-	HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo))
-	HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo))
-	HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTasksFn func(BindingExecutionInfo))
-
-	UnlockKubernetesEvents()
-	UnlockKubernetesEventsFor(monitorID string)
-	StopMonitors()
-	UpdateMonitor(monitorId string, kind, apiVersion string) error
-
-	EnableScheduleBindings()
-	DisableScheduleBindings()
-
-	EnableAdmissionBindings()
-
-	EnableConversionBindings()
-
-	KubernetesSnapshots() map[string][]ObjectAndFilterResult
-	UpdateSnapshots([]BindingContext) []BindingContext
-	SnapshotsInfo() []string
-	SnapshotsDump() map[string]interface{}
+func NewHookController() *HookController {
+	return &HookController{}
 }
 
-var _ HookController = &hookController{}
-
-func NewHookController() HookController {
-	return &hookController{}
-}
-
-type hookController struct {
+type HookController struct {
 	KubernetesController KubernetesBindingsController
 	ScheduleController   ScheduleBindingsController
 	AdmissionController  AdmissionBindingsController
-	ConversionController ConversionBindingsController
+	ConversionController *ConversionBindingsController
 	kubernetesBindings   []OnKubernetesEventConfig
 	scheduleBindings     []ScheduleConfig
 	validatingBindings   []ValidatingConfig
@@ -88,7 +88,7 @@ type hookController struct {
 	conversionBindings   []ConversionConfig
 }
 
-func (hc *hookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager) {
+func (hc *HookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -100,7 +100,7 @@ func (hc *hookController) InitKubernetesBindings(bindings []OnKubernetesEventCon
 	hc.kubernetesBindings = bindings
 }
 
-func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, scheduleMgr schedule_manager.ScheduleManager) {
+func (hc *HookController) InitScheduleBindings(bindings []ScheduleConfig, scheduleMgr schedule_manager.ScheduleManager) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -112,7 +112,7 @@ func (hc *hookController) InitScheduleBindings(bindings []ScheduleConfig, schedu
 	hc.scheduleBindings = bindings
 }
 
-func (hc *hookController) InitAdmissionBindings(vbindings []ValidatingConfig, mbindings []MutatingConfig, webhookMgr *admission.WebhookManager) {
+func (hc *HookController) InitAdmissionBindings(vbindings []ValidatingConfig, mbindings []MutatingConfig, webhookMgr *admission.WebhookManager) {
 	bindingCtrl := NewValidatingBindingsController()
 	bindingCtrl.WithWebhookManager(webhookMgr)
 	hc.AdmissionController = bindingCtrl
@@ -121,7 +121,7 @@ func (hc *hookController) InitAdmissionBindings(vbindings []ValidatingConfig, mb
 	hc.initMutatingBindings(mbindings)
 }
 
-func (hc *hookController) initValidatingBindings(bindings []ValidatingConfig) {
+func (hc *HookController) initValidatingBindings(bindings []ValidatingConfig) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -130,7 +130,7 @@ func (hc *hookController) initValidatingBindings(bindings []ValidatingConfig) {
 	hc.validatingBindings = bindings
 }
 
-func (hc *hookController) initMutatingBindings(bindings []MutatingConfig) {
+func (hc *HookController) initMutatingBindings(bindings []MutatingConfig) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -139,7 +139,7 @@ func (hc *hookController) initMutatingBindings(bindings []MutatingConfig) {
 	hc.mutatingBindings = bindings
 }
 
-func (hc *hookController) InitConversionBindings(bindings []ConversionConfig, webhookMgr *conversion.WebhookManager) {
+func (hc *HookController) InitConversionBindings(bindings []ConversionConfig, webhookMgr *conversion.WebhookManager) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -151,35 +151,35 @@ func (hc *hookController) InitConversionBindings(bindings []ConversionConfig, we
 	hc.conversionBindings = bindings
 }
 
-func (hc *hookController) CanHandleKubeEvent(kubeEvent KubeEvent) bool {
+func (hc *HookController) CanHandleKubeEvent(kubeEvent KubeEvent) bool {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.CanHandleEvent(kubeEvent)
 	}
 	return false
 }
 
-func (hc *hookController) CanHandleScheduleEvent(crontab string) bool {
+func (hc *HookController) CanHandleScheduleEvent(crontab string) bool {
 	if hc.ScheduleController != nil {
 		return hc.ScheduleController.CanHandleEvent(crontab)
 	}
 	return false
 }
 
-func (hc *hookController) CanHandleAdmissionEvent(event AdmissionEvent) bool {
+func (hc *HookController) CanHandleAdmissionEvent(event AdmissionEvent) bool {
 	if hc.AdmissionController != nil {
 		return hc.AdmissionController.CanHandleEvent(event)
 	}
 	return false
 }
 
-func (hc *hookController) CanHandleConversionEvent(event conversion.Event, rule conversion.Rule) bool {
+func (hc *HookController) CanHandleConversionEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule) bool {
 	if hc.ConversionController != nil {
-		return hc.ConversionController.CanHandleEvent(event, rule)
+		return hc.ConversionController.CanHandleEvent(crdName, event, rule)
 	}
 	return false
 }
 
-func (hc *hookController) HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error {
+func (hc *HookController) HandleEnableKubernetesBindings(createTasksFn func(BindingExecutionInfo)) error {
 	if hc.KubernetesController != nil {
 		execInfos, err := hc.KubernetesController.EnableKubernetesBindings()
 		if err != nil {
@@ -195,7 +195,7 @@ func (hc *hookController) HandleEnableKubernetesBindings(createTasksFn func(Bind
 	return nil
 }
 
-func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo)) {
 	if hc.KubernetesController != nil {
 		execInfo := hc.KubernetesController.HandleEvent(event)
 		if createTasksFn != nil {
@@ -204,7 +204,7 @@ func (hc *hookController) HandleKubeEvent(event KubeEvent, createTasksFn func(Bi
 	}
 }
 
-func (hc *hookController) HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleAdmissionEvent(event AdmissionEvent, createTasksFn func(BindingExecutionInfo)) {
 	if hc.AdmissionController == nil {
 		return
 	}
@@ -214,17 +214,17 @@ func (hc *hookController) HandleAdmissionEvent(event AdmissionEvent, createTasks
 	}
 }
 
-func (hc *hookController) HandleConversionEvent(event conversion.Event, rule conversion.Rule, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleConversionEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule, createTasksFn func(BindingExecutionInfo)) {
 	if hc.ConversionController == nil {
 		return
 	}
-	execInfo := hc.ConversionController.HandleEvent(event, rule)
+	execInfo := hc.ConversionController.HandleEvent(crdName, event, rule)
 	if createTasksFn != nil {
 		createTasksFn(execInfo)
 	}
 }
 
-func (hc *hookController) HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo)) {
 	if hc.ScheduleController == nil {
 		return
 	}
@@ -237,51 +237,51 @@ func (hc *hookController) HandleScheduleEvent(crontab string, createTasksFn func
 	}
 }
 
-func (hc *hookController) UnlockKubernetesEvents() {
+func (hc *HookController) UnlockKubernetesEvents() {
 	if hc.KubernetesController != nil {
 		hc.KubernetesController.UnlockEvents()
 	}
 }
 
-func (hc *hookController) UnlockKubernetesEventsFor(monitorID string) {
+func (hc *HookController) UnlockKubernetesEventsFor(monitorID string) {
 	if hc.KubernetesController != nil {
 		hc.KubernetesController.UnlockEventsFor(monitorID)
 	}
 }
 
-func (hc *hookController) StopMonitors() {
+func (hc *HookController) StopMonitors() {
 	if hc.KubernetesController != nil {
 		hc.KubernetesController.StopMonitors()
 	}
 }
 
-func (hc *hookController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
+func (hc *HookController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.UpdateMonitor(monitorId, kind, apiVersion)
 	}
 	return nil
 }
 
-func (hc *hookController) EnableScheduleBindings() {
+func (hc *HookController) EnableScheduleBindings() {
 	if hc.ScheduleController != nil {
 		hc.ScheduleController.EnableScheduleBindings()
 	}
 }
 
-func (hc *hookController) DisableScheduleBindings() {
+func (hc *HookController) DisableScheduleBindings() {
 	if hc.ScheduleController != nil {
 		hc.ScheduleController.DisableScheduleBindings()
 	}
 }
 
-func (hc *hookController) EnableAdmissionBindings() {
+func (hc *HookController) EnableAdmissionBindings() {
 	if hc.AdmissionController != nil {
 		hc.AdmissionController.EnableValidatingBindings()
 		hc.AdmissionController.EnableMutatingBindings()
 	}
 }
 
-func (hc *hookController) EnableConversionBindings() {
+func (hc *HookController) EnableConversionBindings() {
 	if hc.ConversionController != nil {
 		hc.ConversionController.EnableConversionBindings()
 	}
@@ -289,7 +289,7 @@ func (hc *hookController) EnableConversionBindings() {
 
 // KubernetesSnapshots returns a 'full snapshot': all snapshots for all registered kubernetes bindings.
 // Note: no caching as in UpdateSnapshots because KubernetesSnapshots used for non-combined binding contexts.
-func (hc *hookController) KubernetesSnapshots() map[string][]ObjectAndFilterResult {
+func (hc *HookController) KubernetesSnapshots() map[string][]ObjectAndFilterResult {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.Snapshots()
 	}
@@ -297,8 +297,8 @@ func (hc *hookController) KubernetesSnapshots() map[string][]ObjectAndFilterResu
 }
 
 // getIncludeSnapshotsFrom returns binding names from 'includeSnapshotsFrom' field.
-func (hc *hookController) getIncludeSnapshotsFrom(bindingType BindingType, bindingName string) []string {
-	includeSnapshotsFrom := []string{}
+func (hc *HookController) getIncludeSnapshotsFrom(bindingType BindingType, bindingName string) []string {
+	includeSnapshotsFrom := make([]string, 0)
 
 	switch bindingType {
 	case OnKubernetesEvent:
@@ -348,7 +348,7 @@ func (hc *hookController) getIncludeSnapshotsFrom(bindingType BindingType, bindi
 // Combined "Synchronization" binging contexts or "Synchronization"
 // with self-inclusion may require several calls to Snapshot*() methods, but objects
 // may change between these calls.
-func (hc *hookController) UpdateSnapshots(context []BindingContext) []BindingContext {
+func (hc *HookController) UpdateSnapshots(context []BindingContext) []BindingContext {
 	if hc.KubernetesController == nil {
 		return context
 	}
@@ -356,7 +356,7 @@ func (hc *hookController) UpdateSnapshots(context []BindingContext) []BindingCon
 	// Cache retrieved snapshots to make them consistent.
 	cache := make(map[string][]ObjectAndFilterResult)
 
-	newContext := []BindingContext{}
+	newContext := make([]BindingContext, 0)
 	for _, bc := range context {
 		newBc := bc
 
@@ -389,7 +389,7 @@ func (hc *hookController) UpdateSnapshots(context []BindingContext) []BindingCon
 	return newContext
 }
 
-func (hc *hookController) SnapshotsInfo() []string {
+func (hc *HookController) SnapshotsInfo() []string {
 	if hc.KubernetesController == nil {
 		return []string{"no kubernetes bindings for hook"}
 	}
@@ -397,7 +397,7 @@ func (hc *hookController) SnapshotsInfo() []string {
 	return hc.KubernetesController.SnapshotsInfo()
 }
 
-func (hc *hookController) SnapshotsDump() map[string]interface{} {
+func (hc *HookController) SnapshotsDump() map[string]interface{} {
 	if hc.KubernetesController == nil {
 		return nil
 	}

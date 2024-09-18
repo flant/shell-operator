@@ -2,6 +2,7 @@ package controller
 
 import (
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
@@ -19,18 +20,18 @@ type ConversionBindingToWebhookLink struct {
 	Group            string
 }
 
-// ScheduleBindingsController handles schedule bindings for one hook.
-type ConversionBindingsController interface {
-	WithBindings([]ConversionConfig)
-	WithWebhookManager(manager *conversion.WebhookManager)
-	EnableConversionBindings()
-	DisableConversionBindings()
-	CanHandleEvent(event conversion.Event, rule conversion.Rule) bool
-	HandleEvent(event conversion.Event, rule conversion.Rule) BindingExecutionInfo
-}
+//// ScheduleBindingsController handles schedule bindings for one hook.
+// type ConversionBindingsController interface {
+//	WithBindings([]ConversionConfig)
+//	WithWebhookManager(manager *conversion.WebhookManager)
+//	EnableConversionBindings()
+//	DisableConversionBindings()
+//	CanHandleEvent(event conversion.Event, rule conversion.Rule) bool
+//	HandleEvent(event conversion.Event, rule conversion.Rule) BindingExecutionInfo
+//}
 
-// Controller holds validating bindings from one hook.
-type conversionBindingsController struct {
+// ConversionBindingsController holds validating bindings from one hook.
+type ConversionBindingsController struct {
 	// crdName -> conversionRule id -> link
 	Links map[string]map[conversion.Rule]*ConversionBindingToWebhookLink
 
@@ -39,24 +40,22 @@ type conversionBindingsController struct {
 	webhookManager *conversion.WebhookManager
 }
 
-var _ ConversionBindingsController = &conversionBindingsController{}
-
 // NewConversionBindingsController returns an implementation of ConversionBindingsController
-var NewConversionBindingsController = func() *conversionBindingsController {
-	return &conversionBindingsController{
+var NewConversionBindingsController = func() *ConversionBindingsController {
+	return &ConversionBindingsController{
 		Links: make(map[string]map[conversion.Rule]*ConversionBindingToWebhookLink),
 	}
 }
 
-func (c *conversionBindingsController) WithBindings(bindings []ConversionConfig) {
+func (c *ConversionBindingsController) WithBindings(bindings []ConversionConfig) {
 	c.Bindings = bindings
 }
 
-func (c *conversionBindingsController) WithWebhookManager(mgr *conversion.WebhookManager) {
+func (c *ConversionBindingsController) WithWebhookManager(mgr *conversion.WebhookManager) {
 	c.webhookManager = mgr
 }
 
-func (c *conversionBindingsController) EnableConversionBindings() {
+func (c *ConversionBindingsController) EnableConversionBindings() {
 	// Setup links and inform webhookManager about webhooks.
 	for _, config := range c.Bindings {
 		if _, ok := c.Links[config.Webhook.CrdName]; !ok {
@@ -76,31 +75,31 @@ func (c *conversionBindingsController) EnableConversionBindings() {
 	}
 }
 
-func (c *conversionBindingsController) DisableConversionBindings() {
+func (c *ConversionBindingsController) DisableConversionBindings() {
 	// TODO dynamic enable/disable conversion webhooks.
 }
 
-func (c *conversionBindingsController) CanHandleEvent(event conversion.Event, rule conversion.Rule) bool {
-	_, has := c.Links[event.CrdName]
+func (c *ConversionBindingsController) CanHandleEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule) bool {
+	_, has := c.Links[event.Request.DesiredAPIVersion]
 	if !has {
 		return false
 	}
-	_, has = c.Links[event.CrdName][rule]
+	_, has = c.Links[crdName][rule]
 	return has
 }
 
-func (c *conversionBindingsController) HandleEvent(event conversion.Event, rule conversion.Rule) BindingExecutionInfo {
-	_, hasKey := c.Links[event.CrdName]
+func (c *ConversionBindingsController) HandleEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule) BindingExecutionInfo {
+	_, hasKey := c.Links[crdName]
 	if !hasKey {
-		log.Errorf("Possible bug!!! No binding for conversion event for crd/%s", event.CrdName)
+		log.Errorf("Possible bug!!! No binding for conversion event for crd/%s", crdName)
 		return BindingExecutionInfo{
 			BindingContext: []BindingContext{},
 			AllowFailure:   false,
 		}
 	}
-	link, has := c.Links[event.CrdName][rule]
+	link, has := c.Links[crdName][rule]
 	if !has {
-		log.Errorf("Possible bug!!! Event has an unknown conversion rule %s for crd/%s: no binding was registered", rule.String(), event.CrdName)
+		log.Errorf("Possible bug!!! Event has an unknown conversion rule %s for crd/%s: no binding was registered", rule.String(), crdName)
 		return BindingExecutionInfo{
 			BindingContext: []BindingContext{},
 			AllowFailure:   false,
@@ -109,7 +108,7 @@ func (c *conversionBindingsController) HandleEvent(event conversion.Event, rule 
 
 	bc := BindingContext{
 		Binding:          link.BindingName,
-		ConversionReview: event.GetReview(),
+		ConversionReview: event,
 		FromVersion:      link.FromVersion,
 		ToVersion:        link.ToVersion,
 	}

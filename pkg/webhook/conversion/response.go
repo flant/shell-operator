@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 /*
@@ -37,8 +37,8 @@ ConvertedObjects:
 # All other changes to metadata fields by the webhook are ignored.
 */
 type Response struct {
-	FailedMessage    string                      `json:"failedMessage"`
-	ConvertedObjects []unstructured.Unstructured `json:"convertedObjects,omitempty"`
+	FailedMessage    string                 `json:"failedMessage"`
+	ConvertedObjects []runtime.RawExtension `json:"convertedObjects,omitempty"`
 }
 
 func ResponseFromFile(filePath string) (*Response, error) {

@@ -71,7 +71,7 @@ func (c *ContextCombiner) Combined() []binding_context.BindingContext {
 	return bc
 }
 
-func (c *ContextCombiner) CombinedAndUpdated(hookCtrl controller.HookController) (GeneratedBindingContexts, error) {
+func (c *ContextCombiner) CombinedAndUpdated(hookCtrl *controller.HookController) (GeneratedBindingContexts, error) {
 	bc := c.Combined()
 	bc = hookCtrl.UpdateSnapshots(bc)
 	return ConvertToGeneratedBindingContexts(bc)

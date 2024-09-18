@@ -17,12 +17,12 @@ func prepareTestDirTree() (string, error) {
 		return "", fmt.Errorf("error creating temp directory: %v\n", err)
 	}
 
-	if err = os.MkdirAll(filepath.Join(tmpDir, "aa"), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Join(tmpDir, "aa"), 0o755); err != nil {
 		os.RemoveAll(tmpDir)
 		return "", err
 	}
 
-	if err = os.MkdirAll(filepath.Join(tmpDir, "lib"), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Join(tmpDir, "lib"), 0o755); err != nil {
 		os.RemoveAll(tmpDir)
 		return "", err
 	}
@@ -49,7 +49,7 @@ func createExecutableFile(file string) error {
 	if _, err := os.Create(file); err != nil {
 		return err
 	}
-	os.Chmod(file, 0777)
+	os.Chmod(file, 0o777)
 
 	return nil
 }

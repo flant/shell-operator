@@ -15,7 +15,7 @@ import (
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
-func newHookManager(t *testing.T, testdataDir string) *hookManager {
+func newHookManager(t *testing.T, testdataDir string) *Manager {
 	hooksDir, _ := filepath.Abs(testdataDir)
 
 	conversionManager := conversion.NewWebhookManager()
@@ -24,7 +24,7 @@ func newHookManager(t *testing.T, testdataDir string) *hookManager {
 	admissionManager := admission.NewWebhookManager(nil)
 	admissionManager.Settings = app.ValidatingWebhookSettings
 
-	cfg := &HookManagerConfig{
+	cfg := &ManagerConfig{
 		WorkingDir: hooksDir,
 		TempDir:    t.TempDir(),
 		Kmgr:       nil,

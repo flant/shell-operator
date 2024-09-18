@@ -160,7 +160,6 @@ func (c *ConstCounterCollector) UpdateLabels(labels []string) {
 			} else {
 				newCollection[hash] = c.collection[hash]
 			}
-
 		}
 		c.collection = newCollection
 	}
@@ -286,7 +285,6 @@ func (c *ConstGaugeCollector) UpdateLabels(labels []string) {
 			} else {
 				newCollection[hash] = c.collection[hash]
 			}
-
 		}
 		c.collection = newCollection
 	}

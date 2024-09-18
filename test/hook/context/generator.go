@@ -28,7 +28,7 @@ type GeneratedBindingContexts struct {
 
 type BindingContextController struct {
 	Hook       *hook.Hook
-	HookCtrl   controller.HookController
+	HookCtrl   *controller.HookController
 	HookMap    map[string]string
 	HookConfig string
 
@@ -86,9 +86,6 @@ func (b *BindingContextController) RegisterCRD(group, version, kind string, name
 
 // Run generates binding contexts for hook tests
 func (b *BindingContextController) Run(initialState string) (GeneratedBindingContexts, error) {
-	// fmt.Println("Run start")
-	// defer func() { fmt.Println("Run end") }()
-
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
