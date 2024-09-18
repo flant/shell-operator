@@ -3,7 +3,6 @@ package conversion
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -47,16 +46,36 @@ func NewWebhookHandler() *WebhookHandler {
 func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	conversionResponse, err := h.handleReviewRequest(r.URL.Path, r.Body)
+	crdName := detectCrdName(r.URL.Path)
+	log.Infof("Got ConversionReview request for crd/%s", crdName)
+
+	var convertReview v1.ConversionReview
+	err := json.NewDecoder(r.Body).Decode(&convertReview)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(err.Error()))
+		log.Errorf("failed to read conversion request: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	conversionResponse.Request = nil
+
+	if convertReview.Request == nil {
+		log.Error("conversion request is nil")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	conversionResponse, err := h.handleReviewRequest(crdName, convertReview.Request)
+	if err != nil {
+		log.Error(err, "failed to convert", "request", convertReview.Request.UID)
+		convertReview.Response = errored(err)
+	} else {
+		convertReview.Response = conversionResponse
+	}
+
+	convertReview.Response.UID = convertReview.Request.UID
+	convertReview.Request = nil
 
 	w.Header().Set("Content-type", "application/json")
-	err = json.NewEncoder(w).Encode(conversionResponse)
+	err = json.NewEncoder(w).Encode(convertReview)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error json encoding ConversionReview"))
@@ -67,63 +86,25 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 
 // See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#write-a-conversion-webhook-server
 // This code always response with v1 ConversionReview: it works for 1.16+.
-func (h *WebhookHandler) handleReviewRequest(path string, body io.Reader) (*v1.ConversionReview, error) {
-	crdName := detectCrdName(path)
-	log.Infof("Got ConversionReview request for crd/%s", crdName)
-
-	var inReview v1.ConversionReview
-	err := json.NewDecoder(body).Decode(&inReview)
-	if err != nil {
-		log.Errorf("Error parsing ConversionReview: %v", err)
-		return nil, fmt.Errorf("fail to parse ConversionReview: %w", err)
-	}
-
-	if inReview.Request == nil {
-		return nil, fmt.Errorf("conversion request is nil")
-	}
-
-	inReview.Response.UID = inReview.Request.UID
-
+func (h *WebhookHandler) handleReviewRequest(crdName string, request *v1.ConversionRequest) (*v1.ConversionResponse, error) {
 	if h.Manager.EventHandlerFn == nil {
-		inReview.Response.Result = metav1.Status{
-			Status:  "Failed",
-			Message: "ConversionReview handler is not defined",
-		}
-		return &inReview, nil
+		return nil, fmt.Errorf("ConversionReview handler is not defined")
 	}
 
-	conversionResponse, err := h.Manager.EventHandlerFn(crdName, &inReview)
+	conversionResponse, err := h.Manager.EventHandlerFn(crdName, request)
 	if err != nil {
-		inReview.Response.Result = metav1.Status{
-			Status:  "Failed",
-			Message: err.Error(),
-		}
-		return &inReview, nil
+		return nil, err
 	}
 
 	if conversionResponse.FailedMessage != "" {
-		inReview.Response.Result = metav1.Status{
-			Status:  "Failed",
-			Message: conversionResponse.FailedMessage,
-		}
-		return &inReview, nil
+		return nil, fmt.Errorf(conversionResponse.FailedMessage)
 	}
 
-	if len(inReview.Request.Objects) != len(conversionResponse.ConvertedObjects) {
-		inReview.Response.Result = metav1.Status{
-			Status:  "Failed",
-			Message: fmt.Sprintf("Hook returned %d objects instead of %d", len(conversionResponse.ConvertedObjects), len(inReview.Request.Objects)),
-		}
-		return &inReview, nil
+	if len(request.Objects) != len(conversionResponse.ConvertedObjects) {
+		return nil, fmt.Errorf("hook returned %d objects instead of %d", len(conversionResponse.ConvertedObjects), len(request.Objects))
 	}
 
-	inReview.Response.Result = metav1.Status{
-		Status: "Success",
-	}
-
-	inReview.Response.ConvertedObjects = conversionResponse.ConvertedObjects
-
-	return &inReview, nil
+	return &v1.ConversionResponse{ConvertedObjects: conversionResponse.ConvertedObjects}, nil
 }
 
 // detectCrdName extracts crdName from the url path.
@@ -148,4 +129,13 @@ func ExtractAPIVersions(objs []runtime.RawExtension) []string {
 	}
 
 	return res
+}
+
+func errored(err error) *v1.ConversionResponse {
+	return &v1.ConversionResponse{
+		Result: metav1.Status{
+			Status:  metav1.StatusFailure,
+			Message: err.Error(),
+		},
+	}
 }

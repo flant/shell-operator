@@ -297,21 +297,21 @@ func (op *ShellOperator) initConversionWebhookManager() (err error) {
 }
 
 // conversionEventHandler is called when Kubernetes requests a conversion.
-func (op *ShellOperator) conversionEventHandler(crdName string, review *v1.ConversionReview) (*conversion.Response, error) {
+func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.ConversionRequest) (*conversion.Response, error) {
 	logLabels := map[string]string{
 		"event.id": uuid.Must(uuid.NewV4()).String(),
 		"binding":  string(KubernetesConversion),
 	}
 	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
 
-	sourceVersions := conversion.ExtractAPIVersions(review.Request.Objects)
-	logEntry.Infof("Handle '%s' event for crd/%s: %d objects with version %v", string(KubernetesConversion), crdName, len(review.Request.Objects), sourceVersions)
+	sourceVersions := conversion.ExtractAPIVersions(request.Objects)
+	logEntry.Infof("Handle '%s' event for crd/%s: %d objects with version %v", string(KubernetesConversion), crdName, len(request.Objects), sourceVersions)
 
 	done := false
 	for _, srcVer := range sourceVersions {
 		rule := conversion.Rule{
 			FromVersion: srcVer,
-			ToVersion:   review.Request.DesiredAPIVersion,
+			ToVersion:   request.DesiredAPIVersion,
 		}
 		convPath := op.HookManager.FindConversionChain(crdName, rule)
 		if len(convPath) == 0 {
@@ -321,7 +321,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, review *v1.Conve
 
 		for _, convRule := range convPath {
 			var convTask task.Task
-			op.HookManager.HandleConversionEvent(crdName, review, convRule, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+			op.HookManager.HandleConversionEvent(crdName, request, convRule, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 				newTask := task.NewTask(HookRun).
 					WithMetadata(HookMetadata{
 						HookName:       hook.Name,
@@ -345,7 +345,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, review *v1.Conve
 
 			if res.Status == "Fail" {
 				return &conversion.Response{
-					FailedMessage:    fmt.Sprintf("Hook failed to convert to %s", review.Request.DesiredAPIVersion),
+					FailedMessage:    fmt.Sprintf("Hook failed to convert to %s", request.DesiredAPIVersion),
 					ConvertedObjects: nil,
 				}, nil
 			}
@@ -358,13 +358,13 @@ func (op *ShellOperator) conversionEventHandler(crdName string, review *v1.Conve
 			}
 
 			// Set response objects as new objects for a next round.
-			review.Request.Objects = response.ConvertedObjects
+			request.Objects = response.ConvertedObjects
 
 			// Stop iterating if hook has converted all objects to a desiredAPIVersions.
-			newSourceVersions := conversion.ExtractAPIVersions(review.Request.Objects)
+			newSourceVersions := conversion.ExtractAPIVersions(request.Objects)
 			// logEntry.Infof("Hook return conversion response: failMsg=%s, %d convertedObjects, versions:%v, desired: %s", response.FailedMessage, len(response.ConvertedObjects), newSourceVersions, event.Review.Request.DesiredAPIVersion)
 
-			if len(newSourceVersions) == 1 && newSourceVersions[0] == review.Request.DesiredAPIVersion {
+			if len(newSourceVersions) == 1 && newSourceVersions[0] == request.DesiredAPIVersion {
 				// success
 				done = true
 				break
@@ -378,12 +378,12 @@ func (op *ShellOperator) conversionEventHandler(crdName string, review *v1.Conve
 
 	if done {
 		return &conversion.Response{
-			ConvertedObjects: review.Request.Objects,
+			ConvertedObjects: request.Objects,
 		}, nil
 	}
 
 	return &conversion.Response{
-		FailedMessage: fmt.Sprintf("Conversion to %s was not successuful", review.Request.DesiredAPIVersion),
+		FailedMessage: fmt.Sprintf("Conversion to %s was not successuful", request.DesiredAPIVersion),
 	}, nil
 }
 

@@ -343,14 +343,14 @@ func (hm *Manager) DetectAdmissionEventType(event AdmissionEvent) BindingType {
 }
 
 // HandleConversionEvent receives a crdName and calculates a sequence of hooks to run.
-func (hm *Manager) HandleConversionEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleConversionEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesConversion)
 
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
-		if h.HookController.CanHandleConversionEvent(crdName, event, rule) {
+		if h.HookController.CanHandleConversionEvent(crdName, request, rule) {
 			fmt.Println("FOUND")
-			h.HookController.HandleConversionEvent(crdName, event, rule, func(info controller.BindingExecutionInfo) {
+			h.HookController.HandleConversionEvent(crdName, request, rule, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
 				}

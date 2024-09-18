@@ -172,7 +172,7 @@ func (hc *HookController) CanHandleAdmissionEvent(event AdmissionEvent) bool {
 	return false
 }
 
-func (hc *HookController) CanHandleConversionEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule) bool {
+func (hc *HookController) CanHandleConversionEvent(crdName string, event *v1.ConversionRequest, rule conversion.Rule) bool {
 	if hc.ConversionController != nil {
 		return hc.ConversionController.CanHandleEvent(crdName, event, rule)
 	}
@@ -214,11 +214,11 @@ func (hc *HookController) HandleAdmissionEvent(event AdmissionEvent, createTasks
 	}
 }
 
-func (hc *HookController) HandleConversionEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleConversionEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTasksFn func(BindingExecutionInfo)) {
 	if hc.ConversionController == nil {
 		return
 	}
-	execInfo := hc.ConversionController.HandleEvent(crdName, event, rule)
+	execInfo := hc.ConversionController.HandleEvent(crdName, request, rule)
 	if createTasksFn != nil {
 		createTasksFn(execInfo)
 	}

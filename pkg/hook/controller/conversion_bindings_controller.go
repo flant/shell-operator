@@ -81,11 +81,11 @@ func (c *ConversionBindingsController) DisableConversionBindings() {
 	// TODO dynamic enable/disable conversion webhooks.
 }
 
-func (c *ConversionBindingsController) CanHandleEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule) bool {
+func (c *ConversionBindingsController) CanHandleEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule) bool {
 	fmt.Println("LINKS", c.Links)
-	_, has := c.Links[event.Request.DesiredAPIVersion]
+	_, has := c.Links[crdName]
+	fmt.Println("HAS1 ", has)
 	if !has {
-		fmt.Println("HAS1 ", has)
 		return false
 	}
 	_, has = c.Links[crdName][rule]
@@ -93,7 +93,7 @@ func (c *ConversionBindingsController) CanHandleEvent(crdName string, event *v1.
 	return has
 }
 
-func (c *ConversionBindingsController) HandleEvent(crdName string, event *v1.ConversionReview, rule conversion.Rule) BindingExecutionInfo {
+func (c *ConversionBindingsController) HandleEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule) BindingExecutionInfo {
 	_, hasKey := c.Links[crdName]
 	if !hasKey {
 		log.Errorf("Possible bug!!! No binding for conversion event for crd/%s", crdName)
@@ -113,7 +113,7 @@ func (c *ConversionBindingsController) HandleEvent(crdName string, event *v1.Con
 
 	bc := BindingContext{
 		Binding:          link.BindingName,
-		ConversionReview: event,
+		ConversionReview: &v1.ConversionReview{Request: request},
 		FromVersion:      link.FromVersion,
 		ToVersion:        link.ToVersion,
 	}
