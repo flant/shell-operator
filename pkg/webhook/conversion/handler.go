@@ -136,6 +136,13 @@ func ExtractAPIVersions(objs []runtime.RawExtension) []string {
 	res := make([]string, 0)
 
 	for _, obj := range objs {
+		fmt.Println("ASDASDASDASDASD--------")
+		fmt.Println(obj)
+		fmt.Println(obj.Object)
+		fmt.Println(obj.Object.GetObjectKind())
+		fmt.Println(obj.Object.GetObjectKind().GroupVersionKind())
+		fmt.Println(obj.Object.GetObjectKind().GroupVersionKind().GroupVersion())
+		fmt.Println("ASDASDASDASDASD--------- ++++++")
 		version := obj.Object.GetObjectKind().GroupVersionKind().GroupVersion().String()
 
 		if _, ok := verMap[version]; ok {
