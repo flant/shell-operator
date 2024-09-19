@@ -1,11 +1,11 @@
-package types
+package admission
 
 import (
 	v1 "k8s.io/api/admission/v1"
 )
 
-type AdmissionEvent struct {
+type Event struct {
 	WebhookId       string
 	ConfigurationId string
-	Review          *v1.AdmissionReview
+	Request         *v1.AdmissionRequest
 }

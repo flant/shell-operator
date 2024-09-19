@@ -19,7 +19,7 @@ import (
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
+	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -27,11 +27,11 @@ type CommonHook interface {
 	Name() string
 }
 
-type HookResult struct {
+type Result struct {
 	Usage                *executor.CmdUsage
 	Metrics              []operation.MetricOperation
 	ConversionResponse   *conversion.Response
-	AdmissionResponse    *AdmissionResponse
+	AdmissionResponse    *admission.Response
 	KubernetesPatchBytes []byte
 }
 
@@ -81,7 +81,7 @@ func (h *Hook) WithHookController(hookController *controller.HookController) {
 	h.HookController = hookController
 }
 
-func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string]string) (*HookResult, error) {
+func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string]string) (*Result, error) {
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
@@ -136,7 +136,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 
 	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
 
-	result := &HookResult{}
+	result := &Result{}
 
 	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels)
 	if err != nil {
@@ -148,7 +148,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		return result, fmt.Errorf("got bad metrics: %s", err)
 	}
 
-	result.AdmissionResponse, err = AdmissionResponseFromFile(admissionPath)
+	result.AdmissionResponse, err = admission.ResponseFromFile(admissionPath)
 	if err != nil {
 		return result, fmt.Errorf("got bad validating response: %s", err)
 	}

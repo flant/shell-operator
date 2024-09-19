@@ -19,7 +19,6 @@ import (
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -295,7 +294,7 @@ func (hm *Manager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, 
 	}
 }
 
-func (hm *Manager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleAdmissionEvent(event admission.Event, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
@@ -321,7 +320,7 @@ func (hm *Manager) HandleAdmissionEvent(event AdmissionEvent, createTaskFn func(
 	}
 }
 
-func (hm *Manager) DetectAdmissionEventType(event AdmissionEvent) BindingType {
+func (hm *Manager) DetectAdmissionEventType(event admission.Event) BindingType {
 	vHooks, _ := hm.GetHooksInOrder(KubernetesValidating)
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
@@ -338,7 +337,7 @@ func (hm *Manager) DetectAdmissionEventType(event AdmissionEvent) BindingType {
 		}
 	}
 
-	log.Errorf("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s", event.ConfigurationId, event.WebhookId, event.Review.Request.Kind, event.Review.Request.Name, event.Review.Request.Namespace)
+	log.Errorf("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s", event.ConfigurationId, event.WebhookId, event.Request.Kind, event.Request.Name, event.Request.Namespace)
 	return ""
 }
 

@@ -2,11 +2,11 @@ package controller
 
 import (
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/admission/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
-	. "github.com/flant/shell-operator/pkg/webhook/admission/types"
 )
 
 // AdmissionBindingToWebhookLink is a link between a hook and a webhook configuration.
@@ -20,20 +20,7 @@ type AdmissionBindingToWebhookLink struct {
 	Group            string
 }
 
-// AdmissionBindingsController handles admission bindings for one hook.
-type AdmissionBindingsController interface {
-	WithValidatingBindings([]ValidatingConfig)
-	WithMutatingBindings([]MutatingConfig)
-	WithWebhookManager(*admission.WebhookManager)
-	EnableValidatingBindings()
-	EnableMutatingBindings()
-	DisableValidatingBindings()
-	DisableMutatingBindings()
-	CanHandleEvent(event AdmissionEvent) bool
-	HandleEvent(event AdmissionEvent) BindingExecutionInfo
-}
-
-type admissionBindingsController struct {
+type AdmissionBindingsController struct {
 	// Controller holds validating/mutating bindings from one hook. Hook always belongs to one configurationId.
 	ConfigurationId string
 	// WebhookId -> link
@@ -45,28 +32,26 @@ type admissionBindingsController struct {
 	webhookManager *admission.WebhookManager
 }
 
-var _ AdmissionBindingsController = &admissionBindingsController{}
-
 // NewValidatingBindingsController returns an implementation of AdmissionBindingsController
-var NewValidatingBindingsController = func() *admissionBindingsController {
-	return &admissionBindingsController{
+var NewValidatingBindingsController = func() *AdmissionBindingsController {
+	return &AdmissionBindingsController{
 		AdmissionLinks: make(map[string]*AdmissionBindingToWebhookLink),
 	}
 }
 
-func (c *admissionBindingsController) WithValidatingBindings(bindings []ValidatingConfig) {
+func (c *AdmissionBindingsController) WithValidatingBindings(bindings []ValidatingConfig) {
 	c.ValidatingBindings = bindings
 }
 
-func (c *admissionBindingsController) WithMutatingBindings(bindings []MutatingConfig) {
+func (c *AdmissionBindingsController) WithMutatingBindings(bindings []MutatingConfig) {
 	c.MutatingBindings = bindings
 }
 
-func (c *admissionBindingsController) WithWebhookManager(mgr *admission.WebhookManager) {
+func (c *AdmissionBindingsController) WithWebhookManager(mgr *admission.WebhookManager) {
 	c.webhookManager = mgr
 }
 
-func (c *admissionBindingsController) EnableValidatingBindings() {
+func (c *AdmissionBindingsController) EnableValidatingBindings() {
 	confId := ""
 
 	if len(c.ValidatingBindings) == 0 {
@@ -100,7 +85,7 @@ func (c *admissionBindingsController) EnableValidatingBindings() {
 	}
 }
 
-func (c *admissionBindingsController) EnableMutatingBindings() {
+func (c *AdmissionBindingsController) EnableMutatingBindings() {
 	confId := ""
 
 	if len(c.MutatingBindings) == 0 {
@@ -134,15 +119,15 @@ func (c *admissionBindingsController) EnableMutatingBindings() {
 	}
 }
 
-func (c *admissionBindingsController) DisableValidatingBindings() {
+func (c *AdmissionBindingsController) DisableValidatingBindings() {
 	// TODO dynamic enable/disable validating webhooks.
 }
 
-func (c *admissionBindingsController) DisableMutatingBindings() {
+func (c *AdmissionBindingsController) DisableMutatingBindings() {
 	// TODO dynamic enable/disable mutating webhooks.
 }
 
-func (c *admissionBindingsController) CanHandleEvent(event AdmissionEvent) bool {
+func (c *AdmissionBindingsController) CanHandleEvent(event admission.Event) bool {
 	if c.ConfigurationId != event.ConfigurationId {
 		return false
 	}
@@ -150,7 +135,7 @@ func (c *admissionBindingsController) CanHandleEvent(event AdmissionEvent) bool 
 	return has
 }
 
-func (c *admissionBindingsController) HandleEvent(event AdmissionEvent) BindingExecutionInfo {
+func (c *AdmissionBindingsController) HandleEvent(event admission.Event) BindingExecutionInfo {
 	if c.ConfigurationId != event.ConfigurationId {
 		log.Errorf("Possible bug!!! Unknown validating event: no binding for configurationId '%s' (webhookId '%s')", event.ConfigurationId, event.WebhookId)
 		return BindingExecutionInfo{
@@ -170,7 +155,7 @@ func (c *admissionBindingsController) HandleEvent(event AdmissionEvent) BindingE
 
 	bc := BindingContext{
 		Binding:         link.BindingName,
-		AdmissionReview: event.Review,
+		AdmissionReview: &v1.AdmissionReview{Request: event.Request},
 	}
 	bc.Metadata.BindingType = link.BindingType
 	bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
