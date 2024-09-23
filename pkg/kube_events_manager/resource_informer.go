@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,6 +21,7 @@ import (
 )
 
 type resourceInformer struct {
+	id         string
 	KubeClient *klient.Client
 	Monitor    *MonitorConfig
 	// Filter by namespace
@@ -70,6 +72,7 @@ type resourceInformerConfig struct {
 
 func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resourceInformer {
 	informer := &resourceInformer{
+		id:                     uuid.Must(uuid.NewV4()).String(),
 		KubeClient:             cfg.client,
 		metricStorage:          cfg.mstor,
 		Namespace:              ns,
@@ -256,6 +259,11 @@ func (ei *resourceInformer) OnDelete(obj interface{}) {
 func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType WatchEventType) {
 	// check if stop
 	if ei.stopped {
+		log.Debugf("%s: received WATCH for a stopped %s/%s informer %s",
+			ei.Monitor.Metadata.DebugName,
+			ei.Namespace,
+			ei.Name,
+			eventType)
 		return
 	}
 
@@ -427,13 +435,13 @@ func (ei *resourceInformer) start() {
 	go func() {
 		if ei.ctx != nil {
 			<-ei.ctx.Done()
-			DefaultFactoryStore.Stop(ei.FactoryIndex)
+			DefaultFactoryStore.Stop(ei.id, ei.FactoryIndex)
 		}
 	}()
 
 	// TODO: separate handler and informer
 	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage)
-	err := DefaultFactoryStore.Start(ei.ctx, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
+	err := DefaultFactoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
 		ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
 		return
