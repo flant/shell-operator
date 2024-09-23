@@ -86,7 +86,7 @@ func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory
 	return c.data[index]
 }
 
-func (c *FactoryStore) Start(informerId string, ctx context.Context, client dynamic.Interface, index FactoryIndex, handler cache.ResourceEventHandler, errorHandler *WatchErrorHandler) error {
+func (c *FactoryStore) Start(ctx context.Context, informerId string, client dynamic.Interface, index FactoryIndex, handler cache.ResourceEventHandler, errorHandler *WatchErrorHandler) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
