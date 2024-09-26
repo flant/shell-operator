@@ -5,14 +5,10 @@ import (
 	"sync"
 	"time"
 
-	uuid "github.com/gofrs/uuid/v5"
+	"github.com/gofrs/uuid/v5"
 
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
-
-type MetadataDescriptable interface {
-	GetDescription() string
-}
 
 type TaskType string
 
@@ -138,10 +134,14 @@ func (t *BaseTask) GetFailureMessage() string {
 	return t.FailureMessage
 }
 
+type MetadataDescriptionGetter interface {
+	GetDescription() string
+}
+
 func (t *BaseTask) GetDescription() string {
 	metaDescription := ""
 	t.lock.RLock()
-	if descriptor, ok := t.Metadata.(MetadataDescriptable); ok {
+	if descriptor, ok := t.Metadata.(MetadataDescriptionGetter); ok {
 		metaDescription = ":" + descriptor.GetDescription()
 	}
 	t.lock.RUnlock()
