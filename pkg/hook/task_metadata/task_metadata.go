@@ -5,8 +5,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/hook/binding_context"
+	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -22,7 +22,7 @@ type HookNameAccessor interface {
 }
 
 type BindingContextAccessor interface {
-	GetBindingContext() []BindingContext
+	GetBindingContext() []binding_context.BindingContext
 }
 
 type MonitorIDAccessor interface {
@@ -33,8 +33,8 @@ type HookMetadata struct {
 	HookName       string // hook name
 	Binding        string // binding name
 	Group          string
-	BindingType    BindingType
-	BindingContext []BindingContext
+	BindingType    types.BindingType
+	BindingContext []binding_context.BindingContext
 	AllowFailure   bool     // Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
 	MonitorIDs     []string // monitor ids for Synchronization tasks
 
@@ -42,10 +42,10 @@ type HookMetadata struct {
 }
 
 var (
-	_ HookNameAccessor          = HookMetadata{}
-	_ BindingContextAccessor    = HookMetadata{}
-	_ MonitorIDAccessor         = HookMetadata{}
-	_ task.MetadataDescriptable = HookMetadata{}
+	_ HookNameAccessor               = HookMetadata{}
+	_ BindingContextAccessor         = HookMetadata{}
+	_ MonitorIDAccessor              = HookMetadata{}
+	_ task.MetadataDescriptionGetter = HookMetadata{}
 )
 
 func HookMetadataAccessor(t task.Task) (hookMeta HookMetadata) {
@@ -66,11 +66,7 @@ func (m HookMetadata) GetHookName() string {
 	return m.HookName
 }
 
-func (m HookMetadata) GetBinding() BindingType {
-	return m.BindingType
-}
-
-func (m HookMetadata) GetBindingContext() []BindingContext {
+func (m HookMetadata) GetBindingContext() []binding_context.BindingContext {
 	return m.BindingContext
 }
 
@@ -87,17 +83,17 @@ func (m *HookMetadata) WithHookName(name string) *HookMetadata {
 	return m
 }
 
-func (m *HookMetadata) WithBinding(binding BindingType) *HookMetadata {
+func (m *HookMetadata) WithBinding(binding types.BindingType) *HookMetadata {
 	m.BindingType = binding
 	return m
 }
 
-func (m *HookMetadata) WithBindingContext(context []BindingContext) *HookMetadata {
+func (m *HookMetadata) WithBindingContext(context []binding_context.BindingContext) *HookMetadata {
 	m.BindingContext = context
 	return m
 }
 
-func (m *HookMetadata) AppendBindingContext(context BindingContext) *HookMetadata {
+func (m *HookMetadata) AppendBindingContext(context binding_context.BindingContext) *HookMetadata {
 	m.BindingContext = append(m.BindingContext, context)
 	return m
 }
