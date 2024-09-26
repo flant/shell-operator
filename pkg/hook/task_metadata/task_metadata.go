@@ -42,10 +42,10 @@ type HookMetadata struct {
 }
 
 var (
-	_ HookNameAccessor          = HookMetadata{}
-	_ BindingContextAccessor    = HookMetadata{}
-	_ MonitorIDAccessor         = HookMetadata{}
-	_ task.MetadataDescriptable = HookMetadata{}
+	_ HookNameAccessor               = HookMetadata{}
+	_ BindingContextAccessor         = HookMetadata{}
+	_ MonitorIDAccessor              = HookMetadata{}
+	_ task.MetadataDescriptionGetter = HookMetadata{}
 )
 
 func HookMetadataAccessor(t task.Task) (hookMeta HookMetadata) {
