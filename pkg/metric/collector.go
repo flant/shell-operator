@@ -1,4 +1,4 @@
-package vault
+package metric
 
 import (
 	"hash/fnv"
@@ -11,7 +11,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
-type ConstMetricCollector interface {
+type ConstCollector interface {
 	Describe(ch chan<- *prometheus.Desc)
 	Collect(ch chan<- prometheus.Metric)
 	Type() string
@@ -20,11 +20,6 @@ type ConstMetricCollector interface {
 	ExpireGroupMetrics(group string)
 	UpdateLabels([]string)
 }
-
-var (
-	_ ConstMetricCollector = (*ConstCounterCollector)(nil)
-	_ ConstMetricCollector = (*ConstGaugeCollector)(nil)
-)
 
 type GroupedCounterMetric struct {
 	Value       uint64
