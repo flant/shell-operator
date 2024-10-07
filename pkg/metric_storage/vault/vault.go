@@ -2,6 +2,7 @@ package vault
 
 import (
 	"fmt"
+	"github.com/flant/shell-operator/pkg/metric"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,15 +12,23 @@ import (
 )
 
 type GroupedVault struct {
-	collectors map[string]ConstMetricCollector
+	collectors map[string]metric.ConstCollector
 	mtx        sync.Mutex
-	Registerer prometheus.Registerer
+	registerer prometheus.Registerer
 }
 
 func NewGroupedVault() *GroupedVault {
 	return &GroupedVault{
-		collectors: make(map[string]ConstMetricCollector),
+		collectors: make(map[string]metric.ConstCollector),
 	}
+}
+
+func (v *GroupedVault) Registerer() prometheus.Registerer {
+	return v.registerer
+}
+
+func (v *GroupedVault) SetRegisterer(r prometheus.Registerer) {
+	v.registerer = r
 }
 
 // ClearAllMetrics takes each collector in collectors and clear all metrics by group.
@@ -31,32 +40,32 @@ func (v *GroupedVault) ExpireGroupMetrics(group string) {
 	}
 }
 
-func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []string) (*ConstCounterCollector, error) {
+func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []string) (*metric.ConstCounterCollector, error) {
 	v.mtx.Lock()
 	defer v.mtx.Unlock()
 	collector, ok := v.collectors[name]
 	if !ok {
-		collector = NewConstCounterCollector(name, labelNames)
-		if err := v.Registerer.Register(collector); err != nil {
+		collector = metric.NewConstCounterCollector(name, labelNames)
+		if err := v.registerer.Register(collector); err != nil {
 			return nil, fmt.Errorf("counter '%s' %v registration: %v", name, labelNames, err)
 		}
 		v.collectors[name] = collector
 	} else if !IsSubset(collector.LabelNames(), labelNames) {
 		collector.UpdateLabels(labelNames)
 	}
-	if counter, ok := collector.(*ConstCounterCollector); ok {
+	if counter, ok := collector.(*metric.ConstCounterCollector); ok {
 		return counter, nil
 	}
 	return nil, fmt.Errorf("counter %v collector requested, but %s %v collector exists", labelNames, collector.Type(), collector.LabelNames())
 }
 
-func (v *GroupedVault) GetOrCreateGaugeCollector(name string, labelNames []string) (*ConstGaugeCollector, error) {
+func (v *GroupedVault) GetOrCreateGaugeCollector(name string, labelNames []string) (*metric.ConstGaugeCollector, error) {
 	v.mtx.Lock()
 	defer v.mtx.Unlock()
 	collector, ok := v.collectors[name]
 	if !ok {
-		collector = NewConstGaugeCollector(name, labelNames)
-		if err := v.Registerer.Register(collector); err != nil {
+		collector = metric.NewConstGaugeCollector(name, labelNames)
+		if err := v.registerer.Register(collector); err != nil {
 			return nil, fmt.Errorf("gauge '%s' %v registration: %v", name, labelNames, err)
 		}
 		v.collectors[name] = collector
@@ -64,7 +73,7 @@ func (v *GroupedVault) GetOrCreateGaugeCollector(name string, labelNames []strin
 		collector.UpdateLabels(labelNames)
 	}
 
-	if gauge, ok := collector.(*ConstGaugeCollector); ok {
+	if gauge, ok := collector.(*metric.ConstGaugeCollector); ok {
 		return gauge, nil
 	}
 	return nil, fmt.Errorf("gauge %v collector requested, but %s %v collector exists", labelNames, collector.Type(), collector.LabelNames())
