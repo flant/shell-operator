@@ -25,10 +25,20 @@ func NewGroupedVault() *GroupedVault {
 // ClearAllMetrics takes each collector in collectors and clear all metrics by group.
 func (v *GroupedVault) ExpireGroupMetrics(group string) {
 	v.mtx.Lock()
-	defer v.mtx.Unlock()
 	for _, collector := range v.collectors {
 		collector.ExpireGroupMetrics(group)
 	}
+	v.mtx.Unlock()
+}
+
+// ExpireGroupMetricsByName takes a collector by its name and clear all metrics by group.
+func (v *GroupedVault) ExpireGroupMetricsByName(name, group string) {
+	v.mtx.Lock()
+	collector, ok := v.collectors[name]
+	if ok {
+		collector.ExpireGroupMetrics(group)
+	}
+	v.mtx.Unlock()
 }
 
 func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []string) (*ConstCounterCollector, error) {
