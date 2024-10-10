@@ -95,6 +95,7 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 	// Group is always has "type: Group", even for Synchronization.
 	if bc.Metadata.Group != "" {
 		res["type"] = "Group"
+		res["groupName"] = bc.Metadata.Group
 		return res
 	}
 
