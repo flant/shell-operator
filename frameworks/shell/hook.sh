@@ -46,7 +46,8 @@ function hook::_get_possible_handler_names() {
       esac
     ;;
     "Group")
-      echo __on_group::${BINDING_CONTEXT_CURRENT_BINDING}
+      BINDING_CONTEXT_GROUP_NAME=$(context::jq -er '.groupName')
+      echo __on_group::${BINDING_CONTEXT_GROUP_NAME}
     ;;
     "Schedule")
       echo __on_schedule::${BINDING_CONTEXT_CURRENT_BINDING}

@@ -230,17 +230,19 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 				g.Expect(bcList[0]).Should(HaveKey("binding"))
 				g.Expect(bcList[0]).Should(HaveKey("snapshots"))
 				g.Expect(bcList[0]).Should(HaveKey("type"))
+				g.Expect(bcList[0]).Should(HaveKey("groupName"))
 				g.Expect(bcList[0]).ShouldNot(HaveKey("objects"))
 			},
 			[][]string{
 				{`. | length`, `2`},
 
-				// grouped binding context contains binding, type and snapshots
-				{`.[0] | length`, `3`}, // Only 3 fields
+				// grouped binding context contains binding, type, snapshots and groupName
+				{`.[0] | length`, `4`}, // Only 4 fields
 				{`.[0].snapshots | has("monitor_pods")`, `true`},
 				{`.[0].snapshots."monitor_pods" | length`, `1`},
 				{`.[0].binding`, `"monitor_pods"`},
 				{`.[0].type`, `"Group"`},
+				{`.[0].groupName`, `"pods"`},
 
 				// JSON dump should has only 4 fields: binding, type, watchEvent and object.
 				{`.[1] | length`, `4`},
@@ -309,11 +311,12 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 			func() {
 				g.Expect(bcList).Should(HaveLen(2))
 
-				g.Expect(bcList[0]).Should(HaveLen(3))
+				g.Expect(bcList[0]).Should(HaveLen(4))
 				g.Expect(bcList[0]).Should(HaveKey("binding"))
 				g.Expect(bcList[0]["binding"]).Should(Equal("monitor_config_maps"))
 				g.Expect(bcList[0]).Should(HaveKey("type"))
 				g.Expect(bcList[0]["type"]).Should(Equal("Group"))
+				g.Expect(bcList[0]["groupName"]).Should(Equal("pods"))
 				g.Expect(bcList[0]).Should(HaveKey("snapshots"))
 				g.Expect(bcList[0]["snapshots"]).Should(HaveLen(1))
 
@@ -327,8 +330,8 @@ func Test_ConvertBindingContextList_v1(t *testing.T) {
 			[][]string{
 				{`. | length`, `2`},
 
-				// grouped binding context contains binding==group, type and snapshots
-				{`.[0] | length`, `3`}, // Only 3 fields
+				// grouped binding context contains binging, type, snapshots and groupName
+				{`.[0] | length`, `4`}, // Only 4 fields
 				{`.[0].binding`, `"monitor_config_maps"`},
 				{`.[0].type`, `"Group"`},
 				{`.[0].snapshots | has("monitor_config_maps")`, `true`},
