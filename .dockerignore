@@ -3,6 +3,7 @@ docs
 examples
 scripts
 test
+libjq
 
 .git
 .gitignore

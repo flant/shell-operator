@@ -15,3 +15,6 @@
 .idea
 *.iml
 *.proj
+
+# C Dependency
+libjq

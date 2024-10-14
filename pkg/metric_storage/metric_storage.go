@@ -3,6 +3,7 @@ package metric_storage
 import (
 	"context"
 	"fmt"
+	"github.com/flant/shell-operator/pkg/metric"
 	"net/http"
 	"strings"
 	"sync"
@@ -36,7 +37,7 @@ type MetricStorage struct {
 	gaugesLock     sync.RWMutex
 	histogramsLock sync.RWMutex
 
-	GroupedVault *vault.GroupedVault
+	groupedVault *vault.GroupedVault
 
 	Registry   *prometheus.Registry
 	Gatherer   prometheus.Gatherer
@@ -54,20 +55,24 @@ func NewMetricStorage(ctx context.Context, prefix string, newRegistry bool) *Met
 		Counters:         make(map[string]*prometheus.CounterVec),
 		Histograms:       make(map[string]*prometheus.HistogramVec),
 		HistogramBuckets: make(map[string][]float64),
-		GroupedVault:     vault.NewGroupedVault(),
+		groupedVault:     vault.NewGroupedVault(),
 		Gatherer:         prometheus.DefaultGatherer,
 		Registerer:       prometheus.DefaultRegisterer,
 	}
-	m.GroupedVault.Registerer = m.Registerer
+	m.groupedVault.SetRegisterer(m.Registerer)
 
 	if newRegistry {
 		m.Registry = prometheus.NewRegistry()
 		m.Gatherer = m.Registry
 		m.Registerer = m.Registry
-		m.GroupedVault.Registerer = m.Registry
+		m.groupedVault.SetRegisterer(m.Registry)
 	}
 
 	return m
+}
+
+func (m *MetricStorage) Grouped() metric.GroupedStorage {
+	return m.groupedVault
 }
 
 func (m *MetricStorage) resolveMetricName(name string) string {
@@ -372,28 +377,28 @@ func (m *MetricStorage) ApplyOperation(op operation.MetricOperation, commonLabel
 // applyGroupOperations set metrics for group to a new state defined by ops.
 func (m *MetricStorage) applyGroupOperations(group string, ops []operation.MetricOperation, commonLabels map[string]string) {
 	// Implicitly expire all metrics for group.
-	m.GroupedVault.ExpireGroupMetrics(group)
+	m.groupedVault.ExpireGroupMetrics(group)
 
 	// Apply metric operations one-by-one.
 	for _, op := range ops {
 		if op.Action == "expire" {
-			m.GroupedVault.ExpireGroupMetrics(group)
+			m.groupedVault.ExpireGroupMetrics(group)
 			continue
 		}
 		labels := MergeLabels(op.Labels, commonLabels)
 		if op.Action == "add" && op.Value != nil {
-			m.GroupedVault.CounterAdd(group, op.Name, *op.Value, labels)
+			m.groupedVault.CounterAdd(group, op.Name, *op.Value, labels)
 		}
 		//nolint:staticcheck
 		if op.Add != nil {
-			m.GroupedVault.CounterAdd(group, op.Name, *op.Add, labels)
+			m.groupedVault.CounterAdd(group, op.Name, *op.Add, labels)
 		}
 		if op.Action == "set" && op.Value != nil {
-			m.GroupedVault.GaugeSet(group, op.Name, *op.Value, labels)
+			m.groupedVault.GaugeSet(group, op.Name, *op.Value, labels)
 		}
 		//nolint:staticcheck
 		if op.Set != nil {
-			m.GroupedVault.GaugeSet(group, op.Name, *op.Set, labels)
+			m.groupedVault.GaugeSet(group, op.Name, *op.Set, labels)
 		}
 	}
 }
