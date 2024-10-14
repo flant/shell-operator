@@ -104,6 +104,7 @@ func (sm *scheduleManager) Remove(delEntry ScheduleEntry) {
 	// if all ids are deleted, stop scheduled function
 	if len(sm.Entries[delEntry.Crontab].Ids) == 0 {
 		sm.cron.Remove(sm.Entries[delEntry.Crontab].EntryID)
+		delete(sm.Entries, delEntry.Crontab)
 		log.WithField("operator.component", "scheduleManager").Debugf("entry '%s' deleted", delEntry.Crontab)
 	}
 }
