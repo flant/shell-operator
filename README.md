@@ -5,6 +5,7 @@
 <p align="center">
 <a href="https://hub.docker.com/r/flant/shell-operator"><img src="https://img.shields.io/docker/pulls/flant/shell-operator.svg?logo=docker" alt="docker pull flant/shell-operator"/></a>
  <a href="https://github.com/flant/shell-operator/discussions"><img src="https://img.shields.io/badge/GitHub-discussions-brightgreen" alt="GH Discussions"/></a>
+  <a href="https://gurubase.io/g/shell-operator"><img src="https://img.shields.io/badge/Gurubase-Ask%20Shell%20Operator%20Guru-006BFF" alt="GH Discussions"/></a>
 </p>
 
 **Shell-operator** is a tool for running event-driven scripts in a Kubernetes cluster.
