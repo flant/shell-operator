@@ -42,17 +42,10 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string, logger *unilogge
 
 	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
-	if app.LogProxyHookJSON {
-		plo := &proxyJSONLogger{make([]byte, 0), stdoutLogEntry}
-		ple := &proxyJSONLogger{make([]byte, 0), stderrLogEntry}
-		cmd.Stdout = plo
-		cmd.Stderr = io.MultiWriter(ple, stdErr)
-	} else {
-		plo := &proxyLogger{make([]byte, 0), stdoutLogEntry}
-		ple := &proxyLogger{make([]byte, 0), stderrLogEntry}
-		cmd.Stdout = plo
-		cmd.Stderr = io.MultiWriter(ple, stdErr)
-	}
+	plo := &proxyLogger{make([]byte, 0), app.LogProxyHookJSON, stdoutLogEntry}
+	ple := &proxyLogger{make([]byte, 0), app.LogProxyHookJSON, stderrLogEntry}
+	cmd.Stdout = plo
+	cmd.Stderr = io.MultiWriter(ple, stdErr)
 
 	err := cmd.Run()
 	if err != nil {
@@ -79,17 +72,25 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string, logger *unilogge
 	return usage, err
 }
 
-type proxyJSONLogger struct {
+type proxyLogger struct {
 	buf []byte
+
+	logProxyHookJSON bool
 
 	logger *unilogger.Logger
 }
 
-func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
-	pj.buf = append(pj.buf, p...)
+func (pl *proxyLogger) Write(p []byte) (n int, err error) {
+	pl.buf = append(pl.buf, p...)
+
+	if !pl.logProxyHookJSON {
+		pl.logger.Log(context.Background(), unilogger.LevelInfo.Level(), strings.TrimSpace(string(pl.buf)))
+
+		return len(p), nil
+	}
 
 	var line interface{}
-	err = json.Unmarshal(pj.buf, &line)
+	err = json.Unmarshal(pl.buf, &line)
 	if err != nil {
 		if err.Error() == "unexpected end of JSON input" {
 			return len(p), nil
@@ -100,31 +101,17 @@ func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
 
 	logMap, ok := line.(map[string]interface{})
 	if !ok {
-		pj.logger.Debugf("json log line not map[string]interface{}: %v", line)
+		pl.logger.Debugf("json log line not map[string]interface{}: %v", line)
 		// fall back to using the logger
-		pj.logger.Info(string(p))
+		pl.logger.Info(string(p))
 
 		return len(p), err
 	}
 
-	logEntry := pj.logger.With(app.ProxyJsonLogKey, true)
+	logEntry := pl.logger.With(app.ProxyJsonLogKey, true)
 
 	// logEntry.Log(log.FatalLevel, string(logLine))
 	logEntry.Log(context.Background(), unilogger.LevelFatal.Level(), "hook result", slog.Any("hook", logMap))
-
-	return len(p), nil
-}
-
-type proxyLogger struct {
-	buf []byte
-
-	logger *unilogger.Logger
-}
-
-func (pl *proxyLogger) Write(p []byte) (n int, err error) {
-	pl.buf = append(pl.buf, p...)
-
-	pl.logger.Log(context.Background(), unilogger.LevelInfo.Level(), strings.TrimSpace(string(pl.buf)))
 
 	return len(p), nil
 }
