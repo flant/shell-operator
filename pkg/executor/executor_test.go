@@ -70,7 +70,8 @@ func TestRunAndLogLines(t *testing.T) {
 		cmd := exec.Command("echo", `["a","b","c"]`)
 		_, err := RunAndLogLines(cmd, map[string]string{"a": "b"}, logger)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), `"level":"debug","msg":"json log line not map[string]interface{}: [a b c]","source":"executor/executor.go:109","output":"stdout"`)
+		assert.Contains(t, buf.String(), `"level":"debug","msg":"json log line not map[string]interface{}: [a b c]"`)
+		assert.Contains(t, buf.String(), `"output":"stdout"`)
 
 		buf.Reset()
 	})
