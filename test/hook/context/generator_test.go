@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	"github.com/flant/shell-operator/pkg/unilogger"
 )
 
 func parseContexts(contexts string) []BindingContext {
@@ -31,7 +32,7 @@ schedule:
   crontab: "* * * * *"
   includeSnapshotsFrom:
   - selected_pods
-`)
+`, unilogger.NewNop())
 	defer c.Stop()
 
 	// Synchronization contexts
@@ -144,7 +145,7 @@ kubernetes:
   - selected_crds
   kind: MyResource
   name: selected_crds
-`)
+`, unilogger.NewNop())
 	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
 	defer c.Stop()
 
@@ -190,7 +191,7 @@ kubernetes:
   - deployment
   kind: Deployment
   name: deployment
-`)
+`, unilogger.NewNop())
 	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
@@ -241,7 +242,7 @@ kubernetes:
   kind: Pod
   name: pods-grouped
   group: group1
-`)
+`, unilogger.NewNop())
 	defer c.Stop()
 
 	contexts, err := c.Run(`
@@ -286,7 +287,7 @@ kubernetes:
   group: main
   kind: Secret
   name: secret
-`)
+`, unilogger.NewNop())
 	defer c.Stop()
 
 	contexts, err := c.Run(`
@@ -328,7 +329,7 @@ kubernetes:
   kind: Pod
   name: selected_pods_nosync
   executeHookOnSynchronization: false
-`)
+`, unilogger.NewNop())
 	defer c.Stop()
 
 	// Synchronization contexts
@@ -371,7 +372,7 @@ schedule:
   crontab: "* * * * *"
   includeSnapshotsFrom:
   - selected_pods
-`)
+`, unilogger.NewNop())
 	defer c.Stop()
 
 	// Synchronization contexts

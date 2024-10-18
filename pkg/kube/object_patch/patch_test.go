@@ -15,6 +15,7 @@ import (
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
+	"github.com/flant/shell-operator/pkg/unilogger"
 )
 
 func mustReadFile(t *testing.T, filePath string) []byte {
@@ -524,7 +525,7 @@ object:
 			cluster := newFakeClusterWithNamespaceAndObjects(t, namespace, configMap)
 
 			// Apply MergePatch: add a new field in data section.
-			patcher := NewObjectPatcher(cluster.Client)
+			patcher := NewObjectPatcher(cluster.Client, unilogger.NewNop())
 
 			err := tt.fn(patcher)
 
@@ -775,7 +776,7 @@ object: |
 			cluster := newFakeClusterWithNamespaceAndObjects(t, namespace, existingConfigMap)
 
 			// Apply MergePatch: add a new field in data section.
-			patcher := NewObjectPatcher(cluster.Client)
+			patcher := NewObjectPatcher(cluster.Client, unilogger.NewNop())
 
 			err := tt.fn(patcher)
 
@@ -883,7 +884,7 @@ name: %s
 			cluster := newFakeClusterWithNamespaceAndObjects(t, namespace, existingConfigMap)
 
 			// Apply MergePatch: add a new field in data section.
-			patcher := NewObjectPatcher(cluster.Client)
+			patcher := NewObjectPatcher(cluster.Client, unilogger.NewNop())
 
 			err := tt.fn(patcher)
 

@@ -9,6 +9,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/task"
+	"github.com/flant/shell-operator/pkg/unilogger"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 )
 
@@ -18,7 +19,7 @@ func Test_Operator_startup_tasks(t *testing.T) {
 	hooksDir, err := utils.RequireExistingDirectory("testdata/startup_tasks/hooks")
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	op := NewShellOperator(context.Background())
+	op := NewShellOperator(context.Background(), unilogger.NewNop())
 	op.SetupEventManagers()
 	op.setupHookManagers(hooksDir, "")
 

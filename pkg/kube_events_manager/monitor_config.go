@@ -1,7 +1,7 @@
 package kube_events_manager
 
 import (
-	log "github.com/sirupsen/logrus"
+	"github.com/flant/shell-operator/pkg/unilogger"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -25,7 +25,7 @@ type MonitorConfig struct {
 	LabelSelector           *metav1.LabelSelector
 	FieldSelector           *FieldSelector
 	JqFilter                string
-	LogEntry                *log.Entry
+	LogEntry                *unilogger.Logger
 	Mode                    KubeEventMode
 	KeepFullObjectsInMemory bool
 	FilterFunc              func(*unstructured.Unstructured) (interface{}, error)

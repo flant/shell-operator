@@ -3,8 +3,6 @@ package shell_operator
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
-
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/task"
@@ -24,7 +22,7 @@ type CombineResult struct {
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
+func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
 	if q == nil {
 		return nil
 	}
@@ -120,7 +118,7 @@ func combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t
 	} else {
 		compactMsg = fmt.Sprintf("are combined to %d contexts", len(combinedContext))
 	}
-	log.Infof("Binding contexts from %d tasks %s. %d tasks are dropped from queue '%s'", len(otherTasks)+1, compactMsg, len(tasksFilter)-1, t.GetQueueName())
+	op.logger.Infof("Binding contexts from %d tasks %s. %d tasks are dropped from queue '%s'", len(otherTasks)+1, compactMsg, len(tasksFilter)-1, t.GetQueueName())
 
 	res.BindingContexts = compactedContext
 	res.MonitorIDs = monitorIDs

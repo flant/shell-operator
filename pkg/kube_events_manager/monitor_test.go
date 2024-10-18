@@ -12,6 +12,7 @@ import (
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/unilogger"
 )
 
 func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
@@ -38,7 +39,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 
 	mon := NewMonitor(context.Background(), fc.Client, nil, monitorCfg, func(ev KubeEvent) {
 		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
-	})
+	}, unilogger.NewNop())
 
 	// Start monitor.
 	err := mon.CreateInformers()

@@ -13,6 +13,7 @@ import (
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/jq"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
+	"github.com/flant/shell-operator/pkg/unilogger"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
 
@@ -35,6 +36,9 @@ func main() {
 		return nil
 	})
 
+	logger := unilogger.NewLogger(unilogger.Options{})
+	unilogger.SetDefault(logger)
+
 	// start main loop
 	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
@@ -45,7 +49,7 @@ func main() {
 			rand.Seed(time.Now().UnixNano())
 
 			// Init logging and initialize a ShellOperator instance.
-			operator, err := shell_operator.Init()
+			operator, err := shell_operator.Init(logger.Named("shell-operator"))
 			if err != nil {
 				os.Exit(1)
 			}

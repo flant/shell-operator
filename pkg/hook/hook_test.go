@@ -10,6 +10,7 @@ import (
 
 	"github.com/flant/shell-operator/pkg/hook/config"
 	. "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/unilogger"
 )
 
 func Test_Hook_SafeName(t *testing.T) {
@@ -23,7 +24,7 @@ func Test_Hook_SafeName(t *testing.T) {
 		t.Error(err)
 	}
 
-	h := NewHook(hookName, hookPath)
+	h := NewHook(hookName, hookPath, unilogger.NewNop())
 
 	g.Expect(h.SafeName()).To(Equal("002-cool-hooks-monitor-namespaces-py"))
 }
@@ -135,7 +136,7 @@ func Test_Hook_WithConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			hook = NewHook("hook-sh", "/hooks/hook.sh")
+			hook = NewHook("hook-sh", "/hooks/hook.sh", unilogger.NewNop())
 			_, err = hook.LoadConfig([]byte(test.jsonData))
 			test.fn()
 		})

@@ -2,18 +2,21 @@ package executor
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"syscall"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/flant/shell-operator/pkg/unilogger"
+	log "github.com/flant/shell-operator/pkg/unilogger"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 
 	"github.com/flant/shell-operator/pkg/app"
-	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type CmdUsage struct {
@@ -30,24 +33,19 @@ func Run(cmd *exec.Cmd) error {
 	return cmd.Run()
 }
 
-func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, error) {
+func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string, logger *unilogger.Logger) (*CmdUsage, error) {
 	// TODO observability
 	stdErr := bytes.NewBuffer(nil)
-	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
-	stdoutLogEntry := logEntry.WithField("output", "stdout")
-	stderrLogEntry := logEntry.WithField("output", "stderr")
+	logEntry := utils.EnrichLoggerWithLabels(logger, logLabels)
+	stdoutLogEntry := logEntry.With("output", "stdout")
+	stderrLogEntry := logEntry.With("output", "stderr")
 
 	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
-	if app.LogProxyHookJSON {
-		plo := &proxyJSONLogger{stdoutLogEntry, make([]byte, 0)}
-		ple := &proxyJSONLogger{stderrLogEntry, make([]byte, 0)}
-		cmd.Stdout = plo
-		cmd.Stderr = io.MultiWriter(ple, stdErr)
-	} else {
-		cmd.Stdout = stdoutLogEntry.Writer()
-		cmd.Stderr = io.MultiWriter(stderrLogEntry.Writer(), stdErr)
-	}
+	plo := &proxyLogger{make([]byte, 0), app.LogProxyHookJSON, stdoutLogEntry}
+	ple := &proxyLogger{make([]byte, 0), app.LogProxyHookJSON, stderrLogEntry}
+	cmd.Stdout = plo
+	cmd.Stderr = io.MultiWriter(ple, stdErr)
 
 	err := cmd.Run()
 	if err != nil {
@@ -74,41 +72,46 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 	return usage, err
 }
 
-type proxyJSONLogger struct {
-	*log.Entry
-
+type proxyLogger struct {
 	buf []byte
+
+	logProxyHookJSON bool
+
+	logger *unilogger.Logger
 }
 
-func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
-	pj.buf = append(pj.buf, p...)
+func (pl *proxyLogger) Write(p []byte) (n int, err error) {
+	pl.buf = append(pl.buf, p...)
+
+	if !pl.logProxyHookJSON {
+		pl.logger.Log(context.Background(), unilogger.LevelInfo.Level(), strings.TrimSpace(string(pl.buf)))
+
+		return len(p), nil
+	}
 
 	var line interface{}
-	err = json.Unmarshal(pj.buf, &line)
+	err = json.Unmarshal(pl.buf, &line)
 	if err != nil {
 		if err.Error() == "unexpected end of JSON input" {
 			return len(p), nil
 		}
+
 		return len(p), err
 	}
 
 	logMap, ok := line.(map[string]interface{})
 	if !ok {
-		pj.Debugf("json log line not map[string]interface{}: %v", line)
+		pl.logger.Debugf("json log line not map[string]interface{}: %v", line)
 		// fall back to using the logger
-		pj.Info(string(p))
+		pl.logger.Info(string(p))
+
 		return len(p), err
 	}
 
-	for k, v := range pj.Data {
-		logMap[k] = v
-	}
+	logEntry := pl.logger.With(app.ProxyJsonLogKey, true)
 
-	logLine, _ := json.Marshal(logMap)
-
-	logEntry := pj.WithField(app.ProxyJsonLogKey, true)
-
-	logEntry.Log(log.FatalLevel, string(logLine))
+	// logEntry.Log(log.FatalLevel, string(logLine))
+	logEntry.Log(context.Background(), unilogger.LevelFatal.Level(), "hook result", slog.Any("hook", logMap))
 
 	return len(p), nil
 }

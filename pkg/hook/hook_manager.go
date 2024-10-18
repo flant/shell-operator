@@ -8,7 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/flant/shell-operator/pkg/unilogger"
+	log "github.com/flant/shell-operator/pkg/unilogger"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"github.com/flant/shell-operator/pkg/executor"
@@ -41,6 +42,8 @@ type Manager struct {
 
 	// Index crdName -> fromVersion -> conversionLink
 	conversionChains *conversion.ChainStorage
+
+	logger *unilogger.Logger
 }
 
 // ManagerConfig sets configuration for Manager
@@ -51,6 +54,8 @@ type ManagerConfig struct {
 	Smgr       schedule_manager.ScheduleManager
 	Wmgr       *admission.WebhookManager
 	Cmgr       *conversion.WebhookManager
+
+	Logger *unilogger.Logger
 }
 
 func NewHookManager(config *ManagerConfig) *Manager {
@@ -66,6 +71,8 @@ func NewHookManager(config *ManagerConfig) *Manager {
 		scheduleManager:          config.Smgr,
 		admissionWebhookManager:  config.Wmgr,
 		conversionWebhookManager: config.Cmgr,
+
+		logger: config.Logger,
 	}
 }
 
@@ -126,10 +133,10 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 	if err != nil {
 		return nil, err
 	}
-	hook = NewHook(hookName, hookPath)
+	hook = NewHook(hookName, hookPath, hm.logger.Named("hook"))
 
-	hookEntry := log.WithField("hook", hook.Name).
-		WithField("phase", "config")
+	hookEntry := hm.logger.With("hook", hook.Name).
+		With("phase", "config")
 
 	hookEntry.Infof("Load config from '%s'", hookPath)
 
@@ -183,7 +190,7 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 	}
 
 	hookCtrl := controller.NewHookController()
-	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager)
+	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager, hm.logger.Named("kubernetes-bindings"))
 	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
 	hookCtrl.InitConversionBindings(hook.GetConfig().KubernetesConversion, hm.conversionWebhookManager)
 	hookCtrl.InitAdmissionBindings(hook.GetConfig().KubernetesValidating, hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
@@ -208,8 +215,8 @@ func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint str
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 
-	debugEntry := log.WithField("hook", hookName).
-		WithField("cmd", strings.Join(cmd.Args, " "))
+	debugEntry := hm.logger.With("hook", hookName).
+		With("cmd", strings.Join(cmd.Args, " "))
 
 	debugEntry.Debugf("Executing hook in %s", cmd.Dir)
 
