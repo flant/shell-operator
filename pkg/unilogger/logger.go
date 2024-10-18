@@ -56,7 +56,7 @@ func NewLogger(opts Options) *Logger {
 		Level:     l.level,
 		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			switch a.Key {
-			// skip standart fields
+			// skip standard fields
 			case slog.LevelKey, slog.MessageKey, slog.TimeKey:
 				return slog.Attr{}
 			case slog.SourceKey:
@@ -193,11 +193,11 @@ func (l *Logger) Fatalf(format string, args ...any) {
 func getStack() string {
 	rawstack := string(debug.Stack())
 	rawstack = strings.ReplaceAll(rawstack, "\t", "")
-	splitted := strings.Split(rawstack, "\n")
+	split := strings.Split(rawstack, "\n")
 
-	splitted = splitted[2:]
+	split = split[2:]
 
-	return strings.Join(splitted, "")
+	return strings.Join(split, "")
 }
 
 func ParseLevel(rawLogLevel string) (Level, error) {
