@@ -3,16 +3,18 @@ package admission
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	log "github.com/flant/shell-operator/pkg/unilogger"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
+	"github.com/flant/shell-operator/pkg/unilogger"
+	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type EventHandlerFn func(event Event) (*Response, error)
@@ -35,7 +37,7 @@ func NewWebhookHandler() *WebhookHandler {
 	})
 
 	rtr.Group(func(r chi.Router) {
-		r.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "admissionWebhook"))
+		r.Use(structuredLogger.NewStructuredLogger(unilogger.NewLogger(unilogger.Options{}).Named("admissionWebhook"), "admissionWebhook"))
 		r.Use(middleware.Recoverer)
 		r.Use(middleware.AllowContentType("application/json"))
 		r.Post("/*", h.serveReviewRequest)
@@ -63,7 +65,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 
 	admissionResponse, err := h.handleReviewRequest(r.URL.Path, admissionReview.Request)
 	if err != nil {
-		log.Error(err, "validation failed", "request", admissionReview.Request.UID)
+		log.Error("validation failed", "request", admissionReview.Request.UID, slog.String("error", err.Error()))
 		admissionReview.Response = errored(err)
 	} else {
 		admissionReview.Response = admissionResponse

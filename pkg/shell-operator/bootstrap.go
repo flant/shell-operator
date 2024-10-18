@@ -3,8 +3,7 @@ package shell_operator
 import (
 	"context"
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
+	"log/slog"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
@@ -14,6 +13,7 @@ import (
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
+	"github.com/flant/shell-operator/pkg/unilogger"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
@@ -21,32 +21,33 @@ import (
 
 // Init initialize logging, ensures directories and creates
 // a ShellOperator instance with all dependencies.
-func Init() (*ShellOperator, error) {
+func Init(logger *unilogger.Logger) (*ShellOperator, error) {
 	runtimeConfig := config.NewConfig()
 	// Init logging subsystem.
-	app.SetupLogging(runtimeConfig)
+	app.SetupLogging(runtimeConfig, logger)
+
 	// Log version and jq filtering implementation.
-	log.Infof(app.AppStartMessage)
-	log.Debug(jq.FilterInfo())
+	logger.Info(app.AppStartMessage)
+	logger.Debug(jq.FilterInfo())
 
 	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
 	if err != nil {
-		log.Errorf("Fatal: hooks directory is required: %s", err)
+		logger.Fatal("hooks directory is required", slog.String("error", err.Error()))
 		return nil, err
 	}
 
 	tempDir, err := utils.EnsureTempDirectory(app.TempDir)
 	if err != nil {
-		log.Errorf("Fatal: temp directory: %s", err)
+		logger.Fatal("temp directory", slog.String("error", err.Error()))
 		return nil, err
 	}
 
-	op := NewShellOperator(context.Background())
+	op := NewShellOperator(context.Background(), logger)
 
 	// Debug server.
-	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr)
+	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
 	if err != nil {
-		log.Errorf("Fatal: start Debug server: %s", err)
+		logger.Fatal("start Debug server", slog.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -56,13 +57,13 @@ func Init() (*ShellOperator, error) {
 		"queue":   "",
 	})
 	if err != nil {
-		log.Errorf("Fatal: %s", err)
+		logger.Fatal("essemble common operator", slog.String("error", err.Error()))
 		return nil, err
 	}
 
 	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
 	if err != nil {
-		log.Errorf("Fatal: %s", err)
+		logger.Fatal("essemble shell operator", slog.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -88,7 +89,7 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	}
 
 	// ObjectPatcher with a separate Kubernetes client.
-	op.ObjectPatcher, err = initDefaultObjectPatcher(op.MetricStorage)
+	op.ObjectPatcher, err = initDefaultObjectPatcher(op.MetricStorage, op.logger.Named("object-patcher"))
 	if err != nil {
 		return err
 	}
@@ -152,10 +153,10 @@ func (op *ShellOperator) SetupEventManagers() {
 	op.TaskQueues.WithMetricStorage(op.MetricStorage)
 
 	// Initialize schedule manager.
-	op.ScheduleManager = schedule_manager.NewScheduleManager(op.ctx)
+	op.ScheduleManager = schedule_manager.NewScheduleManager(op.ctx, op.logger.Named("schedule-manager"))
 
 	// Initialize kubernetes events manager.
-	op.KubeEventsManager = kube_events_manager.NewKubeEventsManager(op.ctx, op.KubeClient)
+	op.KubeEventsManager = kube_events_manager.NewKubeEventsManager(op.ctx, op.KubeClient, op.logger.Named("kube-events-manager"))
 	op.KubeEventsManager.WithMetricStorage(op.MetricStorage)
 
 	// Initialize events handler that emit tasks to run hooks
@@ -188,6 +189,7 @@ func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 		Smgr:       op.ScheduleManager,
 		Wmgr:       op.AdmissionWebhookManager,
 		Cmgr:       op.ConversionWebhookManager,
+		Logger:     op.logger.Named("hook-manager"),
 	}
 	op.HookManager = hook.NewHookManager(cfg)
 }

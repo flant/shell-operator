@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
+	log "github.com/flant/shell-operator/pkg/unilogger"
 	"github.com/go-chi/chi/v5"
-	log "github.com/sirupsen/logrus"
 )
 
 type WebhookServer struct {

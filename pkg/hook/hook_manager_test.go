@@ -10,6 +10,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/unilogger"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -30,6 +31,8 @@ func newHookManager(t *testing.T, testdataDir string) *Manager {
 		Smgr:       nil,
 		Wmgr:       admissionManager,
 		Cmgr:       conversionManager,
+
+		Logger: unilogger.NewNop(),
 	}
 	hm := NewHookManager(cfg)
 

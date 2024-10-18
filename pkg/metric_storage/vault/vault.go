@@ -2,11 +2,12 @@ package vault
 
 import (
 	"fmt"
-	"github.com/flant/shell-operator/pkg/metric"
 	"sync"
 
+	"github.com/flant/shell-operator/pkg/metric"
+
+	log "github.com/flant/shell-operator/pkg/unilogger"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 
 	. "github.com/flant/shell-operator/pkg/utils/labels"
 )

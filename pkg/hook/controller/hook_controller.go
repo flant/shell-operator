@@ -8,6 +8,7 @@ import (
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/schedule_manager"
+	"github.com/flant/shell-operator/pkg/unilogger"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -48,14 +49,16 @@ type HookController struct {
 	validatingBindings   []ValidatingConfig
 	mutatingBindings     []MutatingConfig
 	conversionBindings   []ConversionConfig
+
+	logger *unilogger.Logger
 }
 
-func (hc *HookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager) {
+func (hc *HookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager, logger *unilogger.Logger) {
 	if len(bindings) == 0 {
 		return
 	}
 
-	bindingCtrl := NewKubernetesBindingsController()
+	bindingCtrl := NewKubernetesBindingsController(logger)
 	bindingCtrl.WithKubeEventsManager(kubeEventMgr)
 	bindingCtrl.WithKubernetesBindings(bindings)
 	hc.KubernetesController = bindingCtrl

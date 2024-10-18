@@ -15,6 +15,7 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/unilogger"
 )
 
 func Test_MainKubeEventsManager_Run(t *testing.T) {
@@ -49,7 +50,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 		},
 	}
 
-	mgr := NewKubeEventsManager(context.Background(), kubeClient)
+	mgr := NewKubeEventsManager(context.Background(), kubeClient, unilogger.NewNop())
 
 	// monitor with 3 namespaces and 4 object names
 	monitor := &MonitorConfig{
@@ -137,7 +138,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
 
 	// Init() replacement
-	mgr := NewKubeEventsManager(ctx, kubeClient)
+	mgr := NewKubeEventsManager(ctx, kubeClient, unilogger.NewNop())
 	mgr.KubeEventCh = make(chan KubeEvent, 10)
 
 	// monitor with 3 namespaces and 4 object names and all event types
@@ -313,7 +314,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
 
 	//// Init() replacement
-	mgr := NewKubeEventsManager(ctx, nil)
+	mgr := NewKubeEventsManager(ctx, nil, unilogger.NewNop())
 
 	// monitor with 3 namespaces and 4 object names and all event types
 	monitor := &MonitorConfig{
