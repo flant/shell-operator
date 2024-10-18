@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -92,11 +91,6 @@ func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
 	var line interface{}
 	err = json.Unmarshal(pj.buf, &line)
 	if err != nil {
-		serr := new(json.SyntaxError)
-		if errors.As(err, &serr) && err.Error() == "unexpected end of JSON input" {
-			return len(p), nil
-		}
-
 		if err.Error() == "unexpected end of JSON input" {
 			return len(p), nil
 		}
