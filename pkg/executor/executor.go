@@ -39,15 +39,10 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 
 	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
-	if app.LogProxyHookJSON {
-		plo := &proxyJSONLogger{stdoutLogEntry, make([]byte, 0)}
-		ple := &proxyJSONLogger{stderrLogEntry, make([]byte, 0)}
-		cmd.Stdout = plo
-		cmd.Stderr = io.MultiWriter(ple, stdErr)
-	} else {
-		cmd.Stdout = stdoutLogEntry.Writer()
-		cmd.Stderr = io.MultiWriter(stderrLogEntry.Writer(), stdErr)
-	}
+	plo := &proxyJSONLogger{stdoutLogEntry, make([]byte, 0), app.LogProxyHookJSON}
+	ple := &proxyJSONLogger{stderrLogEntry, make([]byte, 0), app.LogProxyHookJSON}
+	cmd.Stdout = plo
+	cmd.Stderr = io.MultiWriter(ple, stdErr)
 
 	err := cmd.Run()
 	if err != nil {
@@ -78,10 +73,18 @@ type proxyJSONLogger struct {
 	*log.Entry
 
 	buf []byte
+
+	logProxyHookJSON bool
 }
 
 func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
 	pj.buf = append(pj.buf, p...)
+
+	if !pj.logProxyHookJSON {
+		pj.Entry.Log(log.InfoLevel, strings.TrimSpace(string(pj.buf)))
+
+		return len(p), nil
+	}
 
 	var line interface{}
 	err = json.Unmarshal(pj.buf, &line)
