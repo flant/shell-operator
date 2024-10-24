@@ -41,7 +41,7 @@ func (v *GroupedVault) ExpireGroupMetrics(group string) {
 }
 
 // ExpireGroupMetricByName gets a collector by its name and clears all metrics inside the collector by the group.
-func (v *GroupedVault) ExpireGroupMetricByName(name, group string) {
+func (v *GroupedVault) ExpireGroupMetricByName(group, name string) {
 	v.mtx.Lock()
 	collector, ok := v.collectors[name]
 	if ok {

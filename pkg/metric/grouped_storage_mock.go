@@ -25,9 +25,9 @@ type GroupedStorageMock struct {
 	beforeCounterAddCounter uint64
 	CounterAddMock          mGroupedStorageMockCounterAdd
 
-	funcExpireGroupMetricByName          func(name string, group string)
+	funcExpireGroupMetricByName          func(group string, name string)
 	funcExpireGroupMetricByNameOrigin    string
-	inspectFuncExpireGroupMetricByName   func(name string, group string)
+	inspectFuncExpireGroupMetricByName   func(group string, name string)
 	afterExpireGroupMetricByNameCounter  uint64
 	beforeExpireGroupMetricByNameCounter uint64
 	ExpireGroupMetricByNameMock          mGroupedStorageMockExpireGroupMetricByName
@@ -502,21 +502,21 @@ type GroupedStorageMockExpireGroupMetricByNameExpectation struct {
 
 // GroupedStorageMockExpireGroupMetricByNameParams contains parameters of the GroupedStorage.ExpireGroupMetricByName
 type GroupedStorageMockExpireGroupMetricByNameParams struct {
-	name  string
 	group string
+	name  string
 }
 
 // GroupedStorageMockExpireGroupMetricByNameParamPtrs contains pointers to parameters of the GroupedStorage.ExpireGroupMetricByName
 type GroupedStorageMockExpireGroupMetricByNameParamPtrs struct {
-	name  *string
 	group *string
+	name  *string
 }
 
 // GroupedStorageMockExpireGroupMetricByNameOrigins contains origins of expectations of the GroupedStorage.ExpireGroupMetricByName
 type GroupedStorageMockExpireGroupMetricByNameExpectationOrigins struct {
 	origin      string
-	originName  string
 	originGroup string
+	originName  string
 }
 
 // Marks this method to be optional. The default behavior of any method with Return() is '1 or more', meaning
@@ -530,7 +530,7 @@ func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Opt
 }
 
 // Expect sets up expected params for GroupedStorage.ExpireGroupMetricByName
-func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Expect(name string, group string) *mGroupedStorageMockExpireGroupMetricByName {
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Expect(group string, name string) *mGroupedStorageMockExpireGroupMetricByName {
 	if mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName != nil {
 		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Set")
 	}
@@ -543,7 +543,7 @@ func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Exp
 		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by ExpectParams functions")
 	}
 
-	mmExpireGroupMetricByName.defaultExpectation.params = &GroupedStorageMockExpireGroupMetricByNameParams{name, group}
+	mmExpireGroupMetricByName.defaultExpectation.params = &GroupedStorageMockExpireGroupMetricByNameParams{group, name}
 	mmExpireGroupMetricByName.defaultExpectation.expectationOrigins.origin = minimock.CallerInfo(1)
 	for _, e := range mmExpireGroupMetricByName.expectations {
 		if minimock.Equal(e.params, mmExpireGroupMetricByName.defaultExpectation.params) {
@@ -554,31 +554,8 @@ func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Exp
 	return mmExpireGroupMetricByName
 }
 
-// ExpectNameParam1 sets up expected param name for GroupedStorage.ExpireGroupMetricByName
-func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) ExpectNameParam1(name string) *mGroupedStorageMockExpireGroupMetricByName {
-	if mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName != nil {
-		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Set")
-	}
-
-	if mmExpireGroupMetricByName.defaultExpectation == nil {
-		mmExpireGroupMetricByName.defaultExpectation = &GroupedStorageMockExpireGroupMetricByNameExpectation{}
-	}
-
-	if mmExpireGroupMetricByName.defaultExpectation.params != nil {
-		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Expect")
-	}
-
-	if mmExpireGroupMetricByName.defaultExpectation.paramPtrs == nil {
-		mmExpireGroupMetricByName.defaultExpectation.paramPtrs = &GroupedStorageMockExpireGroupMetricByNameParamPtrs{}
-	}
-	mmExpireGroupMetricByName.defaultExpectation.paramPtrs.name = &name
-	mmExpireGroupMetricByName.defaultExpectation.expectationOrigins.originName = minimock.CallerInfo(1)
-
-	return mmExpireGroupMetricByName
-}
-
-// ExpectGroupParam2 sets up expected param group for GroupedStorage.ExpireGroupMetricByName
-func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) ExpectGroupParam2(group string) *mGroupedStorageMockExpireGroupMetricByName {
+// ExpectGroupParam1 sets up expected param group for GroupedStorage.ExpireGroupMetricByName
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) ExpectGroupParam1(group string) *mGroupedStorageMockExpireGroupMetricByName {
 	if mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName != nil {
 		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Set")
 	}
@@ -600,8 +577,31 @@ func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Exp
 	return mmExpireGroupMetricByName
 }
 
+// ExpectNameParam2 sets up expected param name for GroupedStorage.ExpireGroupMetricByName
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) ExpectNameParam2(name string) *mGroupedStorageMockExpireGroupMetricByName {
+	if mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Set")
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation == nil {
+		mmExpireGroupMetricByName.defaultExpectation = &GroupedStorageMockExpireGroupMetricByNameExpectation{}
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation.params != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Expect")
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation.paramPtrs == nil {
+		mmExpireGroupMetricByName.defaultExpectation.paramPtrs = &GroupedStorageMockExpireGroupMetricByNameParamPtrs{}
+	}
+	mmExpireGroupMetricByName.defaultExpectation.paramPtrs.name = &name
+	mmExpireGroupMetricByName.defaultExpectation.expectationOrigins.originName = minimock.CallerInfo(1)
+
+	return mmExpireGroupMetricByName
+}
+
 // Inspect accepts an inspector function that has same arguments as the GroupedStorage.ExpireGroupMetricByName
-func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Inspect(f func(name string, group string)) *mGroupedStorageMockExpireGroupMetricByName {
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Inspect(f func(group string, name string)) *mGroupedStorageMockExpireGroupMetricByName {
 	if mmExpireGroupMetricByName.mock.inspectFuncExpireGroupMetricByName != nil {
 		mmExpireGroupMetricByName.mock.t.Fatalf("Inspect function is already set for GroupedStorageMock.ExpireGroupMetricByName")
 	}
@@ -626,7 +626,7 @@ func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Ret
 }
 
 // Set uses given function f to mock the GroupedStorage.ExpireGroupMetricByName method
-func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Set(f func(name string, group string)) *GroupedStorageMock {
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Set(f func(group string, name string)) *GroupedStorageMock {
 	if mmExpireGroupMetricByName.defaultExpectation != nil {
 		mmExpireGroupMetricByName.mock.t.Fatalf("Default expectation is already set for the GroupedStorage.ExpireGroupMetricByName method")
 	}
@@ -662,17 +662,17 @@ func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) inv
 }
 
 // ExpireGroupMetricByName implements GroupedStorage
-func (mmExpireGroupMetricByName *GroupedStorageMock) ExpireGroupMetricByName(name string, group string) {
+func (mmExpireGroupMetricByName *GroupedStorageMock) ExpireGroupMetricByName(group string, name string) {
 	mm_atomic.AddUint64(&mmExpireGroupMetricByName.beforeExpireGroupMetricByNameCounter, 1)
 	defer mm_atomic.AddUint64(&mmExpireGroupMetricByName.afterExpireGroupMetricByNameCounter, 1)
 
 	mmExpireGroupMetricByName.t.Helper()
 
 	if mmExpireGroupMetricByName.inspectFuncExpireGroupMetricByName != nil {
-		mmExpireGroupMetricByName.inspectFuncExpireGroupMetricByName(name, group)
+		mmExpireGroupMetricByName.inspectFuncExpireGroupMetricByName(group, name)
 	}
 
-	mm_params := GroupedStorageMockExpireGroupMetricByNameParams{name, group}
+	mm_params := GroupedStorageMockExpireGroupMetricByNameParams{group, name}
 
 	// Record call args
 	mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.mutex.Lock()
@@ -691,18 +691,18 @@ func (mmExpireGroupMetricByName *GroupedStorageMock) ExpireGroupMetricByName(nam
 		mm_want := mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.params
 		mm_want_ptrs := mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.paramPtrs
 
-		mm_got := GroupedStorageMockExpireGroupMetricByNameParams{name, group}
+		mm_got := GroupedStorageMockExpireGroupMetricByNameParams{group, name}
 
 		if mm_want_ptrs != nil {
-
-			if mm_want_ptrs.name != nil && !minimock.Equal(*mm_want_ptrs.name, mm_got.name) {
-				mmExpireGroupMetricByName.t.Errorf("GroupedStorageMock.ExpireGroupMetricByName got unexpected parameter name, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
-					mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.expectationOrigins.originName, *mm_want_ptrs.name, mm_got.name, minimock.Diff(*mm_want_ptrs.name, mm_got.name))
-			}
 
 			if mm_want_ptrs.group != nil && !minimock.Equal(*mm_want_ptrs.group, mm_got.group) {
 				mmExpireGroupMetricByName.t.Errorf("GroupedStorageMock.ExpireGroupMetricByName got unexpected parameter group, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
 					mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.expectationOrigins.originGroup, *mm_want_ptrs.group, mm_got.group, minimock.Diff(*mm_want_ptrs.group, mm_got.group))
+			}
+
+			if mm_want_ptrs.name != nil && !minimock.Equal(*mm_want_ptrs.name, mm_got.name) {
+				mmExpireGroupMetricByName.t.Errorf("GroupedStorageMock.ExpireGroupMetricByName got unexpected parameter name, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.expectationOrigins.originName, *mm_want_ptrs.name, mm_got.name, minimock.Diff(*mm_want_ptrs.name, mm_got.name))
 			}
 
 		} else if mm_want != nil && !minimock.Equal(*mm_want, mm_got) {
@@ -714,10 +714,10 @@ func (mmExpireGroupMetricByName *GroupedStorageMock) ExpireGroupMetricByName(nam
 
 	}
 	if mmExpireGroupMetricByName.funcExpireGroupMetricByName != nil {
-		mmExpireGroupMetricByName.funcExpireGroupMetricByName(name, group)
+		mmExpireGroupMetricByName.funcExpireGroupMetricByName(group, name)
 		return
 	}
-	mmExpireGroupMetricByName.t.Fatalf("Unexpected call to GroupedStorageMock.ExpireGroupMetricByName. %v %v", name, group)
+	mmExpireGroupMetricByName.t.Fatalf("Unexpected call to GroupedStorageMock.ExpireGroupMetricByName. %v %v", group, name)
 
 }
 

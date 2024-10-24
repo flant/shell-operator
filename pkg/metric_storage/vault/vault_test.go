@@ -187,7 +187,7 @@ metric_total4{a="", b="", c="", d="", j=""} 29
 metric_total4{a="", b="", c="", d="", j="j1"} 41
 `
 
-	v.ExpireGroupMetricByName("metric_total5", "group3")
+	v.ExpireGroupMetricByName("group3", "metric_total5")
 	err = promtest.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expect), "metric_total1", "metric_total2", "metric_totalr3", "metric_total4", "metric_total5")
 	g.Expect(err).ShouldNot(HaveOccurred())
 }
