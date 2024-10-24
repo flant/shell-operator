@@ -28,6 +28,7 @@ type Storage interface {
 type GroupedStorage interface {
 	Registerer() prometheus.Registerer
 	ExpireGroupMetrics(group string)
+	ExpireGroupMetricByName(name, group string)
 	GetOrCreateCounterCollector(name string, labelNames []string) (*ConstCounterCollector, error)
 	GetOrCreateGaugeCollector(name string, labelNames []string) (*ConstGaugeCollector, error)
 	CounterAdd(group string, name string, value float64, labels map[string]string)
