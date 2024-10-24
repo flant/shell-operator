@@ -46,7 +46,7 @@ type Hook struct {
 
 	TmpDir string
 
-	logger *unilogger.Logger
+	Logger *unilogger.Logger
 }
 
 func NewHook(name, path string, logger *unilogger.Logger) *Hook {
@@ -54,7 +54,7 @@ func NewHook(name, path string, logger *unilogger.Logger) *Hook {
 		Name:   name,
 		Path:   path,
 		Config: &config.HookConfig{},
-		logger: logger,
+		Logger: logger,
 	}
 }
 
@@ -142,7 +142,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 
 	result := &Result{}
 
-	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels, h.logger)
+	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels, h.Logger)
 	if err != nil {
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
