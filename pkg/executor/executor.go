@@ -78,13 +78,17 @@ type proxyJSONLogger struct {
 }
 
 func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
-	pj.buf = append(pj.buf, p...)
-
 	if !pj.logProxyHookJSON {
-		pj.Entry.Log(log.InfoLevel, strings.TrimSpace(string(pj.buf)))
+		str := strings.TrimSpace(string(p))
+
+		if len(str) != 0 {
+			pj.Entry.Log(log.InfoLevel, str)
+		}
 
 		return len(p), nil
 	}
+
+	pj.buf = append(pj.buf, p...)
 
 	var line interface{}
 	err = json.Unmarshal(pj.buf, &line)
