@@ -34,10 +34,20 @@ func (v *GroupedVault) SetRegisterer(r prometheus.Registerer) {
 // ClearAllMetrics takes each collector in collectors and clear all metrics by group.
 func (v *GroupedVault) ExpireGroupMetrics(group string) {
 	v.mtx.Lock()
-	defer v.mtx.Unlock()
 	for _, collector := range v.collectors {
 		collector.ExpireGroupMetrics(group)
 	}
+	v.mtx.Unlock()
+}
+
+// ExpireGroupMetricByName gets a collector by its name and clears all metrics inside the collector by the group.
+func (v *GroupedVault) ExpireGroupMetricByName(name, group string) {
+	v.mtx.Lock()
+	collector, ok := v.collectors[name]
+	if ok {
+		collector.ExpireGroupMetrics(group)
+	}
+	v.mtx.Unlock()
 }
 
 func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []string) (*metric.ConstCounterCollector, error) {
