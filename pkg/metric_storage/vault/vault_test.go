@@ -17,7 +17,7 @@ func Test_CounterAdd(t *testing.T) {
 	buf := &bytes.Buffer{}
 	log.SetOutput(buf)
 
-	v := NewGroupedVault()
+	v := NewGroupedVault(func (name string) string { return name })
 	v.registerer = prometheus.DefaultRegisterer
 
 	v.CounterAdd("group1", "metric_total", 1.0, map[string]string{"lbl": "val"})
