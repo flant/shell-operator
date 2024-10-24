@@ -5,17 +5,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flant/shell-operator/pkg/unilogger"
+	log "github.com/flant/shell-operator/pkg/unilogger"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
 	promtest "github.com/prometheus/client_golang/prometheus/testutil"
-	log "github.com/sirupsen/logrus"
 )
 
 func Test_CounterAdd(t *testing.T) {
 	g := NewWithT(t)
 
+	logger := unilogger.NewLogger(log.Options{})
+	unilogger.SetDefault(logger)
+
 	buf := &bytes.Buffer{}
-	log.SetOutput(buf)
+	logger.SetOutput(buf)
 
 	v := NewGroupedVault()
 	v.registerer = prometheus.DefaultRegisterer

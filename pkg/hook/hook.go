@@ -19,6 +19,7 @@ import (
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
+	"github.com/flant/shell-operator/pkg/unilogger"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -44,13 +45,16 @@ type Hook struct {
 	RateLimiter    *rate.Limiter
 
 	TmpDir string
+
+	Logger *unilogger.Logger
 }
 
-func NewHook(name, path string) *Hook {
+func NewHook(name, path string, logger *unilogger.Logger) *Hook {
 	return &Hook{
 		Name:   name,
 		Path:   path,
 		Config: &config.HookConfig{},
+		Logger: logger,
 	}
 }
 
@@ -138,7 +142,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 
 	result := &Result{}
 
-	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels)
+	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels, h.Logger)
 	if err != nil {
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}

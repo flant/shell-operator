@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/flant/shell-operator/pkg/schedule_manager/types"
+	"github.com/flant/shell-operator/pkg/unilogger"
 )
 
 func Test_ScheduleManager_Add(t *testing.T) {
-	sm := NewScheduleManager(context.Background())
+	sm := NewScheduleManager(context.Background(), unilogger.NewNop())
 
 	expectations := []struct {
 		testName string

@@ -2,12 +2,13 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/flant/shell-operator/pkg/unilogger"
 )
 
 /**
@@ -42,16 +43,16 @@ type Config struct {
 	temporalValues map[string]*TemporalValue
 	expireTicker   *time.Ticker
 
-	logEntry *log.Entry
+	logEntry *unilogger.Logger
 }
 
-func NewConfig() *Config {
+func NewConfig(logger *unilogger.Logger) *Config {
 	return &Config{
 		params:         make(map[string]*Parameter),
 		values:         make(map[string]string),
 		temporalValues: make(map[string]*TemporalValue),
 		errors:         make(map[string]error),
-		logEntry:       log.WithField("component", "runtimeConfig"),
+		logEntry:       logger.With(slog.String("component", "runtimeConfig")),
 	}
 }
 
@@ -131,7 +132,7 @@ func (c *Config) IsValid(name, value string) error {
 	// maybe we should register it together with a parameter
 	switch name {
 	case "log.level":
-		_, err := log.ParseLevel(value)
+		_, err := unilogger.ParseLevel(value)
 		if err != nil {
 			return err
 		}
@@ -254,7 +255,7 @@ func (c *Config) expireOverrides() {
 
 	for _, expire := range expires {
 		name, oldValue, newValue := expire[0], expire[1], expire[2]
-		c.logEntry.Debugf("Parameter '%s' expired", name)
+		c.logEntry.Debug("Parameter is expired", slog.String("parameter", name))
 		c.callOnChange(name, oldValue, newValue)
 	}
 }
@@ -266,8 +267,8 @@ func (c *Config) callOnChange(name string, oldValue string, newValue string) {
 	}
 	err := c.params[name].onChange(oldValue, newValue)
 	if err != nil {
-		c.logEntry.Errorf("OnChange handler failed for '%s' during value change from '%s' to '%s': %v",
-			name, oldValue, newValue, err)
+		c.logEntry.Error("OnChange handler failed for parameter during value change values",
+			slog.String("parameter", name), slog.String("old_value", oldValue), slog.String("new_value", newValue), slog.String("error", err.Error()))
 	}
 	c.m.Lock()
 	delete(c.errors, name)

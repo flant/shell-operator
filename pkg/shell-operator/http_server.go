@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/flant/shell-operator/pkg/unilogger"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/flant/shell-operator/pkg/app"
 )

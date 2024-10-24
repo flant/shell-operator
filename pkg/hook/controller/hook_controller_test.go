@@ -12,6 +12,7 @@ import (
 	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	types2 "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/unilogger"
 )
 
 // Test updating snapshots for combined contexts.
@@ -19,7 +20,7 @@ func Test_UpdateSnapshots(t *testing.T) {
 	g := NewWithT(t)
 
 	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
-	mgr := kube_events_manager.NewKubeEventsManager(context.Background(), fc.Client)
+	mgr := kube_events_manager.NewKubeEventsManager(context.Background(), fc.Client, unilogger.NewNop())
 
 	testHookConfig := `
 configVersion: v1
@@ -46,7 +47,7 @@ kubernetes:
 	g.Expect(err).ShouldNot(HaveOccurred())
 
 	hc := NewHookController()
-	hc.InitKubernetesBindings(testCfg.OnKubernetesEvents, mgr)
+	hc.InitKubernetesBindings(testCfg.OnKubernetesEvents, mgr, unilogger.NewNop())
 	hc.EnableScheduleBindings()
 
 	// Test case: combined binding context for binding_2 and binding_3.

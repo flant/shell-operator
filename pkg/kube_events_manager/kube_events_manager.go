@@ -5,7 +5,8 @@ import (
 	"runtime/trace"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/flant/shell-operator/pkg/unilogger"
+	log "github.com/flant/shell-operator/pkg/unilogger"
 
 	klient "github.com/flant/kube-client/client"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -37,13 +38,15 @@ type kubeEventsManager struct {
 
 	m        sync.RWMutex
 	Monitors map[string]Monitor
+
+	logger *unilogger.Logger
 }
 
 // kubeEventsManager should implement KubeEventsManager.
 var _ KubeEventsManager = &kubeEventsManager{}
 
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
-func NewKubeEventsManager(ctx context.Context, client *klient.Client) *kubeEventsManager {
+func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *unilogger.Logger) *kubeEventsManager {
 	cctx, cancel := context.WithCancel(ctx)
 	em := &kubeEventsManager{
 		ctx:         cctx,
@@ -52,6 +55,7 @@ func NewKubeEventsManager(ctx context.Context, client *klient.Client) *kubeEvent
 		m:           sync.RWMutex{},
 		Monitors:    make(map[string]Monitor),
 		KubeEventCh: make(chan KubeEvent, 1),
+		logger:      logger,
 	}
 	return em
 }
@@ -73,7 +77,9 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 		func(ev KubeEvent) {
 			defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
 			mgr.KubeEventCh <- ev
-		})
+		},
+		mgr.logger.Named("monitor"),
+	)
 
 	err := monitor.CreateInformers()
 	if err != nil {
