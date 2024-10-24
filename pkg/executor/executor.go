@@ -42,8 +42,8 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string, logger *unilogge
 
 	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
-	plo := &proxyLogger{app.LogProxyHookJSON, stdoutLogEntry}
-	ple := &proxyLogger{app.LogProxyHookJSON, stderrLogEntry}
+	plo := &proxyLogger{app.LogProxyHookJSON, stdoutLogEntry, make([]byte, 0)}
+	ple := &proxyLogger{app.LogProxyHookJSON, stderrLogEntry, make([]byte, 0)}
 	cmd.Stdout = plo
 	cmd.Stderr = io.MultiWriter(ple, stdErr)
 
@@ -76,6 +76,8 @@ type proxyLogger struct {
 	logProxyHookJSON bool
 
 	logger *unilogger.Logger
+
+	buf []byte
 }
 
 func (pl *proxyLogger) Write(p []byte) (n int, err error) {
@@ -89,8 +91,10 @@ func (pl *proxyLogger) Write(p []byte) (n int, err error) {
 		return len(p), nil
 	}
 
+	pl.buf = append(pl.buf, p...)
+
 	var line interface{}
-	err = json.Unmarshal(p, &line)
+	err = json.Unmarshal(pl.buf, &line)
 	if err != nil {
 		if err.Error() == "unexpected end of JSON input" {
 			return len(p), nil
@@ -100,6 +104,10 @@ func (pl *proxyLogger) Write(p []byte) (n int, err error) {
 	}
 
 	logMap, ok := line.(map[string]interface{})
+	defer func() {
+		pl.buf = []byte{}
+	}()
+
 	if !ok {
 		pl.logger.Debugf("json log line not map[string]interface{}: %v", line)
 		// fall back to using the logger
