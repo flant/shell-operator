@@ -3,8 +3,8 @@ package object_patch
 import (
 	"fmt"
 
+	log "github.com/flant/shell-operator/pkg/unilogger"
 	"github.com/hashicorp/go-multierror"
-	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"

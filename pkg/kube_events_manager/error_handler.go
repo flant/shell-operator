@@ -3,7 +3,7 @@ package kube_events_manager
 import (
 	"io"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/flant/shell-operator/pkg/unilogger"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
@@ -14,16 +14,19 @@ import (
 type WatchErrorHandler struct {
 	description   string
 	kind          string
-	logEntry      *log.Entry
+	logEntry      *unilogger.Logger
 	metricStorage *metric_storage.MetricStorage
+
+	logger *unilogger.Logger
 }
 
-func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage *metric_storage.MetricStorage) *WatchErrorHandler {
+func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage *metric_storage.MetricStorage, logger *unilogger.Logger) *WatchErrorHandler {
 	return &WatchErrorHandler{
 		description:   description,
 		kind:          kind,
-		logEntry:      log.WithFields(utils.LabelsToLogFields(logLabels)),
+		logEntry:      utils.EnrichLoggerWithLabels(logger, logLabels),
 		metricStorage: metricStorage,
+		logger:        logger,
 	}
 }
 
