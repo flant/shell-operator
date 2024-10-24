@@ -17,7 +17,7 @@ func Test_CounterAdd(t *testing.T) {
 	buf := &bytes.Buffer{}
 	log.SetOutput(buf)
 
-	v := NewGroupedVault()
+	v := NewGroupedVault(func (name string) string { return name })
 	v.registerer = prometheus.DefaultRegisterer
 
 	v.CounterAdd("group1", "metric_total", 1.0, map[string]string{"lbl": "val"})
@@ -125,6 +125,8 @@ metric2_total{lbl="val222"} 2
 	v.CounterAdd("group3", "metric_total4", 39.0, map[string]string{"j": "j1"})
 	v.CounterAdd("group3", "metric_total4", 1.0, map[string]string{"j": "j1"})
 	v.CounterAdd("group3", "metric_total4", 1.0, map[string]string{"a": "", "b": "", "c": "", "d": "", "j": "j1"})
+	v.CounterAdd("group3", "metric_total5", 7.0, map[string]string{"g": "g1"})
+	v.CounterAdd("group3", "metric_total5", 11.0, map[string]string{"foo": "bar"})
 
 	g.Expect(buf.String()).ShouldNot(ContainSubstring("error"), "error occurred in log: %s", buf.String())
 
@@ -151,8 +153,41 @@ metric_total4{a="a1", b="b1", c="c1", d="d1", j=""} 99
 metric_total4{a="", b="", c="c2", d="", j=""} 19
 metric_total4{a="", b="", c="", d="", j=""} 29
 metric_total4{a="", b="", c="", d="", j="j1"} 41
+# HELP metric_total5 metric_total5
+# TYPE metric_total5 counter
+metric_total5{foo="", g="g1"} 7
+metric_total5{foo="bar", g=""} 11
 `
 
-	err = promtest.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expect), "metric_total1", "metric_total2", "metric_total3", "metric_total4")
+	err = promtest.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expect), "metric_total1", "metric_total2", "metric_total3", "metric_total4", "metric_total5")
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	expect = `
+# HELP metric_total1 metric_total1
+# TYPE metric_total1 gauge
+metric_total1{a="A", b="", c=""} 5
+metric_total1{a="", b="", c="C"} 2
+metric_total1{a="A", b="B", c=""} 3
+# HELP metric_total2 metric_total2
+# TYPE metric_total2 gauge
+metric_total2{a="A1", b="", c=""} 1
+metric_total2{a="", b="", c="C2"} 2
+metric_total2{a="A3", b="B3", c=""} 3
+# HELP metric_total3 metric_total3
+# TYPE metric_total3 counter
+metric_total3{lbl="val222", ord=""} 5
+metric_total3{lbl="", ord="ord222"} 10
+metric_total3{lbl="val222", ord="ord222"} 108
+# HELP metric_total4 metric_total4
+# TYPE metric_total4 counter
+metric_total4{a="", b="", c="", d="d1", j=""} 9
+metric_total4{a="a1", b="b1", c="c1", d="d1", j=""} 99
+metric_total4{a="", b="", c="c2", d="", j=""} 19
+metric_total4{a="", b="", c="", d="", j=""} 29
+metric_total4{a="", b="", c="", d="", j="j1"} 41
+`
+
+	v.ExpireGroupMetricByName("group3", "metric_total5")
+	err = promtest.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expect), "metric_total1", "metric_total2", "metric_totalr3", "metric_total4", "metric_total5")
 	g.Expect(err).ShouldNot(HaveOccurred())
 }

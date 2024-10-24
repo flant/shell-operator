@@ -25,6 +25,13 @@ type GroupedStorageMock struct {
 	beforeCounterAddCounter uint64
 	CounterAddMock          mGroupedStorageMockCounterAdd
 
+	funcExpireGroupMetricByName          func(group string, name string)
+	funcExpireGroupMetricByNameOrigin    string
+	inspectFuncExpireGroupMetricByName   func(group string, name string)
+	afterExpireGroupMetricByNameCounter  uint64
+	beforeExpireGroupMetricByNameCounter uint64
+	ExpireGroupMetricByNameMock          mGroupedStorageMockExpireGroupMetricByName
+
 	funcExpireGroupMetrics          func(group string)
 	funcExpireGroupMetricsOrigin    string
 	inspectFuncExpireGroupMetrics   func(group string)
@@ -71,6 +78,9 @@ func NewGroupedStorageMock(t minimock.Tester) *GroupedStorageMock {
 
 	m.CounterAddMock = mGroupedStorageMockCounterAdd{mock: m}
 	m.CounterAddMock.callArgs = []*GroupedStorageMockCounterAddParams{}
+
+	m.ExpireGroupMetricByNameMock = mGroupedStorageMockExpireGroupMetricByName{mock: m}
+	m.ExpireGroupMetricByNameMock.callArgs = []*GroupedStorageMockExpireGroupMetricByNameParams{}
 
 	m.ExpireGroupMetricsMock = mGroupedStorageMockExpireGroupMetrics{mock: m}
 	m.ExpireGroupMetricsMock.callArgs = []*GroupedStorageMockExpireGroupMetricsParams{}
@@ -463,6 +473,319 @@ func (m *GroupedStorageMock) MinimockCounterAddInspect() {
 	if !m.CounterAddMock.invocationsDone() && afterCounterAddCounter > 0 {
 		m.t.Errorf("Expected %d calls to GroupedStorageMock.CounterAdd at\n%s but found %d calls",
 			mm_atomic.LoadUint64(&m.CounterAddMock.expectedInvocations), m.CounterAddMock.expectedInvocationsOrigin, afterCounterAddCounter)
+	}
+}
+
+type mGroupedStorageMockExpireGroupMetricByName struct {
+	optional           bool
+	mock               *GroupedStorageMock
+	defaultExpectation *GroupedStorageMockExpireGroupMetricByNameExpectation
+	expectations       []*GroupedStorageMockExpireGroupMetricByNameExpectation
+
+	callArgs []*GroupedStorageMockExpireGroupMetricByNameParams
+	mutex    sync.RWMutex
+
+	expectedInvocations       uint64
+	expectedInvocationsOrigin string
+}
+
+// GroupedStorageMockExpireGroupMetricByNameExpectation specifies expectation struct of the GroupedStorage.ExpireGroupMetricByName
+type GroupedStorageMockExpireGroupMetricByNameExpectation struct {
+	mock               *GroupedStorageMock
+	params             *GroupedStorageMockExpireGroupMetricByNameParams
+	paramPtrs          *GroupedStorageMockExpireGroupMetricByNameParamPtrs
+	expectationOrigins GroupedStorageMockExpireGroupMetricByNameExpectationOrigins
+
+	returnOrigin string
+	Counter      uint64
+}
+
+// GroupedStorageMockExpireGroupMetricByNameParams contains parameters of the GroupedStorage.ExpireGroupMetricByName
+type GroupedStorageMockExpireGroupMetricByNameParams struct {
+	group string
+	name  string
+}
+
+// GroupedStorageMockExpireGroupMetricByNameParamPtrs contains pointers to parameters of the GroupedStorage.ExpireGroupMetricByName
+type GroupedStorageMockExpireGroupMetricByNameParamPtrs struct {
+	group *string
+	name  *string
+}
+
+// GroupedStorageMockExpireGroupMetricByNameOrigins contains origins of expectations of the GroupedStorage.ExpireGroupMetricByName
+type GroupedStorageMockExpireGroupMetricByNameExpectationOrigins struct {
+	origin      string
+	originGroup string
+	originName  string
+}
+
+// Marks this method to be optional. The default behavior of any method with Return() is '1 or more', meaning
+// the test will fail minimock's automatic final call check if the mocked method was not called at least once.
+// Optional() makes method check to work in '0 or more' mode.
+// It is NOT RECOMMENDED to use this option unless you really need it, as default behaviour helps to
+// catch the problems when the expected method call is totally skipped during test run.
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Optional() *mGroupedStorageMockExpireGroupMetricByName {
+	mmExpireGroupMetricByName.optional = true
+	return mmExpireGroupMetricByName
+}
+
+// Expect sets up expected params for GroupedStorage.ExpireGroupMetricByName
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Expect(group string, name string) *mGroupedStorageMockExpireGroupMetricByName {
+	if mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Set")
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation == nil {
+		mmExpireGroupMetricByName.defaultExpectation = &GroupedStorageMockExpireGroupMetricByNameExpectation{}
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation.paramPtrs != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by ExpectParams functions")
+	}
+
+	mmExpireGroupMetricByName.defaultExpectation.params = &GroupedStorageMockExpireGroupMetricByNameParams{group, name}
+	mmExpireGroupMetricByName.defaultExpectation.expectationOrigins.origin = minimock.CallerInfo(1)
+	for _, e := range mmExpireGroupMetricByName.expectations {
+		if minimock.Equal(e.params, mmExpireGroupMetricByName.defaultExpectation.params) {
+			mmExpireGroupMetricByName.mock.t.Fatalf("Expectation set by When has same params: %#v", *mmExpireGroupMetricByName.defaultExpectation.params)
+		}
+	}
+
+	return mmExpireGroupMetricByName
+}
+
+// ExpectGroupParam1 sets up expected param group for GroupedStorage.ExpireGroupMetricByName
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) ExpectGroupParam1(group string) *mGroupedStorageMockExpireGroupMetricByName {
+	if mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Set")
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation == nil {
+		mmExpireGroupMetricByName.defaultExpectation = &GroupedStorageMockExpireGroupMetricByNameExpectation{}
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation.params != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Expect")
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation.paramPtrs == nil {
+		mmExpireGroupMetricByName.defaultExpectation.paramPtrs = &GroupedStorageMockExpireGroupMetricByNameParamPtrs{}
+	}
+	mmExpireGroupMetricByName.defaultExpectation.paramPtrs.group = &group
+	mmExpireGroupMetricByName.defaultExpectation.expectationOrigins.originGroup = minimock.CallerInfo(1)
+
+	return mmExpireGroupMetricByName
+}
+
+// ExpectNameParam2 sets up expected param name for GroupedStorage.ExpireGroupMetricByName
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) ExpectNameParam2(name string) *mGroupedStorageMockExpireGroupMetricByName {
+	if mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Set")
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation == nil {
+		mmExpireGroupMetricByName.defaultExpectation = &GroupedStorageMockExpireGroupMetricByNameExpectation{}
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation.params != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Expect")
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation.paramPtrs == nil {
+		mmExpireGroupMetricByName.defaultExpectation.paramPtrs = &GroupedStorageMockExpireGroupMetricByNameParamPtrs{}
+	}
+	mmExpireGroupMetricByName.defaultExpectation.paramPtrs.name = &name
+	mmExpireGroupMetricByName.defaultExpectation.expectationOrigins.originName = minimock.CallerInfo(1)
+
+	return mmExpireGroupMetricByName
+}
+
+// Inspect accepts an inspector function that has same arguments as the GroupedStorage.ExpireGroupMetricByName
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Inspect(f func(group string, name string)) *mGroupedStorageMockExpireGroupMetricByName {
+	if mmExpireGroupMetricByName.mock.inspectFuncExpireGroupMetricByName != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("Inspect function is already set for GroupedStorageMock.ExpireGroupMetricByName")
+	}
+
+	mmExpireGroupMetricByName.mock.inspectFuncExpireGroupMetricByName = f
+
+	return mmExpireGroupMetricByName
+}
+
+// Return sets up results that will be returned by GroupedStorage.ExpireGroupMetricByName
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Return() *GroupedStorageMock {
+	if mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("GroupedStorageMock.ExpireGroupMetricByName mock is already set by Set")
+	}
+
+	if mmExpireGroupMetricByName.defaultExpectation == nil {
+		mmExpireGroupMetricByName.defaultExpectation = &GroupedStorageMockExpireGroupMetricByNameExpectation{mock: mmExpireGroupMetricByName.mock}
+	}
+
+	mmExpireGroupMetricByName.defaultExpectation.returnOrigin = minimock.CallerInfo(1)
+	return mmExpireGroupMetricByName.mock
+}
+
+// Set uses given function f to mock the GroupedStorage.ExpireGroupMetricByName method
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Set(f func(group string, name string)) *GroupedStorageMock {
+	if mmExpireGroupMetricByName.defaultExpectation != nil {
+		mmExpireGroupMetricByName.mock.t.Fatalf("Default expectation is already set for the GroupedStorage.ExpireGroupMetricByName method")
+	}
+
+	if len(mmExpireGroupMetricByName.expectations) > 0 {
+		mmExpireGroupMetricByName.mock.t.Fatalf("Some expectations are already set for the GroupedStorage.ExpireGroupMetricByName method")
+	}
+
+	mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName = f
+	mmExpireGroupMetricByName.mock.funcExpireGroupMetricByNameOrigin = minimock.CallerInfo(1)
+	return mmExpireGroupMetricByName.mock
+}
+
+// Times sets number of times GroupedStorage.ExpireGroupMetricByName should be invoked
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Times(n uint64) *mGroupedStorageMockExpireGroupMetricByName {
+	if n == 0 {
+		mmExpireGroupMetricByName.mock.t.Fatalf("Times of GroupedStorageMock.ExpireGroupMetricByName mock can not be zero")
+	}
+	mm_atomic.StoreUint64(&mmExpireGroupMetricByName.expectedInvocations, n)
+	mmExpireGroupMetricByName.expectedInvocationsOrigin = minimock.CallerInfo(1)
+	return mmExpireGroupMetricByName
+}
+
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) invocationsDone() bool {
+	if len(mmExpireGroupMetricByName.expectations) == 0 && mmExpireGroupMetricByName.defaultExpectation == nil && mmExpireGroupMetricByName.mock.funcExpireGroupMetricByName == nil {
+		return true
+	}
+
+	totalInvocations := mm_atomic.LoadUint64(&mmExpireGroupMetricByName.mock.afterExpireGroupMetricByNameCounter)
+	expectedInvocations := mm_atomic.LoadUint64(&mmExpireGroupMetricByName.expectedInvocations)
+
+	return totalInvocations > 0 && (expectedInvocations == 0 || expectedInvocations == totalInvocations)
+}
+
+// ExpireGroupMetricByName implements GroupedStorage
+func (mmExpireGroupMetricByName *GroupedStorageMock) ExpireGroupMetricByName(group string, name string) {
+	mm_atomic.AddUint64(&mmExpireGroupMetricByName.beforeExpireGroupMetricByNameCounter, 1)
+	defer mm_atomic.AddUint64(&mmExpireGroupMetricByName.afterExpireGroupMetricByNameCounter, 1)
+
+	mmExpireGroupMetricByName.t.Helper()
+
+	if mmExpireGroupMetricByName.inspectFuncExpireGroupMetricByName != nil {
+		mmExpireGroupMetricByName.inspectFuncExpireGroupMetricByName(group, name)
+	}
+
+	mm_params := GroupedStorageMockExpireGroupMetricByNameParams{group, name}
+
+	// Record call args
+	mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.mutex.Lock()
+	mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.callArgs = append(mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.callArgs, &mm_params)
+	mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.mutex.Unlock()
+
+	for _, e := range mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.expectations {
+		if minimock.Equal(*e.params, mm_params) {
+			mm_atomic.AddUint64(&e.Counter, 1)
+			return
+		}
+	}
+
+	if mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation != nil {
+		mm_atomic.AddUint64(&mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.Counter, 1)
+		mm_want := mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.params
+		mm_want_ptrs := mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.paramPtrs
+
+		mm_got := GroupedStorageMockExpireGroupMetricByNameParams{group, name}
+
+		if mm_want_ptrs != nil {
+
+			if mm_want_ptrs.group != nil && !minimock.Equal(*mm_want_ptrs.group, mm_got.group) {
+				mmExpireGroupMetricByName.t.Errorf("GroupedStorageMock.ExpireGroupMetricByName got unexpected parameter group, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.expectationOrigins.originGroup, *mm_want_ptrs.group, mm_got.group, minimock.Diff(*mm_want_ptrs.group, mm_got.group))
+			}
+
+			if mm_want_ptrs.name != nil && !minimock.Equal(*mm_want_ptrs.name, mm_got.name) {
+				mmExpireGroupMetricByName.t.Errorf("GroupedStorageMock.ExpireGroupMetricByName got unexpected parameter name, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.expectationOrigins.originName, *mm_want_ptrs.name, mm_got.name, minimock.Diff(*mm_want_ptrs.name, mm_got.name))
+			}
+
+		} else if mm_want != nil && !minimock.Equal(*mm_want, mm_got) {
+			mmExpireGroupMetricByName.t.Errorf("GroupedStorageMock.ExpireGroupMetricByName got unexpected parameters, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+				mmExpireGroupMetricByName.ExpireGroupMetricByNameMock.defaultExpectation.expectationOrigins.origin, *mm_want, mm_got, minimock.Diff(*mm_want, mm_got))
+		}
+
+		return
+
+	}
+	if mmExpireGroupMetricByName.funcExpireGroupMetricByName != nil {
+		mmExpireGroupMetricByName.funcExpireGroupMetricByName(group, name)
+		return
+	}
+	mmExpireGroupMetricByName.t.Fatalf("Unexpected call to GroupedStorageMock.ExpireGroupMetricByName. %v %v", group, name)
+
+}
+
+// ExpireGroupMetricByNameAfterCounter returns a count of finished GroupedStorageMock.ExpireGroupMetricByName invocations
+func (mmExpireGroupMetricByName *GroupedStorageMock) ExpireGroupMetricByNameAfterCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmExpireGroupMetricByName.afterExpireGroupMetricByNameCounter)
+}
+
+// ExpireGroupMetricByNameBeforeCounter returns a count of GroupedStorageMock.ExpireGroupMetricByName invocations
+func (mmExpireGroupMetricByName *GroupedStorageMock) ExpireGroupMetricByNameBeforeCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmExpireGroupMetricByName.beforeExpireGroupMetricByNameCounter)
+}
+
+// Calls returns a list of arguments used in each call to GroupedStorageMock.ExpireGroupMetricByName.
+// The list is in the same order as the calls were made (i.e. recent calls have a higher index)
+func (mmExpireGroupMetricByName *mGroupedStorageMockExpireGroupMetricByName) Calls() []*GroupedStorageMockExpireGroupMetricByNameParams {
+	mmExpireGroupMetricByName.mutex.RLock()
+
+	argCopy := make([]*GroupedStorageMockExpireGroupMetricByNameParams, len(mmExpireGroupMetricByName.callArgs))
+	copy(argCopy, mmExpireGroupMetricByName.callArgs)
+
+	mmExpireGroupMetricByName.mutex.RUnlock()
+
+	return argCopy
+}
+
+// MinimockExpireGroupMetricByNameDone returns true if the count of the ExpireGroupMetricByName invocations corresponds
+// the number of defined expectations
+func (m *GroupedStorageMock) MinimockExpireGroupMetricByNameDone() bool {
+	if m.ExpireGroupMetricByNameMock.optional {
+		// Optional methods provide '0 or more' call count restriction.
+		return true
+	}
+
+	for _, e := range m.ExpireGroupMetricByNameMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			return false
+		}
+	}
+
+	return m.ExpireGroupMetricByNameMock.invocationsDone()
+}
+
+// MinimockExpireGroupMetricByNameInspect logs each unmet expectation
+func (m *GroupedStorageMock) MinimockExpireGroupMetricByNameInspect() {
+	for _, e := range m.ExpireGroupMetricByNameMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			m.t.Errorf("Expected call to GroupedStorageMock.ExpireGroupMetricByName at\n%s with params: %#v", e.expectationOrigins.origin, *e.params)
+		}
+	}
+
+	afterExpireGroupMetricByNameCounter := mm_atomic.LoadUint64(&m.afterExpireGroupMetricByNameCounter)
+	// if default expectation was set then invocations count should be greater than zero
+	if m.ExpireGroupMetricByNameMock.defaultExpectation != nil && afterExpireGroupMetricByNameCounter < 1 {
+		if m.ExpireGroupMetricByNameMock.defaultExpectation.params == nil {
+			m.t.Errorf("Expected call to GroupedStorageMock.ExpireGroupMetricByName at\n%s", m.ExpireGroupMetricByNameMock.defaultExpectation.returnOrigin)
+		} else {
+			m.t.Errorf("Expected call to GroupedStorageMock.ExpireGroupMetricByName at\n%s with params: %#v", m.ExpireGroupMetricByNameMock.defaultExpectation.expectationOrigins.origin, *m.ExpireGroupMetricByNameMock.defaultExpectation.params)
+		}
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcExpireGroupMetricByName != nil && afterExpireGroupMetricByNameCounter < 1 {
+		m.t.Errorf("Expected call to GroupedStorageMock.ExpireGroupMetricByName at\n%s", m.funcExpireGroupMetricByNameOrigin)
+	}
+
+	if !m.ExpireGroupMetricByNameMock.invocationsDone() && afterExpireGroupMetricByNameCounter > 0 {
+		m.t.Errorf("Expected %d calls to GroupedStorageMock.ExpireGroupMetricByName at\n%s but found %d calls",
+			mm_atomic.LoadUint64(&m.ExpireGroupMetricByNameMock.expectedInvocations), m.ExpireGroupMetricByNameMock.expectedInvocationsOrigin, afterExpireGroupMetricByNameCounter)
 	}
 }
 
@@ -2001,6 +2324,8 @@ func (m *GroupedStorageMock) MinimockFinish() {
 		if !m.minimockDone() {
 			m.MinimockCounterAddInspect()
 
+			m.MinimockExpireGroupMetricByNameInspect()
+
 			m.MinimockExpireGroupMetricsInspect()
 
 			m.MinimockGaugeSetInspect()
@@ -2034,6 +2359,7 @@ func (m *GroupedStorageMock) minimockDone() bool {
 	done := true
 	return done &&
 		m.MinimockCounterAddDone() &&
+		m.MinimockExpireGroupMetricByNameDone() &&
 		m.MinimockExpireGroupMetricsDone() &&
 		m.MinimockGaugeSetDone() &&
 		m.MinimockGetOrCreateCounterCollectorDone() &&

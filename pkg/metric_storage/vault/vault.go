@@ -15,11 +15,13 @@ type GroupedVault struct {
 	collectors map[string]metric.ConstCollector
 	mtx        sync.Mutex
 	registerer prometheus.Registerer
+	resolveMetricNameFunc func(name string) string
 }
 
-func NewGroupedVault() *GroupedVault {
+func NewGroupedVault(resolveMetricNameFunc func(name string) string) *GroupedVault {
 	return &GroupedVault{
 		collectors: make(map[string]metric.ConstCollector),
+		resolveMetricNameFunc : resolveMetricNameFunc,
 	}
 }
 
@@ -34,22 +36,34 @@ func (v *GroupedVault) SetRegisterer(r prometheus.Registerer) {
 // ClearAllMetrics takes each collector in collectors and clear all metrics by group.
 func (v *GroupedVault) ExpireGroupMetrics(group string) {
 	v.mtx.Lock()
-	defer v.mtx.Unlock()
 	for _, collector := range v.collectors {
 		collector.ExpireGroupMetrics(group)
 	}
+	v.mtx.Unlock()
+}
+
+// ExpireGroupMetricByName gets a collector by its name and clears all metrics inside the collector by the group.
+func (v *GroupedVault) ExpireGroupMetricByName(group, name string) {
+	metricName := v.resolveMetricNameFunc(name)
+	v.mtx.Lock()
+	collector, ok := v.collectors[metricName]
+	if ok {
+		collector.ExpireGroupMetrics(group)
+	}
+	v.mtx.Unlock()
 }
 
 func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []string) (*metric.ConstCounterCollector, error) {
+	metricName := v.resolveMetricNameFunc(name)
 	v.mtx.Lock()
 	defer v.mtx.Unlock()
-	collector, ok := v.collectors[name]
+	collector, ok := v.collectors[metricName]
 	if !ok {
-		collector = metric.NewConstCounterCollector(name, labelNames)
+		collector = metric.NewConstCounterCollector(metricName, labelNames)
 		if err := v.registerer.Register(collector); err != nil {
-			return nil, fmt.Errorf("counter '%s' %v registration: %v", name, labelNames, err)
+			return nil, fmt.Errorf("counter '%s' %v registration: %v", metricName, labelNames, err)
 		}
-		v.collectors[name] = collector
+		v.collectors[metricName] = collector
 	} else if !IsSubset(collector.LabelNames(), labelNames) {
 		collector.UpdateLabels(labelNames)
 	}
@@ -60,15 +74,16 @@ func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []str
 }
 
 func (v *GroupedVault) GetOrCreateGaugeCollector(name string, labelNames []string) (*metric.ConstGaugeCollector, error) {
+	metricName := v.resolveMetricNameFunc(name)
 	v.mtx.Lock()
 	defer v.mtx.Unlock()
-	collector, ok := v.collectors[name]
+	collector, ok := v.collectors[metricName]
 	if !ok {
-		collector = metric.NewConstGaugeCollector(name, labelNames)
+		collector = metric.NewConstGaugeCollector(metricName, labelNames)
 		if err := v.registerer.Register(collector); err != nil {
-			return nil, fmt.Errorf("gauge '%s' %v registration: %v", name, labelNames, err)
+			return nil, fmt.Errorf("gauge '%s' %v registration: %v", metricName, labelNames, err)
 		}
-		v.collectors[name] = collector
+		v.collectors[metricName] = collector
 	} else if !IsSubset(collector.LabelNames(), labelNames) {
 		collector.UpdateLabels(labelNames)
 	}
@@ -80,7 +95,8 @@ func (v *GroupedVault) GetOrCreateGaugeCollector(name string, labelNames []strin
 }
 
 func (v *GroupedVault) CounterAdd(group string, name string, value float64, labels map[string]string) {
-	c, err := v.GetOrCreateCounterCollector(name, LabelNames(labels))
+	metricName := v.resolveMetricNameFunc(name)
+	c, err := v.GetOrCreateCounterCollector(metricName, LabelNames(labels))
 	if err != nil {
 		log.Errorf("CounterAdd: %v", err)
 		return
@@ -89,7 +105,8 @@ func (v *GroupedVault) CounterAdd(group string, name string, value float64, labe
 }
 
 func (v *GroupedVault) GaugeSet(group string, name string, value float64, labels map[string]string) {
-	c, err := v.GetOrCreateGaugeCollector(name, LabelNames(labels))
+	metricName := v.resolveMetricNameFunc(name)
+	c, err := v.GetOrCreateGaugeCollector(metricName, LabelNames(labels))
 	if err != nil {
 		log.Errorf("GaugeSet: %v", err)
 		return
