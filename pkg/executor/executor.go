@@ -85,6 +85,7 @@ func (pj *proxyJSONLogger) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
+	// join all parts of json
 	pj.buf = append(pj.buf, p...)
 
 	var line interface{}
@@ -108,11 +109,21 @@ func (pj *proxyJSONLogger) Write(p []byte) (int, error) {
 		logMap[k] = v
 	}
 
-	logLine, _ := json.Marshal(logMap)
+	logLineRaw, _ := json.Marshal(logMap)
+
+	logLine := string(logLineRaw)
+
+	if len(logLine) > 10000 {
+		logLine = fmt.Sprintf("%s:truncated", string(logLine[:10000]))
+	}
+
+	truncetedLog, _ := json.Marshal(map[string]string{
+		"truncated": logLine,
+	})
 
 	logEntry := pj.WithField(app.ProxyJsonLogKey, true)
 
-	logEntry.Log(log.FatalLevel, string(logLine))
+	logEntry.Log(log.FatalLevel, string(truncetedLog))
 
 	return len(p), nil
 }
@@ -142,6 +153,10 @@ func (pj *proxyJSONLogger) writerScanner(p []byte) {
 		str := strings.TrimSpace(scanner.Text())
 		if str == "" {
 			continue
+		}
+
+		if len(str) > 10000 {
+			str = fmt.Sprintf("%s:truncated", str[:10000])
 		}
 
 		pj.Entry.Info(str)

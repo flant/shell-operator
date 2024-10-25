@@ -55,7 +55,7 @@ func TestRunAndLogLines(t *testing.T) {
 		cmd := exec.Command("cat", f.Name())
 		_, err = RunAndLogLines(cmd, map[string]string{"a": "b"})
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), `\",\"output\":\"stdout\"}" a=b output=stdout proxyJsonLog=true`)
+		assert.Contains(t, buf.String(), `:truncated\"}" a=b output=stdout proxyJsonLog=true`)
 
 		buf.Reset()
 	})
