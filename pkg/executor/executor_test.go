@@ -86,15 +86,13 @@ func TestRunAndLogLines(t *testing.T) {
 	t.Run("multiline non json", func(t *testing.T) {
 		app.LogProxyHookJSON = false
 		cmd := exec.Command("echo", `
-{"a":"b",
-"c":"d"}
+a b
+c d
 `)
 		_, err := RunAndLogLines(cmd, map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), `level=info foor=baar output=stdout`)
-		assert.Contains(t, buf.String(), `level=info msg="{\"a\":\"b\"," foor=baar output=stdout`)
-		assert.Contains(t, buf.String(), `level=info msg="\"c\":\"d\"}" foor=baar output=stdout`)
-		assert.Contains(t, buf.String(), `level=info foor=baar output=stdout`)
+		assert.Contains(t, buf.String(), `level=info msg="a b" foor=baar output=stdout`)
+		assert.Contains(t, buf.String(), `level=info msg="c d" foor=baar output=stdout`)
 
 		buf.Reset()
 	})

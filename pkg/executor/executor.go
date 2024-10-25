@@ -138,7 +138,13 @@ func (pj *proxyJSONLogger) writerScanner(p []byte) {
 
 	// Scan the input and write it to the logger using the specified print function
 	for scanner.Scan() {
-		pj.Entry.Info(strings.TrimRight(scanner.Text(), "\r\n"))
+		// prevent empty logging
+		str := strings.TrimSpace(scanner.Text())
+		if str == "" {
+			continue
+		}
+
+		pj.Entry.Info(str)
 	}
 
 	// If there was an error while scanning the input, log an error
