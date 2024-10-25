@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -77,13 +78,9 @@ type proxyJSONLogger struct {
 	logProxyHookJSON bool
 }
 
-func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
+func (pj *proxyJSONLogger) Write(p []byte) (int, error) {
 	if !pj.logProxyHookJSON {
-		str := strings.TrimSpace(string(p))
-
-		if len(str) != 0 {
-			pj.Entry.Log(log.InfoLevel, str)
-		}
+		pj.writerScanner(p)
 
 		return len(p), nil
 	}
@@ -91,7 +88,7 @@ func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
 	pj.buf = append(pj.buf, p...)
 
 	var line interface{}
-	err = json.Unmarshal(pj.buf, &line)
+	err := json.Unmarshal(pj.buf, &line)
 	if err != nil {
 		if err.Error() == "unexpected end of JSON input" {
 			return len(p), nil
@@ -118,6 +115,36 @@ func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
 	logEntry.Log(log.FatalLevel, string(logLine))
 
 	return len(p), nil
+}
+
+func (pj *proxyJSONLogger) writerScanner(p []byte) {
+	scanner := bufio.NewScanner(bytes.NewReader(p))
+
+	// Set the buffer size to the maximum token size to avoid buffer overflows
+	scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize)
+
+	// Define a split function to split the input into chunks of up to 64KB
+	chunkSize := bufio.MaxScanTokenSize // 64KB
+	splitFunc := func(data []byte, atEOF bool) (int, []byte, error) {
+		if len(data) >= chunkSize {
+			return chunkSize, data[:chunkSize], nil
+		}
+
+		return bufio.ScanLines(data, atEOF)
+	}
+
+	// Use the custom split function to split the input
+	scanner.Split(splitFunc)
+
+	// Scan the input and write it to the logger using the specified print function
+	for scanner.Scan() {
+		pj.Entry.Info(strings.TrimRight(scanner.Text(), "\r\n"))
+	}
+
+	// If there was an error while scanning the input, log an error
+	if err := scanner.Err(); err != nil {
+		pj.Entry.Errorf("Error while reading from Writer: %s", err)
+	}
 }
 
 func Output(cmd *exec.Cmd) (output []byte, err error) {
