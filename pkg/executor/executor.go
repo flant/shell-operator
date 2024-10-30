@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -77,17 +78,18 @@ type proxyJSONLogger struct {
 	logProxyHookJSON bool
 }
 
-func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
-	pj.buf = append(pj.buf, p...)
-
+func (pj *proxyJSONLogger) Write(p []byte) (int, error) {
 	if !pj.logProxyHookJSON {
-		pj.Entry.Log(log.InfoLevel, strings.TrimSpace(string(pj.buf)))
+		pj.writerScanner(p)
 
 		return len(p), nil
 	}
 
+	// join all parts of json
+	pj.buf = append(pj.buf, p...)
+
 	var line interface{}
-	err = json.Unmarshal(pj.buf, &line)
+	err := json.Unmarshal(pj.buf, &line)
 	if err != nil {
 		if err.Error() == "unexpected end of JSON input" {
 			return len(p), nil
@@ -107,13 +109,65 @@ func (pj *proxyJSONLogger) Write(p []byte) (n int, err error) {
 		logMap[k] = v
 	}
 
-	logLine, _ := json.Marshal(logMap)
+	logLineRaw, _ := json.Marshal(logMap)
+
+	logLine := string(logLineRaw)
 
 	logEntry := pj.WithField(app.ProxyJsonLogKey, true)
+
+	if len(logLine) > 10000 {
+		logLine = fmt.Sprintf("%s:truncated", string(logLine[:10000]))
+
+		truncatedLog, _ := json.Marshal(map[string]string{
+			"truncated": logLine,
+		})
+
+		logEntry.Log(log.FatalLevel, string(truncatedLog))
+	}
 
 	logEntry.Log(log.FatalLevel, string(logLine))
 
 	return len(p), nil
+}
+
+func (pj *proxyJSONLogger) writerScanner(p []byte) {
+	scanner := bufio.NewScanner(bytes.NewReader(p))
+
+	// Set the buffer size to the maximum token size to avoid buffer overflows
+	scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize)
+
+	// Define a split function to split the input into chunks of up to 64KB
+	chunkSize := bufio.MaxScanTokenSize // 64KB
+	splitFunc := func(data []byte, atEOF bool) (int, []byte, error) {
+		if len(data) >= chunkSize {
+			return chunkSize, data[:chunkSize], nil
+		}
+
+		return bufio.ScanLines(data, atEOF)
+	}
+
+	// Use the custom split function to split the input
+	scanner.Split(splitFunc)
+
+	// Scan the input and write it to the logger using the specified print function
+	for scanner.Scan() {
+		// prevent empty logging
+		str := strings.TrimSpace(scanner.Text())
+		if str == "" {
+			continue
+		}
+
+		if len(str) > 10000 {
+			str = fmt.Sprintf("%s:truncated", str[:10000])
+		}
+
+		pj.Entry.Info(str)
+	}
+
+	// If there was an error while scanning the input, log an error
+	if err := scanner.Err(); err != nil {
+		pj.Entry.Errorf("Error while reading from Writer: %s", err)
+	}
 }
 
 func Output(cmd *exec.Cmd) (output []byte, err error) {
