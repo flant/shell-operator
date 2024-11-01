@@ -1,10 +1,10 @@
 package kube_events_manager
 
 import (
-	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -25,7 +25,7 @@ type MonitorConfig struct {
 	LabelSelector           *metav1.LabelSelector
 	FieldSelector           *FieldSelector
 	JqFilter                string
-	LogEntry                *log.Entry
+	LogEntry                *log.Logger
 	Mode                    KubeEventMode
 	KeepFullObjectsInMemory bool
 	FilterFunc              func(*unstructured.Unstructured) (interface{}, error)

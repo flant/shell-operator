@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	. "github.com/onsi/gomega"
 
 	"github.com/flant/kube-client/fake"
@@ -19,7 +20,7 @@ func Test_UpdateSnapshots(t *testing.T) {
 	g := NewWithT(t)
 
 	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
-	mgr := kube_events_manager.NewKubeEventsManager(context.Background(), fc.Client)
+	mgr := kube_events_manager.NewKubeEventsManager(context.Background(), fc.Client, log.NewNop())
 
 	testHookConfig := `
 configVersion: v1
@@ -46,7 +47,7 @@ kubernetes:
 	g.Expect(err).ShouldNot(HaveOccurred())
 
 	hc := NewHookController()
-	hc.InitKubernetesBindings(testCfg.OnKubernetesEvents, mgr)
+	hc.InitKubernetesBindings(testCfg.OnKubernetesEvents, mgr, log.NewNop())
 	hc.EnableScheduleBindings()
 
 	// Test case: combined binding context for binding_2 and binding_3.

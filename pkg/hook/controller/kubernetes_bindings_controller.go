@@ -3,7 +3,7 @@ package controller
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/go_lib/log"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
@@ -48,15 +48,18 @@ type kubernetesBindingsController struct {
 
 	// dependencies
 	kubeEventsManager kube_events_manager.KubeEventsManager
+
+	logger *log.Logger
 }
 
 // kubernetesHooksController should implement the KubernetesHooksController
 var _ KubernetesBindingsController = &kubernetesBindingsController{}
 
 // NewKubernetesBindingsController returns an implementation of KubernetesBindingsController
-var NewKubernetesBindingsController = func() *kubernetesBindingsController {
+var NewKubernetesBindingsController = func(logger *log.Logger) *kubernetesBindingsController {
 	return &kubernetesBindingsController{
 		BindingMonitorLinks: make(map[string]*KubernetesBindingToMonitorLink),
+		logger:              logger,
 	}
 }
 
@@ -123,7 +126,7 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 		return fmt.Errorf("recreate monitor for binding '%s': %v", bindingName, err)
 	}
 
-	log.WithFields(utils.LabelsToLogFields(link.BindingConfig.Monitor.Metadata.LogLabels)).
+	utils.EnrichLoggerWithLabels(c.logger, link.BindingConfig.Monitor.Metadata.LogLabels).
 		Infof("Monitor for '%s' is recreated with new kind=%s and apiVersion=%s",
 			link.BindingConfig.BindingName, link.BindingConfig.Monitor.Kind, link.BindingConfig.Monitor.ApiVersion)
 

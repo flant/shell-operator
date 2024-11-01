@@ -3,7 +3,7 @@ package admission
 import (
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/deckhouse/deckhouse/go_lib/log"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"

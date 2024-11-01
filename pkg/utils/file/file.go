@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/deckhouse/deckhouse/go_lib/log"
 )
 
 // FileExists returns true if path exists

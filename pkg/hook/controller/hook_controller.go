@@ -3,6 +3,7 @@ package controller
 import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -48,14 +49,16 @@ type HookController struct {
 	validatingBindings   []ValidatingConfig
 	mutatingBindings     []MutatingConfig
 	conversionBindings   []ConversionConfig
+
+	logger *log.Logger
 }
 
-func (hc *HookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager) {
+func (hc *HookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager, logger *log.Logger) {
 	if len(bindings) == 0 {
 		return
 	}
 
-	bindingCtrl := NewKubernetesBindingsController()
+	bindingCtrl := NewKubernetesBindingsController(logger)
 	bindingCtrl.WithKubeEventsManager(kubeEventMgr)
 	bindingCtrl.WithKubernetesBindings(bindings)
 	hc.KubernetesController = bindingCtrl

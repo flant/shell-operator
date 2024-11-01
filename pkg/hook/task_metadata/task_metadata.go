@@ -3,7 +3,7 @@ package task_metadata
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/deckhouse/deckhouse/go_lib/log"
 
 	"github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/types"

@@ -1,14 +1,13 @@
 package app
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	"github.com/flant/shell-operator/pkg/config"
 )
 
@@ -45,33 +44,34 @@ func DefineLoggingFlags(cmd *kingpin.CmdClause) {
 }
 
 // SetupLogging sets logger formatter and level.
-func SetupLogging(runtimeConfig *config.Config) {
-	jsonFormatter := log.JSONFormatter{DisableTimestamp: LogNoTime}
-	textFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true}
-	colorFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true, FullTimestamp: true}
-	switch strings.ToLower(LogType) {
-	case "json":
-		log.SetFormatter(&jsonFormatter)
-	case "text":
-		log.SetFormatter(&textFormatter)
-	case "color":
-		log.SetFormatter(&colorFormatter)
-	default:
-		log.SetFormatter(&jsonFormatter)
-	}
-	if LogProxyHookJSON {
-		formatter := log.StandardLogger().Formatter
-		log.SetFormatter(&ProxyJsonWrapperFormatter{WrappedFormatter: formatter})
-	}
+func SetupLogging(runtimeConfig *config.Config, logger *log.Logger) {
+	// TODO: if we need formatters - add to logger
+	// jsonFormatter := log.JSONFormatter{DisableTimestamp: LogNoTime}
+	// textFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true}
+	// colorFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, ForceColors: true, FullTimestamp: true}
+	// switch strings.ToLower(LogType) {
+	// case "json":
+	// 	log.SetFormatter(&jsonFormatter)
+	// case "text":
+	// 	log.SetFormatter(&textFormatter)
+	// case "color":
+	// 	log.SetFormatter(&colorFormatter)
+	// default:
+	// 	log.SetFormatter(&jsonFormatter)
+	// }
+	// if LogProxyHookJSON {
+	// 	formatter := log.StandardLogger().Formatter
+	// 	log.SetFormatter(&ProxyJsonWrapperFormatter{WrappedFormatter: formatter})
+	// }
 
-	setLogLevel(LogLevel)
+	log.SetDefaultLevel(log.LogLevelFromStr(LogLevel))
 
 	runtimeConfig.Register("log.level",
 		fmt.Sprintf("Global log level. Default duration for debug level is %s", ForcedDurationForDebugLevel),
 		strings.ToLower(LogLevel),
 		func(oldValue string, newValue string) error {
 			log.Infof("Set log level to '%s'", newValue)
-			setLogLevel(newValue)
+			log.SetDefaultLevel(log.LogLevelFromStr(newValue))
 			return nil
 		}, func(oldValue string, newValue string) time.Duration {
 			if strings.ToLower(newValue) == "debug" {
@@ -81,32 +81,19 @@ func SetupLogging(runtimeConfig *config.Config) {
 		})
 }
 
-func setLogLevel(logLevel string) {
-	switch strings.ToLower(logLevel) {
-	case "debug":
-		log.SetLevel(log.DebugLevel)
-	case "error":
-		log.SetLevel(log.ErrorLevel)
-	case "info":
-		log.SetLevel(log.InfoLevel)
-	default:
-		log.SetLevel(log.InfoLevel)
-	}
-}
+// type ProxyJsonWrapperFormatter struct {
+// 	WrappedFormatter log.Formatter
+// }
 
-type ProxyJsonWrapperFormatter struct {
-	WrappedFormatter log.Formatter
-}
+// func (f *ProxyJsonWrapperFormatter) Format(entry *log.Entry) ([]byte, error) {
+// 	// if proxying the json message is intended, just return the bytes
+// 	// TODO: Find a more elegant way to carry this info
+// 	if entry.Data[ProxyJsonLogKey] == true {
+// 		b := bytes.NewBufferString(entry.Message)
+// 		b.WriteString("\n")
+// 		return b.Bytes(), nil
+// 	}
 
-func (f *ProxyJsonWrapperFormatter) Format(entry *log.Entry) ([]byte, error) {
-	// if proxying the json message is intended, just return the bytes
-	// TODO: Find a more elegant way to carry this info
-	if entry.Data[ProxyJsonLogKey] == true {
-		b := bytes.NewBufferString(entry.Message)
-		b.WriteString("\n")
-		return b.Bytes(), nil
-	}
-
-	// otherwise, use the wrapped formatter
-	return f.WrappedFormatter.Format(entry)
-}
+// 	// otherwise, use the wrapped formatter
+// 	return f.WrappedFormatter.Format(entry)
+// }

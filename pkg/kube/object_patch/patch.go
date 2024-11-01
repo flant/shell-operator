@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	"github.com/hashicorp/go-multierror"
 	gerror "github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +23,7 @@ import (
 
 type ObjectPatcher struct {
 	kubeClient KubeClient
-	logger     *log.Entry
+	logger     *log.Logger
 }
 
 type KubeClient interface {
@@ -32,10 +32,10 @@ type KubeClient interface {
 	GroupVersionResource(apiVersion string, kind string) (schema.GroupVersionResource, error)
 }
 
-func NewObjectPatcher(kubeClient KubeClient) *ObjectPatcher {
+func NewObjectPatcher(kubeClient KubeClient, logger *log.Logger) *ObjectPatcher {
 	return &ObjectPatcher{
 		kubeClient: kubeClient,
-		logger:     log.WithField("operator.component", "KubernetesObjectPatcher"),
+		logger:     logger.With("operator.component", "KubernetesObjectPatcher"),
 	}
 }
 

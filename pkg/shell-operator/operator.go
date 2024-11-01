@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -34,6 +34,8 @@ type ShellOperator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	logger *log.Logger
+
 	// APIServer common http server for liveness and metrics endpoints
 	APIServer *baseHTTPServer
 
@@ -57,7 +59,7 @@ type ShellOperator struct {
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
-func NewShellOperator(ctx context.Context) *ShellOperator {
+func NewShellOperator(ctx context.Context, logger *log.Logger) *ShellOperator {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -65,6 +67,7 @@ func NewShellOperator(ctx context.Context) *ShellOperator {
 	return &ShellOperator{
 		ctx:    cctx,
 		cancel: cancel,
+		logger: logger,
 	}
 }
 
@@ -115,7 +118,7 @@ func (op *ShellOperator) initHookManager() (err error) {
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"binding":  string(types.OnKubernetesEvent),
 		}
-		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
+		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debugf("Create tasks for 'kubernetes' event '%s'", kubeEvent.String())
 
 		var tasks []task.Task
@@ -133,7 +136,7 @@ func (op *ShellOperator) initHookManager() (err error) {
 				WithQueueName(info.QueueName)
 			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
 
-			logEntry.WithField("queue", info.QueueName).
+			logEntry.With("queue", info.QueueName).
 				Infof("queue task %s", newTask.GetDescription())
 		})
 
@@ -144,7 +147,7 @@ func (op *ShellOperator) initHookManager() (err error) {
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"binding":  string(types.Schedule),
 		}
-		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
+		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debugf("Create tasks for 'schedule' event '%s'", crontab)
 
 		var tasks []task.Task
@@ -162,7 +165,7 @@ func (op *ShellOperator) initHookManager() (err error) {
 				WithQueueName(info.QueueName)
 			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
 
-			logEntry.WithField("queue", info.QueueName).
+			logEntry.With("queue", info.QueueName).
 				Infof("queue task %s", newTask.GetDescription())
 		})
 
@@ -209,7 +212,7 @@ func (op *ShellOperator) initValidatingWebhookManager() (err error) {
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"event":    string(eventBindingType),
 		}
-		logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
+		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debugf("Handle '%s' event '%s' '%s'", eventBindingType, event.ConfigurationId, event.WebhookId)
 
 		var admissionTask task.Task
@@ -297,7 +300,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 		"event.id": uuid.Must(uuid.NewV4()).String(),
 		"binding":  string(types.KubernetesConversion),
 	}
-	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
+	logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 
 	sourceVersions := conversion.ExtractAPIVersions(request.Objects)
 	logEntry.Infof("Handle '%s' event for crd/%s: %d objects with versions %v", string(types.KubernetesConversion), crdName, len(request.Objects), sourceVersions)
@@ -382,7 +385,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 
 // taskHandler
 func (op *ShellOperator) taskHandler(t task.Task) queue.TaskResult {
-	logEntry := log.WithField("operator.component", "taskRunner")
+	logEntry := op.logger.With("operator.component", "taskRunner")
 	hookMeta := task_metadata.HookMetadataAccessor(t)
 	var res queue.TaskResult
 
@@ -400,7 +403,7 @@ func (op *ShellOperator) taskHandler(t task.Task) queue.TaskResult {
 		hookLogLabels["task"] = "EnableScheduleBindings"
 		hookLogLabels["queue"] = "main"
 
-		taskLogEntry := logEntry.WithFields(utils.LabelsToLogFields(hookLogLabels))
+		taskLogEntry := utils.EnrichLoggerWithLabels(logEntry, hookLogLabels)
 
 		taskHook := op.HookManager.GetHook(hookMeta.HookName)
 		taskHook.HookController.EnableScheduleBindings()
@@ -429,7 +432,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(t task.Task) queue.T
 	hookLogLabels["task"] = "EnableKubernetesBindings"
 	hookLogLabels["queue"] = "main"
 
-	taskLogEntry := log.WithFields(utils.LabelsToLogFields(hookLogLabels))
+	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
 
 	taskLogEntry.Info("Enable kubernetes binding for hook")
 
@@ -511,7 +514,7 @@ func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
 	hookLogLabels["task"] = "HookRun"
 	hookLogLabels["queue"] = t.GetQueueName()
 
-	taskLogEntry := log.WithFields(utils.LabelsToLogFields(hookLogLabels))
+	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
 
 	isSynchronization := hookMeta.IsSynchronization()
 	shouldRunHook := true
@@ -536,7 +539,7 @@ func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
 			}
 		}
 		if shouldCombine {
-			combineResult := combineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
+			combineResult := op.combineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
 			if combineResult != nil {
 				hookMeta.BindingContext = combineResult.BindingContexts
 				// Extra monitor IDs can be returned if several Synchronization for Group are combined.
@@ -592,7 +595,7 @@ func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
 	return res
 }
 
-func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMeta task_metadata.HookMetadata, taskLogEntry *log.Entry, hookLogLabels map[string]string, metricLabels map[string]string) error {
+func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMeta task_metadata.HookMetadata, taskLogEntry *log.Logger, hookLogLabels map[string]string, metricLabels map[string]string) error {
 	for _, info := range taskHook.HookController.SnapshotsInfo() {
 		taskLogEntry.Debugf("snapshot info: %s", info)
 	}
@@ -769,7 +772,7 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 // bootstrapMainQueue adds tasks to run hooks with OnStartup bindings
 // and tasks to enable kubernetes bindings.
 func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
-	logEntry := log.WithField("operator.component", "initMainQueue")
+	logEntry := op.logger.With("operator.component", "initMainQueue")
 
 	// Prepopulate main queue with 'onStartup' tasks and 'enable kubernetes bindings' tasks.
 	tqs.WithMainName("main")

@@ -9,7 +9,7 @@ import (
 
 // setupMetricStorage creates and initializes metrics storage for built-in operator metrics
 func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels map[string]string) {
-	metricStorage := metric_storage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, false)
+	metricStorage := metric_storage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, false, op.logger.Named("metric-storage"))
 
 	registerCommonMetrics(metricStorage)
 	registerTaskQueueMetrics(metricStorage)

@@ -5,17 +5,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
 	promtest "github.com/prometheus/client_golang/prometheus/testutil"
-	log "github.com/sirupsen/logrus"
 )
 
 func Test_CounterAdd(t *testing.T) {
 	g := NewWithT(t)
 
+	logger := log.NewLogger(log.Options{})
+	log.SetDefault(logger)
+
 	buf := &bytes.Buffer{}
-	log.SetOutput(buf)
+	logger.SetOutput(buf)
 
 	v := NewGroupedVault(func (name string) string { return name })
 	v.registerer = prometheus.DefaultRegisterer

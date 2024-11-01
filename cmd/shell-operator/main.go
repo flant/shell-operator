@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	"github.com/flant/kube-client/klogtologrus"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
@@ -35,6 +36,9 @@ func main() {
 		return nil
 	})
 
+	logger := log.NewLogger(log.Options{})
+	log.SetDefault(logger)
+
 	// start main loop
 	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
@@ -45,7 +49,7 @@ func main() {
 			rand.Seed(time.Now().UnixNano())
 
 			// Init logging and initialize a ShellOperator instance.
-			operator, err := shell_operator.Init()
+			operator, err := shell_operator.Init(logger.Named("shell-operator"))
 			if err != nil {
 				os.Exit(1)
 			}

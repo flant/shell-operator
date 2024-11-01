@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/task/dump"
@@ -15,8 +16,8 @@ import (
 
 // RunDefaultDebugServer initialized and run default debug server on unix and http sockets
 // This method is also used in addon-operator
-func RunDefaultDebugServer(unixSocket, httpServerAddress string) (*debug.Server, error) {
-	dbgSrv := debug.NewServer("/debug", unixSocket, httpServerAddress)
+func RunDefaultDebugServer(unixSocket, httpServerAddress string, logger *log.Logger) (*debug.Server, error) {
+	dbgSrv := debug.NewServer("/debug", unixSocket, httpServerAddress, logger)
 
 	dbgSrv.RegisterHandler(http.MethodGet, "/", func(_ *http.Request) (interface{}, error) {
 		return "debug endpoint is alive", nil

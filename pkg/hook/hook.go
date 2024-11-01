@@ -12,6 +12,7 @@ import (
 	"github.com/kennygrant/sanitize"
 	"golang.org/x/time/rate"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -44,13 +45,16 @@ type Hook struct {
 	RateLimiter    *rate.Limiter
 
 	TmpDir string
+
+	Logger *log.Logger
 }
 
-func NewHook(name, path string) *Hook {
+func NewHook(name, path string, logger *log.Logger) *Hook {
 	return &Hook{
 		Name:   name,
 		Path:   path,
 		Config: &config.HookConfig{},
+		Logger: logger,
 	}
 }
 
@@ -138,7 +142,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 
 	result := &Result{}
 
-	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels)
+	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels, h.Logger)
 	if err != nil {
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}

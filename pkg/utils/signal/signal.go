@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/deckhouse/deckhouse/go_lib/log"
 )
 
 // WaitForProcessInterruption wait for SIGINT or SIGTERM and run a callback function.

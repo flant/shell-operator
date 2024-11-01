@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	"github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
 func Test_ScheduleManager_Add(t *testing.T) {
-	sm := NewScheduleManager(context.Background())
+	sm := NewScheduleManager(context.Background(), log.NewNop())
 
 	expectations := []struct {
 		testName string

@@ -3,6 +3,7 @@ package shell_operator
 import (
 	"fmt"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
@@ -50,11 +51,11 @@ func defaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage,
 	return client
 }
 
-func initDefaultObjectPatcher(metricStorage *metric_storage.MetricStorage) (*object_patch.ObjectPatcher, error) {
+func initDefaultObjectPatcher(metricStorage *metric_storage.MetricStorage, logger *log.Logger) (*object_patch.ObjectPatcher, error) {
 	patcherKubeClient := defaultObjectPatcherKubeClient(metricStorage, defaultObjectPatcherKubeClientMetricLabels)
 	err := patcherKubeClient.Init()
 	if err != nil {
 		return nil, fmt.Errorf("initialize Kubernetes client for Object patcher: %s\n", err)
 	}
-	return object_patch.NewObjectPatcher(patcherKubeClient), nil
+	return object_patch.NewObjectPatcher(patcherKubeClient, logger), nil
 }

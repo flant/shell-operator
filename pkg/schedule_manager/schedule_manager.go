@@ -3,9 +3,9 @@ package schedule_manager
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/robfig/cron.v2"
 
+	"github.com/deckhouse/deckhouse/go_lib/log"
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
@@ -28,11 +28,13 @@ type scheduleManager struct {
 	cron       *cron.Cron
 	ScheduleCh chan string
 	Entries    map[string]CronEntry
+
+	logger *log.Logger
 }
 
 var _ ScheduleManager = &scheduleManager{}
 
-func NewScheduleManager(ctx context.Context) *scheduleManager {
+func NewScheduleManager(ctx context.Context, logger *log.Logger) *scheduleManager {
 	cctx, cancel := context.WithCancel(ctx)
 	sm := &scheduleManager{
 		ctx:        cctx,
@@ -40,6 +42,8 @@ func NewScheduleManager(ctx context.Context) *scheduleManager {
 		ScheduleCh: make(chan string, 1),
 		cron:       cron.New(),
 		Entries:    make(map[string]CronEntry),
+
+		logger: logger,
 	}
 	return sm
 }
@@ -54,7 +58,7 @@ func (sm *scheduleManager) Stop() {
 // Crontab string should be validated with cron.Parse
 // function before pass to Add.
 func (sm *scheduleManager) Add(newEntry ScheduleEntry) {
-	logEntry := log.WithField("operator.component", "scheduleManager")
+	logEntry := sm.logger.With("operator.component", "scheduleManager")
 
 	cronEntry, hasCronEntry := sm.Entries[newEntry.Crontab]
 
@@ -105,7 +109,7 @@ func (sm *scheduleManager) Remove(delEntry ScheduleEntry) {
 	if len(sm.Entries[delEntry.Crontab].Ids) == 0 {
 		sm.cron.Remove(sm.Entries[delEntry.Crontab].EntryID)
 		delete(sm.Entries, delEntry.Crontab)
-		log.WithField("operator.component", "scheduleManager").Debugf("entry '%s' deleted", delEntry.Crontab)
+		sm.logger.With("operator.component", "scheduleManager").Debugf("entry '%s' deleted", delEntry.Crontab)
 	}
 }
 
