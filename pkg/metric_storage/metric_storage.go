@@ -55,10 +55,10 @@ func NewMetricStorage(ctx context.Context, prefix string, newRegistry bool) *Met
 		Counters:         make(map[string]*prometheus.CounterVec),
 		Histograms:       make(map[string]*prometheus.HistogramVec),
 		HistogramBuckets: make(map[string][]float64),
-		groupedVault:     vault.NewGroupedVault(),
 		Gatherer:         prometheus.DefaultGatherer,
 		Registerer:       prometheus.DefaultRegisterer,
 	}
+	m.groupedVault = vault.NewGroupedVault(m.resolveMetricName)
 	m.groupedVault.SetRegisterer(m.Registerer)
 
 	if newRegistry {
