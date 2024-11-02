@@ -110,7 +110,8 @@ func (h *WebhookHandler) handleReviewRequest(crdName string, request *v1.Convers
 		UID:              request.UID,
 		Result: metav1.Status{
 			Status: metav1.StatusSuccess,
-		}}, nil
+		},
+	}, nil
 }
 
 // detectCrdName extracts crdName from the url path.

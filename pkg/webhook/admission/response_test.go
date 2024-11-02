@@ -4,7 +4,6 @@ import "testing"
 
 func Test_AdmissionResponseFromFile_Allowed(t *testing.T) {
 	r, err := ResponseFromFile("testdata/response/good_allow.json")
-
 	if err != nil {
 		t.Fatalf("ValidatingResponse should be loaded from file: %v", err)
 	}
@@ -20,7 +19,6 @@ func Test_AdmissionResponseFromFile_Allowed(t *testing.T) {
 
 func Test_AdmissionResponseFromFile_AllowedWithWarnings(t *testing.T) {
 	r, err := ResponseFromFile("testdata/response/good_allow_warnings.json")
-
 	if err != nil {
 		t.Fatalf("ValidatingResponse should be loaded from file: %v", err)
 	}
@@ -40,7 +38,6 @@ func Test_AdmissionResponseFromFile_AllowedWithWarnings(t *testing.T) {
 
 func Test_AdmissionResponseFromFile_NotAllowed_WithMessage(t *testing.T) {
 	r, err := ResponseFromFile("testdata/response/good_deny.json")
-
 	if err != nil {
 		t.Fatalf("ValidatingResponse should be loaded from file: %v", err)
 	}
@@ -60,7 +57,6 @@ func Test_AdmissionResponseFromFile_NotAllowed_WithMessage(t *testing.T) {
 
 func Test_AdmissionResponseFromFile_NotAllowed_WithoutMessage(t *testing.T) {
 	r, err := ResponseFromFile("testdata/response/good_deny_quiet.json")
-
 	if err != nil {
 		t.Fatalf("ValidatingResponse should be loaded from file: %v", err)
 	}
