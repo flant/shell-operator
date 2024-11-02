@@ -87,7 +87,7 @@ func Test_CreateLimiter(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.title, func(t *testing.T) {
+		t.Run(c.title, func(_ *testing.T) {
 			cfg := &config.HookConfig{
 				Settings: c.settings,
 			}
@@ -135,7 +135,7 @@ func Test_Hook_WithConfig(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(_ *testing.T) {
 			hook = NewHook("hook-sh", "/hooks/hook.sh", log.NewNop())
 			_, err = hook.LoadConfig([]byte(test.jsonData))
 			test.fn()

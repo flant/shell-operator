@@ -122,7 +122,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 	logLine := string(logLineRaw)
 
 	if len(logLine) > 10000 {
-		logLine = fmt.Sprintf("%s:truncated", string(logLine[:10000]))
+		logLine = fmt.Sprintf("%s:truncated", logLine[:10000])
 
 		logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", slog.Any("hook", map[string]any{
 			"truncated": logLine,

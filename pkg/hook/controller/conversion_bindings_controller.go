@@ -69,7 +69,7 @@ func (c *ConversionBindingsController) DisableConversionBindings() {
 	// TODO dynamic enable/disable conversion webhooks.
 }
 
-func (c *ConversionBindingsController) CanHandleEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule) bool {
+func (c *ConversionBindingsController) CanHandleEvent(crdName string, _ *v1.ConversionRequest, rule conversion.Rule) bool {
 	_, has := c.Links[crdName]
 	if !has {
 		return false

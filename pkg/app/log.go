@@ -69,11 +69,11 @@ func SetupLogging(runtimeConfig *config.Config, logger *log.Logger) {
 	runtimeConfig.Register("log.level",
 		fmt.Sprintf("Global log level. Default duration for debug level is %s", ForcedDurationForDebugLevel),
 		strings.ToLower(LogLevel),
-		func(oldValue string, newValue string) error {
-			log.Infof("Set log level to '%s'", newValue)
+		func(_ string, newValue string) error {
+			logger.Infof("Set log level to '%s'", newValue)
 			log.SetDefaultLevel(log.LogLevelFromStr(newValue))
 			return nil
-		}, func(oldValue string, newValue string) time.Duration {
+		}, func(_ string, newValue string) time.Duration {
 			if strings.ToLower(newValue) == "debug" {
 				return ForcedDurationForDebugLevel
 			}

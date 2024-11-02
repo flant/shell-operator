@@ -775,7 +775,7 @@ settings:
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(_ *testing.T) {
 			hookConfig = &HookConfig{}
 			err = hookConfig.LoadAndValidate([]byte(test.jsonConfig))
 			test.testFn()
@@ -1045,7 +1045,7 @@ func Test_HookConfig_V1_Kubernetes_Validate(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(_ *testing.T) {
 			hookConfig = &HookConfig{}
 			err = hookConfig.LoadAndValidate([]byte(test.jsonText))
 			test.testFn()
@@ -1083,7 +1083,7 @@ func Test_MergeArrays(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(_ *testing.T) {
 			res := MergeArrays(test.a1, test.a2)
 			g.Expect(res).To(Equal(test.expect))
 		})

@@ -63,6 +63,7 @@ func (hc *HookController) InitKubernetesBindings(bindings []OnKubernetesEventCon
 	bindingCtrl.WithKubernetesBindings(bindings)
 	hc.KubernetesController = bindingCtrl
 	hc.kubernetesBindings = bindings
+	hc.logger = logger
 }
 
 func (hc *HookController) InitScheduleBindings(bindings []ScheduleConfig, scheduleMgr schedule_manager.ScheduleManager) {

@@ -3,7 +3,7 @@ package executor
 import (
 	"bytes"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"regexp"
@@ -159,7 +159,7 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 func randStringRunes(n int) string {
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		b[i] = letterRunes[rand.IntN(len(letterRunes))]
 	}
 	return string(b)
 }

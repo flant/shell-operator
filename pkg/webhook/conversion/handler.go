@@ -2,6 +2,7 @@ package conversion
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -98,7 +99,7 @@ func (h *WebhookHandler) handleReviewRequest(crdName string, request *v1.Convers
 	}
 
 	if conversionResponse.FailedMessage != "" {
-		return nil, fmt.Errorf(conversionResponse.FailedMessage)
+		return nil, errors.New(conversionResponse.FailedMessage)
 	}
 
 	if len(request.Objects) != len(conversionResponse.ConvertedObjects) {

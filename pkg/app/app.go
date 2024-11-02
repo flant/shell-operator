@@ -148,7 +148,7 @@ Use "%s debug-options" for a list of debug options for start command.
 
 // CommandWithDefaultUsageTemplate is used to workaround an absence of per-command usage templates
 func CommandWithDefaultUsageTemplate(kpApp *kingpin.Application, name, help string) *kingpin.CmdClause {
-	return kpApp.Command(name, help).PreAction(func(context *kingpin.ParseContext) error {
+	return kpApp.Command(name, help).PreAction(func(_ *kingpin.ParseContext) error {
 		kpApp.UsageTemplate(kingpin.DefaultUsageTemplate)
 		return nil
 	})

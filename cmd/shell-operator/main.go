@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -27,13 +25,13 @@ func main() {
 	kpApp.UsageTemplate(app.OperatorUsageTemplate(app.AppName))
 
 	// Initialize klog wrapper when all values are parsed
-	kpApp.Action(func(c *kingpin.ParseContext) error {
+	kpApp.Action(func(_ *kingpin.ParseContext) error {
 		klogtolog.InitAdapter(app.DebugKubernetesAPI, logger.Named("klog"))
 		return nil
 	})
 
 	// print version
-	kpApp.Command("version", "Show version.").Action(func(c *kingpin.ParseContext) error {
+	kpApp.Command("version", "Show version.").Action(func(_ *kingpin.ParseContext) error {
 		fmt.Printf("%s %s\n", app.AppName, app.Version)
 		fmt.Println(jq.FilterInfo())
 		return nil
@@ -42,11 +40,8 @@ func main() {
 	// start main loop
 	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
-		Action(func(c *kingpin.ParseContext) error {
+		Action(func(_ *kingpin.ParseContext) error {
 			app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
-
-			// Init rand generator.
-			rand.Seed(time.Now().UnixNano())
 
 			// Init logging and initialize a ShellOperator instance.
 			operator, err := shell_operator.Init(logger.Named("shell-operator"))
