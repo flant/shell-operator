@@ -1,8 +1,9 @@
 package metric
 
 import (
-	"github.com/flant/shell-operator/pkg/metric_storage/operation"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/flant/shell-operator/pkg/metric_storage/operation"
 )
 
 type Storage interface {

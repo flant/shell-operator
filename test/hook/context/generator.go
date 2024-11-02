@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/shell-operator/pkg/hook"
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"

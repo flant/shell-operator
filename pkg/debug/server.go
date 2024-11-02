@@ -9,11 +9,11 @@ import (
 	"os"
 	"path"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"gopkg.in/yaml.v3"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )

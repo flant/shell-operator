@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+
 	"github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 

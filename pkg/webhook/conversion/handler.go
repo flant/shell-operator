@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 

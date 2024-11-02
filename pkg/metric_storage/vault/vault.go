@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/flant/shell-operator/pkg/metric"
-
 	log "github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/flant/shell-operator/pkg/metric"
 	. "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

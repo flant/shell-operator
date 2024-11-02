@@ -3,9 +3,9 @@ package schedule_manager
 import (
 	"context"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 

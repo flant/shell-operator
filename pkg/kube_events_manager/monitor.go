@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+
 	klient "github.com/flant/kube-client/client"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric_storage"

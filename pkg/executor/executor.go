@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	utils "github.com/flant/shell-operator/pkg/utils/labels"
 
 	"github.com/flant/shell-operator/pkg/app"
+	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type CmdUsage struct {
