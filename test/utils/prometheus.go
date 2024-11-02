@@ -127,10 +127,10 @@ func (p *PromScraper) Scrape() error {
 	return nil
 }
 
-func (p *PromScraper) HasMetric(name string) {
+func (p *PromScraper) HasMetric(_ string) {
 }
 
-func (p *PromScraper) MetricEquals(name string) {
+func (p *PromScraper) MetricEquals(_ string) {
 }
 
 // FindExact searches metric by name and labels
@@ -199,11 +199,11 @@ func (matcher *HaveMetricMatcher) Match(actual interface{}) (success bool, err e
 	return !promScraper.FindExact(matcher.pmv).IsEmpty(), nil
 }
 
-func (matcher *HaveMetricMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *HaveMetricMatcher) FailureMessage(_ interface{}) (message string) {
 	return "Expected ShellOperator has metric"
 }
 
-func (matcher *HaveMetricMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *HaveMetricMatcher) NegatedFailureMessage(_ interface{}) (message string) {
 	return "Expected ShellOperator has no metric"
 }
 

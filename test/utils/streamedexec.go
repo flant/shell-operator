@@ -102,7 +102,7 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 	return nil
 }
 
-func consumeLines(r io.Reader, session *gexec.Session, opts CommandOptions) {
+func consumeLines(r io.Reader, _ *gexec.Session, opts CommandOptions) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		opts.OutputLineHandler(scanner.Text())
