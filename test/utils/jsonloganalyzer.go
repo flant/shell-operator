@@ -29,11 +29,11 @@ func NewJsonLogAnalyzer() *JsonLogAnalyzer {
 }
 
 func (a *JsonLogAnalyzer) AddGroup(analyzers ...*JsonLogMatcher) {
-	r.Matchers = append(r.Matchers, analyzers)
+	a.Matchers = append(a.Matchers, analyzers)
 }
 
 func (a *JsonLogAnalyzer) OnStop(fn func()) {
-	r.OnStopFn = fn
+	a.OnStopFn = fn
 }
 
 func (a *JsonLogAnalyzer) Finished() bool {
