@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"sort"
 
-	"github.com/deckhouse/deckhouse/go_lib/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 )
 
 // MergeLabels merges several maps into one. Last map keys overrides keys from first maps.

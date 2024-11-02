@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/deckhouse/deckhouse/go_lib/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 
 	"github.com/flant/shell-operator/pkg/app"

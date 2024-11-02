@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	log "github.com/deckhouse/deckhouse/go_lib/log"
+	log "github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
@@ -19,7 +19,7 @@ func Test_Operator_startup_tasks(t *testing.T) {
 	hooksDir, err := utils.RequireExistingDirectory("testdata/startup_tasks/hooks")
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	op := NewShellOperator(context.Background(), log.NewNop())
+	op := NewShellOperator(context.Background(), WithLogger(log.NewNop()))
 	op.SetupEventManagers()
 	op.setupHookManagers(hooksDir, "")
 

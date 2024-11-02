@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/deckhouse/deckhouse/go_lib/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
 	"github.com/flant/kube-client/fake"

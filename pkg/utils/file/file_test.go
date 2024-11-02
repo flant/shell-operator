@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	log "github.com/deckhouse/deckhouse/go_lib/log"
+	log "github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/deckhouse/deckhouse/go_lib/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/hashicorp/go-multierror"
 	gerror "github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"

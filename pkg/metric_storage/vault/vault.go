@@ -6,23 +6,23 @@ import (
 
 	"github.com/flant/shell-operator/pkg/metric"
 
-	log "github.com/deckhouse/deckhouse/go_lib/log"
+	log "github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
 	. "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type GroupedVault struct {
-	collectors map[string]metric.ConstCollector
-	mtx        sync.Mutex
-	registerer prometheus.Registerer
+	collectors            map[string]metric.ConstCollector
+	mtx                   sync.Mutex
+	registerer            prometheus.Registerer
 	resolveMetricNameFunc func(name string) string
 }
 
 func NewGroupedVault(resolveMetricNameFunc func(name string) string) *GroupedVault {
 	return &GroupedVault{
-		collectors: make(map[string]metric.ConstCollector),
-		resolveMetricNameFunc : resolveMetricNameFunc,
+		collectors:            make(map[string]metric.ConstCollector),
+		resolveMetricNameFunc: resolveMetricNameFunc,
 	}
 }
 

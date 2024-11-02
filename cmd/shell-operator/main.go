@@ -8,8 +8,8 @@ import (
 
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/deckhouse/deckhouse/go_lib/log"
-	"github.com/flant/kube-client/klogtologrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/flant/kube-client/klogtolog"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/jq"
@@ -20,12 +20,15 @@ import (
 func main() {
 	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
 
+	logger := log.NewLogger(log.Options{})
+	log.SetDefault(logger)
+
 	// override usage template to reveal additional commands with information about start command
 	kpApp.UsageTemplate(app.OperatorUsageTemplate(app.AppName))
 
 	// Initialize klog wrapper when all values are parsed
 	kpApp.Action(func(c *kingpin.ParseContext) error {
-		klogtologrus.InitAdapter(app.DebugKubernetesAPI)
+		klogtolog.InitAdapter(app.DebugKubernetesAPI, logger.Named("klog"))
 		return nil
 	})
 
@@ -35,9 +38,6 @@ func main() {
 		fmt.Println(jq.FilterInfo())
 		return nil
 	})
-
-	logger := log.NewLogger(log.Options{})
-	log.SetDefault(logger)
 
 	// start main loop
 	startCmd := kpApp.Command("start", "Start shell-operator.").

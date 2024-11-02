@@ -3,7 +3,7 @@ package shell_operator
 import (
 	"fmt"
 
-	"github.com/deckhouse/deckhouse/go_lib/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"

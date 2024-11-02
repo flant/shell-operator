@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/deckhouse/deckhouse/go_lib/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5/middleware"
 )
 

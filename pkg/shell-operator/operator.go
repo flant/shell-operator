@@ -8,7 +8,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	"github.com/deckhouse/deckhouse/go_lib/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/hook"
 	"github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -59,16 +59,31 @@ type ShellOperator struct {
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
-func NewShellOperator(ctx context.Context, logger *log.Logger) *ShellOperator {
+type Option func(operator *ShellOperator)
+
+func WithLogger(logger *log.Logger) Option {
+	return func(operator *ShellOperator) {
+		operator.logger = logger
+	}
+}
+
+func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	cctx, cancel := context.WithCancel(ctx)
-	return &ShellOperator{
+
+	so := &ShellOperator{
 		ctx:    cctx,
 		cancel: cancel,
-		logger: logger,
 	}
+
+	for _, opt := range opts {
+		opt(so)
+	}
+
+	return so
 }
 
 // Start run the operator
