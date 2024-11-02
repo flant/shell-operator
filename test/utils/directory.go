@@ -9,6 +9,8 @@ import (
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 )
 
+// TODO: remove useless code
+
 // ChooseExistedDirectoryPath returns first non-empty existed directory path from arguments.
 //
 // Each argument is prefixed with current directory if is not started with /

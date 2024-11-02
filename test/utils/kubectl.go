@@ -1,6 +1,8 @@
 //go:build test
 // +build test
 
+// TODO: remove useless code
+
 package utils
 
 import (
