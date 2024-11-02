@@ -1,7 +1,5 @@
 run:
   timeout: 15m
-  skip-dirs:
-  - test/integration
 linters:
   disable-all: true
   enable:
@@ -76,6 +74,8 @@ linters-settings:
           - pkg: "gopkg.in/satori/go.uuid.v1"
             desc: "Use https://github.com/gofrs/uuid instead. Satori/go.uuid is no longer maintained and has critical vulnerabilities."
 issues:
+  exclude-dirs:
+    - test/integration
   exclude:
     # Using underscores is a common practice, refactor in the future
     - "var-naming: don't use an underscore in package name" # revive
