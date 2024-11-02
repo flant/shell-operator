@@ -7,6 +7,7 @@ package utils
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -92,7 +93,7 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 	if exitCode := session.ExitCode(); exitCode != 0 {
 		cmdErr := fmt.Errorf("command failed, exit code %d", exitCode)
 		if stopMsg != "" {
-			cmdErr = fmt.Errorf(stopMsg)
+			cmdErr = errors.New(stopMsg)
 		}
 		return &CommandError{
 			CommandError: cmdErr,
