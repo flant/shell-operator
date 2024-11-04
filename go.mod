@@ -1,9 +1,8 @@
 module github.com/flant/shell-operator
 
 go 1.22
-
 require (
-	github.com/flant/kube-client v1.2.0
+	github.com/flant/kube-client v1.2.1
 	github.com/flant/libjq-go v1.6.3-0.20201126171326-c46a40ff22ee // branch: master
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-openapi/spec v0.19.8
@@ -36,12 +35,14 @@ replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v
 require github.com/gojuno/minimock/v3 v3.4.0
 
 require (
+	github.com/DataDog/gostackparse v0.7.0 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241102110904-83c5e473e0ca // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
