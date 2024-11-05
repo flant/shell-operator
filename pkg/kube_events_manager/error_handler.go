@@ -14,7 +14,6 @@ import (
 type WatchErrorHandler struct {
 	description   string
 	kind          string
-	logEntry      *log.Logger
 	metricStorage *metric_storage.MetricStorage
 
 	logger *log.Logger
@@ -24,9 +23,9 @@ func newWatchErrorHandler(description string, kind string, logLabels map[string]
 	return &WatchErrorHandler{
 		description:   description,
 		kind:          kind,
-		logEntry:      utils.EnrichLoggerWithLabels(logger, logLabels),
 		metricStorage: metricStorage,
-		logger:        logger,
+
+		logger: utils.EnrichLoggerWithLabels(logger, logLabels),
 	}
 }
 
@@ -39,16 +38,16 @@ func (weh *WatchErrorHandler) handler(_ *cache.Reflector, err error) {
 		// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 		// has a semantic that it returns data at least as fresh as provided RV.
 		// So first try to LIST with setting RV to resource version of last observed object.
-		weh.logEntry.Errorf("%s: Watch of %v closed with: %v", weh.description, weh.kind, err)
+		weh.logger.Errorf("%s: Watch of %v closed with: %v", weh.description, weh.kind, err)
 		errorType = "expired"
 	case err == io.EOF:
 		// watch closed normally
 		errorType = "eof"
 	case err == io.ErrUnexpectedEOF:
-		weh.logEntry.Errorf("%s: Watch for %v closed with unexpected EOF: %v", weh.description, weh.kind, err)
+		weh.logger.Errorf("%s: Watch for %v closed with unexpected EOF: %v", weh.description, weh.kind, err)
 		errorType = "unexpected-eof"
 	case err != nil:
-		weh.logEntry.Errorf("%s: Failed to watch %v: %v", weh.description, weh.kind, err)
+		weh.logger.Errorf("%s: Failed to watch %v: %v", weh.description, weh.kind, err)
 		errorType = "fail"
 	}
 
