@@ -25,7 +25,7 @@ type MonitorConfig struct {
 	LabelSelector           *metav1.LabelSelector
 	FieldSelector           *FieldSelector
 	JqFilter                string
-	LogEntry                *log.Logger
+	Logger                  *log.Logger
 	Mode                    KubeEventMode
 	KeepFullObjectsInMemory bool
 	FilterFunc              func(*unstructured.Unstructured) (interface{}, error)
