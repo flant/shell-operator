@@ -11,7 +11,7 @@ import (
 )
 
 // StructuredLogger is a simple, but powerful implementation of a custom structured
-// logger backed on logrus. It is adapted from https://github.com/go-chi/chi
+// logger backed on slog. It is adapted from https://github.com/go-chi/chi
 // 'logging' example.
 
 func NewStructuredLogger(logger *log.Logger, componentLabel string) func(next http.Handler) http.Handler {
@@ -35,7 +35,7 @@ func (l *StructuredLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 		slog.String("http_method", r.Method),
 		slog.String("uri", r.RequestURI),
 	)
-	// entry.Logger.Infoln("request started")
+	// entry.Logger.Info("request started")
 
 	return entry
 }
