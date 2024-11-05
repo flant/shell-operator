@@ -2,7 +2,7 @@ package kube_events_manager
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,9 +59,9 @@ const (
 // randomizedResyncPeriod returns a time.Duration between 2 hours and 4 hours with jitter and granularity
 func randomizedResyncPeriod() time.Duration {
 	spreadCount := ResyncPeriodSpread.Nanoseconds() / ResyncPeriodGranularity.Nanoseconds()
-	rndSpreadDelta := time.Duration(rand.Int63n(spreadCount)) * ResyncPeriodGranularity
+	rndSpreadDelta := time.Duration(rand.Int64N(spreadCount)) * ResyncPeriodGranularity
 	jitterCount := ResyncPeriodGranularity.Nanoseconds() / ResyncPeriodJitterGranularity.Nanoseconds()
-	rndJitterDelta := time.Duration(rand.Int63n(jitterCount)) * ResyncPeriodJitterGranularity
+	rndJitterDelta := time.Duration(rand.Int64N(jitterCount)) * ResyncPeriodJitterGranularity
 
 	return ResyncPeriodMedian - (ResyncPeriodSpread / 2) + rndSpreadDelta + rndJitterDelta
 }

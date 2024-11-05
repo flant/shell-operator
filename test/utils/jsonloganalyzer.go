@@ -28,12 +28,12 @@ func NewJsonLogAnalyzer() *JsonLogAnalyzer {
 	}
 }
 
-func (r *JsonLogAnalyzer) AddGroup(analyzers ...*JsonLogMatcher) {
-	r.Matchers = append(r.Matchers, analyzers)
+func (a *JsonLogAnalyzer) AddGroup(analyzers ...*JsonLogMatcher) {
+	a.Matchers = append(a.Matchers, analyzers)
 }
 
-func (r *JsonLogAnalyzer) OnStop(fn func()) {
-	r.OnStopFn = fn
+func (a *JsonLogAnalyzer) OnStop(fn func()) {
+	a.OnStopFn = fn
 }
 
 func (a *JsonLogAnalyzer) Finished() bool {
@@ -57,10 +57,10 @@ func (a *JsonLogAnalyzer) Reset() {
 }
 
 func (a *JsonLogAnalyzer) HandleLine(line string) {
-	//fmt.Printf("Got line: %s\n", line)
-	//defer func() {
+	// fmt.Printf("Got line: %s\n", line)
+	// defer func() {
 	//	fmt.Printf("analyzer.HandleLine done: ind=%d fin=%v err=%v\n", a.Index, a.finished, a.err)
-	//}()
+	// }()
 	if a.finished {
 		return
 	}
@@ -156,14 +156,14 @@ func NewJsonLogMatcher(steps ...*MatcherStep) *JsonLogMatcher {
 	}
 }
 
-func (m *JsonLogMatcher) HandleRecord(r JsonLogRecord) {
+func (m *JsonLogMatcher) HandleRecord(_ JsonLogRecord) {
 }
 
 func (m *JsonLogMatcher) HandleLine(line string) {
-	//fmt.Printf("Matcher Got line: %s\n", line)
-	//defer func() {
+	// fmt.Printf("Matcher Got line: %s\n", line)
+	// defer func() {
 	//	fmt.Printf("matcher.HandleLine done: ind=%d fin=%v err=%v\n", m.Index, m.finished, m.err)
-	//}()
+	// }()
 	defer func() {
 		e := recover()
 		if e != nil {
@@ -259,7 +259,7 @@ func (matcher *FinishAllMatchersSuccessfullyMatcher) Match(actual interface{}) (
 	return matcher.finished && matcher.err == nil, nil
 }
 
-func (matcher *FinishAllMatchersSuccessfullyMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *FinishAllMatchersSuccessfullyMatcher) FailureMessage(_ interface{}) (message string) {
 	msgs := []string{}
 	if !matcher.finished {
 		msgs = append(msgs, "is finished")
@@ -270,7 +270,7 @@ func (matcher *FinishAllMatchersSuccessfullyMatcher) FailureMessage(actual inter
 	return fmt.Sprintf("Expected JsonLogAnalyzer %s", strings.Join(msgs, " and "))
 }
 
-func (matcher *FinishAllMatchersSuccessfullyMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *FinishAllMatchersSuccessfullyMatcher) NegatedFailureMessage(_ interface{}) (message string) {
 	msgs := []string{}
 	if matcher.finished {
 		msgs = append(msgs, "is not finished")

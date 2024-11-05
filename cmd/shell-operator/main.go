@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/flant/kube-client/klogtologrus"
+	"github.com/flant/kube-client/klogtolog"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/jq"
@@ -19,17 +18,20 @@ import (
 func main() {
 	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
 
+	logger := log.NewLogger(log.Options{})
+	log.SetDefault(logger)
+
 	// override usage template to reveal additional commands with information about start command
 	kpApp.UsageTemplate(app.OperatorUsageTemplate(app.AppName))
 
 	// Initialize klog wrapper when all values are parsed
-	kpApp.Action(func(c *kingpin.ParseContext) error {
-		klogtologrus.InitAdapter(app.DebugKubernetesAPI)
+	kpApp.Action(func(_ *kingpin.ParseContext) error {
+		klogtolog.InitAdapter(app.DebugKubernetesAPI, logger.Named("klog"))
 		return nil
 	})
 
 	// print version
-	kpApp.Command("version", "Show version.").Action(func(c *kingpin.ParseContext) error {
+	kpApp.Command("version", "Show version.").Action(func(_ *kingpin.ParseContext) error {
 		fmt.Printf("%s %s\n", app.AppName, app.Version)
 		fmt.Println(jq.FilterInfo())
 		return nil
@@ -38,14 +40,11 @@ func main() {
 	// start main loop
 	startCmd := kpApp.Command("start", "Start shell-operator.").
 		Default().
-		Action(func(c *kingpin.ParseContext) error {
+		Action(func(_ *kingpin.ParseContext) error {
 			app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
 
-			// Init rand generator.
-			rand.Seed(time.Now().UnixNano())
-
 			// Init logging and initialize a ShellOperator instance.
-			operator, err := shell_operator.Init()
+			operator, err := shell_operator.Init(logger.Named("shell-operator"))
 			if err != nil {
 				os.Exit(1)
 			}

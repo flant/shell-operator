@@ -5,19 +5,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
 	promtest "github.com/prometheus/client_golang/prometheus/testutil"
-	log "github.com/sirupsen/logrus"
 )
 
 func Test_CounterAdd(t *testing.T) {
 	g := NewWithT(t)
 
-	buf := &bytes.Buffer{}
-	log.SetOutput(buf)
+	logger := log.NewLogger(log.Options{})
+	log.SetDefault(logger)
 
-	v := NewGroupedVault(func (name string) string { return name })
+	buf := &bytes.Buffer{}
+	logger.SetOutput(buf)
+
+	v := NewGroupedVault(func(name string) string { return name })
 	v.registerer = prometheus.DefaultRegisterer
 
 	v.CounterAdd("group1", "metric_total", 1.0, map[string]string{"lbl": "val"})

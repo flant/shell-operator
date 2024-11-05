@@ -9,13 +9,13 @@ import (
 	"os"
 	"path"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
 	utils "github.com/flant/shell-operator/pkg/utils/file"
-	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
+	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type Server struct {
@@ -24,11 +24,14 @@ type Server struct {
 	HttpAddr   string
 
 	Router chi.Router
+
+	logger *log.Logger
 }
 
-func NewServer(prefix, socketPath, httpAddr string) *Server {
+func NewServer(prefix, socketPath, httpAddr string, logger *log.Logger) *Server {
 	router := chi.NewRouter()
-	router.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "debugEndpoint"))
+
+	router.Use(structuredLogger.NewStructuredLogger(logger.Named("debugEndpoint"), "debugEndpoint"))
 	router.Use(middleware.Recoverer)
 
 	return &Server{
@@ -36,6 +39,7 @@ func NewServer(prefix, socketPath, httpAddr string) *Server {
 		SocketPath: socketPath,
 		HttpAddr:   httpAddr,
 		Router:     router,
+		logger:     logger,
 	}
 }
 
@@ -44,19 +48,19 @@ func (s *Server) Init() (err error) {
 
 	err = os.MkdirAll(path.Dir(address), 0o700)
 	if err != nil {
-		log.Errorf("Debug HTTP server fail to create socket '%s': %v", address, err)
+		s.logger.Errorf("Debug HTTP server fail to create socket '%s': %v", address, err)
 		return err
 	}
 
 	exists, err := utils.FileExists(address)
 	if err != nil {
-		log.Errorf("Debug HTTP server fail to check socket '%s': %v", address, err)
+		s.logger.Errorf("Debug HTTP server fail to check socket '%s': %v", address, err)
 		return err
 	}
 	if exists {
 		err = os.Remove(address)
 		if err != nil {
-			log.Errorf("Debug HTTP server fail to remove existing socket '%s': %v", address, err)
+			s.logger.Errorf("Debug HTTP server fail to remove existing socket '%s': %v", address, err)
 			return err
 		}
 	}
@@ -64,15 +68,15 @@ func (s *Server) Init() (err error) {
 	// Check if socket is available
 	listener, err := net.Listen("unix", address)
 	if err != nil {
-		log.Errorf("Debug HTTP server fail to listen on '%s': %v", address, err)
+		s.logger.Errorf("Debug HTTP server fail to listen on '%s': %v", address, err)
 		return err
 	}
 
-	log.Infof("Debug endpoint listen on %s", address)
+	s.logger.Infof("Debug endpoint listen on %s", address)
 
 	go func() {
 		if err := http.Serve(listener, s.Router); err != nil {
-			log.Errorf("Error starting Debug socket server: %s", err)
+			s.logger.Errorf("Error starting Debug socket server: %s", err)
 			os.Exit(1)
 		}
 	}()
@@ -80,7 +84,7 @@ func (s *Server) Init() (err error) {
 	if s.HttpAddr != "" {
 		go func() {
 			if err := http.ListenAndServe(s.HttpAddr, s.Router); err != nil {
-				log.Errorf("Error starting Debug HTTP server: %s", err)
+				s.logger.Errorf("Error starting Debug HTTP server: %s", err)
 				os.Exit(1)
 			}
 		}()
@@ -131,7 +135,7 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	}
 
 	format := FormatFromRequest(request)
-	structured_logger.GetLogEntry(request).Debugf("use format '%s'", format)
+	structuredLogger.GetLogEntry(request).Debugf("use format '%s'", format)
 
 	switch format {
 	case "text":

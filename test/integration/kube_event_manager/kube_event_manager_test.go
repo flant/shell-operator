@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -26,7 +27,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 	var KubeEventsManager kube_events_manager.KubeEventsManager
 
 	BeforeEach(func() {
-		KubeEventsManager = kube_events_manager.NewKubeEventsManager(context.Background(), KubeClient)
+		KubeEventsManager = kube_events_manager.NewKubeEventsManager(context.Background(), KubeClient, log.NewNop())
 	})
 
 	Context("with configVersion: v1", func() {
@@ -67,7 +68,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 
 		When("Pod is Added", func() {
 			JustBeforeEach(func() {
-				app.SetupLogging(nil)
+				app.SetupLogging(nil, log.NewNop())
 
 				// Unlock KubeEvent emitting.
 				m := KubeEventsManager.GetMonitor(monitorConfig.Metadata.MonitorId)

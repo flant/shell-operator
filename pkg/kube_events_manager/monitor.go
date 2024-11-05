@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -46,9 +46,11 @@ type monitor struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	metricStorage *metric_storage.MetricStorage
+
+	logger *log.Logger
 }
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor *metric_storage.MetricStorage, config *MonitorConfig, eventCb func(KubeEvent)) *monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor *metric_storage.MetricStorage, config *MonitorConfig, eventCb func(KubeEvent), logger *log.Logger) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{
@@ -62,6 +64,7 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor *metric_storag
 		VaryingInformers:  make(map[string][]*resourceInformer),
 		cancelForNs:       make(map[string]context.CancelFunc),
 		staticNamespaces:  make(map[string]bool),
+		logger:            logger,
 	}
 }
 
@@ -75,9 +78,8 @@ func (m *monitor) GetConfig() *MonitorConfig {
 // multiple informers are created for each namespace.
 // If no NamespaceSelector defined, then one informer is created.
 func (m *monitor) CreateInformers() error {
-	logEntry := log.
-		WithFields(utils.LabelsToLogFields(m.Config.Metadata.LogLabels)).
-		WithField("binding.name", m.Config.Metadata.DebugName)
+	logEntry := utils.EnrichLoggerWithLabels(m.logger, m.Config.Metadata.LogLabels).
+		With("binding.name", m.Config.Metadata.DebugName)
 
 	if m.Config.Kind == "" && m.Config.ApiVersion == "" {
 		logEntry.Debugf("Create Informers for Config with empty kind and apiVersion: %+v", m.Config)
@@ -229,6 +231,7 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []*re
 		mstor:   m.metricStorage,
 		eventCb: m.eventCb,
 		monitor: m.Config,
+		logger:  m.logger.Named("resource-informer"),
 	}
 
 	objNames := []string{""}

@@ -1,10 +1,13 @@
 //go:build test
 // +build test
 
+// TODO: remove useless code
+
 package utils
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -90,7 +93,7 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 	if exitCode := session.ExitCode(); exitCode != 0 {
 		cmdErr := fmt.Errorf("command failed, exit code %d", exitCode)
 		if stopMsg != "" {
-			cmdErr = fmt.Errorf(stopMsg)
+			cmdErr = errors.New(stopMsg)
 		}
 		return &CommandError{
 			CommandError: cmdErr,
@@ -100,7 +103,7 @@ func StreamedExecCommand(cmd *exec.Cmd, opts CommandOptions) error {
 	return nil
 }
 
-func consumeLines(r io.Reader, session *gexec.Session, opts CommandOptions) {
+func consumeLines(r io.Reader, _ *gexec.Session, opts CommandOptions) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		opts.OutputLineHandler(scanner.Text())

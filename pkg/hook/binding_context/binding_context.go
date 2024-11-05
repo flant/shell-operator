@@ -2,7 +2,8 @@ package binding_context
 
 import (
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admission/v1"
 	apixv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 

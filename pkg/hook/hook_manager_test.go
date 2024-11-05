@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -30,6 +31,8 @@ func newHookManager(t *testing.T, testdataDir string) *Manager {
 		Smgr:       nil,
 		Wmgr:       admissionManager,
 		Cmgr:       conversionManager,
+
+		Logger: log.NewNop(),
 	}
 	hm := NewHookManager(cfg)
 

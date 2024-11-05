@@ -74,7 +74,7 @@ func Test_Dump(t *testing.T) {
 	tqs.WithContext(context.Background())
 
 	// Empty set, no queues, dump should not fail.
-	t.Run("empty set", func(t *testing.T) {
+	t.Run("empty set", func(_ *testing.T) {
 		dump := testDumpQueuesWrapper(tqs, "text", true)
 		g.Expect(dump).To(ContainSubstring("No queues"))
 	})
@@ -94,7 +94,7 @@ func Test_Dump(t *testing.T) {
 		g.Expect(dump).To(MatchJSON(`{"active":[],"summary":{"mainQueueTasks":0,"otherQueues":{"active":0,"empty":0,"tasks":0},"totalTasks":0}}`))
 	})
 
-	t.Run("main queue as active", func(t *testing.T) {
+	t.Run("main queue as active", func(_ *testing.T) {
 		fillQueue(tqs.GetMain(), mainTasks)
 
 		// Main queue is not counted as active or empty queue.
@@ -104,7 +104,7 @@ func Test_Dump(t *testing.T) {
 	})
 
 	// Create and fill active queue.
-	t.Run("fill active queue", func(t *testing.T) {
+	t.Run("fill active queue", func(_ *testing.T) {
 		tqs.NewNamedQueue("active-queue", nil)
 		fillQueue(tqs.GetByName("active-queue"), activeTasks)
 
@@ -128,7 +128,7 @@ func Test_Dump(t *testing.T) {
 		g.Expect(dump).To(MatchJSON(`{"active":[{"name":"main","tasksCount":5,"tasks":[{"index":1,"description":":::test_task_main_0004"},{"index":2,"description":":::test_task_main_0003"},{"index":3,"description":":::test_task_main_0002"},{"index":4,"description":":::test_task_main_0001"},{"index":5,"description":":::test_task_main_0000"}]},{"name":"active-queue","tasksCount":4,"tasks":[{"index":1,"description":":::test_task_active-queue_0003"},{"index":2,"description":":::test_task_active-queue_0002"},{"index":3,"description":":::test_task_active-queue_0001"},{"index":4,"description":":::test_task_active-queue_0000"}]}],"empty":[{"name":"empty","tasksCount":0}],"summary":{"mainQueueTasks":5,"otherQueues":{"active":1,"empty":1,"tasks":4},"totalTasks":9}}`))
 	})
 
-	t.Run("omit empty queue", func(t *testing.T) {
+	t.Run("omit empty queue", func(_ *testing.T) {
 		dump := testDumpQueuesWrapper(tqs, "text", false)
 		g.Expect(dump).To(ContainSubstring("1 active"))
 		g.Expect(dump).ToNot(ContainSubstring("Empty queues (1):"))

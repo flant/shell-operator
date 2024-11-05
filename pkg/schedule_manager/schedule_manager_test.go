@@ -4,11 +4,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
+
 	"github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
 func Test_ScheduleManager_Add(t *testing.T) {
-	sm := NewScheduleManager(context.Background())
+	sm := NewScheduleManager(context.Background(), log.NewNop())
 
 	expectations := []struct {
 		testName string
@@ -37,7 +39,7 @@ func Test_ScheduleManager_Add(t *testing.T) {
 	}
 
 	for _, expectation := range expectations {
-		t.Run(expectation.testName, func(t *testing.T) {
+		t.Run(expectation.testName, func(_ *testing.T) {
 			sm.Add(types.ScheduleEntry{Crontab: expectation.crontab, Id: expectation.id})
 
 			// if expectation.err != "" {

@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
-	log "github.com/sirupsen/logrus"
 )
 
 type WebhookServer struct {

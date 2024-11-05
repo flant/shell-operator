@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -137,7 +137,7 @@ func (ni *namespaceInformer) start() {
 	if err := wait.PollUntilContextCancel(cctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 		return ni.SharedInformer.HasSynced(), nil
 	}); err != nil {
-		ni.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ni.Monitor.Metadata.DebugName)
+		ni.Monitor.Logger.Errorf("%s: cache is not synced for informer", ni.Monitor.Metadata.DebugName)
 	}
 
 	log.Debugf("%s: informer is ready", ni.Monitor.Metadata.DebugName)

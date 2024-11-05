@@ -3,15 +3,17 @@ package executor
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"syscall"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/shell-operator/pkg/app"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
@@ -31,17 +33,17 @@ func Run(cmd *exec.Cmd) error {
 	return cmd.Run()
 }
 
-func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, error) {
+func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string, logger *log.Logger) (*CmdUsage, error) {
 	// TODO observability
 	stdErr := bytes.NewBuffer(nil)
-	logEntry := log.WithFields(utils.LabelsToLogFields(logLabels))
-	stdoutLogEntry := logEntry.WithField("output", "stdout")
-	stderrLogEntry := logEntry.WithField("output", "stderr")
+	logEntry := utils.EnrichLoggerWithLabels(logger, logLabels)
+	stdoutLogEntry := logEntry.With("output", "stdout")
+	stderrLogEntry := logEntry.With("output", "stderr")
 
 	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
 
-	plo := &proxyJSONLogger{stdoutLogEntry, make([]byte, 0), app.LogProxyHookJSON}
-	ple := &proxyJSONLogger{stderrLogEntry, make([]byte, 0), app.LogProxyHookJSON}
+	plo := &proxyLogger{app.LogProxyHookJSON, stdoutLogEntry, make([]byte, 0)}
+	ple := &proxyLogger{app.LogProxyHookJSON, stderrLogEntry, make([]byte, 0)}
 	cmd.Stdout = plo
 	cmd.Stderr = io.MultiWriter(ple, stdErr)
 
@@ -50,6 +52,7 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 		if len(stdErr.Bytes()) > 0 {
 			return nil, fmt.Errorf("%s", stdErr.String())
 		}
+
 		return nil, err
 	}
 
@@ -59,6 +62,7 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 			Sys:  cmd.ProcessState.SystemTime(),
 			User: cmd.ProcessState.UserTime(),
 		}
+
 		// FIXME Maxrss is Unix specific.
 		sysUsage := cmd.ProcessState.SysUsage()
 		if v, ok := sysUsage.(*syscall.Rusage); ok {
@@ -70,67 +74,70 @@ func RunAndLogLines(cmd *exec.Cmd, logLabels map[string]string) (*CmdUsage, erro
 	return usage, err
 }
 
-type proxyJSONLogger struct {
-	*log.Entry
+type proxyLogger struct {
+	logProxyHookJSON bool
+
+	logger *log.Logger
 
 	buf []byte
-
-	logProxyHookJSON bool
 }
 
-func (pj *proxyJSONLogger) Write(p []byte) (int, error) {
-	if !pj.logProxyHookJSON {
-		pj.writerScanner(p)
+func (pl *proxyLogger) Write(p []byte) (int, error) {
+	if !pl.logProxyHookJSON {
+		pl.writerScanner(p)
 
 		return len(p), nil
 	}
 
 	// join all parts of json
-	pj.buf = append(pj.buf, p...)
+	pl.buf = append(pl.buf, p...)
 
 	var line interface{}
-	err := json.Unmarshal(pj.buf, &line)
+	err := json.Unmarshal(pl.buf, &line)
 	if err != nil {
 		if err.Error() == "unexpected end of JSON input" {
 			return len(p), nil
 		}
+
 		return len(p), err
 	}
 
 	logMap, ok := line.(map[string]interface{})
+	defer func() {
+		pl.buf = []byte{}
+	}()
+
 	if !ok {
-		pj.Debugf("json log line not map[string]interface{}: %v", line)
+		pl.logger.Debug("json log line not map[string]interface{}", slog.Any("line", line))
+
 		// fall back to using the logger
-		pj.Info(string(p))
+		pl.logger.Info(string(p))
+
 		return len(p), err
 	}
 
-	for k, v := range pj.Data {
-		logMap[k] = v
-	}
+	logger := pl.logger.With(app.ProxyJsonLogKey, true)
 
 	logLineRaw, _ := json.Marshal(logMap)
-
 	logLine := string(logLineRaw)
 
-	logEntry := pj.WithField(app.ProxyJsonLogKey, true)
-
 	if len(logLine) > 10000 {
-		logLine = fmt.Sprintf("%s:truncated", string(logLine[:10000]))
+		logLine = fmt.Sprintf("%s:truncated", logLine[:10000])
 
-		truncatedLog, _ := json.Marshal(map[string]string{
+		logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", slog.Any("hook", map[string]any{
 			"truncated": logLine,
-		})
+		}))
 
-		logEntry.Log(log.FatalLevel, string(truncatedLog))
+		return len(p), nil
 	}
 
-	logEntry.Log(log.FatalLevel, string(logLine))
+	// logEntry.Log(log.FatalLevel, string(logLine))
+	logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", slog.Any("hook", logMap))
 
 	return len(p), nil
 }
 
-func (pj *proxyJSONLogger) writerScanner(p []byte) {
+func (pl *proxyLogger) writerScanner(p []byte) {
 	scanner := bufio.NewScanner(bytes.NewReader(p))
 
 	// Set the buffer size to the maximum token size to avoid buffer overflows
@@ -161,12 +168,12 @@ func (pj *proxyJSONLogger) writerScanner(p []byte) {
 			str = fmt.Sprintf("%s:truncated", str[:10000])
 		}
 
-		pj.Entry.Info(str)
+		pl.logger.Info(str)
 	}
 
 	// If there was an error while scanning the input, log an error
 	if err := scanner.Err(); err != nil {
-		pj.Entry.Errorf("Error while reading from Writer: %s", err)
+		pl.logger.Error("reading from scanner", slog.String("error", err.Error()))
 	}
 }
 

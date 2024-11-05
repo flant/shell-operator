@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 	"golang.org/x/time/rate"
 
@@ -23,7 +24,7 @@ func Test_Hook_SafeName(t *testing.T) {
 		t.Error(err)
 	}
 
-	h := NewHook(hookName, hookPath)
+	h := NewHook(hookName, hookPath, log.NewNop())
 
 	g.Expect(h.SafeName()).To(Equal("002-cool-hooks-monitor-namespaces-py"))
 }
@@ -86,7 +87,7 @@ func Test_CreateLimiter(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.title, func(t *testing.T) {
+		t.Run(c.title, func(_ *testing.T) {
 			cfg := &config.HookConfig{
 				Settings: c.settings,
 			}
@@ -134,8 +135,8 @@ func Test_Hook_WithConfig(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			hook = NewHook("hook-sh", "/hooks/hook.sh")
+		t.Run(test.name, func(_ *testing.T) {
+			hook = NewHook("hook-sh", "/hooks/hook.sh", log.NewNop())
 			_, err = hook.LoadConfig([]byte(test.jsonData))
 			test.fn()
 		})

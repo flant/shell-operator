@@ -8,7 +8,7 @@ import (
 )
 
 func (op *ShellOperator) setupHookMetricStorage() {
-	metricStorage := metric_storage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, true)
+	metricStorage := metric_storage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, true, op.logger.Named("metric-storage"))
 
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics/hooks", metricStorage.Handler().ServeHTTP)
 	// create new metric storage for hooks

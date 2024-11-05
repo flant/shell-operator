@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/kube/object_patch"
 )
@@ -36,5 +37,5 @@ var _ = BeforeSuite(func() {
 	err := KubeClient.Init()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	ObjectPatcher = object_patch.NewObjectPatcher(KubeClient)
+	ObjectPatcher = object_patch.NewObjectPatcher(KubeClient, log.NewNop())
 })

@@ -1,9 +1,10 @@
 module github.com/flant/shell-operator
 
-go 1.22
+go 1.22.8
 
 require (
-	github.com/flant/kube-client v1.2.0
+	github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241102120041-7e44e3e22ab9
+	github.com/flant/kube-client v1.2.1
 	github.com/flant/libjq-go v1.6.3-0.20201126171326-c46a40ff22ee // branch: master
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-openapi/spec v0.19.8
@@ -17,7 +18,6 @@ require (
 	github.com/onsi/gomega v1.34.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.5
-	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/time v0.7.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
@@ -36,6 +36,7 @@ replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v
 require github.com/gojuno/minimock/v3 v3.4.0
 
 require (
+	github.com/DataDog/gostackparse v0.7.0 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 // indirect

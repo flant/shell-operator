@@ -2,18 +2,20 @@ package conversion
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	structured_logger "github.com/flant/shell-operator/pkg/utils/structured-logger"
+	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type WebhookHandler struct {
@@ -34,7 +36,7 @@ func NewWebhookHandler() *WebhookHandler {
 	})
 
 	rtr.Group(func(r chi.Router) {
-		r.Use(structured_logger.NewStructuredLogger(log.StandardLogger(), "conversionWebhook"))
+		r.Use(structuredLogger.NewStructuredLogger(log.NewLogger(log.Options{}).Named("conversionWebhook"), "conversionWebhook"))
 		r.Use(middleware.Recoverer)
 		r.Use(middleware.AllowContentType("application/json"))
 		r.Post("/*", h.serveReviewRequest)
@@ -65,7 +67,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 
 	conversionResponse, err := h.handleReviewRequest(crdName, convertReview.Request)
 	if err != nil {
-		log.Error(err, "failed to convert", "request", convertReview.Request.UID)
+		log.Error("failed to convert", "request", convertReview.Request.UID, slog.String("error", err.Error()))
 		convertReview.Response = errored(err)
 	} else {
 		convertReview.Response = conversionResponse
@@ -97,7 +99,7 @@ func (h *WebhookHandler) handleReviewRequest(crdName string, request *v1.Convers
 	}
 
 	if conversionResponse.FailedMessage != "" {
-		return nil, fmt.Errorf(conversionResponse.FailedMessage)
+		return nil, errors.New(conversionResponse.FailedMessage)
 	}
 
 	if len(request.Objects) != len(conversionResponse.ConvertedObjects) {
@@ -109,7 +111,8 @@ func (h *WebhookHandler) handleReviewRequest(crdName string, request *v1.Convers
 		UID:              request.UID,
 		Result: metav1.Status{
 			Status: metav1.StatusSuccess,
-		}}, nil
+		},
+	}, nil
 }
 
 // detectCrdName extracts crdName from the url path.

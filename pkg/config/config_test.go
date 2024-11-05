@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConfig_Register(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(log.NewNop())
 
 	c.Register("log.level", "", "info", nil, nil)
 
@@ -32,10 +33,10 @@ func TestConfig_Register(t *testing.T) {
 }
 
 func TestConfig_OnChange(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(log.NewNop())
 
 	newValue := ""
-	c.Register("log.level", "", "info", func(oldValue string, n string) error {
+	c.Register("log.level", "", "info", func(_ string, n string) error {
 		newValue = n
 		return nil
 	}, nil)
@@ -66,9 +67,9 @@ func TestConfig_OnChange(t *testing.T) {
 
 func TestConfig_Errors(t *testing.T) {
 	var err error
-	c := NewConfig()
+	c := NewConfig(log.NewNop())
 
-	c.Register("log.level", "", "info", func(oldValue string, n string) error {
+	c.Register("log.level", "", "info", func(_ string, n string) error {
 		if n == "debug" {
 			return nil
 		}

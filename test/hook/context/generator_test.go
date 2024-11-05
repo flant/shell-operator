@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -31,7 +32,7 @@ schedule:
   crontab: "* * * * *"
   includeSnapshotsFrom:
   - selected_pods
-`)
+`, log.NewNop())
 	defer c.Stop()
 
 	// Synchronization contexts
@@ -144,7 +145,7 @@ kubernetes:
   - selected_crds
   kind: MyResource
   name: selected_crds
-`)
+`, log.NewNop())
 	c.RegisterCRD("my.crd.io", "v1alpha1", "MyResource", true)
 	defer c.Stop()
 
@@ -190,7 +191,7 @@ kubernetes:
   - deployment
   kind: Deployment
   name: deployment
-`)
+`, log.NewNop())
 	contexts, err := c.Run(`
 ---
 apiVersion: apps/v1
@@ -241,7 +242,7 @@ kubernetes:
   kind: Pod
   name: pods-grouped
   group: group1
-`)
+`, log.NewNop())
 	defer c.Stop()
 
 	contexts, err := c.Run(`
@@ -286,7 +287,7 @@ kubernetes:
   group: main
   kind: Secret
   name: secret
-`)
+`, log.NewNop())
 	defer c.Stop()
 
 	contexts, err := c.Run(`
@@ -328,7 +329,7 @@ kubernetes:
   kind: Pod
   name: selected_pods_nosync
   executeHookOnSynchronization: false
-`)
+`, log.NewNop())
 	defer c.Stop()
 
 	// Synchronization contexts
@@ -371,7 +372,7 @@ schedule:
   crontab: "* * * * *"
   includeSnapshotsFrom:
   - selected_pods
-`)
+`, log.NewNop())
 	defer c.Stop()
 
 	// Synchronization contexts

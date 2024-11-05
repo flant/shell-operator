@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	uuid "github.com/gofrs/uuid/v5"
 	"github.com/kennygrant/sanitize"
 	"golang.org/x/time/rate"
@@ -44,13 +45,16 @@ type Hook struct {
 	RateLimiter    *rate.Limiter
 
 	TmpDir string
+
+	Logger *log.Logger
 }
 
-func NewHook(name, path string) *Hook {
+func NewHook(name, path string, logger *log.Logger) *Hook {
 	return &Hook{
 		Name:   name,
 		Path:   path,
 		Config: &config.HookConfig{},
+		Logger: logger,
 	}
 }
 
@@ -138,7 +142,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 
 	result := &Result{}
 
-	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels)
+	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels, h.Logger)
 	if err != nil {
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}

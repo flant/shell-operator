@@ -1,7 +1,6 @@
 package exponential_backoff
 
 import (
-	"math/rand"
 	"testing"
 	"time"
 )
@@ -9,7 +8,6 @@ import (
 func Test_Delay(t *testing.T) {
 	var initialSeconds int64 = 5
 	initialDelay := time.Duration(5) * time.Second
-	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < 64; i++ {
 		delay := CalculateDelay(initialDelay, i)
 		seconds := int64(delay.Seconds())

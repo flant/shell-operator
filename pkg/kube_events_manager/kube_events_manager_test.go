@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -49,7 +50,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 		},
 	}
 
-	mgr := NewKubeEventsManager(context.Background(), kubeClient)
+	mgr := NewKubeEventsManager(context.Background(), kubeClient, log.NewNop())
 
 	// monitor with 3 namespaces and 4 object names
 	monitor := &MonitorConfig{
@@ -137,7 +138,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
 
 	// Init() replacement
-	mgr := NewKubeEventsManager(ctx, kubeClient)
+	mgr := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
 	mgr.KubeEventCh = make(chan KubeEvent, 10)
 
 	// monitor with 3 namespaces and 4 object names and all event types
@@ -313,7 +314,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
 
 	//// Init() replacement
-	mgr := NewKubeEventsManager(ctx, nil)
+	mgr := NewKubeEventsManager(ctx, nil, log.NewNop())
 
 	// monitor with 3 namespaces and 4 object names and all event types
 	monitor := &MonitorConfig{

@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/stretchr/testify/assert"
 )
 
 func prepareTestDirTree() (string, error) {
@@ -119,23 +121,29 @@ func TestRecursiveCheckLibDirectory(t *testing.T) {
 	}
 	for _, tt := range tests {
 		var buf bytes.Buffer
-		log.SetOutput(&buf)
 
-		formatter := new(log.TextFormatter)
-		formatter.DisableColors = true
-		formatter.DisableTimestamp = true
-		log.SetFormatter(formatter)
+		logger := log.NewLogger(log.Options{
+			Output: &buf,
+			TimeFunc: func(_ time.Time) time.Time {
+				parsedTime, err := time.Parse(time.DateTime, "2006-01-02 15:04:05")
+				if err != nil {
+					assert.NoError(t, err)
+				}
+
+				return parsedTime
+			},
+		})
+
+		log.SetDefault(logger)
 
 		t.Run(tt.name, func(t *testing.T) {
 			if err := RecursiveCheckLibDirectory(tt.args.dir); (err != nil) != tt.wantErr {
 				t.Errorf("RecursiveCheckLibDirectory() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			if strings.Compare(
-				strings.TrimSpace(buf.String()),
-				`level=warning msg="File '/lib.py' has executable permissions and is located in the ignored 'lib' directory"`) != 0 {
-				t.Errorf("RecursiveCheckLibDirectory() error, got `%v`", buf.String())
-			}
+			assert.Equal(t,
+				buf.String(),
+				`{"level":"warn","msg":"File '/lib.py' has executable permissions and is located in the ignored 'lib' directory","time":"2006-01-02T15:04:05Z"}`+"\n")
 		})
 	}
 

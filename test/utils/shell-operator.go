@@ -1,6 +1,8 @@
 //go:build test
 // +build test
 
+// TODO: remove useless code
+
 package utils
 
 import (
@@ -107,10 +109,10 @@ func (matcher *BeShellOperatorStoppedMatcher) Match(actual interface{}) (success
 	return matcher.err != nil && strings.Contains(matcher.err.Error(), "command is stopped"), nil
 }
 
-func (matcher *BeShellOperatorStoppedMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeShellOperatorStoppedMatcher) FailureMessage(_ interface{}) (message string) {
 	return fmt.Sprintf("Expected ShellOperator stopped. Got error: %v", matcher.err)
 }
 
-func (matcher *BeShellOperatorStoppedMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeShellOperatorStoppedMatcher) NegatedFailureMessage(_ interface{}) (message string) {
 	return "Expected ShellOperator stopped with error"
 }

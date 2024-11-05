@@ -1,7 +1,5 @@
 run:
   timeout: 15m
-  skip-dirs:
-  - test/integration
 linters:
   disable-all: true
   enable:
@@ -24,6 +22,7 @@ linters:
     - nolintlint
     - prealloc
     - revive
+    - sloglint
     - staticcheck
     - stylecheck
     - unconvert
@@ -39,6 +38,33 @@ linters-settings:
     local-prefixes: github.com/flant/
   nolintlint:
     allow-unused: true
+  sloglint:
+      # Enforce not mixing key-value pairs and attributes.
+      no-mixed-args: true
+      # Enforce using key-value pairs only (overrides no-mixed-args, incompatible with attr-only).
+      kv-only: false
+      # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).
+      attr-only: false
+      # Enforce not using global loggers.
+      no-global: ""
+      # Enforce using methods that accept a context.
+      context: ""
+      # Enforce using static values for log messages.
+      static-msg: false
+      # Enforce using constants instead of raw keys.
+      no-raw-keys: false
+      # Enforce a single key naming convention.
+      key-naming-case: ""
+      # Enforce not using specific keys.
+      forbidden-keys:
+        - level
+        - msg
+        - logger
+        - source
+        - stacktrace
+        - time
+      # Enforce putting arguments on separate lines.
+      args-on-sep-lines: false
   depguard:
     rules:
       Main:
@@ -48,6 +74,8 @@ linters-settings:
           - pkg: "gopkg.in/satori/go.uuid.v1"
             desc: "Use https://github.com/gofrs/uuid instead. Satori/go.uuid is no longer maintained and has critical vulnerabilities."
 issues:
+  exclude-dirs:
+    - test/integration
   exclude:
     # Using underscores is a common practice, refactor in the future
     - "var-naming: don't use an underscore in package name" # revive

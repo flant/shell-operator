@@ -3,7 +3,7 @@ package shell_operator
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/shell-operator/pkg/kube_events_manager"
 	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -16,6 +16,8 @@ type managerEventsHandlerConfig struct {
 	tqs  *queue.TaskQueueSet
 	mgr  kube_events_manager.KubeEventsManager
 	smgr schedule_manager.ScheduleManager
+
+	logger *log.Logger
 }
 
 type ManagerEventsHandler struct {
@@ -29,6 +31,8 @@ type ManagerEventsHandler struct {
 	scheduleCb  func(crontab string) []task.Task
 
 	taskQueues *queue.TaskQueueSet
+
+	logger *log.Logger
 }
 
 func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfig) *ManagerEventsHandler {
@@ -43,6 +47,7 @@ func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfi
 		scheduleManager:   cfg.smgr,
 		kubeEventsManager: cfg.mgr,
 		taskQueues:        cfg.tqs,
+		logger:            cfg.logger,
 	}
 }
 
@@ -63,7 +68,7 @@ func (m *ManagerEventsHandler) Start() {
 	go func() {
 		for {
 			var tailTasks []task.Task
-			logEntry := log.WithField("operator.component", "handleEvents")
+			logEntry := m.logger.With("operator.component", "handleEvents")
 			select {
 			case crontab := <-m.scheduleManager.Ch():
 				if m.scheduleCb != nil {

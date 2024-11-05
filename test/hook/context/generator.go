@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/shell-operator/pkg/hook"
@@ -40,10 +40,12 @@ type BindingContextController struct {
 
 	mu      sync.Mutex
 	started bool
+
+	logger *log.Logger
 }
 
-func NewBindingContextController(config string, version ...fake.ClusterVersion) *BindingContextController {
-	logrus.SetLevel(logrus.ErrorLevel)
+func NewBindingContextController(config string, logger *log.Logger, version ...fake.ClusterVersion) *BindingContextController {
+	log.SetDefaultLevel(log.LevelError)
 
 	k8sVersion := fake.ClusterVersionV119
 	if len(version) > 0 {
@@ -57,13 +59,14 @@ func NewBindingContextController(config string, version ...fake.ClusterVersion) 
 		HookMap:     make(map[string]string),
 		HookConfig:  config,
 		fakeCluster: fc,
+		logger:      logger,
 	}
 
-	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client)
+	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client, b.logger.Named("kube-events-manager"))
 	// Re-create factory to drop informers created using different b.fakeCluster.Client.
 	kubeeventsmanager.DefaultFactoryStore = kubeeventsmanager.NewFactoryStore()
 
-	b.ScheduleManager = schedulemanager.NewScheduleManager(ctx)
+	b.ScheduleManager = schedulemanager.NewScheduleManager(ctx, b.logger.Named("schedule-manager"))
 
 	b.Controller = NewStateController(fc, b.KubeEventsManager)
 
@@ -99,7 +102,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	if b.Hook == nil {
-		testHook := hook.NewHook("test", "test")
+		testHook := hook.NewHook("test", "test", b.logger.Named("hook"))
 		testHook, err = testHook.LoadConfig([]byte(b.HookConfig))
 		if err != nil {
 			return GeneratedBindingContexts{}, fmt.Errorf("couldn't load or validate hook configuration: %v", err)
@@ -108,7 +111,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	b.HookCtrl = controller.NewHookController()
-	b.HookCtrl.InitKubernetesBindings(b.Hook.GetConfig().OnKubernetesEvents, b.KubeEventsManager)
+	b.HookCtrl.InitKubernetesBindings(b.Hook.GetConfig().OnKubernetesEvents, b.KubeEventsManager, b.logger.Named("kubernetes-bindings"))
 	b.HookCtrl.InitScheduleBindings(b.Hook.GetConfig().Schedules, b.ScheduleManager)
 	b.HookCtrl.EnableScheduleBindings()
 

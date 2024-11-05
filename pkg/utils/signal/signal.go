@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
 )
 
 // WaitForProcessInterruption wait for SIGINT or SIGTERM and run a callback function.

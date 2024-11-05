@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/flant/shell-operator/pkg/app"
 )
@@ -77,9 +77,9 @@ func newBaseHTTPServer(address, port string) *baseHTTPServer {
 	// inject pprof
 	router.Mount("/debug", middleware.Profiler())
 
-	router.Get("/discovery", func(writer http.ResponseWriter, request *http.Request) {
+	router.Get("/discovery", func(writer http.ResponseWriter, _ *http.Request) {
 		buf := bytes.NewBuffer(nil)
-		walkFn := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		walkFn := func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 			// skip pprof routes
 			if strings.HasPrefix(route, "/debug/") {
 				return nil
@@ -110,7 +110,7 @@ func newBaseHTTPServer(address, port string) *baseHTTPServer {
 }
 
 func registerRootRoute(op *ShellOperator) {
-	op.APIServer.RegisterRoute(http.MethodGet, "/", func(writer http.ResponseWriter, request *http.Request) {
+	op.APIServer.RegisterRoute(http.MethodGet, "/", func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintf(writer, `<html>
   <head><title>Shell operator</title></head>
   <body>

@@ -1,9 +1,10 @@
 package utils
 
 import (
+	"log/slog"
 	"sort"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
 )
 
 // MergeLabels merges several maps into one. Last map keys overrides keys from first maps.
@@ -19,14 +20,16 @@ func MergeLabels(labelsMaps ...map[string]string) map[string]string {
 	return labels
 }
 
-func LabelsToLogFields(labelsMaps ...map[string]string) log.Fields {
-	fields := log.Fields{}
+func EnrichLoggerWithLabels(logger *log.Logger, labelsMaps ...map[string]string) *log.Logger {
+	loggerEntry := logger
+
 	for _, labels := range labelsMaps {
 		for k, v := range labels {
-			fields[k] = v
+			loggerEntry = loggerEntry.With(slog.String(k, v))
 		}
 	}
-	return fields
+
+	return loggerEntry
 }
 
 // LabelNames returns sorted label keys

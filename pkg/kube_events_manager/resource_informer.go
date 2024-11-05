@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/gofrs/uuid/v5"
-	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -60,6 +60,8 @@ type resourceInformer struct {
 
 	// a flag to stop handle events after Stop()
 	stopped bool
+
+	logger *log.Logger
 }
 
 // resourceInformer should implement ResourceInformer
@@ -68,6 +70,8 @@ type resourceInformerConfig struct {
 	mstor   *metric_storage.MetricStorage
 	eventCb func(KubeEvent)
 	monitor *MonitorConfig
+
+	logger *log.Logger
 }
 
 func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resourceInformer {
@@ -84,6 +88,7 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		eventBufLock:           sync.Mutex{},
 		cachedObjectsInfo:      &CachedObjectsInfo{},
 		cachedObjectsIncrement: &CachedObjectsInfo{},
+		logger:                 cfg.logger,
 	}
 	return informer
 }
@@ -440,10 +445,10 @@ func (ei *resourceInformer) start() {
 	}()
 
 	// TODO: separate handler and informer
-	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage)
+	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage, ei.logger.Named("watch-error-handler"))
 	err := DefaultFactoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
-		ei.Monitor.LogEntry.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
+		ei.Monitor.Logger.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
 		return
 	}
 

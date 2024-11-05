@@ -144,7 +144,7 @@ func Test_Validate_V1_With_Error(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			vu = prepareConfigObj(g, tt.configText)
 			s := GetSchema(vu.Version)
 			err = ValidateConfig(vu.Obj, s, "root")

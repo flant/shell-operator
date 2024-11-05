@@ -1,7 +1,7 @@
 package controller
 
 import (
-	log "github.com/sirupsen/logrus"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -69,7 +69,7 @@ func (c *ConversionBindingsController) DisableConversionBindings() {
 	// TODO dynamic enable/disable conversion webhooks.
 }
 
-func (c *ConversionBindingsController) CanHandleEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule) bool {
+func (c *ConversionBindingsController) CanHandleEvent(crdName string, _ *v1.ConversionRequest, rule conversion.Rule) bool {
 	_, has := c.Links[crdName]
 	if !has {
 		return false

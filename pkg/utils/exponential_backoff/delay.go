@@ -2,7 +2,7 @@ package exponential_backoff
 
 import (
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -52,7 +52,7 @@ func CalculateDelayWithMax(initialDelay time.Duration, maxDelay time.Duration, r
 	}
 
 	// Random addition to delay.
-	rndDelayNs := rand.Int63n(ExponentialDelayRandomMs) * int64(time.Millisecond)
+	rndDelayNs := rand.Int64N(ExponentialDelayRandomMs) * int64(time.Millisecond)
 
 	delay := initialDelay + time.Duration(delayNs) + time.Duration(rndDelayNs)
 	delay = delay.Truncate(100 * time.Millisecond)

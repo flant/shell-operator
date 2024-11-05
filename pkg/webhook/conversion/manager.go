@@ -2,9 +2,10 @@ package conversion
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"os"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/webhook/server"

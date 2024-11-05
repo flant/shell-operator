@@ -114,7 +114,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 	// Set exponential backoff to the constant delay just to wait more than DelayOnQueueIsEmpty.
 	// It is a test of delaying between task runs, not a test of exponential distribution.
 	mockExponentialDelay := 30 * time.Millisecond
-	q.ExponentialBackoffFn = func(failureCount int) time.Duration {
+	q.ExponentialBackoffFn = func(_ int) time.Duration {
 		return mockExponentialDelay
 	}
 
@@ -201,7 +201,7 @@ func Test_CancelDelay(t *testing.T) {
 	// Set exponential backoff to the constant delay just to wait more than DelayOnQueueIsEmpty.
 	// It is a test of delaying between task runs, not a test of exponential distribution.
 	mockExponentialDelay := 150 * time.Millisecond
-	q.ExponentialBackoffFn = func(failureCount int) time.Duration {
+	q.ExponentialBackoffFn = func(_ int) time.Duration {
 		return mockExponentialDelay
 	}
 
