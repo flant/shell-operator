@@ -33,13 +33,13 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 
 	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
 	if err != nil {
-		logger.Fatal("hooks directory is required", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "hooks directory is required", slog.String("error", err.Error()))
 		return nil, err
 	}
 
 	tempDir, err := utils.EnsureTempDirectory(app.TempDir)
 	if err != nil {
-		logger.Fatal("temp directory", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "temp directory", slog.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -48,7 +48,7 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 	// Debug server.
 	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
 	if err != nil {
-		logger.Fatal("start Debug server", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "start Debug server", slog.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -58,13 +58,13 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		"queue":   "",
 	})
 	if err != nil {
-		logger.Fatal("essemble common operator", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble common operator", slog.String("error", err.Error()))
 		return nil, err
 	}
 
 	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
 	if err != nil {
-		logger.Fatal("essemble shell operator", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble shell operator", slog.String("error", err.Error()))
 		return nil, err
 	}
 
