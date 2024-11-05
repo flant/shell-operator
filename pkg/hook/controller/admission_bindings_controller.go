@@ -1,7 +1,7 @@
 package controller
 
 import (
-	log "github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admission/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/binding_context"

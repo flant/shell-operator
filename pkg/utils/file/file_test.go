@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/stretchr/testify/assert"
 )
 

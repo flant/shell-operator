@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	log "github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
 )
 

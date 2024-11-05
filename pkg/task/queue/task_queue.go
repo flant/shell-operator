@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/shell-operator/pkg/metric_storage"
 	"github.com/flant/shell-operator/pkg/task"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	log "github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
 	"github.com/flant/shell-operator/pkg/hook/binding_context"

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/flant/shell-operator/pkg/metric"
