@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	log "github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/stretchr/testify/assert"
@@ -123,8 +124,15 @@ func TestRecursiveCheckLibDirectory(t *testing.T) {
 
 		logger := log.NewLogger(log.Options{
 			Output: &buf,
+			TimeFunc: func(_ time.Time) time.Time {
+				parsedTime, err := time.Parse(time.DateTime, "2006-01-02 15:04:05")
+				if err != nil {
+					assert.NoError(t, err)
+				}
+
+				return parsedTime
+			},
 		})
-		logger = logger.With("time", "0:0:0")
 
 		log.SetDefault(logger)
 
@@ -133,9 +141,9 @@ func TestRecursiveCheckLibDirectory(t *testing.T) {
 				t.Errorf("RecursiveCheckLibDirectory() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			assert.Contains(t,
-				strings.TrimSpace(buf.String()),
-				`File '/lib.py' has executable permissions and is located in the ignored 'lib' directory`)
+			assert.Equal(t,
+				buf.String(),
+				`{"level":"warn","msg":"File '/lib.py' has executable permissions and is located in the ignored 'lib' directory","time":"2006-01-02T15:04:05Z"}`+"\n")
 		})
 	}
 
