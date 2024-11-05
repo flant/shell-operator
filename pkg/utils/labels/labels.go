@@ -25,7 +25,7 @@ func EnrichLoggerWithLabels(logger *log.Logger, labelsMaps ...map[string]string)
 
 	for _, labels := range labelsMaps {
 		for k, v := range labels {
-			loggerEntry.With(slog.String(k, v))
+			loggerEntry = loggerEntry.With(slog.String(k, v))
 		}
 	}
 

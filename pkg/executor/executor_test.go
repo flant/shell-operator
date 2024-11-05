@@ -42,7 +42,7 @@ func TestRunAndLogLines(t *testing.T) {
 		_, err := RunAndLogLines(cmd, map[string]string{"a": "b"}, logger)
 		assert.NoError(t, err)
 
-		assert.Equal(t, buf.String(), `{"level":"fatal","msg":"hook result","hook":{"foo":"baz"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
+		assert.Equal(t, buf.String(), `{"level":"fatal","msg":"hook result","a":"b","hook":{"foo":"baz"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
 	})
@@ -54,7 +54,7 @@ func TestRunAndLogLines(t *testing.T) {
 		_, err := RunAndLogLines(cmd, map[string]string{"a": "b"}, logger)
 		assert.NoError(t, err)
 
-		assert.Equal(t, buf.String(), `{"level":"info","msg":"foobar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
+		assert.Equal(t, buf.String(), `{"level":"info","msg":"foobar","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
 	})
@@ -73,7 +73,7 @@ func TestRunAndLogLines(t *testing.T) {
 		_, err = RunAndLogLines(cmd, map[string]string{"a": "b"}, logger)
 		assert.NoError(t, err)
 
-		reg := regexp.MustCompile(`{"level":"fatal","msg":"hook result","hook":{"truncated":".*:truncated"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"`)
+		reg := regexp.MustCompile(`{"level":"fatal","msg":"hook result","a":"b","hook":{"truncated":".*:truncated"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"`)
 		assert.Regexp(t, reg, buf.String())
 
 		buf.Reset()
@@ -93,7 +93,7 @@ func TestRunAndLogLines(t *testing.T) {
 		_, err = RunAndLogLines(cmd, map[string]string{"a": "b"}, logger)
 		assert.NoError(t, err)
 
-		reg := regexp.MustCompile(`{"level":"info","msg":"result .*:truncated","output":"stdout","time":"2006-01-02T15:04:05Z"`)
+		reg := regexp.MustCompile(`{"level":"info","msg":"result .*:truncated","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"`)
 		assert.Regexp(t, reg, buf.String())
 
 		buf.Reset()
@@ -105,9 +105,9 @@ func TestRunAndLogLines(t *testing.T) {
 		cmd := exec.Command("echo", `["a","b","c"]`)
 		_, err := RunAndLogLines(cmd, map[string]string{"a": "b"}, logger)
 		assert.NoError(t, err)
-		assert.Equal(t, buf.String(), `{"level":"debug","msg":"Executing command 'echo [\"a\",\"b\",\"c\"]' in '' dir","source":"executor/executor.go:43","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:111","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:114","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
+		assert.Equal(t, buf.String(), `{"level":"debug","msg":"Executing command 'echo [\"a\",\"b\",\"c\"]' in '' dir","source":"executor/executor.go:43","a":"b","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:111","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:114","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
 	})
@@ -121,7 +121,7 @@ func TestRunAndLogLines(t *testing.T) {
 `)
 		_, err := RunAndLogLines(cmd, map[string]string{"foor": "baar"}, logger)
 		assert.NoError(t, err)
-		assert.Equal(t, buf.String(), `{"level":"fatal","msg":"hook result","hook":{"a":"b","c":"d"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
+		assert.Equal(t, buf.String(), `{"level":"fatal","msg":"hook result","foor":"baar","hook":{"a":"b","c":"d"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
 	})
@@ -134,8 +134,8 @@ c d
 `)
 		_, err := RunAndLogLines(cmd, map[string]string{"foor": "baar"}, logger)
 		assert.NoError(t, err)
-		assert.Equal(t, buf.String(), `{"level":"info","msg":"a b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"info","msg":"c d","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
+		assert.Equal(t, buf.String(), `{"level":"info","msg":"a b","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"info","msg":"c d","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
 	})
@@ -148,7 +148,7 @@ c d
 }`)
 		_, err := RunAndLogLines(cmd, map[string]string{"foor": "baar"}, logger)
 		assert.NoError(t, err)
-		assert.Equal(t, buf.String(), `{"level":"fatal","msg":"hook result","hook":{"a":"b","c":"d"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
+		assert.Equal(t, buf.String(), `{"level":"fatal","msg":"hook result","foor":"baar","hook":{"a":"b","c":"d"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
 	})
