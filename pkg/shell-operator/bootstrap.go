@@ -84,7 +84,7 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	op.setupHookMetricStorage()
 
 	// 'main' Kubernetes client.
-	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage)
+	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage, op.logger)
 	if err != nil {
 		return err
 	}

@@ -3,8 +3,8 @@ module github.com/flant/shell-operator
 go 1.22.8
 
 require (
-	github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241102120041-7e44e3e22ab9
-	github.com/flant/kube-client v1.2.1
+	github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241106140903-258b93b3334e
+	github.com/flant/kube-client v0.0.0-20241106144802-74dd66e8b239
 	github.com/flant/libjq-go v1.6.3-0.20201126171326-c46a40ff22ee // branch: master
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-openapi/spec v0.19.8
