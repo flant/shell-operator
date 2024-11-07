@@ -19,8 +19,8 @@ var (
 
 // defaultMainKubeClient creates a Kubernetes client for hooks. No timeout specified, because
 // timeout will reset connections for Watchers.
-func defaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) *klient.Client {
-	client := klient.New()
+func defaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string, logger *log.Logger) *klient.Client {
+	client := klient.New(klient.WithLogger(logger))
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
 	client.WithRateLimiterSettings(app.KubeClientQps, app.KubeClientBurst)
@@ -29,10 +29,10 @@ func defaultMainKubeClient(metricStorage *metric_storage.MetricStorage, metricLa
 	return client
 }
 
-func initDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage) (*klient.Client, error) {
+func initDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage, logger *log.Logger) (*klient.Client, error) {
 	//nolint:staticcheck
 	klient.RegisterKubernetesClientMetrics(metricStorage, defaultMainKubeClientMetricLabels)
-	kubeClient := defaultMainKubeClient(metricStorage, defaultMainKubeClientMetricLabels)
+	kubeClient := defaultMainKubeClient(metricStorage, defaultMainKubeClientMetricLabels, logger.Named("main-kube-client"))
 	err := kubeClient.Init()
 	if err != nil {
 		return nil, fmt.Errorf("initialize 'main' Kubernetes client: %s\n", err)
@@ -41,8 +41,8 @@ func initDefaultMainKubeClient(metricStorage *metric_storage.MetricStorage) (*kl
 }
 
 // defaultObjectPatcherKubeClient initializes a Kubernetes client for ObjectPatcher. Timeout is specified here.
-func defaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string) *klient.Client {
-	client := klient.New()
+func defaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage, metricLabels map[string]string, logger *log.Logger) *klient.Client {
+	client := klient.New(klient.WithLogger(logger))
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
 	client.WithRateLimiterSettings(app.ObjectPatcherKubeClientQps, app.ObjectPatcherKubeClientBurst)
@@ -53,7 +53,7 @@ func defaultObjectPatcherKubeClient(metricStorage *metric_storage.MetricStorage,
 }
 
 func initDefaultObjectPatcher(metricStorage *metric_storage.MetricStorage, logger *log.Logger) (*object_patch.ObjectPatcher, error) {
-	patcherKubeClient := defaultObjectPatcherKubeClient(metricStorage, defaultObjectPatcherKubeClientMetricLabels)
+	patcherKubeClient := defaultObjectPatcherKubeClient(metricStorage, defaultObjectPatcherKubeClientMetricLabels, logger.Named("object-patcher-kube-client"))
 	err := patcherKubeClient.Init()
 	if err != nil {
 		return nil, fmt.Errorf("initialize Kubernetes client for Object patcher: %s\n", err)

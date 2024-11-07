@@ -32,7 +32,7 @@ func RunIntegrationSuite(t *testing.T, description string, clusterPrefix string)
 
 var _ = BeforeSuite(func() {
 	// Initialize kube client out-of-cluster
-	KubeClient = klient.New()
+	KubeClient = klient.New(klient.WithLogger(log.NewNop()))
 	KubeClient.WithContextName(ContextName)
 	err := KubeClient.Init()
 	Expect(err).ShouldNot(HaveOccurred())
