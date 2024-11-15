@@ -1,4 +1,4 @@
-package schedule_manager
+package schedulemanager
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
 
-	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+	. "github.com/flant/shell-operator/pkg/schedule-manager/types"
 )
 
 type ScheduleManager interface {

@@ -11,15 +11,15 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/hook"
-	"github.com/flant/shell-operator/pkg/hook/binding_context"
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding-context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/kube/object_patch"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemTypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric_storage"
-	"github.com/flant/shell-operator/pkg/schedule_manager"
+	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
+	objectpatch "github.com/flant/shell-operator/pkg/object-patch"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule-manager"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
@@ -40,14 +40,14 @@ type ShellOperator struct {
 	APIServer *baseHTTPServer
 
 	// MetricStorage collects and store metrics for built-in operator primitives, hook execution
-	MetricStorage *metric_storage.MetricStorage
+	MetricStorage *metricstorage.MetricStorage
 	// HookMetricStorage separate metric storage for metrics, which are returned by user hooks
-	HookMetricStorage *metric_storage.MetricStorage
+	HookMetricStorage *metricstorage.MetricStorage
 	KubeClient        *klient.Client
-	ObjectPatcher     *object_patch.ObjectPatcher
+	ObjectPatcher     *objectpatch.ObjectPatcher
 
-	ScheduleManager   schedule_manager.ScheduleManager
-	KubeEventsManager kube_events_manager.KubeEventsManager
+	ScheduleManager   schedulemanager.ScheduleManager
+	KubeEventsManager kubeeventsmanager.KubeEventsManager
 
 	TaskQueues *queue.TaskQueueSet
 
@@ -622,12 +622,12 @@ func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 	result, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
 	if err != nil {
 		if result != nil && len(result.KubernetesPatchBytes) > 0 {
-			operations, patchStatusErr := object_patch.ParseOperations(result.KubernetesPatchBytes)
+			operations, patchStatusErr := objectpatch.ParseOperations(result.KubernetesPatchBytes)
 			if patchStatusErr != nil {
 				return fmt.Errorf("%s: couldn't patch status: %s", err, patchStatusErr)
 			}
 
-			patchStatusErr = op.ObjectPatcher.ExecuteOperations(object_patch.GetPatchStatusOperationsOnHookError(operations))
+			patchStatusErr = op.ObjectPatcher.ExecuteOperations(objectpatch.GetPatchStatusOperationsOnHookError(operations))
 			if patchStatusErr != nil {
 				return fmt.Errorf("%s: couldn't patch status: %s", err, patchStatusErr)
 			}
@@ -644,7 +644,7 @@ func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 
 	// Try to apply Kubernetes actions.
 	if len(result.KubernetesPatchBytes) > 0 {
-		operations, err := object_patch.ParseOperations(result.KubernetesPatchBytes)
+		operations, err := objectpatch.ParseOperations(result.KubernetesPatchBytes)
 		if err != nil {
 			return err
 		}
@@ -735,7 +735,7 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	}
 
 	// Combine binding context and make a map to delete excess tasks
-	combinedContext := make([]binding_context.BindingContext, 0)
+	combinedContext := make([]bindingcontext.BindingContext, 0)
 	monitorIDs := taskMeta.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
 	tasksFilter := make(map[string]bool)
 	// current task always remain in queue
@@ -759,7 +759,7 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	})
 
 	// group is used to compact binding contexts when only snapshots are needed
-	compactedContext := make([]binding_context.BindingContext, 0)
+	compactedContext := make([]bindingcontext.BindingContext, 0)
 	for i := 0; i < len(combinedContext); i++ {
 		keep := true
 
@@ -807,7 +807,7 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 	}
 
 	for _, hookName := range onStartupHooks {
-		bc := binding_context.BindingContext{
+		bc := bindingcontext.BindingContext{
 			Binding: string(types.OnStartup),
 		}
 		bc.Metadata.BindingType = types.OnStartup
@@ -816,7 +816,7 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 			WithMetadata(task_metadata.HookMetadata{
 				HookName:       hookName,
 				BindingType:    types.OnStartup,
-				BindingContext: []binding_context.BindingContext{bc},
+				BindingContext: []bindingcontext.BindingContext{bc},
 			}).
 			WithQueuedAt(time.Now())
 		mainQueue.AddLast(newTask)

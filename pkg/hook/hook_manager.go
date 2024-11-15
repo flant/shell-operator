@@ -11,12 +11,13 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/schedule_manager"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule-manager"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
@@ -26,8 +27,8 @@ type Manager struct {
 	// dependencies
 	workingDir               string
 	tempDir                  string
-	kubeEventsManager        kube_events_manager.KubeEventsManager
-	scheduleManager          schedule_manager.ScheduleManager
+	kubeEventsManager        kubeeventsmanager.KubeEventsManager
+	scheduleManager          schedulemanager.ScheduleManager
 	conversionWebhookManager *conversion.WebhookManager
 	admissionWebhookManager  *admission.WebhookManager
 
@@ -49,8 +50,8 @@ type Manager struct {
 type ManagerConfig struct {
 	WorkingDir string
 	TempDir    string
-	Kmgr       kube_events_manager.KubeEventsManager
-	Smgr       schedule_manager.ScheduleManager
+	Kmgr       kubeeventsmanager.KubeEventsManager
+	Smgr       schedulemanager.ScheduleManager
 	Wmgr       *admission.WebhookManager
 	Cmgr       *conversion.WebhookManager
 
@@ -132,7 +133,7 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 	if err != nil {
 		return nil, err
 	}
-	hook = NewHook(hookName, hookPath, hm.logger.Named("hook"))
+	hook = NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
 
 	hookEntry := hm.logger.With("hook", hook.Name).
 		With("phase", "config")
@@ -210,16 +211,23 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 
 func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
 	envs = append(os.Environ(), envs...)
-	cmd := executor.MakeCommand(dir, entrypoint, args, envs)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
+	hookCmd := executor.NewExecutor(
+		dir,
+		entrypoint,
+		args,
+		envs).
+		WithLogProxyHookJSON(app.LogProxyHookJSON).
+		WithLogProxyHookJSONKey(app.ProxyJsonLogKey).
+		WithCMDStdout(nil).
+		WithCMDStderr(nil).
+		WithLogger(hm.logger.Named("executor"))
 
 	debugEntry := hm.logger.With("hook", hookName).
-		With("cmd", strings.Join(cmd.Args, " "))
+		With("cmd", strings.Join(args, " "))
 
-	debugEntry.Debugf("Executing hook in %s", cmd.Dir)
+	debugEntry.Debugf("Executing hook in %s", dir)
 
-	output, err := executor.Output(cmd)
+	output, err := hookCmd.Output()
 	if err != nil {
 		return output, err
 	}
@@ -270,7 +278,7 @@ func (hm *Manager) GetHooksInOrder(bindingType BindingType) ([]string, error) {
 	return hooksNames, nil
 }
 
-func (hm *Manager) HandleKubeEvent(kubeEvent KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	kubeHooks, _ := hm.GetHooksInOrder(OnKubernetesEvent)
 
 	for _, hookName := range kubeHooks {

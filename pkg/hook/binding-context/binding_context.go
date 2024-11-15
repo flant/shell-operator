@@ -1,4 +1,4 @@
-package binding_context
+package bindingcontext
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	apixv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 // BindingContext contains information about event for hook
@@ -25,10 +25,10 @@ type BindingContext struct {
 	// name of a binding or a group or kubeEventType if binding has no 'name' field
 	Binding string
 	// additional fields for 'kubernetes' binding
-	Type             KubeEventType
-	WatchEvent       WatchEventType
-	Objects          []ObjectAndFilterResult
-	Snapshots        map[string][]ObjectAndFilterResult
+	Type             kemtypes.KubeEventType
+	WatchEvent       kemtypes.WatchEventType
+	Objects          []kemtypes.ObjectAndFilterResult
+	Snapshots        map[string][]kemtypes.ObjectAndFilterResult
 	AdmissionReview  *v1.AdmissionReview
 	ConversionReview *apixv1.ConversionReview
 	FromVersion      string
@@ -36,7 +36,7 @@ type BindingContext struct {
 }
 
 func (bc BindingContext) IsSynchronization() bool {
-	return bc.Metadata.BindingType == OnKubernetesEvent && bc.Type == TypeSynchronization
+	return bc.Metadata.BindingType == OnKubernetesEvent && bc.Type == kemtypes.TypeSynchronization
 }
 
 func (bc BindingContext) MarshalJSON() ([]byte, error) {
@@ -117,13 +117,13 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		res["watchEvent"] = string(bc.WatchEvent)
 	}
 	switch bc.Type {
-	case TypeSynchronization:
+	case kemtypes.TypeSynchronization:
 		if len(bc.Objects) == 0 {
 			res["objects"] = make([]string, 0)
 		} else {
 			res["objects"] = bc.Objects
 		}
-	case TypeEvent:
+	case kemtypes.TypeEvent:
 		if len(bc.Objects) == 0 {
 			res["object"] = nil
 			if bc.Metadata.JqFilter != "" {
@@ -151,11 +151,11 @@ func (bc BindingContext) MapV0() map[string]interface{} {
 
 	eventV0 := ""
 	switch bc.WatchEvent {
-	case WatchEventAdded:
+	case kemtypes.WatchEventAdded:
 		eventV0 = "add"
-	case WatchEventModified:
+	case kemtypes.WatchEventModified:
 		eventV0 = "update"
-	case WatchEventDeleted:
+	case kemtypes.WatchEventDeleted:
 		eventV0 = "delete"
 	}
 

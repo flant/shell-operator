@@ -1,4 +1,4 @@
-package object_patch
+package objectpatch
 
 import (
 	"bytes"

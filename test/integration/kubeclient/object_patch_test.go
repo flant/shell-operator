@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 
+	objectpatch "github.com/flant/shell-operator/pkg/object-patch"
+	. "github.com/flant/shell-operator/test/integration/suite"
 	uuid "github.com/gofrs/uuid/v5"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -16,9 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
-
-	"github.com/flant/shell-operator/pkg/kube/object_patch"
-	. "github.com/flant/shell-operator/test/integration/suite"
 )
 
 const (
@@ -65,7 +64,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should fail to Create() an object if it already exists", func() {
-			err := ObjectPatcher.ExecuteOperation(object_patch.NewCreateOperation(unstructuredCM))
+			err := ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredCM))
 			Expect(err).To(Not(Succeed()))
 		})
 
@@ -79,7 +78,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			unstructuredNewTestCM, err := generateUnstructured(newTestCM)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.ExecuteOperation(object_patch.NewCreateOperation(unstructuredNewTestCM, object_patch.UpdateIfExists()))
+			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredNewTestCM, objectpatch.UpdateIfExists()))
 			Expect(err).To(Succeed())
 
 			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), newTestCM.Name, metav1.GetOptions{})
@@ -94,7 +93,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			unstructuredSeparateTestCM, err := generateUnstructured(separateTestCM)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.ExecuteOperation(object_patch.NewCreateOperation(unstructuredSeparateTestCM, object_patch.UpdateIfExists()))
+			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredSeparateTestCM, objectpatch.UpdateIfExists()))
 			Expect(err).To(Succeed())
 
 			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), separateTestCM.Name, metav1.GetOptions{})
@@ -118,9 +117,9 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully delete an object", func() {
-			err := ObjectPatcher.ExecuteOperation(object_patch.NewDeleteOperation(
+			err := ObjectPatcher.ExecuteOperation(objectpatch.NewDeleteOperation(
 				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name,
-				object_patch.InBackground()))
+				objectpatch.InBackground()))
 			Expect(err).Should(Succeed())
 
 			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), testCM.Name, metav1.GetOptions{})
@@ -128,7 +127,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully delete an object if it doesn't exist", func() {
-			err := ObjectPatcher.ExecuteOperation(object_patch.NewDeleteOperation(testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
+			err := ObjectPatcher.ExecuteOperation(objectpatch.NewDeleteOperation(testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -149,8 +148,8 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully JQPatch an object", func() {
-			err := ObjectPatcher.ExecuteOperation(object_patch.NewFromOperationSpec(object_patch.OperationSpec{
-				Operation:  object_patch.JQPatch,
+			err := ObjectPatcher.ExecuteOperation(objectpatch.NewFromOperationSpec(objectpatch.OperationSpec{
+				Operation:  objectpatch.JQPatch,
 				ApiVersion: testCM.APIVersion,
 				Kind:       testCM.Kind,
 				Namespace:  testCM.Namespace,
@@ -176,7 +175,7 @@ data:
 			mergePatchJson, err := json.Marshal(mergePatch)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.ExecuteOperation(object_patch.NewMergePatchOperation(mergePatchJson, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
+			err = ObjectPatcher.ExecuteOperation(objectpatch.NewMergePatchOperation(mergePatchJson, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
 			Expect(err).To(Succeed())
 
 			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), testCM.Name, metav1.GetOptions{})
@@ -185,7 +184,7 @@ data:
 		})
 
 		It("should successfully JSONPatch an object", func() {
-			err := ObjectPatcher.ExecuteOperation(object_patch.NewJSONPatchOperation(
+			err := ObjectPatcher.ExecuteOperation(objectpatch.NewJSONPatchOperation(
 				[]byte(`[{ "op": "replace", "path": "/data/firstField", "value": "jsonPatched"}]`),
 				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
 			Expect(err).To(Succeed())
@@ -205,7 +204,7 @@ func ensureNamespace(name string) error {
 		panic(err)
 	}
 
-	return ObjectPatcher.ExecuteOperation(object_patch.NewCreateOperation(unstructuredNS, object_patch.UpdateIfExists()))
+	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredNS, objectpatch.UpdateIfExists()))
 }
 
 func ensureTestObject(_ string, obj interface{}) error {
@@ -214,11 +213,11 @@ func ensureTestObject(_ string, obj interface{}) error {
 		panic(err)
 	}
 
-	return ObjectPatcher.ExecuteOperation(object_patch.NewCreateOperation(unstructuredObj, object_patch.UpdateIfExists()))
+	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredObj, objectpatch.UpdateIfExists()))
 }
 
 func removeNamespace(name string) error {
-	return ObjectPatcher.ExecuteOperation(object_patch.NewDeleteOperation("", "Namespace", "", name))
+	return ObjectPatcher.ExecuteOperation(objectpatch.NewDeleteOperation("", "Namespace", "", name))
 }
 
 func generateUnstructured(obj interface{}) (*unstructured.Unstructured, error) {

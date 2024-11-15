@@ -1,4 +1,4 @@
-package binding_context
+package bindingcontext
 
 // TODO: need refactoring
 // change JQ tests for another testing tool

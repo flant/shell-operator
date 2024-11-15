@@ -1,4 +1,4 @@
-package object_patch
+package objectpatch
 
 import (
 	"fmt"
@@ -8,6 +8,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/filter/jq"
 )
 
 // A JSON and YAML representation of the operation for shell hooks
@@ -192,7 +195,8 @@ func NewFromOperationSpec(spec OperationSpec) Operation {
 	case JQPatch:
 		return NewFilterPatchOperation(
 			func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-				return applyJQPatch(spec.JQFilter, u)
+				filter := jq.NewFilter(app.JqLibraryPath)
+				return applyJQPatch(spec.JQFilter, filter, u)
 			},
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),

@@ -13,13 +13,12 @@ import (
 	"github.com/kennygrant/sanitize"
 	"golang.org/x/time/rate"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/binding-context"
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/metric_storage/operation"
+	"github.com/flant/shell-operator/pkg/metric-storage/operation"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -44,17 +43,24 @@ type Hook struct {
 	HookController *controller.HookController
 	RateLimiter    *rate.Limiter
 
-	TmpDir string
+	TmpDir                 string
+	KeepTemporaryHookFiles bool
+
+	LogProxyHookJSON    bool
+	LogProxyHookJSONKey string
 
 	Logger *log.Logger
 }
 
-func NewHook(name, path string, logger *log.Logger) *Hook {
+func NewHook(name, path string, keepTemporaryHookFiles bool, logProxyHookJSON bool, logProxyHookJSONKey string, logger *log.Logger) *Hook {
 	return &Hook{
-		Name:   name,
-		Path:   path,
-		Config: &config.HookConfig{},
-		Logger: logger,
+		Name:                   name,
+		Path:                   path,
+		Config:                 &config.HookConfig{},
+		KeepTemporaryHookFiles: keepTemporaryHookFiles,
+		LogProxyHookJSON:       logProxyHookJSON,
+		LogProxyHookJSONKey:    logProxyHookJSONKey,
+		Logger:                 logger,
 	}
 }
 
@@ -118,7 +124,7 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 
 	// remove tmp file on hook exit
 	defer func() {
-		if app.DebugKeepTmpFiles != "yes" {
+		if h.KeepTemporaryHookFiles {
 			_ = os.Remove(contextPath)
 			_ = os.Remove(metricsPath)
 			_ = os.Remove(conversionPath)
@@ -138,11 +144,18 @@ func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string
 		envs = append(envs, fmt.Sprintf("KUBERNETES_PATCH_PATH=%s", kubernetesPatchPath))
 	}
 
-	hookCmd := executor.MakeCommand(path.Dir(h.Path), h.Path, []string{}, envs)
+	hookCmd := executor.NewExecutor(
+		path.Dir(h.Path),
+		h.Path,
+		[]string{},
+		envs).
+		WithLogProxyHookJSON(h.LogProxyHookJSON).
+		WithLogProxyHookJSONKey(h.LogProxyHookJSONKey).
+		WithLogger(h.Logger.Named("executor"))
 
 	result := &Result{}
 
-	result.Usage, err = executor.RunAndLogLines(hookCmd, logLabels, h.Logger)
+	result.Usage, err = hookCmd.RunAndLogLines(logLabels)
 	if err != nil {
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}

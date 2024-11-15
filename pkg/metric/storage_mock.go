@@ -9,7 +9,7 @@ import (
 	mm_atomic "sync/atomic"
 	mm_time "time"
 
-	"github.com/flant/shell-operator/pkg/metric_storage/operation"
+	"github.com/flant/shell-operator/pkg/metric-storage/operation"
 	"github.com/gojuno/minimock/v3"
 	"github.com/prometheus/client_golang/prometheus"
 )

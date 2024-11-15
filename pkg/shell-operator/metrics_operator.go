@@ -4,12 +4,12 @@ import (
 	"net/http"
 
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/metric_storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
 )
 
 // setupMetricStorage creates and initializes metrics storage for built-in operator metrics
 func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels map[string]string) {
-	metricStorage := metric_storage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, false, op.logger.Named("metric-storage"))
+	metricStorage := metricstorage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, false, op.logger.Named("metric-storage"))
 
 	registerCommonMetrics(metricStorage)
 	registerTaskQueueMetrics(metricStorage)
@@ -23,13 +23,13 @@ func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels map[string]s
 
 // registerCommonMetrics register base metric
 // This function is used in the addon-operator
-func registerCommonMetrics(metricStorage *metric_storage.MetricStorage) {
+func registerCommonMetrics(metricStorage *metricstorage.MetricStorage) {
 	metricStorage.RegisterCounter("{PREFIX}live_ticks", map[string]string{})
 }
 
 // registerTaskQueueMetrics
 // This function is used in the addon-operator
-func registerTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
+func registerTaskQueueMetrics(metricStorage *metricstorage.MetricStorage) {
 	metricStorage.RegisterHistogram(
 		"{PREFIX}tasks_queue_action_duration_seconds",
 		map[string]string{
@@ -50,7 +50,7 @@ func registerTaskQueueMetrics(metricStorage *metric_storage.MetricStorage) {
 
 // registerKubeEventsManagerMetrics registers metrics for kube_event_manager
 // This function is used in the addon-operator
-func registerKubeEventsManagerMetrics(metricStorage *metric_storage.MetricStorage, labels map[string]string) {
+func registerKubeEventsManagerMetrics(metricStorage *metricstorage.MetricStorage, labels map[string]string) {
 	// Count of objects in snapshot for one kubernets bindings.
 	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
 	// Duration of jqFilter applying.

@@ -4,7 +4,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/binding-context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )

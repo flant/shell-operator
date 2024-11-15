@@ -5,17 +5,17 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/schedule_manager"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule-manager"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
 
 type managerEventsHandlerConfig struct {
 	tqs  *queue.TaskQueueSet
-	mgr  kube_events_manager.KubeEventsManager
-	smgr schedule_manager.ScheduleManager
+	mgr  kubeeventsmanager.KubeEventsManager
+	smgr schedulemanager.ScheduleManager
 
 	logger *log.Logger
 }
@@ -24,10 +24,10 @@ type ManagerEventsHandler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	kubeEventsManager kube_events_manager.KubeEventsManager
-	scheduleManager   schedule_manager.ScheduleManager
+	kubeEventsManager kubeeventsmanager.KubeEventsManager
+	scheduleManager   schedulemanager.ScheduleManager
 
-	kubeEventCb func(kubeEvent KubeEvent) []task.Task
+	kubeEventCb func(kubeEvent kemtypes.KubeEvent) []task.Task
 	scheduleCb  func(crontab string) []task.Task
 
 	taskQueues *queue.TaskQueueSet
@@ -53,7 +53,7 @@ func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfi
 
 // WithKubeEventHandler sets custom function for event handling.
 // This function is used inside addon-operator.
-func (m *ManagerEventsHandler) WithKubeEventHandler(fn func(kubeEvent KubeEvent) []task.Task) {
+func (m *ManagerEventsHandler) WithKubeEventHandler(fn func(kubeEvent kemtypes.KubeEvent) []task.Task) {
 	m.kubeEventCb = fn
 }
 

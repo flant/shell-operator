@@ -1,4 +1,4 @@
-package object_patch
+package objectpatch
 
 import (
 	"bytes"
@@ -12,8 +12,7 @@ import (
 	k8yaml "sigs.k8s.io/yaml"
 
 	"github.com/flant/kube-client/manifest"
-	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/jq"
+	"github.com/flant/shell-operator/pkg/filter"
 )
 
 func unmarshalFromJSONOrYAML(specs []byte) ([]OperationSpec, error) {
@@ -65,13 +64,13 @@ func unmarshalFromYaml(yamlSpecs []byte) ([]OperationSpec, error) {
 	return specSlice, nil
 }
 
-func applyJQPatch(jqFilter string, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func applyJQPatch(jqFilter string, fl filter.Filter, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	objBytes, err := obj.MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
 
-	filterResult, err := jq.ApplyJqFilter(jqFilter, objBytes, app.JqLibraryPath)
+	filterResult, err := fl.ApplyFilter(jqFilter, objBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply jqFilter:\n%sto Object:\n%s\n"+
 			"error: %s", jqFilter, obj, err)

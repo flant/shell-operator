@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"context"
@@ -8,32 +8,32 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric_storage"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
 )
 
 type KubeEventsManager interface {
-	WithMetricStorage(mstor *metric_storage.MetricStorage)
+	WithMetricStorage(mstor *metricstorage.MetricStorage)
 	AddMonitor(monitorConfig *MonitorConfig) error
 	HasMonitor(monitorID string) bool
 	GetMonitor(monitorID string) Monitor
 	StartMonitor(monitorID string)
 	StopMonitor(monitorID string) error
 
-	Ch() chan KubeEvent
+	Ch() chan kemtypes.KubeEvent
 	PauseHandleEvents()
 }
 
 // kubeEventsManager is a main implementation of KubeEventsManager.
 type kubeEventsManager struct {
 	// channel to emit KubeEvent objects
-	KubeEventCh chan KubeEvent
+	KubeEventCh chan kemtypes.KubeEvent
 
 	KubeClient *klient.Client
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage *metric_storage.MetricStorage
+	metricStorage *metricstorage.MetricStorage
 
 	m        sync.RWMutex
 	Monitors map[string]Monitor
@@ -53,13 +53,13 @@ func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *lo
 		KubeClient:  client,
 		m:           sync.RWMutex{},
 		Monitors:    make(map[string]Monitor),
-		KubeEventCh: make(chan KubeEvent, 1),
+		KubeEventCh: make(chan kemtypes.KubeEvent, 1),
 		logger:      logger,
 	}
 	return em
 }
 
-func (mgr *kubeEventsManager) WithMetricStorage(mstor *metric_storage.MetricStorage) {
+func (mgr *kubeEventsManager) WithMetricStorage(mstor *metricstorage.MetricStorage) {
 	mgr.metricStorage = mstor
 }
 
@@ -73,7 +73,7 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 		mgr.KubeClient,
 		mgr.metricStorage,
 		monitorConfig,
-		func(ev KubeEvent) {
+		func(ev kemtypes.KubeEvent) {
 			defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
 			mgr.KubeEventCh <- ev
 		},
@@ -130,7 +130,7 @@ func (mgr *kubeEventsManager) StopMonitor(monitorID string) error {
 }
 
 // Ch returns a channel to receive KubeEvent objects.
-func (mgr *kubeEventsManager) Ch() chan KubeEvent {
+func (mgr *kubeEventsManager) Ch() chan kemtypes.KubeEvent {
 	return mgr.KubeEventCh
 }
 

@@ -9,12 +9,13 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/kube-client/fake"
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/binding-context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
-	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule-manager"
 )
 
 func init() {
@@ -102,7 +103,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	if b.Hook == nil {
-		testHook := hook.NewHook("test", "test", b.logger.Named("hook"))
+		testHook := hook.NewHook("test", "test", app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, b.logger.Named("hook"))
 		testHook, err = testHook.LoadConfig([]byte(b.HookConfig))
 		if err != nil {
 			return GeneratedBindingContexts{}, fmt.Errorf("couldn't load or validate hook configuration: %v", err)

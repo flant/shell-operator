@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"context"
@@ -10,19 +10,18 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/jq"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/filter"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 )
 
 // applyFilter filters object json representation with jq expression, calculate checksum
 // over result and return ObjectAndFilterResult. If jqFilter is empty, no filter
 // is required and checksum is calculated over full json representation of the object.
-func applyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*ObjectAndFilterResult, error) {
+func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
 	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
 
-	res := &ObjectAndFilterResult{
+	res := &kemtypes.ObjectAndFilterResult{
 		Object: obj,
 	}
 	res.Metadata.JqFilter = jqFilter
@@ -57,7 +56,7 @@ func applyFilter(jqFilter string, filterFn func(obj *unstructured.Unstructured) 
 	} else {
 		var err error
 		var filtered string
-		filtered, err = jq.ApplyJqFilter(jqFilter, data, app.JqLibraryPath)
+		filtered, err = fl.ApplyFilter(jqFilter, data)
 		if err != nil {
 			return nil, fmt.Errorf("jqFilter: %v", err)
 		}

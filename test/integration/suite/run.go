@@ -7,19 +7,18 @@ import (
 	"os"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
 	"github.com/deckhouse/deckhouse/pkg/log"
 	klient "github.com/flant/kube-client/client"
-	"github.com/flant/shell-operator/pkg/kube/object_patch"
+	objectpatch "github.com/flant/shell-operator/pkg/object-patch"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var (
 	ClusterName   string
 	ContextName   string
 	KubeClient    *klient.Client
-	ObjectPatcher *object_patch.ObjectPatcher
+	ObjectPatcher *objectpatch.ObjectPatcher
 )
 
 func RunIntegrationSuite(t *testing.T, description string, clusterPrefix string) {
@@ -37,5 +36,5 @@ var _ = BeforeSuite(func() {
 	err := KubeClient.Init()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	ObjectPatcher = object_patch.NewObjectPatcher(KubeClient, log.NewNop())
+	ObjectPatcher = objectpatch.NewObjectPatcher(KubeClient, log.NewNop())
 })

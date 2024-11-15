@@ -5,10 +5,10 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/binding-context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -21,19 +21,19 @@ type KubernetesBindingToMonitorLink struct {
 // KubernetesBindingsController handles kubernetes bindings for one hook.
 type KubernetesBindingsController interface {
 	WithKubernetesBindings([]OnKubernetesEventConfig)
-	WithKubeEventsManager(kube_events_manager.KubeEventsManager)
+	WithKubeEventsManager(kubeeventsmanager.KubeEventsManager)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
 	UpdateMonitor(monitorId string, kind, apiVersion string) error
 	UnlockEvents()
 	UnlockEventsFor(monitorID string)
 	StopMonitors()
-	CanHandleEvent(kubeEvent KubeEvent) bool
-	HandleEvent(kubeEvent KubeEvent) BindingExecutionInfo
+	CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool
+	HandleEvent(kubeEvent kemtypes.KubeEvent) BindingExecutionInfo
 	BindingNames() []string
 
-	SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult
-	SnapshotsFor(bindingName string) []ObjectAndFilterResult
-	Snapshots() map[string][]ObjectAndFilterResult
+	SnapshotsFrom(bindingNames ...string) map[string][]kemtypes.ObjectAndFilterResult
+	SnapshotsFor(bindingName string) []kemtypes.ObjectAndFilterResult
+	Snapshots() map[string][]kemtypes.ObjectAndFilterResult
 	SnapshotsInfo() []string
 	SnapshotsDump() map[string]interface{}
 }
@@ -47,7 +47,7 @@ type kubernetesBindingsController struct {
 	KubernetesBindings []OnKubernetesEventConfig
 
 	// dependencies
-	kubeEventsManager kube_events_manager.KubeEventsManager
+	kubeEventsManager kubeeventsmanager.KubeEventsManager
 
 	logger *log.Logger
 }
@@ -67,7 +67,7 @@ func (c *kubernetesBindingsController) WithKubernetesBindings(bindings []OnKuber
 	c.KubernetesBindings = bindings
 }
 
-func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager kube_events_manager.KubeEventsManager) {
+func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager kubeeventsmanager.KubeEventsManager) {
 	c.kubeEventsManager = kubeEventsManager
 }
 
@@ -89,9 +89,9 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 		// Start monitor's informers to fill the cache.
 		c.kubeEventsManager.StartMonitor(config.Monitor.Metadata.MonitorId)
 
-		synchronizationInfo := c.HandleEvent(KubeEvent{
+		synchronizationInfo := c.HandleEvent(kemtypes.KubeEvent{
 			MonitorId: config.Monitor.Metadata.MonitorId,
-			Type:      TypeSynchronization,
+			Type:      kemtypes.TypeSynchronization,
 		})
 		res = append(res, synchronizationInfo)
 	}
@@ -132,10 +132,10 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 
 	// Synchronization has no meaning for UpdateMonitor. Just emit Added event to handle objects of
 	// a new kind.
-	kubeEvent := KubeEvent{
+	kubeEvent := kemtypes.KubeEvent{
 		MonitorId:   monitorId,
-		Type:        TypeEvent,
-		WatchEvents: []WatchEventType{WatchEventAdded},
+		Type:        kemtypes.TypeEvent,
+		WatchEvents: []kemtypes.WatchEventType{kemtypes.WatchEventAdded},
 		Objects:     nil,
 	}
 	c.kubeEventsManager.Ch() <- kubeEvent
@@ -173,7 +173,7 @@ func (c *kubernetesBindingsController) StopMonitors() {
 	}
 }
 
-func (c *kubernetesBindingsController) CanHandleEvent(kubeEvent KubeEvent) bool {
+func (c *kubernetesBindingsController) CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool {
 	for key := range c.BindingMonitorLinks {
 		if key == kubeEvent.MonitorId {
 			return true
@@ -184,7 +184,7 @@ func (c *kubernetesBindingsController) CanHandleEvent(kubeEvent KubeEvent) bool 
 
 // HandleEvent receives event from KubeEventManager and returns a BindingExecutionInfo
 // to help create a new task to run a hook.
-func (c *kubernetesBindingsController) HandleEvent(kubeEvent KubeEvent) BindingExecutionInfo {
+func (c *kubernetesBindingsController) HandleEvent(kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
 	link, hasKey := c.BindingMonitorLinks[kubeEvent.MonitorId]
 	if !hasKey {
 		log.Errorf("Possible bug!!! Unknown kube event: no such monitor id '%s' registered", kubeEvent.MonitorId)
@@ -218,7 +218,7 @@ func (c *kubernetesBindingsController) BindingNames() []string {
 
 // SnapshotsFor returns snapshot for single onKubernetes binding.
 // It finds a monitorId for a binding name and returns an array of objects.
-func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []ObjectAndFilterResult {
+func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []kemtypes.ObjectAndFilterResult {
 	for _, binding := range c.KubernetesBindings {
 		if bindingName == binding.BindingName {
 			monitorID := binding.Monitor.Metadata.MonitorId
@@ -234,12 +234,12 @@ func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []Object
 // SnapshotsFrom returns snapshot for several binding names.
 // It finds a monitorId for each binding name and get its Snapshot,
 // then returns a map of object arrays for each binding name.
-func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]ObjectAndFilterResult {
-	res := map[string][]ObjectAndFilterResult{}
+func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]kemtypes.ObjectAndFilterResult {
+	res := map[string][]kemtypes.ObjectAndFilterResult{}
 
 	for _, bindingName := range bindingNames {
 		// Initialize all keys with empty arrays.
-		res[bindingName] = make([]ObjectAndFilterResult, 0)
+		res[bindingName] = make([]kemtypes.ObjectAndFilterResult, 0)
 
 		snapshot := c.SnapshotsFor(bindingName)
 		if snapshot != nil {
@@ -250,7 +250,7 @@ func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map
 	return res
 }
 
-func (c *kubernetesBindingsController) Snapshots() map[string][]ObjectAndFilterResult {
+func (c *kubernetesBindingsController) Snapshots() map[string][]kemtypes.ObjectAndFilterResult {
 	return c.SnapshotsFrom(c.BindingNames()...)
 }
 
@@ -298,11 +298,11 @@ func (c *kubernetesBindingsController) SnapshotsDump() map[string]interface{} {
 	return dumps
 }
 
-func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, link *KubernetesBindingToMonitorLink) []BindingContext {
+func ConvertKubeEventToBindingContext(kubeEvent kemtypes.KubeEvent, link *KubernetesBindingToMonitorLink) []BindingContext {
 	bindingContexts := make([]BindingContext, 0)
 
 	switch kubeEvent.Type {
-	case TypeSynchronization:
+	case kemtypes.TypeSynchronization:
 		bc := BindingContext{
 			Binding: link.BindingConfig.BindingName,
 			Type:    kubeEvent.Type,
@@ -315,7 +315,7 @@ func ConvertKubeEventToBindingContext(kubeEvent KubeEvent, link *KubernetesBindi
 
 		bindingContexts = append(bindingContexts, bc)
 
-	case TypeEvent:
+	case kemtypes.TypeEvent:
 		for _, kEvent := range kubeEvent.WatchEvents {
 			bc := BindingContext{
 				Binding:    link.BindingConfig.BindingName,

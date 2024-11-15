@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"io"
@@ -7,19 +7,19 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/flant/shell-operator/pkg/metric_storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type WatchErrorHandler struct {
 	description   string
 	kind          string
-	metricStorage *metric_storage.MetricStorage
+	metricStorage *metricstorage.MetricStorage
 
 	logger *log.Logger
 }
 
-func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage *metric_storage.MetricStorage, logger *log.Logger) *WatchErrorHandler {
+func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage *metricstorage.MetricStorage, logger *log.Logger) *WatchErrorHandler {
 	return &WatchErrorHandler{
 		description:   description,
 		kind:          kind,

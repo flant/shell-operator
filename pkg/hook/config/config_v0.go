@@ -7,9 +7,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	. "github.com/flant/shell-operator/pkg/schedule-manager/types"
 )
 
 type HookConfigV0 struct {
@@ -69,23 +69,23 @@ func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) (err error) {
 			return fmt.Errorf("invalid onKubernetesEvent config [%d]: %v", i, err)
 		}
 
-		monitor := &kube_events_manager.MonitorConfig{}
+		monitor := &kubeeventsmanager.MonitorConfig{}
 		monitor.Metadata.DebugName = MonitorDebugName(kubeCfg.Name, i)
 		monitor.Metadata.MonitorId = MonitorConfigID()
 		monitor.Metadata.LogLabels = map[string]string{}
 		monitor.Metadata.MetricLabels = map[string]string{}
-		monitor.WithMode(ModeV0)
+		monitor.WithMode(kemtypes.ModeV0)
 
 		// convert event names from legacy config.
-		eventTypes := []WatchEventType{}
+		eventTypes := []kemtypes.WatchEventType{}
 		for _, eventName := range kubeCfg.EventTypes {
 			switch eventName {
 			case "add":
-				eventTypes = append(eventTypes, WatchEventAdded)
+				eventTypes = append(eventTypes, kemtypes.WatchEventAdded)
 			case "update":
-				eventTypes = append(eventTypes, WatchEventModified)
+				eventTypes = append(eventTypes, kemtypes.WatchEventModified)
 			case "delete":
-				eventTypes = append(eventTypes, WatchEventDeleted)
+				eventTypes = append(eventTypes, kemtypes.WatchEventDeleted)
 			default:
 				return fmt.Errorf("event '%s' is unsupported", eventName)
 			}
@@ -94,13 +94,13 @@ func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) (err error) {
 
 		monitor.Kind = kubeCfg.Kind
 		if kubeCfg.ObjectName != "" {
-			monitor.WithNameSelector(&NameSelector{
+			monitor.WithNameSelector(&kemtypes.NameSelector{
 				MatchNames: []string{kubeCfg.ObjectName},
 			})
 		}
 		if kubeCfg.NamespaceSelector != nil && !kubeCfg.NamespaceSelector.Any {
-			monitor.WithNamespaceSelector(&NamespaceSelector{
-				NameSelector: &NameSelector{
+			monitor.WithNamespaceSelector(&kemtypes.NamespaceSelector{
+				NameSelector: &kemtypes.NameSelector{
 					MatchNames: kubeCfg.NamespaceSelector.MatchNames,
 				},
 			})

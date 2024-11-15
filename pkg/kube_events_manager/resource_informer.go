@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"context"
@@ -15,8 +15,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/filter/jq"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
@@ -35,7 +37,7 @@ type resourceInformer struct {
 	ListOptions          metav1.ListOptions
 
 	// A cache of objects and filterResults. It is a part of the Monitor's snapshot.
-	cachedObjects map[string]*ObjectAndFilterResult
+	cachedObjects map[string]*kemtypes.ObjectAndFilterResult
 	cacheLock     sync.RWMutex
 
 	// Cached objects operations since start
@@ -45,18 +47,18 @@ type resourceInformer struct {
 
 	// Events buffer for "Synchronization" mode: it stores events between CachedObjects call and enableKubeEventCb call
 	// to replay them when "Synchronization" hook is done.
-	eventBuf     []KubeEvent
+	eventBuf     []kemtypes.KubeEvent
 	eventBufLock sync.Mutex
 
 	// A callback function that define custom handling of Kubernetes events.
-	eventCb        func(KubeEvent)
+	eventCb        func(kemtypes.KubeEvent)
 	eventCbEnabled bool
 
 	// TODO resourceInformer should be stoppable (think of deleted namespaces and disabled modules in addon-operator)
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	metricStorage *metric_storage.MetricStorage
+	metricStorage *metricstorage.MetricStorage
 
 	// a flag to stop handle events after Stop()
 	stopped bool
@@ -67,8 +69,8 @@ type resourceInformer struct {
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
 	client  *klient.Client
-	mstor   *metric_storage.MetricStorage
-	eventCb func(KubeEvent)
+	mstor   *metricstorage.MetricStorage
+	eventCb func(kemtypes.KubeEvent)
 	monitor *MonitorConfig
 
 	logger *log.Logger
@@ -83,7 +85,7 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		Name:                   name,
 		eventCb:                cfg.eventCb,
 		Monitor:                cfg.monitor,
-		cachedObjects:          make(map[string]*ObjectAndFilterResult),
+		cachedObjects:          make(map[string]*kemtypes.ObjectAndFilterResult),
 		cacheLock:              sync.RWMutex{},
 		eventBufLock:           sync.Mutex{},
 		cachedObjectsInfo:      &CachedObjectsInfo{},
@@ -97,7 +99,7 @@ func (ei *resourceInformer) withContext(ctx context.Context) {
 	ei.ctx, ei.cancel = context.WithCancel(ctx)
 }
 
-func (ei *resourceInformer) putEvent(ev KubeEvent) {
+func (ei *resourceInformer) putEvent(ev kemtypes.KubeEvent) {
 	if ei.eventCb != nil {
 		ei.eventCb(ev)
 	}
@@ -147,9 +149,9 @@ func (ei *resourceInformer) createSharedInformer() (err error) {
 }
 
 // Snapshot returns all cached objects for this informer
-func (ei *resourceInformer) getCachedObjects() []ObjectAndFilterResult {
+func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
 	ei.cacheLock.RLock()
-	res := make([]ObjectAndFilterResult, 0)
+	res := make([]kemtypes.ObjectAndFilterResult, 0)
 	for _, obj := range ei.cachedObjects {
 		res = append(res, *obj)
 	}
@@ -201,19 +203,20 @@ func (ei *resourceInformer) loadExistedObjects() error {
 	// log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
 	log.Debugf("%s: '%s' initial list: Got %d existing resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, len(objList.Items))
 
-	filteredObjects := make(map[string]*ObjectAndFilterResult)
+	filteredObjects := make(map[string]*kemtypes.ObjectAndFilterResult)
 
 	for _, item := range objList.Items {
 		// copy loop var to avoid duplication of pointer in filteredObjects
 		obj := item
 
-		var objFilterRes *ObjectAndFilterResult
+		var objFilterRes *kemtypes.ObjectAndFilterResult
 		var err error
 		func() {
 			defer measure.Duration(func(d time.Duration) {
 				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 			})()
-			objFilterRes, err = applyFilter(ei.Monitor.JqFilter, ei.Monitor.FilterFunc, &obj)
+			filter := jq.NewFilter(app.JqLibraryPath)
+			objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, &obj)
 		}()
 
 		if err != nil {
@@ -246,22 +249,22 @@ func (ei *resourceInformer) loadExistedObjects() error {
 }
 
 func (ei *resourceInformer) OnAdd(obj interface{}, _ bool) {
-	ei.handleWatchEvent(obj, WatchEventAdded)
+	ei.handleWatchEvent(obj, kemtypes.WatchEventAdded)
 }
 
 func (ei *resourceInformer) OnUpdate(_, newObj interface{}) {
-	ei.handleWatchEvent(newObj, WatchEventModified)
+	ei.handleWatchEvent(newObj, kemtypes.WatchEventModified)
 }
 
 func (ei *resourceInformer) OnDelete(obj interface{}) {
-	ei.handleWatchEvent(obj, WatchEventDeleted)
+	ei.handleWatchEvent(obj, kemtypes.WatchEventDeleted)
 }
 
 // HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 // func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
-func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType WatchEventType) {
+func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemtypes.WatchEventType) {
 	// check if stop
 	if ei.stopped {
 		log.Debugf("%s: received WATCH for a stopped %s/%s informer %s",
@@ -286,13 +289,14 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 
 	// Always calculate checksum and update cache, because we need an actual state in ei.cachedObjects.
 
-	var objFilterRes *ObjectAndFilterResult
+	var objFilterRes *kemtypes.ObjectAndFilterResult
 	var err error
 	func() {
 		defer measure.Duration(func(d time.Duration) {
 			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 		})()
-		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, ei.Monitor.FilterFunc, obj)
+		filter := jq.NewFilter(app.JqLibraryPath)
+		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, obj)
 	}()
 	if err != nil {
 		log.Errorf("%s: WATCH %s: %s",
@@ -309,9 +313,9 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 	// Do not fire Added or Modified if object is in cache and its checksum is equal to the newChecksum.
 	// Delete is always fired.
 	switch eventType {
-	case WatchEventAdded:
+	case kemtypes.WatchEventAdded:
 		fallthrough
-	case WatchEventModified:
+	case kemtypes.WatchEventModified:
 		// Update object in cache
 		ei.cacheLock.Lock()
 		cachedObject, objectInCache := ei.cachedObjects[resourceId]
@@ -328,7 +332,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 		ei.cachedObjects[resourceId] = objFilterRes
 		// Update cached objects info.
 		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
-		if eventType == WatchEventAdded {
+		if eventType == kemtypes.WatchEventAdded {
 			ei.cachedObjectsInfo.Added++
 			ei.cachedObjectsIncrement.Added++
 		} else {
@@ -342,7 +346,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 			return
 		}
 
-	case WatchEventDeleted:
+	case kemtypes.WatchEventDeleted:
 		ei.cacheLock.Lock()
 		delete(ei.cachedObjects, resourceId)
 		// Update cached objects info.
@@ -368,11 +372,11 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 		// TODO: should be disabled by default and enabled by a debug feature switch
 		// log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
-		kubeEvent := KubeEvent{
-			Type:        TypeEvent,
+		kubeEvent := kemtypes.KubeEvent{
+			Type:        kemtypes.TypeEvent,
 			MonitorId:   ei.Monitor.Metadata.MonitorId,
-			WatchEvents: []WatchEventType{eventType},
-			Objects:     []ObjectAndFilterResult{*objFilterRes},
+			WatchEvents: []kemtypes.WatchEventType{eventType},
+			Objects:     []kemtypes.ObjectAndFilterResult{*objFilterRes},
 		}
 
 		// fix race with enableKubeEventCb.
@@ -388,7 +392,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 			ei.eventBufLock.Lock()
 			// Save event in buffer until the callback is enabled.
 			if ei.eventBuf == nil {
-				ei.eventBuf = make([]KubeEvent, 0)
+				ei.eventBuf = make([]kemtypes.KubeEvent, 0)
 			}
 			ei.eventBuf = append(ei.eventBuf, kubeEvent)
 			ei.eventBufLock.Unlock()
@@ -396,24 +400,24 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType Watch
 	}
 }
 
-func (ei *resourceInformer) adjustFieldSelector(selector *FieldSelector, objName string) *FieldSelector {
-	var selectorCopy *FieldSelector
+func (ei *resourceInformer) adjustFieldSelector(selector *kemtypes.FieldSelector, objName string) *kemtypes.FieldSelector {
+	var selectorCopy *kemtypes.FieldSelector
 
 	if selector != nil {
-		selectorCopy = &FieldSelector{
+		selectorCopy = &kemtypes.FieldSelector{
 			MatchExpressions: selector.MatchExpressions,
 		}
 	}
 
 	if objName != "" {
-		objNameReq := FieldSelectorRequirement{
+		objNameReq := kemtypes.FieldSelectorRequirement{
 			Field:    "metadata.name",
 			Operator: "=",
 			Value:    objName,
 		}
 		if selectorCopy == nil {
-			selectorCopy = &FieldSelector{
-				MatchExpressions: []FieldSelectorRequirement{
+			selectorCopy = &kemtypes.FieldSelector{
+				MatchExpressions: []kemtypes.FieldSelectorRequirement{
 					objNameReq,
 				},
 			}
@@ -425,7 +429,7 @@ func (ei *resourceInformer) adjustFieldSelector(selector *FieldSelector, objName
 	return selectorCopy
 }
 
-func (ei *resourceInformer) shouldFireEvent(checkEvent WatchEventType) bool {
+func (ei *resourceInformer) shouldFireEvent(checkEvent kemtypes.WatchEventType) bool {
 	for _, event := range ei.Monitor.EventTypes {
 		if event == checkEvent {
 			return true

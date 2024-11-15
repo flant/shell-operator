@@ -1,4 +1,4 @@
-package metric_storage
+package metricstorage
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/flant/shell-operator/pkg/metric"
-	"github.com/flant/shell-operator/pkg/metric_storage/operation"
-	"github.com/flant/shell-operator/pkg/metric_storage/vault"
+	"github.com/flant/shell-operator/pkg/metric-storage/operation"
+	"github.com/flant/shell-operator/pkg/metric-storage/vault"
 	. "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

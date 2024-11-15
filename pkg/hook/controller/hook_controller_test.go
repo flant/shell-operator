@@ -8,11 +8,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/flant/kube-client/fake"
-	"github.com/flant/shell-operator/pkg/hook/binding_context"
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding-context"
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	types2 "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 // Test updating snapshots for combined contexts.
@@ -20,7 +20,7 @@ func Test_UpdateSnapshots(t *testing.T) {
 	g := NewWithT(t)
 
 	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
-	mgr := kube_events_manager.NewKubeEventsManager(context.Background(), fc.Client, log.NewNop())
+	mgr := kubeeventsmanager.NewKubeEventsManager(context.Background(), fc.Client, log.NewNop())
 
 	testHookConfig := `
 configVersion: v1
@@ -51,16 +51,16 @@ kubernetes:
 	hc.EnableScheduleBindings()
 
 	// Test case: combined binding context for binding_2 and binding_3.
-	bcs := []binding_context.BindingContext{
+	bcs := []bindingcontext.BindingContext{
 		{
 			Binding:    "binding_2",
-			Type:       types2.TypeEvent,
-			WatchEvent: types2.WatchEventAdded,
+			Type:       kemtypes.TypeEvent,
+			WatchEvent: kemtypes.WatchEventAdded,
 		},
 		{
 			Binding:    "binding_3",
-			Type:       types2.TypeEvent,
-			WatchEvent: types2.WatchEventAdded,
+			Type:       kemtypes.TypeEvent,
+			WatchEvent: kemtypes.WatchEventAdded,
 		},
 	}
 	bcs[0].Metadata.BindingType = types.OnKubernetesEvent

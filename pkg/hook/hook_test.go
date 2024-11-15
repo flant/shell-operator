@@ -24,7 +24,7 @@ func Test_Hook_SafeName(t *testing.T) {
 		t.Error(err)
 	}
 
-	h := NewHook(hookName, hookPath, log.NewNop())
+	h := NewHook(hookName, hookPath, false, false, "", log.NewNop())
 
 	g.Expect(h.SafeName()).To(Equal("002-cool-hooks-monitor-namespaces-py"))
 }
@@ -136,7 +136,7 @@ func Test_Hook_WithConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(_ *testing.T) {
-			hook = NewHook("hook-sh", "/hooks/hook.sh", log.NewNop())
+			hook = NewHook("hook-sh", "/hooks/hook.sh", false, false, "", log.NewNop())
 			_, err = hook.LoadConfig([]byte(test.jsonData))
 			test.fn()
 		})

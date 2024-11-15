@@ -7,10 +7,10 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
-	"github.com/flant/shell-operator/pkg/hook/binding_context"
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding-context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -31,10 +31,10 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -42,10 +42,10 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -53,7 +53,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "schedule",
 					},
@@ -63,10 +63,10 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -74,10 +74,10 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook2.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -85,10 +85,10 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -125,10 +125,10 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 			WithQueueName("test_no_combine").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -136,10 +136,10 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 			WithQueueName("test_no_combine").
 			WithMetadata(HookMetadata{
 				HookName: "hook2.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -147,7 +147,7 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 			WithQueueName("test_no_combine").
 			WithMetadata(HookMetadata{
 				HookName: "hook3.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "schedule",
 					},
@@ -179,7 +179,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 		}
 	})
 
-	bcMeta := binding_context.BindingContext{}.Metadata
+	bcMeta := bindingcontext.BindingContext{}.Metadata
 	bcMeta.Group = "pods"
 
 	tasks := []task.Task{
@@ -188,11 +188,11 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Metadata: bcMeta,
 						Binding:  "kubernetes",
-						Type:     TypeEvent,
+						Type:     kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -200,11 +200,11 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Metadata: bcMeta,
 						Binding:  "kubernetes",
-						Type:     TypeEvent,
+						Type:     kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -212,7 +212,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Metadata: bcMeta,
 						Binding:  "schedule",
@@ -223,10 +223,10 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -235,10 +235,10 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook2.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -246,10 +246,10 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -281,11 +281,11 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 		}
 	})
 
-	bcMeta := binding_context.BindingContext{}.Metadata
+	bcMeta := bindingcontext.BindingContext{}.Metadata
 	bcMeta.Group = "pods"
 	bcMeta.BindingType = types.OnKubernetesEvent
 
-	schMeta := binding_context.BindingContext{}.Metadata
+	schMeta := bindingcontext.BindingContext{}.Metadata
 	schMeta.Group = "pods"
 	schMeta.BindingType = types.Schedule
 
@@ -294,11 +294,11 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Metadata: bcMeta,
 						Binding:  "kubernetes",
-						Type:     TypeSynchronization,
+						Type:     kemtypes.TypeSynchronization,
 					},
 				},
 			}),
@@ -306,11 +306,11 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Metadata: bcMeta,
 						Binding:  "kubernetes2",
-						Type:     TypeSynchronization,
+						Type:     kemtypes.TypeSynchronization,
 					},
 				},
 			}),
@@ -318,7 +318,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Metadata: bcMeta,
 						Binding:  "schedule",
@@ -327,15 +327,15 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			}),
 		// stop compaction for group
 
-		// bcList[1] type == TypeEvent
+		// bcList[1] type == kemtypes.TypeEvent
 		task.NewTask(HookRun).
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -344,7 +344,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Metadata: schMeta,
 						Binding:  "schedule",
@@ -356,10 +356,10 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
-						Metadata: func() binding_context.BindingContext {
-							bc := binding_context.BindingContext{}
+						Metadata: func() bindingcontext.BindingContext {
+							bc := bindingcontext.BindingContext{}
 							bc.Metadata.BindingType = types.Schedule
 							return bc
 						}().Metadata,
@@ -372,11 +372,11 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Metadata: bcMeta,
 						Binding:  "kubernetes",
-						Type:     TypeEvent,
+						Type:     kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -385,10 +385,10 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -396,10 +396,10 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 			WithQueueName("test_multiple_hooks").
 			WithMetadata(HookMetadata{
 				HookName: "hook1.sh",
-				BindingContext: []binding_context.BindingContext{
+				BindingContext: []bindingcontext.BindingContext{
 					{
 						Binding: "kubernetes",
-						Type:    TypeEvent,
+						Type:    kemtypes.TypeEvent,
 					},
 				},
 			}),
@@ -424,13 +424,13 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	g.Expect(string(bcList[0].Type)).Should(Equal(""), "bc: %+v", bcList[0])
 	g.Expect(bcList[0].Metadata.Group).Should(Equal("pods"), "bc: %+v", bcList[0])
 
-	g.Expect(bcList[1].Type).Should(Equal(TypeEvent))
+	g.Expect(bcList[1].Type).Should(Equal(kemtypes.TypeEvent))
 
 	g.Expect(string(bcList[2].Type)).Should(Equal(""))
 	g.Expect(bcList[2].Metadata.Group).Should(Equal("pods"), "bc: %+v", bcList[2])
 
 	g.Expect(string(bcList[3].Type)).Should(Equal(""))
 
-	g.Expect(bcList[4].Type).Should(Equal(TypeEvent))
+	g.Expect(bcList[4].Type).Should(Equal(kemtypes.TypeEvent))
 	g.Expect(bcList[4].Metadata.Group).Should(Equal("pods"), "bc: %+v", bcList[4])
 }

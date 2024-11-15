@@ -7,7 +7,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/binding-context"
 )
 
 func parseContexts(contexts string) []BindingContext {

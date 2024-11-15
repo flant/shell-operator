@@ -5,7 +5,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	"github.com/flant/shell-operator/pkg/hook/binding_context"
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding-context"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/task"
 )
@@ -22,7 +22,7 @@ type HookNameAccessor interface {
 }
 
 type BindingContextAccessor interface {
-	GetBindingContext() []binding_context.BindingContext
+	GetBindingContext() []bindingcontext.BindingContext
 }
 
 type MonitorIDAccessor interface {
@@ -34,7 +34,7 @@ type HookMetadata struct {
 	Binding        string // binding name
 	Group          string
 	BindingType    types.BindingType
-	BindingContext []binding_context.BindingContext
+	BindingContext []bindingcontext.BindingContext
 	AllowFailure   bool     // Task considered as 'ok' if hook failed. False by default. Can be true for some schedule hooks.
 	MonitorIDs     []string // monitor ids for Synchronization tasks
 
@@ -66,7 +66,7 @@ func (m HookMetadata) GetHookName() string {
 	return m.HookName
 }
 
-func (m HookMetadata) GetBindingContext() []binding_context.BindingContext {
+func (m HookMetadata) GetBindingContext() []bindingcontext.BindingContext {
 	return m.BindingContext
 }
 
@@ -88,12 +88,12 @@ func (m *HookMetadata) WithBinding(binding types.BindingType) *HookMetadata {
 	return m
 }
 
-func (m *HookMetadata) WithBindingContext(context []binding_context.BindingContext) *HookMetadata {
+func (m *HookMetadata) WithBindingContext(context []bindingcontext.BindingContext) *HookMetadata {
 	m.BindingContext = context
 	return m
 }
 
-func (m *HookMetadata) AppendBindingContext(context binding_context.BindingContext) *HookMetadata {
+func (m *HookMetadata) AppendBindingContext(context bindingcontext.BindingContext) *HookMetadata {
 	m.BindingContext = append(m.BindingContext, context)
 	return m
 }

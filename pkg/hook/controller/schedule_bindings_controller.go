@@ -1,9 +1,9 @@
 package controller
 
 import (
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	. "github.com/flant/shell-operator/pkg/hook/binding-context"
 	. "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/schedule_manager"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule-manager"
 )
 
 // A link between a hook and a kube monitor
@@ -20,7 +20,7 @@ type ScheduleBindingToCrontabLink struct {
 // ScheduleBindingsController handles schedule bindings for one hook.
 type ScheduleBindingsController interface {
 	WithScheduleBindings([]ScheduleConfig)
-	WithScheduleManager(schedule_manager.ScheduleManager)
+	WithScheduleManager(schedulemanager.ScheduleManager)
 	EnableScheduleBindings()
 	DisableScheduleBindings()
 	CanHandleEvent(crontab string) bool
@@ -36,7 +36,7 @@ type scheduleBindingsController struct {
 	ScheduleBindings []ScheduleConfig
 
 	// dependencies
-	scheduleManager schedule_manager.ScheduleManager
+	scheduleManager schedulemanager.ScheduleManager
 }
 
 // kubernetesHooksController should implement the KubernetesHooksController
@@ -53,7 +53,7 @@ func (c *scheduleBindingsController) WithScheduleBindings(bindings []ScheduleCon
 	c.ScheduleBindings = bindings
 }
 
-func (c *scheduleBindingsController) WithScheduleManager(scheduleManager schedule_manager.ScheduleManager) {
+func (c *scheduleBindingsController) WithScheduleManager(scheduleManager schedulemanager.ScheduleManager) {
 	c.scheduleManager = scheduleManager
 }
 
