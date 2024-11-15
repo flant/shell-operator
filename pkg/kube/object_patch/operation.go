@@ -1,4 +1,4 @@
-package objectpatch
+package object_patch
 
 import (
 	"fmt"

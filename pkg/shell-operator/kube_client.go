@@ -7,8 +7,8 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/app"
+	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
-	objectpatch "github.com/flant/shell-operator/pkg/object_patch"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

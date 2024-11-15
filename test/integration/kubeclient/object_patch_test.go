@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 
-	objectpatch "github.com/flant/shell-operator/pkg/object_patch"
+	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	. "github.com/flant/shell-operator/test/integration/suite"
 	uuid "github.com/gofrs/uuid/v5"
 	. "github.com/onsi/ginkgo"
