@@ -11,11 +11,11 @@ import (
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
-	. "github.com/flant/shell-operator/pkg/hook/binding-context"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
-	schedulemanager "github.com/flant/shell-operator/pkg/schedule-manager"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
 func init() {
@@ -24,7 +24,7 @@ func init() {
 
 type GeneratedBindingContexts struct {
 	Rendered        string
-	BindingContexts []BindingContext
+	BindingContexts []bctx.BindingContext
 }
 
 type BindingContextController struct {
@@ -182,14 +182,14 @@ func (b *BindingContextController) RunBindingWithAllSnapshots(binding types.Bind
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	bc := BindingContext{
+	bc := bctx.BindingContext{
 		Binding:   string(binding),
 		Snapshots: b.HookCtrl.KubernetesSnapshots(),
 	}
 	bc.Metadata.BindingType = binding
 	bc.Metadata.IncludeAllSnapshots = true
 
-	return ConvertToGeneratedBindingContexts([]BindingContext{bc})
+	return ConvertToGeneratedBindingContexts([]bctx.BindingContext{bc})
 }
 
 func (b *BindingContextController) Stop() {

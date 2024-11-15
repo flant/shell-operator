@@ -3,14 +3,14 @@ package shell_operator
 import (
 	"fmt"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding-context"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
 
 type CombineResult struct {
-	BindingContexts []BindingContext
+	BindingContexts []bctx.BindingContext
 	MonitorIDs      []string
 }
 
@@ -72,7 +72,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 	}
 
 	// Combine binding context and make a map to delete excess tasks
-	combinedContext := make([]BindingContext, 0)
+	combinedContext := make([]bctx.BindingContext, 0)
 	monitorIDs := taskMeta.(MonitorIDAccessor).GetMonitorIDs()
 	tasksFilter := make(map[string]bool)
 	// current task always remain in queue
@@ -96,7 +96,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 	})
 
 	// group is used to compact binding contexts when only snapshots are needed
-	compactedContext := make([]BindingContext, 0)
+	compactedContext := make([]bctx.BindingContext, 0)
 	for i := 0; i < len(combinedContext); i++ {
 		keep := true
 

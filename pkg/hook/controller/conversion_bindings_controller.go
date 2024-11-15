@@ -4,8 +4,8 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding-context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -25,7 +25,7 @@ type ConversionBindingsController struct {
 	// crdName -> conversionRule id -> link
 	Links map[string]map[conversion.Rule]*ConversionBindingToWebhookLink
 
-	Bindings []ConversionConfig
+	Bindings []htypes.ConversionConfig
 
 	webhookManager *conversion.WebhookManager
 }
@@ -37,7 +37,7 @@ var NewConversionBindingsController = func() *ConversionBindingsController {
 	}
 }
 
-func (c *ConversionBindingsController) WithBindings(bindings []ConversionConfig) {
+func (c *ConversionBindingsController) WithBindings(bindings []htypes.ConversionConfig) {
 	c.Bindings = bindings
 }
 
@@ -83,7 +83,7 @@ func (c *ConversionBindingsController) HandleEvent(crdName string, request *v1.C
 	if !hasKey {
 		log.Errorf("Possible bug!!! No binding for conversion event for crd/%s", crdName)
 		return BindingExecutionInfo{
-			BindingContext: []BindingContext{},
+			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
 		}
 	}
@@ -91,23 +91,23 @@ func (c *ConversionBindingsController) HandleEvent(crdName string, request *v1.C
 	if !has {
 		log.Errorf("Possible bug!!! Event has an unknown conversion rule %s for crd/%s: no binding was registered", rule.String(), crdName)
 		return BindingExecutionInfo{
-			BindingContext: []BindingContext{},
+			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
 		}
 	}
 
-	bc := BindingContext{
+	bc := bctx.BindingContext{
 		Binding:          link.BindingName,
 		ConversionReview: &v1.ConversionReview{Request: request},
 		FromVersion:      link.FromVersion,
 		ToVersion:        link.ToVersion,
 	}
-	bc.Metadata.BindingType = KubernetesConversion
+	bc.Metadata.BindingType = htypes.KubernetesConversion
 	bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
 	bc.Metadata.Group = link.Group
 
 	return BindingExecutionInfo{
-		BindingContext:   []BindingContext{bc},
+		BindingContext:   []bctx.BindingContext{bc},
 		Binding:          link.BindingName,
 		IncludeSnapshots: link.IncludeSnapshots,
 		Group:            link.Group,

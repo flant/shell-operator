@@ -7,7 +7,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
-	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding-context"
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"

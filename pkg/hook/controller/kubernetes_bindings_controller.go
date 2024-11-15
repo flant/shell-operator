@@ -5,8 +5,8 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding-context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
@@ -15,12 +15,12 @@ import (
 // KubernetesBindingToMonitorLink is a link between a binding config and a Monitor.
 type KubernetesBindingToMonitorLink struct {
 	MonitorId     string
-	BindingConfig OnKubernetesEventConfig
+	BindingConfig htypes.OnKubernetesEventConfig
 }
 
 // KubernetesBindingsController handles kubernetes bindings for one hook.
 type KubernetesBindingsController interface {
-	WithKubernetesBindings([]OnKubernetesEventConfig)
+	WithKubernetesBindings([]htypes.OnKubernetesEventConfig)
 	WithKubeEventsManager(kubeeventsmanager.KubeEventsManager)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
 	UpdateMonitor(monitorId string, kind, apiVersion string) error
@@ -44,7 +44,7 @@ type kubernetesBindingsController struct {
 	BindingMonitorLinks map[string]*KubernetesBindingToMonitorLink
 
 	// bindings configurations
-	KubernetesBindings []OnKubernetesEventConfig
+	KubernetesBindings []htypes.OnKubernetesEventConfig
 
 	// dependencies
 	kubeEventsManager kubeeventsmanager.KubeEventsManager
@@ -63,7 +63,7 @@ var NewKubernetesBindingsController = func(logger *log.Logger) *kubernetesBindin
 	}
 }
 
-func (c *kubernetesBindingsController) WithKubernetesBindings(bindings []OnKubernetesEventConfig) {
+func (c *kubernetesBindingsController) WithKubernetesBindings(bindings []htypes.OnKubernetesEventConfig) {
 	c.KubernetesBindings = bindings
 }
 
@@ -189,7 +189,7 @@ func (c *kubernetesBindingsController) HandleEvent(kubeEvent kemtypes.KubeEvent)
 	if !hasKey {
 		log.Errorf("Possible bug!!! Unknown kube event: no such monitor id '%s' registered", kubeEvent.MonitorId)
 		return BindingExecutionInfo{
-			BindingContext: []BindingContext{},
+			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
 		}
 	}
@@ -298,18 +298,18 @@ func (c *kubernetesBindingsController) SnapshotsDump() map[string]interface{} {
 	return dumps
 }
 
-func ConvertKubeEventToBindingContext(kubeEvent kemtypes.KubeEvent, link *KubernetesBindingToMonitorLink) []BindingContext {
-	bindingContexts := make([]BindingContext, 0)
+func ConvertKubeEventToBindingContext(kubeEvent kemtypes.KubeEvent, link *KubernetesBindingToMonitorLink) []bctx.BindingContext {
+	bindingContexts := make([]bctx.BindingContext, 0)
 
 	switch kubeEvent.Type {
 	case kemtypes.TypeSynchronization:
-		bc := BindingContext{
+		bc := bctx.BindingContext{
 			Binding: link.BindingConfig.BindingName,
 			Type:    kubeEvent.Type,
 			Objects: kubeEvent.Objects,
 		}
 		bc.Metadata.JqFilter = link.BindingConfig.Monitor.JqFilter
-		bc.Metadata.BindingType = OnKubernetesEvent
+		bc.Metadata.BindingType = htypes.OnKubernetesEvent
 		bc.Metadata.IncludeSnapshots = link.BindingConfig.IncludeSnapshotsFrom
 		bc.Metadata.Group = link.BindingConfig.Group
 
@@ -317,14 +317,14 @@ func ConvertKubeEventToBindingContext(kubeEvent kemtypes.KubeEvent, link *Kubern
 
 	case kemtypes.TypeEvent:
 		for _, kEvent := range kubeEvent.WatchEvents {
-			bc := BindingContext{
+			bc := bctx.BindingContext{
 				Binding:    link.BindingConfig.BindingName,
 				Type:       kubeEvent.Type,
 				WatchEvent: kEvent,
 				Objects:    kubeEvent.Objects,
 			}
 			bc.Metadata.JqFilter = link.BindingConfig.Monitor.JqFilter
-			bc.Metadata.BindingType = OnKubernetesEvent
+			bc.Metadata.BindingType = htypes.OnKubernetesEvent
 			bc.Metadata.IncludeSnapshots = link.BindingConfig.IncludeSnapshotsFrom
 			bc.Metadata.Group = link.BindingConfig.Group
 

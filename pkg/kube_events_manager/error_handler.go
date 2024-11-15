@@ -7,7 +7,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
-	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

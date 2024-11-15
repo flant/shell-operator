@@ -2,8 +2,8 @@ package metric_test
 
 import (
 	"github.com/flant/shell-operator/pkg/metric"
-	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
-	"github.com/flant/shell-operator/pkg/metric-storage/vault"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/metric_storage/vault"
 )
 
 var (

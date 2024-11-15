@@ -5,7 +5,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding-context"
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/task"
 )

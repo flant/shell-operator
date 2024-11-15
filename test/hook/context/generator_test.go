@@ -7,11 +7,11 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding-context"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 )
 
-func parseContexts(contexts string) []BindingContext {
-	var parsedBindingContexts []BindingContext
+func parseContexts(contexts string) []bctx.BindingContext {
+	var parsedBindingContexts []bctx.BindingContext
 	_ = json.Unmarshal([]byte(contexts), &parsedBindingContexts)
 	return parsedBindingContexts
 }

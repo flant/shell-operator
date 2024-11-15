@@ -14,11 +14,11 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/flant/shell-operator/pkg/executor"
-	. "github.com/flant/shell-operator/pkg/hook/binding-context"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/hook/controller"
-	. "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/metric-storage/operation"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/metric_storage/operation"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -91,11 +91,11 @@ func (h *Hook) WithHookController(hookController *controller.HookController) {
 	h.HookController = hookController
 }
 
-func (h *Hook) Run(_ BindingType, context []BindingContext, logLabels map[string]string) (*Result, error) {
+func (h *Hook) Run(_ htypes.BindingType, context []bctx.BindingContext, logLabels map[string]string) (*Result, error) {
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
-	versionedContextList := ConvertBindingContextList(h.Config.Version, freshBindingContext)
+	versionedContextList := bctx.ConvertBindingContextList(h.Config.Version, freshBindingContext)
 
 	contextPath, err := h.prepareBindingContextJsonFile(versionedContextList)
 	if err != nil {
@@ -271,7 +271,7 @@ func (h *Hook) GetConfigDescription() string {
 	return strings.Join(msgs, ", ")
 }
 
-func (h *Hook) prepareBindingContextJsonFile(context BindingContextList) (string, error) {
+func (h *Hook) prepareBindingContextJsonFile(context bctx.BindingContextList) (string, error) {
 	var err error
 	data, err := context.Json()
 	if err != nil {

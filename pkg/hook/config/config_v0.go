@@ -6,10 +6,10 @@ import (
 	"gopkg.in/robfig/cron.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/schedule-manager/types"
+	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
 type HookConfigV0 struct {
@@ -49,7 +49,7 @@ func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) (err error) {
 		return err
 	}
 
-	c.Schedules = []ScheduleConfig{}
+	c.Schedules = []htypes.ScheduleConfig{}
 	for i, rawSchedule := range cv0.Schedule {
 		err := cv0.CheckSchedule(rawSchedule)
 		if err != nil {
@@ -62,7 +62,7 @@ func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) (err error) {
 		c.Schedules = append(c.Schedules, schedule)
 	}
 
-	c.OnKubernetesEvents = []OnKubernetesEventConfig{}
+	c.OnKubernetesEvents = []htypes.OnKubernetesEventConfig{}
 	for i, kubeCfg := range cv0.OnKubernetesEvent {
 		err := cv0.CheckOnKubernetesEvent(kubeCfg, fmt.Sprintf("onKubernetesEvent[%d]", i))
 		if err != nil {
@@ -108,7 +108,7 @@ func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) (err error) {
 		monitor.WithLabelSelector(kubeCfg.Selector)
 		monitor.JqFilter = kubeCfg.JqFilter
 
-		kubeConfig := OnKubernetesEventConfig{}
+		kubeConfig := htypes.OnKubernetesEventConfig{}
 		kubeConfig.Monitor = monitor
 		kubeConfig.AllowFailure = kubeCfg.AllowFailure
 		if kubeCfg.Name == "" {
@@ -132,17 +132,17 @@ func (cv0 *HookConfigV0) CheckSchedule(schV0 ScheduleConfigV0) error {
 	return nil
 }
 
-func (cv0 *HookConfigV0) ConvertSchedule(schV0 ScheduleConfigV0) (ScheduleConfig, error) {
-	res := ScheduleConfig{}
+func (cv0 *HookConfigV0) ConvertSchedule(schV0 ScheduleConfigV0) (htypes.ScheduleConfig, error) {
+	res := htypes.ScheduleConfig{}
 
 	if schV0.Name != "" {
 		res.BindingName = schV0.Name
 	} else {
-		res.BindingName = string(Schedule)
+		res.BindingName = string(htypes.Schedule)
 	}
 
 	res.AllowFailure = schV0.AllowFailure
-	res.ScheduleEntry = ScheduleEntry{
+	res.ScheduleEntry = smtypes.ScheduleEntry{
 		Crontab: schV0.Crontab,
 		Id:      ScheduleID(),
 	}

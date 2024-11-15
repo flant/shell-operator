@@ -1,9 +1,9 @@
 package controller
 
 import (
-	. "github.com/flant/shell-operator/pkg/hook/binding-context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
-	schedulemanager "github.com/flant/shell-operator/pkg/schedule-manager"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
 // A link between a hook and a kube monitor
@@ -19,7 +19,7 @@ type ScheduleBindingToCrontabLink struct {
 
 // ScheduleBindingsController handles schedule bindings for one hook.
 type ScheduleBindingsController interface {
-	WithScheduleBindings([]ScheduleConfig)
+	WithScheduleBindings([]htypes.ScheduleConfig)
 	WithScheduleManager(schedulemanager.ScheduleManager)
 	EnableScheduleBindings()
 	DisableScheduleBindings()
@@ -33,7 +33,7 @@ type scheduleBindingsController struct {
 	ScheduleLinks map[string]*ScheduleBindingToCrontabLink
 
 	// bindings configurations
-	ScheduleBindings []ScheduleConfig
+	ScheduleBindings []htypes.ScheduleConfig
 
 	// dependencies
 	scheduleManager schedulemanager.ScheduleManager
@@ -49,7 +49,7 @@ var NewScheduleBindingsController = func() *scheduleBindingsController {
 	}
 }
 
-func (c *scheduleBindingsController) WithScheduleBindings(bindings []ScheduleConfig) {
+func (c *scheduleBindingsController) WithScheduleBindings(bindings []htypes.ScheduleConfig) {
 	c.ScheduleBindings = bindings
 }
 
@@ -71,15 +71,15 @@ func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecut
 
 	for _, link := range c.ScheduleLinks {
 		if link.Crontab == crontab {
-			bc := BindingContext{
+			bc := bctx.BindingContext{
 				Binding: link.BindingName,
 			}
-			bc.Metadata.BindingType = Schedule
+			bc.Metadata.BindingType = htypes.Schedule
 			bc.Metadata.IncludeSnapshots = link.IncludeSnapshots
 			bc.Metadata.Group = link.Group
 
 			info := BindingExecutionInfo{
-				BindingContext:   []BindingContext{bc},
+				BindingContext:   []bctx.BindingContext{bc},
 				IncludeSnapshots: link.IncludeSnapshots,
 				AllowFailure:     link.AllowFailure,
 				QueueName:        link.QueueName,

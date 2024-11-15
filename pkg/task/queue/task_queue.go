@@ -10,7 +10,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
 	"github.com/flant/shell-operator/pkg/utils/measure"

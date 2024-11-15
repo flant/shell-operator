@@ -9,7 +9,7 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

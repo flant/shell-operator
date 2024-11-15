@@ -5,10 +5,10 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
 )
 
-var validBindingTypes = []BindingType{OnStartup, Schedule, OnKubernetesEvent, KubernetesValidating, KubernetesMutating, KubernetesConversion}
+var validBindingTypes = []htypes.BindingType{htypes.OnStartup, htypes.Schedule, htypes.OnKubernetesEvent, htypes.KubernetesValidating, htypes.KubernetesMutating, htypes.KubernetesConversion}
 
 // HookConfig is a structure with versioned hook configuration
 type HookConfig struct {
@@ -20,13 +20,13 @@ type HookConfig struct {
 	V1 *HookConfigV1
 
 	// effective config values
-	OnStartup            *OnStartupConfig
-	Schedules            []ScheduleConfig
-	OnKubernetesEvents   []OnKubernetesEventConfig
-	KubernetesValidating []ValidatingConfig
-	KubernetesMutating   []MutatingConfig
-	KubernetesConversion []ConversionConfig
-	Settings             *Settings
+	OnStartup            *htypes.OnStartupConfig
+	Schedules            []htypes.ScheduleConfig
+	OnKubernetesEvents   []htypes.OnKubernetesEventConfig
+	KubernetesValidating []htypes.ValidatingConfig
+	KubernetesMutating   []htypes.MutatingConfig
+	KubernetesConversion []htypes.ConversionConfig
+	Settings             *htypes.Settings
 }
 
 // LoadAndValidate loads config from bytes and validate it. Returns multierror.
@@ -92,8 +92,8 @@ func (c *HookConfig) ConvertAndCheck(data []byte) error {
 }
 
 // Bindings returns a list of binding types in hook configuration.
-func (c *HookConfig) Bindings() []BindingType {
-	res := []BindingType{}
+func (c *HookConfig) Bindings() []htypes.BindingType {
+	res := []htypes.BindingType{}
 
 	for _, binding := range validBindingTypes {
 		if c.HasBinding(binding) {
@@ -105,33 +105,33 @@ func (c *HookConfig) Bindings() []BindingType {
 }
 
 // HasBinding returns true if a hook configuration has binding type.
-func (c *HookConfig) HasBinding(binding BindingType) bool {
+func (c *HookConfig) HasBinding(binding htypes.BindingType) bool {
 	switch binding {
-	case OnStartup:
+	case htypes.OnStartup:
 		return c.OnStartup != nil
-	case Schedule:
+	case htypes.Schedule:
 		return len(c.Schedules) > 0
-	case OnKubernetesEvent:
+	case htypes.OnKubernetesEvent:
 		return len(c.OnKubernetesEvents) > 0
-	case KubernetesValidating:
+	case htypes.KubernetesValidating:
 		return len(c.KubernetesValidating) > 0
-	case KubernetesMutating:
+	case htypes.KubernetesMutating:
 		return len(c.KubernetesMutating) > 0
-	case KubernetesConversion:
+	case htypes.KubernetesConversion:
 		return len(c.KubernetesConversion) > 0
 	}
 	return false
 }
 
-func (c *HookConfig) ConvertOnStartup(value interface{}) (*OnStartupConfig, error) {
+func (c *HookConfig) ConvertOnStartup(value interface{}) (*htypes.OnStartupConfig, error) {
 	floatValue, err := ConvertFloatForBinding(value, "onStartup")
 	if err != nil || floatValue == nil {
 		return nil, err
 	}
 
-	res := &OnStartupConfig{}
+	res := &htypes.OnStartupConfig{}
 	res.AllowFailure = false
-	res.BindingName = string(OnStartup)
+	res.BindingName = string(htypes.OnStartup)
 	res.Order = *floatValue
 	return res, nil
 }
@@ -142,7 +142,7 @@ func (c *HookConfig) ConvertOnStartup(value interface{}) (*OnStartupConfig, erro
 // - binding name should exists,
 //
 // - binding name should not be repeated.
-func CheckIncludeSnapshots(kubeConfigs []OnKubernetesEventConfig, includes ...string) error {
+func CheckIncludeSnapshots(kubeConfigs []htypes.OnKubernetesEventConfig, includes ...string) error {
 	for _, include := range includes {
 		bindings := 0
 		for _, kubeCfg := range kubeConfigs {

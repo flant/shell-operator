@@ -13,7 +13,7 @@ import (
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	"github.com/flant/shell-operator/pkg/hook"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
-	schedulemanager "github.com/flant/shell-operator/pkg/schedule-manager"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"

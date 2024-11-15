@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding-context"
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"

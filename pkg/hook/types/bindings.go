@@ -4,7 +4,7 @@ import (
 	"time"
 
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/schedule-manager/types"
+	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -33,7 +33,7 @@ type OnStartupConfig struct {
 
 type ScheduleConfig struct {
 	CommonBindingConfig
-	ScheduleEntry        ScheduleEntry
+	ScheduleEntry        smtypes.ScheduleEntry
 	IncludeSnapshotsFrom []string
 	Queue                string
 	Group                string

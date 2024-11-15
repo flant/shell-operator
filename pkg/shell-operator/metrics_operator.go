@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/flant/shell-operator/pkg/app"
-	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 )
 
 // setupMetricStorage creates and initializes metrics storage for built-in operator metrics

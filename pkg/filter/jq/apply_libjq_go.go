@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	. "github.com/flant/libjq-go"
+	libjq "github.com/flant/libjq-go"
 	"github.com/flant/shell-operator/pkg/filter"
 )
 
@@ -34,7 +34,7 @@ func (f *Filter) ApplyFilter(jqFilter string, jsonData []byte) (string, error) {
 		return jqExec(jqFilter, jsonData, f.Libpath)
 	}
 
-	result, err := Jq().WithLibPath(f.Libpath).Program(jqFilter).Cached().Run(string(jsonData))
+	result, err := libjq.Jq().WithLibPath(f.Libpath).Program(jqFilter).Cached().Run(string(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("libjq filter '%s': '%s'", jqFilter, err)
 	}

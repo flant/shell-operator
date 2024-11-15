@@ -18,7 +18,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	metricstorage "github.com/flant/shell-operator/pkg/metric-storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 

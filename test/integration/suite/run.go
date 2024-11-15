@@ -9,7 +9,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	klient "github.com/flant/kube-client/client"
-	objectpatch "github.com/flant/shell-operator/pkg/object-patch"
+	objectpatch "github.com/flant/shell-operator/pkg/object_patch"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

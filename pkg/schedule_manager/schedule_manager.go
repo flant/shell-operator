@@ -6,14 +6,14 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
 
-	. "github.com/flant/shell-operator/pkg/schedule-manager/types"
+	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
 type ScheduleManager interface {
 	Stop()
 	Start()
-	Add(entry ScheduleEntry)
-	Remove(entry ScheduleEntry)
+	Add(entry smtypes.ScheduleEntry)
+	Remove(entry smtypes.ScheduleEntry)
 	Ch() chan string
 }
 
@@ -57,7 +57,7 @@ func (sm *scheduleManager) Stop() {
 // Add create entry for crontab and id and start scheduled function.
 // Crontab string should be validated with cron.Parse
 // function before pass to Add.
-func (sm *scheduleManager) Add(newEntry ScheduleEntry) {
+func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	logEntry := sm.logger.With("operator.component", "scheduleManager")
 
 	cronEntry, hasCronEntry := sm.Entries[newEntry.Crontab]
@@ -88,7 +88,7 @@ func (sm *scheduleManager) Add(newEntry ScheduleEntry) {
 	}
 }
 
-func (sm *scheduleManager) Remove(delEntry ScheduleEntry) {
+func (sm *scheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
 	cronEntry, hasCronEntry := sm.Entries[delEntry.Crontab]
 
 	// Nothing to Remove
