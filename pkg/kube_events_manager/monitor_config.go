@@ -1,11 +1,11 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 // MonitorConfig is a config that suits the latest
@@ -17,49 +17,49 @@ type MonitorConfig struct {
 		LogLabels    map[string]string
 		MetricLabels map[string]string
 	}
-	EventTypes              []WatchEventType
+	EventTypes              []kemtypes.WatchEventType
 	ApiVersion              string
 	Kind                    string
-	NameSelector            *NameSelector
-	NamespaceSelector       *NamespaceSelector
+	NameSelector            *kemtypes.NameSelector
+	NamespaceSelector       *kemtypes.NamespaceSelector
 	LabelSelector           *metav1.LabelSelector
-	FieldSelector           *FieldSelector
+	FieldSelector           *kemtypes.FieldSelector
 	JqFilter                string
 	Logger                  *log.Logger
-	Mode                    KubeEventMode
+	Mode                    kemtypes.KubeEventMode
 	KeepFullObjectsInMemory bool
 	FilterFunc              func(*unstructured.Unstructured) (interface{}, error)
 }
 
-func (c *MonitorConfig) WithEventTypes(types []WatchEventType) *MonitorConfig {
+func (c *MonitorConfig) WithEventTypes(types []kemtypes.WatchEventType) *MonitorConfig {
 	if types == nil {
-		c.EventTypes = []WatchEventType{
-			WatchEventAdded,
-			WatchEventModified,
-			WatchEventDeleted,
+		c.EventTypes = []kemtypes.WatchEventType{
+			kemtypes.WatchEventAdded,
+			kemtypes.WatchEventModified,
+			kemtypes.WatchEventDeleted,
 		}
 	} else {
-		c.EventTypes = []WatchEventType{}
+		c.EventTypes = []kemtypes.WatchEventType{}
 		c.EventTypes = append(c.EventTypes, types...)
 	}
 	return c
 }
 
 // WithNameSelector copies input NameSelector into monitor.NameSelector
-func (c *MonitorConfig) WithNameSelector(nSel *NameSelector) {
+func (c *MonitorConfig) WithNameSelector(nSel *kemtypes.NameSelector) {
 	if nSel != nil {
-		c.NameSelector = &NameSelector{
+		c.NameSelector = &kemtypes.NameSelector{
 			MatchNames: nSel.MatchNames,
 		}
 	}
 }
 
 // WithNamespaceSelector copies input NamespaceSelector into monitor.NamespaceSelector
-func (c *MonitorConfig) WithNamespaceSelector(nsSel *NamespaceSelector) {
+func (c *MonitorConfig) WithNamespaceSelector(nsSel *kemtypes.NamespaceSelector) {
 	if nsSel != nil {
-		c.NamespaceSelector = &NamespaceSelector{}
+		c.NamespaceSelector = &kemtypes.NamespaceSelector{}
 		if nsSel.NameSelector != nil {
-			c.NamespaceSelector.NameSelector = &NameSelector{
+			c.NamespaceSelector.NameSelector = &kemtypes.NameSelector{
 				MatchNames: nsSel.NameSelector.MatchNames,
 			}
 		}
@@ -73,9 +73,9 @@ func (c *MonitorConfig) WithNamespaceSelector(nsSel *NamespaceSelector) {
 }
 
 // WithFieldSelector copies input FieldSelector into monitor.FieldSelector
-func (c *MonitorConfig) WithFieldSelector(fieldSel *FieldSelector) {
+func (c *MonitorConfig) WithFieldSelector(fieldSel *kemtypes.FieldSelector) {
 	if fieldSel != nil {
-		c.FieldSelector = &FieldSelector{
+		c.FieldSelector = &kemtypes.FieldSelector{
 			MatchExpressions: fieldSel.MatchExpressions,
 		}
 	}
@@ -131,9 +131,9 @@ func (c *MonitorConfig) namespaces() (nsNames []string) {
 	return nsNames
 }
 
-func (c *MonitorConfig) WithMode(mode KubeEventMode) {
+func (c *MonitorConfig) WithMode(mode kemtypes.KubeEventMode) {
 	if mode == "" {
-		c.Mode = ModeIncremental
+		c.Mode = kemtypes.ModeIncremental
 	}
 	c.Mode = mode
 }

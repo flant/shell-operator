@@ -12,10 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/flant/shell-operator/pkg/app"
-	. "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	"github.com/flant/shell-operator/pkg/webhook/validating/validation"
@@ -44,32 +44,32 @@ type ScheduleConfigV1 struct {
 
 // version 1 of kubernetes event configuration
 type OnKubernetesEventConfigV1 struct {
-	Name                         string                   `json:"name,omitempty"`
-	WatchEventTypes              []WatchEventType         `json:"watchEvent,omitempty"`
-	ExecuteHookOnEvents          []WatchEventType         `json:"executeHookOnEvent,omitempty"`
-	ExecuteHookOnSynchronization string                   `json:"executeHookOnSynchronization,omitempty"`
-	WaitForSynchronization       string                   `json:"waitForSynchronization,omitempty"`
-	KeepFullObjectsInMemory      string                   `json:"keepFullObjectsInMemory,omitempty"`
-	Mode                         KubeEventMode            `json:"mode,omitempty"`
-	ApiVersion                   string                   `json:"apiVersion,omitempty"`
-	Kind                         string                   `json:"kind,omitempty"`
-	NameSelector                 *KubeNameSelectorV1      `json:"nameSelector,omitempty"`
-	LabelSelector                *metav1.LabelSelector    `json:"labelSelector,omitempty"`
-	FieldSelector                *KubeFieldSelectorV1     `json:"fieldSelector,omitempty"`
-	Namespace                    *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
-	JqFilter                     string                   `json:"jqFilter,omitempty"`
-	AllowFailure                 bool                     `json:"allowFailure,omitempty"`
-	ResynchronizationPeriod      string                   `json:"resynchronizationPeriod,omitempty"`
-	IncludeSnapshotsFrom         []string                 `json:"includeSnapshotsFrom,omitempty"`
-	Queue                        string                   `json:"queue,omitempty"`
-	Group                        string                   `json:"group,omitempty"`
+	Name                         string                    `json:"name,omitempty"`
+	WatchEventTypes              []kemtypes.WatchEventType `json:"watchEvent,omitempty"`
+	ExecuteHookOnEvents          []kemtypes.WatchEventType `json:"executeHookOnEvent,omitempty"`
+	ExecuteHookOnSynchronization string                    `json:"executeHookOnSynchronization,omitempty"`
+	WaitForSynchronization       string                    `json:"waitForSynchronization,omitempty"`
+	KeepFullObjectsInMemory      string                    `json:"keepFullObjectsInMemory,omitempty"`
+	Mode                         kemtypes.KubeEventMode    `json:"mode,omitempty"`
+	ApiVersion                   string                    `json:"apiVersion,omitempty"`
+	Kind                         string                    `json:"kind,omitempty"`
+	NameSelector                 *KubeNameSelectorV1       `json:"nameSelector,omitempty"`
+	LabelSelector                *metav1.LabelSelector     `json:"labelSelector,omitempty"`
+	FieldSelector                *KubeFieldSelectorV1      `json:"fieldSelector,omitempty"`
+	Namespace                    *KubeNamespaceSelectorV1  `json:"namespace,omitempty"`
+	JqFilter                     string                    `json:"jqFilter,omitempty"`
+	AllowFailure                 bool                      `json:"allowFailure,omitempty"`
+	ResynchronizationPeriod      string                    `json:"resynchronizationPeriod,omitempty"`
+	IncludeSnapshotsFrom         []string                  `json:"includeSnapshotsFrom,omitempty"`
+	Queue                        string                    `json:"queue,omitempty"`
+	Group                        string                    `json:"group,omitempty"`
 }
 
-type KubeNameSelectorV1 NameSelector
+type KubeNameSelectorV1 kemtypes.NameSelector
 
-type KubeFieldSelectorV1 FieldSelector
+type KubeFieldSelectorV1 kemtypes.FieldSelector
 
-type KubeNamespaceSelectorV1 NamespaceSelector
+type KubeNamespaceSelectorV1 kemtypes.NamespaceSelector
 
 // version 1 of kubernetes vali configuration
 type KubernetesAdmissionConfigV1 struct {
@@ -111,14 +111,14 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 		return err
 	}
 
-	c.OnKubernetesEvents = []OnKubernetesEventConfig{}
+	c.OnKubernetesEvents = []htypes.OnKubernetesEventConfig{}
 	for i, kubeCfg := range cv1.OnKubernetesEvent {
 		err := cv1.CheckOnKubernetesEvent(kubeCfg, fmt.Sprintf("kubernetes[%d]", i))
 		if err != nil {
 			return fmt.Errorf("invalid kubernetes config [%d]: %v", i, err)
 		}
 
-		monitor := &kube_events_manager.MonitorConfig{}
+		monitor := &kubeeventsmanager.MonitorConfig{}
 		monitor.Metadata.DebugName = MonitorDebugName(kubeCfg.Name, i)
 		monitor.Metadata.MonitorId = MonitorConfigID()
 		monitor.Metadata.LogLabels = map[string]string{}
@@ -126,9 +126,9 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 		monitor.WithMode(kubeCfg.Mode)
 		monitor.ApiVersion = kubeCfg.ApiVersion
 		monitor.Kind = kubeCfg.Kind
-		monitor.WithNameSelector((*NameSelector)(kubeCfg.NameSelector))
-		monitor.WithFieldSelector((*FieldSelector)(kubeCfg.FieldSelector))
-		monitor.WithNamespaceSelector((*NamespaceSelector)(kubeCfg.Namespace))
+		monitor.WithNameSelector((*kemtypes.NameSelector)(kubeCfg.NameSelector))
+		monitor.WithFieldSelector((*kemtypes.FieldSelector)(kubeCfg.FieldSelector))
+		monitor.WithNamespaceSelector((*kemtypes.NamespaceSelector)(kubeCfg.Namespace))
 		monitor.WithLabelSelector(kubeCfg.LabelSelector)
 		monitor.JqFilter = kubeCfg.JqFilter
 		// executeHookOnEvent is a priority
@@ -142,11 +142,11 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 			}
 		}
 
-		kubeConfig := OnKubernetesEventConfig{}
+		kubeConfig := htypes.OnKubernetesEventConfig{}
 		kubeConfig.Monitor = monitor
 		kubeConfig.AllowFailure = kubeCfg.AllowFailure
 		if kubeCfg.Name == "" {
-			kubeConfig.BindingName = string(OnKubernetesEvent)
+			kubeConfig.BindingName = string(htypes.OnKubernetesEvent)
 		} else {
 			kubeConfig.BindingName = kubeCfg.Name
 		}
@@ -192,7 +192,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 
 	// schedule bindings with includeSnapshotsFrom
 	// are depend on kubernetes bindings.
-	c.Schedules = []ScheduleConfig{}
+	c.Schedules = []htypes.ScheduleConfig{}
 	for i, rawSchedule := range cv1.Schedule {
 		err := cv1.CheckSchedule(c.OnKubernetesEvents, rawSchedule)
 		if err != nil {
@@ -206,7 +206,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	}
 
 	// Validating webhooks
-	c.KubernetesValidating = []ValidatingConfig{}
+	c.KubernetesValidating = []htypes.ValidatingConfig{}
 	for i, rawValidating := range c.V1.KubernetesValidating {
 		err := cv1.CheckAdmission(c.OnKubernetesEvents, rawValidating)
 		if err != nil {
@@ -230,7 +230,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 		return err
 	}
 
-	c.KubernetesMutating = []MutatingConfig{}
+	c.KubernetesMutating = []htypes.MutatingConfig{}
 	for i, rawMutating := range c.V1.KubernetesMutating {
 		err := cv1.CheckAdmission(c.OnKubernetesEvents, rawMutating)
 		if err != nil {
@@ -245,7 +245,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	// TODO: Validate mutatingWebhooks
 
 	// Conversion webhooks.
-	c.KubernetesConversion = []ConversionConfig{}
+	c.KubernetesConversion = []htypes.ConversionConfig{}
 	for i, rawConversion := range c.V1.KubernetesConversion {
 		err := cv1.CheckConversion(c.OnKubernetesEvents, rawConversion)
 		if err != nil {
@@ -270,7 +270,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 		}
 		groupSnapshots[kubeCfg.Group] = append(groupSnapshots[kubeCfg.Group], kubeCfg.BindingName)
 	}
-	newKubeEvents := make([]OnKubernetesEventConfig, 0)
+	newKubeEvents := make([]htypes.OnKubernetesEventConfig, 0)
 	for _, cfg := range c.OnKubernetesEvents {
 		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
 			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
@@ -279,7 +279,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	}
 	c.OnKubernetesEvents = newKubeEvents
 
-	newSchedules := make([]ScheduleConfig, 0)
+	newSchedules := make([]htypes.ScheduleConfig, 0)
 	for _, cfg := range c.Schedules {
 		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
 			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
@@ -288,7 +288,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	}
 	c.Schedules = newSchedules
 
-	newValidating := make([]ValidatingConfig, 0)
+	newValidating := make([]htypes.ValidatingConfig, 0)
 	for _, cfg := range c.KubernetesValidating {
 		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
 			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
@@ -297,7 +297,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	}
 	c.KubernetesValidating = newValidating
 
-	newMutating := make([]MutatingConfig, 0)
+	newMutating := make([]htypes.MutatingConfig, 0)
 	for _, cfg := range c.KubernetesMutating {
 		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
 			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
@@ -306,7 +306,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	}
 	c.KubernetesMutating = newMutating
 
-	newConversion := make([]ConversionConfig, 0)
+	newConversion := make([]htypes.ConversionConfig, 0)
 	for _, cfg := range c.KubernetesConversion {
 		if snapshots, ok := groupSnapshots[cfg.Group]; ok {
 			cfg.IncludeSnapshotsFrom = MergeArrays(cfg.IncludeSnapshotsFrom, snapshots)
@@ -318,17 +318,17 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	return nil
 }
 
-func (cv1 *HookConfigV1) ConvertSchedule(schV1 ScheduleConfigV1) (ScheduleConfig, error) {
-	res := ScheduleConfig{}
+func (cv1 *HookConfigV1) ConvertSchedule(schV1 ScheduleConfigV1) (htypes.ScheduleConfig, error) {
+	res := htypes.ScheduleConfig{}
 
 	if schV1.Name != "" {
 		res.BindingName = schV1.Name
 	} else {
-		res.BindingName = string(Schedule)
+		res.BindingName = string(htypes.Schedule)
 	}
 
 	res.AllowFailure = schV1.AllowFailure
-	res.ScheduleEntry = ScheduleEntry{
+	res.ScheduleEntry = smtypes.ScheduleEntry{
 		Crontab: schV1.Crontab,
 		Id:      ScheduleID(),
 	}
@@ -344,7 +344,7 @@ func (cv1 *HookConfigV1) ConvertSchedule(schV1 ScheduleConfigV1) (ScheduleConfig
 	return res, nil
 }
 
-func (cv1 *HookConfigV1) CheckSchedule(kubeConfigs []OnKubernetesEventConfig, schV1 ScheduleConfigV1) (allErr error) {
+func (cv1 *HookConfigV1) CheckSchedule(kubeConfigs []htypes.OnKubernetesEventConfig, schV1 ScheduleConfigV1) (allErr error) {
 	var err error
 	_, err = cron.Parse(schV1.Crontab)
 	if err != nil {
@@ -370,14 +370,14 @@ func (cv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV
 	}
 
 	if kubeCfg.LabelSelector != nil {
-		_, err := kube_events_manager.FormatLabelSelector(kubeCfg.LabelSelector)
+		_, err := kubeeventsmanager.FormatLabelSelector(kubeCfg.LabelSelector)
 		if err != nil {
 			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %v", err))
 		}
 	}
 
 	if kubeCfg.FieldSelector != nil {
-		_, err := kube_events_manager.FormatFieldSelector((*FieldSelector)(kubeCfg.FieldSelector))
+		_, err := kubeeventsmanager.FormatFieldSelector((*kemtypes.FieldSelector)(kubeCfg.FieldSelector))
 		if err != nil {
 			allErr = multierror.Append(allErr, fmt.Errorf("fieldSelector is invalid: %v", err))
 		}
@@ -396,7 +396,7 @@ func (cv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV
 	return allErr
 }
 
-func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []OnKubernetesEventConfig, cfgV1 KubernetesAdmissionConfigV1) (allErr error) {
+func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []htypes.OnKubernetesEventConfig, cfgV1 KubernetesAdmissionConfigV1) (allErr error) {
 	var err error
 
 	if len(cfgV1.IncludeSnapshotsFrom) > 0 {
@@ -407,14 +407,14 @@ func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []OnKubernetesEventConfig, c
 	}
 
 	if cfgV1.LabelSelector != nil {
-		_, err := kube_events_manager.FormatLabelSelector(cfgV1.LabelSelector)
+		_, err := kubeeventsmanager.FormatLabelSelector(cfgV1.LabelSelector)
 		if err != nil {
 			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %v", err))
 		}
 	}
 
 	if cfgV1.Namespace != nil && cfgV1.Namespace.LabelSelector != nil {
-		_, err := kube_events_manager.FormatLabelSelector(cfgV1.Namespace.LabelSelector)
+		_, err := kubeeventsmanager.FormatLabelSelector(cfgV1.Namespace.LabelSelector)
 		if err != nil {
 			allErr = multierror.Append(allErr, fmt.Errorf("namespace.labelSelector is invalid: %v", err))
 		}
@@ -423,8 +423,8 @@ func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []OnKubernetesEventConfig, c
 	return allErr
 }
 
-func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, error) {
-	cfg := ValidatingConfig{}
+func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (htypes.ValidatingConfig, error) {
+	cfg := htypes.ValidatingConfig{}
 
 	cfg.Group = cfgV1.Group
 	cfg.IncludeSnapshotsFrom = cfgV1.IncludeSnapshotsFrom
@@ -469,8 +469,8 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (ValidatingConfig, err
 	return cfg, nil
 }
 
-func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (MutatingConfig, error) {
-	cfg := MutatingConfig{}
+func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (htypes.MutatingConfig, error) {
+	cfg := htypes.MutatingConfig{}
 
 	cfg.Group = cfgV1.Group
 	cfg.IncludeSnapshotsFrom = cfgV1.IncludeSnapshotsFrom
@@ -515,7 +515,7 @@ func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (MutatingConfig, error) 
 	return cfg, nil
 }
 
-func (cv1 *HookConfigV1) CheckConversion(kubeConfigs []OnKubernetesEventConfig, cfgV1 KubernetesConversionConfigV1) (allErr error) {
+func (cv1 *HookConfigV1) CheckConversion(kubeConfigs []htypes.OnKubernetesEventConfig, cfgV1 KubernetesConversionConfigV1) (allErr error) {
 	var err error
 
 	if len(cfgV1.IncludeSnapshotsFrom) > 0 {
@@ -528,8 +528,8 @@ func (cv1 *HookConfigV1) CheckConversion(kubeConfigs []OnKubernetesEventConfig, 
 	return allErr
 }
 
-func (cv1 *HookConfigV1) ConvertConversion(cfgV1 KubernetesConversionConfigV1) (ConversionConfig, error) {
-	cfg := ConversionConfig{}
+func (cv1 *HookConfigV1) ConvertConversion(cfgV1 KubernetesConversionConfigV1) (htypes.ConversionConfig, error) {
+	cfg := htypes.ConversionConfig{}
 
 	cfg.Group = cfgV1.Group
 	cfg.IncludeSnapshotsFrom = cfgV1.IncludeSnapshotsFrom
@@ -547,7 +547,7 @@ func (cv1 *HookConfigV1) ConvertConversion(cfgV1 KubernetesConversionConfigV1) (
 }
 
 // CheckAndConvertSettings validates a duration and returns a Settings struct.
-func (cv1 *HookConfigV1) CheckAndConvertSettings(settings *SettingsV1) (out *Settings, allErr error) {
+func (cv1 *HookConfigV1) CheckAndConvertSettings(settings *SettingsV1) (out *htypes.Settings, allErr error) {
 	if settings == nil {
 		return nil, nil
 	}
@@ -565,7 +565,7 @@ func (cv1 *HookConfigV1) CheckAndConvertSettings(settings *SettingsV1) (out *Set
 		return nil, allErr
 	}
 
-	return &Settings{
+	return &htypes.Settings{
 		ExecutionMinInterval: interval,
 		ExecutionBurst:       int(burst),
 	}, nil

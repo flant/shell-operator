@@ -3,8 +3,8 @@ package types
 import (
 	"time"
 
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/schedule_manager/types"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -33,7 +33,7 @@ type OnStartupConfig struct {
 
 type ScheduleConfig struct {
 	CommonBindingConfig
-	ScheduleEntry        ScheduleEntry
+	ScheduleEntry        smtypes.ScheduleEntry
 	IncludeSnapshotsFrom []string
 	Queue                string
 	Group                string
@@ -41,7 +41,7 @@ type ScheduleConfig struct {
 
 type OnKubernetesEventConfig struct {
 	CommonBindingConfig
-	Monitor                      *kube_events_manager.MonitorConfig
+	Monitor                      *kubeeventsmanager.MonitorConfig
 	IncludeSnapshotsFrom         []string
 	Queue                        string
 	Group                        string

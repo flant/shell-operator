@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric_storage"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -18,7 +18,7 @@ type Monitor interface {
 	Start(context.Context)
 	Stop()
 	PauseHandleEvents()
-	Snapshot() []ObjectAndFilterResult
+	Snapshot() []kemtypes.ObjectAndFilterResult
 	EnableKubeEventCb()
 	GetConfig() *MonitorConfig
 	SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo)
@@ -36,7 +36,7 @@ type monitor struct {
 	// map of dynamically starting informers
 	VaryingInformers map[string][]*resourceInformer
 
-	eventCb       func(KubeEvent)
+	eventCb       func(kemtypes.KubeEvent)
 	eventsEnabled bool
 	// Index of namespaces statically defined in monitor configuration
 	staticNamespaces map[string]bool
@@ -45,12 +45,12 @@ type monitor struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage *metric_storage.MetricStorage
+	metricStorage *metricstorage.MetricStorage
 
 	logger *log.Logger
 }
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor *metric_storage.MetricStorage, config *MonitorConfig, eventCb func(KubeEvent), logger *log.Logger) *monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor *metricstorage.MetricStorage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{
@@ -186,8 +186,8 @@ func (m *monitor) CreateInformers() error {
 }
 
 // Snapshot returns all existed objects from all created informers
-func (m *monitor) Snapshot() []ObjectAndFilterResult {
-	objects := make([]ObjectAndFilterResult, 0)
+func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
+	objects := make([]kemtypes.ObjectAndFilterResult, 0)
 
 	for _, informer := range m.ResourceInformers {
 		objects = append(objects, informer.getCachedObjects()...)
@@ -200,7 +200,7 @@ func (m *monitor) Snapshot() []ObjectAndFilterResult {
 	}
 
 	// Sort objects by namespace and name
-	sort.Sort(ByNamespaceAndName(objects))
+	sort.Sort(kemtypes.ByNamespaceAndName(objects))
 
 	return objects
 }

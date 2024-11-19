@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 // Namespace manager monitor namespaces for onKubernetesEvent config.
 

@@ -1,4 +1,4 @@
-package binding_context
+package bindingcontext
 
 import (
 	"encoding/json"
@@ -7,15 +7,15 @@ import (
 	v1 "k8s.io/api/admission/v1"
 	apixv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	. "github.com/flant/shell-operator/pkg/hook/types"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 // BindingContext contains information about event for hook
 type BindingContext struct {
 	Metadata struct {
 		Version             string
-		BindingType         BindingType
+		BindingType         htypes.BindingType
 		JqFilter            string
 		IncludeSnapshots    []string
 		IncludeAllSnapshots bool
@@ -25,10 +25,10 @@ type BindingContext struct {
 	// name of a binding or a group or kubeEventType if binding has no 'name' field
 	Binding string
 	// additional fields for 'kubernetes' binding
-	Type             KubeEventType
-	WatchEvent       WatchEventType
-	Objects          []ObjectAndFilterResult
-	Snapshots        map[string][]ObjectAndFilterResult
+	Type             kemtypes.KubeEventType
+	WatchEvent       kemtypes.WatchEventType
+	Objects          []kemtypes.ObjectAndFilterResult
+	Snapshots        map[string][]kemtypes.ObjectAndFilterResult
 	AdmissionReview  *v1.AdmissionReview
 	ConversionReview *apixv1.ConversionReview
 	FromVersion      string
@@ -36,7 +36,7 @@ type BindingContext struct {
 }
 
 func (bc BindingContext) IsSynchronization() bool {
-	return bc.Metadata.BindingType == OnKubernetesEvent && bc.Type == TypeSynchronization
+	return bc.Metadata.BindingType == htypes.OnKubernetesEvent && bc.Type == kemtypes.TypeSynchronization
 }
 
 func (bc BindingContext) MarshalJSON() ([]byte, error) {
@@ -59,7 +59,7 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 	res := make(map[string]interface{})
 	res["binding"] = bc.Binding
 
-	if bc.Metadata.BindingType == OnStartup {
+	if bc.Metadata.BindingType == htypes.OnStartup {
 		return res
 	}
 
@@ -73,19 +73,19 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 	}
 
 	// Handle admission and conversion before grouping.
-	if bc.Metadata.BindingType == KubernetesValidating {
+	if bc.Metadata.BindingType == htypes.KubernetesValidating {
 		res["type"] = "Validating"
 		res["review"] = bc.AdmissionReview
 		return res
 	}
 
-	if bc.Metadata.BindingType == KubernetesMutating {
+	if bc.Metadata.BindingType == htypes.KubernetesMutating {
 		res["type"] = "Mutating"
 		res["review"] = bc.AdmissionReview
 		return res
 	}
 
-	if bc.Metadata.BindingType == KubernetesConversion {
+	if bc.Metadata.BindingType == htypes.KubernetesConversion {
 		res["type"] = "Conversion"
 		res["fromVersion"] = bc.FromVersion
 		res["toVersion"] = bc.ToVersion
@@ -100,13 +100,13 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		return res
 	}
 
-	if bc.Metadata.BindingType == Schedule {
+	if bc.Metadata.BindingType == htypes.Schedule {
 		res["type"] = "Schedule"
 		return res
 	}
 
 	// A short way for addon-operator's hooks.
-	if bc.Metadata.BindingType != OnKubernetesEvent || bc.Type == "" {
+	if bc.Metadata.BindingType != htypes.OnKubernetesEvent || bc.Type == "" {
 		return res
 	}
 
@@ -117,13 +117,13 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 		res["watchEvent"] = string(bc.WatchEvent)
 	}
 	switch bc.Type {
-	case TypeSynchronization:
+	case kemtypes.TypeSynchronization:
 		if len(bc.Objects) == 0 {
 			res["objects"] = make([]string, 0)
 		} else {
 			res["objects"] = bc.Objects
 		}
-	case TypeEvent:
+	case kemtypes.TypeEvent:
 		if len(bc.Objects) == 0 {
 			res["object"] = nil
 			if bc.Metadata.JqFilter != "" {
@@ -145,17 +145,17 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 func (bc BindingContext) MapV0() map[string]interface{} {
 	res := make(map[string]interface{})
 	res["binding"] = bc.Binding
-	if bc.Metadata.BindingType != OnKubernetesEvent {
+	if bc.Metadata.BindingType != htypes.OnKubernetesEvent {
 		return res
 	}
 
 	eventV0 := ""
 	switch bc.WatchEvent {
-	case WatchEventAdded:
+	case kemtypes.WatchEventAdded:
 		eventV0 = "add"
-	case WatchEventModified:
+	case kemtypes.WatchEventModified:
 		eventV0 = "update"
-	case WatchEventDeleted:
+	case kemtypes.WatchEventDeleted:
 		eventV0 = "delete"
 	}
 

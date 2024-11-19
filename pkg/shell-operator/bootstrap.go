@@ -10,10 +10,10 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
+	"github.com/flant/shell-operator/pkg/filter/jq"
 	"github.com/flant/shell-operator/pkg/hook"
-	"github.com/flant/shell-operator/pkg/jq"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	"github.com/flant/shell-operator/pkg/schedule_manager"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
@@ -29,7 +29,8 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 
 	// Log version and jq filtering implementation.
 	logger.Info(app.AppStartMessage)
-	logger.Debug(jq.FilterInfo())
+	fl := jq.NewFilter(app.JqLibraryPath)
+	logger.Debug(fl.FilterInfo())
 
 	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
 	if err != nil {
@@ -154,10 +155,10 @@ func (op *ShellOperator) SetupEventManagers() {
 	op.TaskQueues.WithMetricStorage(op.MetricStorage)
 
 	// Initialize schedule manager.
-	op.ScheduleManager = schedule_manager.NewScheduleManager(op.ctx, op.logger.Named("schedule-manager"))
+	op.ScheduleManager = schedulemanager.NewScheduleManager(op.ctx, op.logger.Named("schedule-manager"))
 
 	// Initialize kubernetes events manager.
-	op.KubeEventsManager = kube_events_manager.NewKubeEventsManager(op.ctx, op.KubeClient, op.logger.Named("kube-events-manager"))
+	op.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(op.ctx, op.KubeClient, op.logger.Named("kube-events-manager"))
 	op.KubeEventsManager.WithMetricStorage(op.MetricStorage)
 
 	// Initialize events handler that emit tasks to run hooks

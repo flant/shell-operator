@@ -4,6 +4,15 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+type IPatchCollector interface {
+	Create(object interface{}, options ...CreateOption)
+	Delete(apiVersion string, kind string, namespace string, name string, options ...DeleteOption)
+	Filter(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, options ...FilterOption)
+	JSONPatch(jsonPatch interface{}, apiVersion string, kind string, namespace string, name string, options ...PatchOption)
+	MergePatch(mergePatch interface{}, apiVersion string, kind string, namespace string, name string, options ...PatchOption)
+	Operations() []Operation
+}
+
 type PatchCollector struct {
 	patchOperations []Operation
 }

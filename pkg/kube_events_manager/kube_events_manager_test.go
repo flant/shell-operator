@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 
 	klient "github.com/flant/kube-client/client"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 func Test_MainKubeEventsManager_Run(t *testing.T) {
@@ -56,12 +56,12 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 	monitor := &MonitorConfig{
 		ApiVersion: "v1",
 		Kind:       "Pod",
-		NamespaceSelector: &NamespaceSelector{
-			NameSelector: &NameSelector{
+		NamespaceSelector: &kemtypes.NamespaceSelector{
+			NameSelector: &kemtypes.NameSelector{
 				MatchNames: []string{"default", "prod", "stage"},
 			},
 		},
-		NameSelector: &NameSelector{
+		NameSelector: &kemtypes.NameSelector{
 			MatchNames: []string{"pod-1", "pod-2", "pod-3", "pod-4"},
 		},
 	}
@@ -139,15 +139,15 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 
 	// Init() replacement
 	mgr := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
-	mgr.KubeEventCh = make(chan KubeEvent, 10)
+	mgr.KubeEventCh = make(chan kemtypes.KubeEvent, 10)
 
 	// monitor with 3 namespaces and 4 object names and all event types
 	monitor := &MonitorConfig{
 		ApiVersion: "v1",
 		Kind:       "Pod",
-		EventTypes: []WatchEventType{WatchEventAdded, WatchEventModified, WatchEventDeleted},
-		NamespaceSelector: &NamespaceSelector{
-			NameSelector: &NameSelector{
+		EventTypes: []kemtypes.WatchEventType{kemtypes.WatchEventAdded, kemtypes.WatchEventModified, kemtypes.WatchEventDeleted},
+		NamespaceSelector: &kemtypes.NamespaceSelector{
+			NameSelector: &kemtypes.NameSelector{
 				MatchNames: []string{"default"},
 			},
 		},
@@ -212,7 +212,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 
 			assert.Equal(t, "Event", ev.Type)
 			assert.Equal(t, "MonitorId", ev.MonitorId)
-			assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
+			assert.Equal(t, kemtypes.WatchEventAdded, ev.WatchEvents[0])
 			assert.Len(t, ev.Objects, 1)
 
 			name := ev.Objects[0].Object.GetName()
@@ -320,9 +320,9 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	monitor := &MonitorConfig{
 		ApiVersion: "v1",
 		Kind:       "Pod",
-		EventTypes: []WatchEventType{WatchEventAdded, WatchEventModified, WatchEventDeleted},
-		NamespaceSelector: &NamespaceSelector{
-			NameSelector: &NameSelector{
+		EventTypes: []kemtypes.WatchEventType{kemtypes.WatchEventAdded, kemtypes.WatchEventModified, kemtypes.WatchEventDeleted},
+		NamespaceSelector: &kemtypes.NamespaceSelector{
+			NameSelector: &kemtypes.NameSelector{
 				MatchNames: []string{"default"},
 			},
 		},
@@ -392,7 +392,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 
 			assert.Equal(t, "Event", ev.Type)
 			assert.Equal(t, "MonitorId", ev.MonitorId)
-			assert.Equal(t, WatchEventAdded, ev.WatchEvents[0])
+			assert.Equal(t, kemtypes.WatchEventAdded, ev.WatchEvents[0])
 			assert.Len(t, ev.Objects, 1)
 
 			name := ev.Objects[0].Object.GetName()

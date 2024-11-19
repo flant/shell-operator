@@ -1,4 +1,4 @@
-package metric_storage
+package metricstorage
 
 import (
 	"context"

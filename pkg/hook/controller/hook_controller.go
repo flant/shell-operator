@@ -4,24 +4,24 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/kube_events_manager"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/schedule_manager"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
 type BindingExecutionInfo struct {
-	BindingContext      []BindingContext
+	BindingContext      []bctx.BindingContext
 	IncludeSnapshots    []string
 	IncludeAllSnapshots bool
 	AllowFailure        bool
 	QueueName           string
 	Binding             string
 	Group               string
-	KubernetesBinding   OnKubernetesEventConfig
+	KubernetesBinding   htypes.OnKubernetesEventConfig
 }
 
 // В каждый хук надо будет положить этот объект.
@@ -44,16 +44,16 @@ type HookController struct {
 	ScheduleController   ScheduleBindingsController
 	AdmissionController  *AdmissionBindingsController
 	ConversionController *ConversionBindingsController
-	kubernetesBindings   []OnKubernetesEventConfig
-	scheduleBindings     []ScheduleConfig
-	validatingBindings   []ValidatingConfig
-	mutatingBindings     []MutatingConfig
-	conversionBindings   []ConversionConfig
+	kubernetesBindings   []htypes.OnKubernetesEventConfig
+	scheduleBindings     []htypes.ScheduleConfig
+	validatingBindings   []htypes.ValidatingConfig
+	mutatingBindings     []htypes.MutatingConfig
+	conversionBindings   []htypes.ConversionConfig
 
 	logger *log.Logger
 }
 
-func (hc *HookController) InitKubernetesBindings(bindings []OnKubernetesEventConfig, kubeEventMgr kube_events_manager.KubeEventsManager, logger *log.Logger) {
+func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesEventConfig, kubeEventMgr kubeeventsmanager.KubeEventsManager, logger *log.Logger) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -66,7 +66,7 @@ func (hc *HookController) InitKubernetesBindings(bindings []OnKubernetesEventCon
 	hc.logger = logger
 }
 
-func (hc *HookController) InitScheduleBindings(bindings []ScheduleConfig, scheduleMgr schedule_manager.ScheduleManager) {
+func (hc *HookController) InitScheduleBindings(bindings []htypes.ScheduleConfig, scheduleMgr schedulemanager.ScheduleManager) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -78,7 +78,7 @@ func (hc *HookController) InitScheduleBindings(bindings []ScheduleConfig, schedu
 	hc.scheduleBindings = bindings
 }
 
-func (hc *HookController) InitAdmissionBindings(vbindings []ValidatingConfig, mbindings []MutatingConfig, webhookMgr *admission.WebhookManager) {
+func (hc *HookController) InitAdmissionBindings(vbindings []htypes.ValidatingConfig, mbindings []htypes.MutatingConfig, webhookMgr *admission.WebhookManager) {
 	bindingCtrl := NewValidatingBindingsController()
 	bindingCtrl.WithWebhookManager(webhookMgr)
 	hc.AdmissionController = bindingCtrl
@@ -87,7 +87,7 @@ func (hc *HookController) InitAdmissionBindings(vbindings []ValidatingConfig, mb
 	hc.initMutatingBindings(mbindings)
 }
 
-func (hc *HookController) initValidatingBindings(bindings []ValidatingConfig) {
+func (hc *HookController) initValidatingBindings(bindings []htypes.ValidatingConfig) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -96,7 +96,7 @@ func (hc *HookController) initValidatingBindings(bindings []ValidatingConfig) {
 	hc.validatingBindings = bindings
 }
 
-func (hc *HookController) initMutatingBindings(bindings []MutatingConfig) {
+func (hc *HookController) initMutatingBindings(bindings []htypes.MutatingConfig) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -105,7 +105,7 @@ func (hc *HookController) initMutatingBindings(bindings []MutatingConfig) {
 	hc.mutatingBindings = bindings
 }
 
-func (hc *HookController) InitConversionBindings(bindings []ConversionConfig, webhookMgr *conversion.WebhookManager) {
+func (hc *HookController) InitConversionBindings(bindings []htypes.ConversionConfig, webhookMgr *conversion.WebhookManager) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -117,7 +117,7 @@ func (hc *HookController) InitConversionBindings(bindings []ConversionConfig, we
 	hc.conversionBindings = bindings
 }
 
-func (hc *HookController) CanHandleKubeEvent(kubeEvent KubeEvent) bool {
+func (hc *HookController) CanHandleKubeEvent(kubeEvent kemtypes.KubeEvent) bool {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.CanHandleEvent(kubeEvent)
 	}
@@ -161,7 +161,7 @@ func (hc *HookController) HandleEnableKubernetesBindings(createTasksFn func(Bind
 	return nil
 }
 
-func (hc *HookController) HandleKubeEvent(event KubeEvent, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleKubeEvent(event kemtypes.KubeEvent, createTasksFn func(BindingExecutionInfo)) {
 	if hc.KubernetesController != nil {
 		execInfo := hc.KubernetesController.HandleEvent(event)
 		if createTasksFn != nil {
@@ -255,47 +255,47 @@ func (hc *HookController) EnableConversionBindings() {
 
 // KubernetesSnapshots returns a 'full snapshot': all snapshots for all registered kubernetes bindings.
 // Note: no caching as in UpdateSnapshots because KubernetesSnapshots used for non-combined binding contexts.
-func (hc *HookController) KubernetesSnapshots() map[string][]ObjectAndFilterResult {
+func (hc *HookController) KubernetesSnapshots() map[string][]kemtypes.ObjectAndFilterResult {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.Snapshots()
 	}
-	return map[string][]ObjectAndFilterResult{}
+	return map[string][]kemtypes.ObjectAndFilterResult{}
 }
 
 // getIncludeSnapshotsFrom returns binding names from 'includeSnapshotsFrom' field.
-func (hc *HookController) getIncludeSnapshotsFrom(bindingType BindingType, bindingName string) []string {
+func (hc *HookController) getIncludeSnapshotsFrom(bindingType htypes.BindingType, bindingName string) []string {
 	includeSnapshotsFrom := make([]string, 0)
 
 	switch bindingType {
-	case OnKubernetesEvent:
+	case htypes.OnKubernetesEvent:
 		for _, binding := range hc.kubernetesBindings {
 			if bindingName == binding.BindingName {
 				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
 				break
 			}
 		}
-	case Schedule:
+	case htypes.Schedule:
 		for _, binding := range hc.scheduleBindings {
 			if bindingName == binding.BindingName {
 				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
 				break
 			}
 		}
-	case KubernetesValidating:
+	case htypes.KubernetesValidating:
 		for _, binding := range hc.validatingBindings {
 			if bindingName == binding.BindingName {
 				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
 				break
 			}
 		}
-	case KubernetesMutating:
+	case htypes.KubernetesMutating:
 		for _, binding := range hc.mutatingBindings {
 			if bindingName == binding.BindingName {
 				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
 				break
 			}
 		}
-	case KubernetesConversion:
+	case htypes.KubernetesConversion:
 		for _, binding := range hc.conversionBindings {
 			if bindingName == binding.BindingName {
 				includeSnapshotsFrom = binding.IncludeSnapshotsFrom
@@ -314,25 +314,25 @@ func (hc *HookController) getIncludeSnapshotsFrom(bindingType BindingType, bindi
 // Combined "Synchronization" binging contexts or "Synchronization"
 // with self-inclusion may require several calls to Snapshot*() methods, but objects
 // may change between these calls.
-func (hc *HookController) UpdateSnapshots(context []BindingContext) []BindingContext {
+func (hc *HookController) UpdateSnapshots(context []bctx.BindingContext) []bctx.BindingContext {
 	if hc.KubernetesController == nil {
 		return context
 	}
 
 	// Cache retrieved snapshots to make them consistent.
-	cache := make(map[string][]ObjectAndFilterResult)
+	cache := make(map[string][]kemtypes.ObjectAndFilterResult)
 
-	newContext := make([]BindingContext, 0)
+	newContext := make([]bctx.BindingContext, 0)
 	for _, bc := range context {
 		newBc := bc
 
 		// Update 'snapshots' field to fresh snapshot based on 'includeSnapshotsFrom' field.
 		// Note: it is a cache-enabled version of KubernetesController.SnapshotsFrom.
-		newBc.Snapshots = make(map[string][]ObjectAndFilterResult)
+		newBc.Snapshots = make(map[string][]kemtypes.ObjectAndFilterResult)
 		includeSnapshotsFrom := hc.getIncludeSnapshotsFrom(bc.Metadata.BindingType, bc.Binding)
 		for _, bindingName := range includeSnapshotsFrom {
 			// Initialize all keys with empty arrays.
-			newBc.Snapshots[bindingName] = make([]ObjectAndFilterResult, 0)
+			newBc.Snapshots[bindingName] = make([]kemtypes.ObjectAndFilterResult, 0)
 			if _, has := cache[bindingName]; !has {
 				cache[bindingName] = hc.KubernetesController.SnapshotsFor(bindingName)
 			}
@@ -342,7 +342,7 @@ func (hc *HookController) UpdateSnapshots(context []BindingContext) []BindingCon
 		}
 
 		// Also refresh 'objects' field for Kubernetes.Synchronization event.
-		if newBc.Metadata.BindingType == OnKubernetesEvent && newBc.Type == TypeSynchronization {
+		if newBc.Metadata.BindingType == htypes.OnKubernetesEvent && newBc.Type == kemtypes.TypeSynchronization {
 			if _, has := cache[bc.Binding]; !has {
 				cache[bc.Binding] = hc.KubernetesController.SnapshotsFor(bc.Binding)
 			}

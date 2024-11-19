@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/task"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 )
@@ -30,16 +30,16 @@ func Test_Operator_startup_tasks(t *testing.T) {
 
 	expectTasks := []struct {
 		taskType    task.TaskType
-		bindingType BindingType
+		bindingType htypes.BindingType
 		hookPrefix  string
 	}{
 		// OnStartup in specified order.
 		// onStartup: 1
-		{HookRun, OnStartup, "hook02"},
+		{HookRun, htypes.OnStartup, "hook02"},
 		// onStartup: 10
-		{HookRun, OnStartup, "hook03"},
+		{HookRun, htypes.OnStartup, "hook03"},
 		// onStartup: 20
-		{HookRun, OnStartup, "hook01"},
+		{HookRun, htypes.OnStartup, "hook01"},
 		// EnableKubernetes and EnableSchedule in alphabet order.
 		{EnableKubernetesBindings, "", "hook01"},
 		{EnableScheduleBindings, "", "hook02"},

@@ -1,4 +1,4 @@
-package schedule_manager
+package schedulemanager
 
 import (
 	"context"

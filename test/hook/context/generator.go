@@ -9,8 +9,9 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/kube-client/fake"
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -23,7 +24,7 @@ func init() {
 
 type GeneratedBindingContexts struct {
 	Rendered        string
-	BindingContexts []BindingContext
+	BindingContexts []bctx.BindingContext
 }
 
 type BindingContextController struct {
@@ -102,7 +103,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	if b.Hook == nil {
-		testHook := hook.NewHook("test", "test", b.logger.Named("hook"))
+		testHook := hook.NewHook("test", "test", app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, b.logger.Named("hook"))
 		testHook, err = testHook.LoadConfig([]byte(b.HookConfig))
 		if err != nil {
 			return GeneratedBindingContexts{}, fmt.Errorf("couldn't load or validate hook configuration: %v", err)
@@ -181,14 +182,14 @@ func (b *BindingContextController) RunBindingWithAllSnapshots(binding types.Bind
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	bc := BindingContext{
+	bc := bctx.BindingContext{
 		Binding:   string(binding),
 		Snapshots: b.HookCtrl.KubernetesSnapshots(),
 	}
 	bc.Metadata.BindingType = binding
 	bc.Metadata.IncludeAllSnapshots = true
 
-	return ConvertToGeneratedBindingContexts([]BindingContext{bc})
+	return ConvertToGeneratedBindingContexts([]bctx.BindingContext{bc})
 }
 
 func (b *BindingContextController) Stop() {

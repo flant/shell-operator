@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
@@ -26,8 +26,8 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	monitorCfg := &MonitorConfig{
 		ApiVersion: "v1",
 		Kind:       "ConfigMap",
-		EventTypes: []WatchEventType{WatchEventAdded, WatchEventModified, WatchEventDeleted},
-		NamespaceSelector: &NamespaceSelector{
+		EventTypes: []kemtypes.WatchEventType{kemtypes.WatchEventAdded, kemtypes.WatchEventModified, kemtypes.WatchEventDeleted},
+		NamespaceSelector: &kemtypes.NamespaceSelector{
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"test-label": "",
@@ -37,7 +37,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	}
 	objsFromEvents := make([]string, 0)
 
-	mon := NewMonitor(context.Background(), fc.Client, nil, monitorCfg, func(ev KubeEvent) {
+	mon := NewMonitor(context.Background(), fc.Client, nil, monitorCfg, func(ev kemtypes.KubeEvent) {
 		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
 	}, log.NewNop())
 
@@ -139,7 +139,7 @@ data:
 `, name)
 }
 
-func snapshotResourceIDs(snap []ObjectAndFilterResult) []string {
+func snapshotResourceIDs(snap []kemtypes.ObjectAndFilterResult) []string {
 	ids := make([]string, 0)
 	for _, obj := range snap {
 		ids = append(ids, obj.Metadata.ResourceId)

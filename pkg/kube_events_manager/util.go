@@ -1,4 +1,4 @@
-package kube_events_manager
+package kubeeventsmanager
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 
-	. "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 // ResourceId describes object with namespace, kind and name
@@ -28,7 +28,7 @@ func FormatLabelSelector(selector *metav1.LabelSelector) (string, error) {
 	return res.String(), nil
 }
 
-func FormatFieldSelector(selector *FieldSelector) (string, error) {
+func FormatFieldSelector(selector *kemtypes.FieldSelector) (string, error) {
 	if selector == nil || selector.MatchExpressions == nil {
 		return "", nil
 	}

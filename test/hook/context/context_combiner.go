@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flant/shell-operator/pkg/hook/binding_context"
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
@@ -54,10 +54,10 @@ func (c *ContextCombiner) AddBindingContext(bindingType types.BindingType, info 
 
 // CombinedContext returns a combined context or a binding context
 // from the first task.
-func (c *ContextCombiner) Combined() []binding_context.BindingContext {
+func (c *ContextCombiner) Combined() []bindingcontext.BindingContext {
 	firstTask := c.q.GetFirst()
 	if firstTask == nil {
-		return []binding_context.BindingContext{}
+		return []bindingcontext.BindingContext{}
 	}
 	taskMeta := firstTask.GetMetadata()
 
@@ -81,11 +81,11 @@ func (c *ContextCombiner) QueueLen() int {
 	return c.q.Length()
 }
 
-func ConvertToGeneratedBindingContexts(bindingContexts []binding_context.BindingContext) (GeneratedBindingContexts, error) {
+func ConvertToGeneratedBindingContexts(bindingContexts []bindingcontext.BindingContext) (GeneratedBindingContexts, error) {
 	res := GeneratedBindingContexts{}
 
 	// Support only v1 binding contexts.
-	bcList := binding_context.ConvertBindingContextList("v1", bindingContexts)
+	bcList := bindingcontext.ConvertBindingContextList("v1", bindingContexts)
 	data, err := bcList.Json()
 	if err != nil {
 		return res, fmt.Errorf("marshaling binding context error: %v", err)

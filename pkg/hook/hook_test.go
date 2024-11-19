@@ -10,7 +10,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/flant/shell-operator/pkg/hook/config"
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
 )
 
 func Test_Hook_SafeName(t *testing.T) {
@@ -24,7 +24,7 @@ func Test_Hook_SafeName(t *testing.T) {
 		t.Error(err)
 	}
 
-	h := NewHook(hookName, hookPath, log.NewNop())
+	h := NewHook(hookName, hookPath, false, false, "", log.NewNop())
 
 	g.Expect(h.SafeName()).To(Equal("002-cool-hooks-monitor-namespaces-py"))
 }
@@ -41,7 +41,7 @@ func Test_CreateLimiter(t *testing.T) {
 		burst    int
 		limit    rate.Limit
 		title    string
-		settings *Settings
+		settings *htypes.Settings
 	}{
 		{
 			title:    "Nil run settings: should return limiter with defaults",
@@ -54,14 +54,14 @@ func Test_CreateLimiter(t *testing.T) {
 			title:    "Empty settings: should return limiter with defaults",
 			limit:    defaultLimit,
 			burst:    defaultBurst,
-			settings: &Settings{},
+			settings: &htypes.Settings{},
 		},
 
 		{
 			title: "Burst is zero, limit is non-zero: should return limiter with zero burst and converted interval",
 			limit: rate.Limit(1 / 20.0),
 			burst: defaultBurst,
-			settings: &Settings{
+			settings: &htypes.Settings{
 				ExecutionMinInterval: 20 * time.Second,
 			},
 		},
@@ -70,7 +70,7 @@ func Test_CreateLimiter(t *testing.T) {
 			title: "Burst is non-zero, limit is zero: should return limiter with default limiter and passed burst",
 			limit: defaultLimit,
 			burst: 3,
-			settings: &Settings{
+			settings: &htypes.Settings{
 				ExecutionBurst: 3,
 			},
 		},
@@ -79,7 +79,7 @@ func Test_CreateLimiter(t *testing.T) {
 			title: "Burst and limit are passed: should run limiter with passed burst and converted interval",
 			limit: rate.Limit(1.0 / 30),
 			burst: 3,
-			settings: &Settings{
+			settings: &htypes.Settings{
 				ExecutionBurst:       3,
 				ExecutionMinInterval: 30 * time.Second,
 			},
@@ -117,7 +117,7 @@ func Test_Hook_WithConfig(t *testing.T) {
 			func() {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(hook.Config).ToNot(BeNil())
-				g.Expect(hook.Config.Bindings()).To(Equal([]BindingType{OnStartup}))
+				g.Expect(hook.Config.Bindings()).To(Equal([]htypes.BindingType{htypes.OnStartup}))
 				g.Expect(hook.Config.OnStartup).ToNot(BeNil())
 				g.Expect(hook.Config.OnStartup.Order).To(Equal(10.0))
 			},
@@ -136,7 +136,7 @@ func Test_Hook_WithConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(_ *testing.T) {
-			hook = NewHook("hook-sh", "/hooks/hook.sh", log.NewNop())
+			hook = NewHook("hook-sh", "/hooks/hook.sh", false, false, "", log.NewNop())
 			_, err = hook.LoadConfig([]byte(test.jsonData))
 			test.fn()
 		})

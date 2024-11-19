@@ -4,11 +4,11 @@ import (
 	"net/http"
 
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/metric_storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 )
 
 func (op *ShellOperator) setupHookMetricStorage() {
-	metricStorage := metric_storage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, true, op.logger.Named("metric-storage"))
+	metricStorage := metricstorage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, true, op.logger.Named("metric-storage"))
 
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics/hooks", metricStorage.Handler().ServeHTTP)
 	// create new metric storage for hooks
@@ -17,7 +17,7 @@ func (op *ShellOperator) setupHookMetricStorage() {
 }
 
 // specific metrics for shell-operator HookManager
-func registerHookMetrics(metricStorage *metric_storage.MetricStorage) {
+func registerHookMetrics(metricStorage *metricstorage.MetricStorage) {
 	// Metrics for enable kubernetes bindings.
 	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", map[string]string{"hook": ""})
 	metricStorage.RegisterCounter("{PREFIX}hook_enable_kubernetes_bindings_errors_total", map[string]string{"hook": ""})

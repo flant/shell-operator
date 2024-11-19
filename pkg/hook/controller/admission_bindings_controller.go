@@ -4,14 +4,14 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admission/v1"
 
-	. "github.com/flant/shell-operator/pkg/hook/binding_context"
-	. "github.com/flant/shell-operator/pkg/hook/types"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 )
 
 // AdmissionBindingToWebhookLink is a link between a hook and a webhook configuration.
 type AdmissionBindingToWebhookLink struct {
-	BindingType     BindingType
+	BindingType     htypes.BindingType
 	BindingName     string
 	ConfigurationId string
 	WebhookId       string
@@ -26,8 +26,8 @@ type AdmissionBindingsController struct {
 	// WebhookId -> link
 	AdmissionLinks map[string]*AdmissionBindingToWebhookLink
 
-	ValidatingBindings []ValidatingConfig
-	MutatingBindings   []MutatingConfig
+	ValidatingBindings []htypes.ValidatingConfig
+	MutatingBindings   []htypes.MutatingConfig
 
 	webhookManager *admission.WebhookManager
 }
@@ -39,11 +39,11 @@ var NewValidatingBindingsController = func() *AdmissionBindingsController {
 	}
 }
 
-func (c *AdmissionBindingsController) WithValidatingBindings(bindings []ValidatingConfig) {
+func (c *AdmissionBindingsController) WithValidatingBindings(bindings []htypes.ValidatingConfig) {
 	c.ValidatingBindings = bindings
 }
 
-func (c *AdmissionBindingsController) WithMutatingBindings(bindings []MutatingConfig) {
+func (c *AdmissionBindingsController) WithMutatingBindings(bindings []htypes.MutatingConfig) {
 	c.MutatingBindings = bindings
 }
 
@@ -74,7 +74,7 @@ func (c *AdmissionBindingsController) EnableValidatingBindings() {
 
 	for _, config := range c.ValidatingBindings {
 		c.AdmissionLinks[config.Webhook.Metadata.WebhookId] = &AdmissionBindingToWebhookLink{
-			BindingType:      KubernetesValidating,
+			BindingType:      htypes.KubernetesValidating,
 			BindingName:      config.BindingName,
 			ConfigurationId:  c.ConfigurationId,
 			WebhookId:        config.Webhook.Metadata.WebhookId,
@@ -108,7 +108,7 @@ func (c *AdmissionBindingsController) EnableMutatingBindings() {
 
 	for _, config := range c.MutatingBindings {
 		c.AdmissionLinks[config.Webhook.Metadata.WebhookId] = &AdmissionBindingToWebhookLink{
-			BindingType:      KubernetesMutating,
+			BindingType:      htypes.KubernetesMutating,
 			BindingName:      config.BindingName,
 			ConfigurationId:  c.ConfigurationId,
 			WebhookId:        config.Webhook.Metadata.WebhookId,
@@ -139,7 +139,7 @@ func (c *AdmissionBindingsController) HandleEvent(event admission.Event) Binding
 	if c.ConfigurationId != event.ConfigurationId {
 		log.Errorf("Possible bug!!! Unknown validating event: no binding for configurationId '%s' (webhookId '%s')", event.ConfigurationId, event.WebhookId)
 		return BindingExecutionInfo{
-			BindingContext: []BindingContext{},
+			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
 		}
 	}
@@ -148,12 +148,12 @@ func (c *AdmissionBindingsController) HandleEvent(event admission.Event) Binding
 	if !hasKey {
 		log.Errorf("Possible bug!!! Unknown validating event: no binding for configurationId '%s', webhookId '%s'", event.ConfigurationId, event.WebhookId)
 		return BindingExecutionInfo{
-			BindingContext: []BindingContext{},
+			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
 		}
 	}
 
-	bc := BindingContext{
+	bc := bctx.BindingContext{
 		Binding:         link.BindingName,
 		AdmissionReview: &v1.AdmissionReview{Request: event.Request},
 	}
@@ -162,7 +162,7 @@ func (c *AdmissionBindingsController) HandleEvent(event admission.Event) Binding
 	bc.Metadata.Group = link.Group
 
 	return BindingExecutionInfo{
-		BindingContext:   []BindingContext{bc},
+		BindingContext:   []bctx.BindingContext{bc},
 		Binding:          link.BindingName,
 		IncludeSnapshots: link.IncludeSnapshots,
 		Group:            link.Group,
