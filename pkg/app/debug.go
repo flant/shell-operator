@@ -30,11 +30,7 @@ func DefineDebugFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
 	cmd.Flag("debug-keep-tmp-files", "set to yes to disable cleanup of temporary files").
 		Envar("DEBUG_KEEP_TMP_FILES").
 		Hidden().
-		Default(DebugKeepTmpFilesVar).Action(func(_ *kingpin.ParseContext) error {
-		DebugKeepTmpFiles = DebugKeepTmpFilesVar == "yes"
-
-		return nil
-	}).
+		Default(DebugKeepTmpFilesVar).
 		StringVar(&DebugKeepTmpFilesVar)
 
 	cmd.Flag("debug-kubernetes-api", "enable client-go debug messages").
