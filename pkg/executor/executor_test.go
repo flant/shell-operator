@@ -108,8 +108,8 @@ func TestRunAndLogLines(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, buf.String(), `{"level":"debug","msg":"Executing command 'echo [\"a\",\"b\",\"c\"]' in '' dir","source":"executor/executor.go:101","a":"b","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:170","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:173","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
+			`{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:173","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:176","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
 	})
@@ -142,6 +142,24 @@ c d
 		_, err := ex.RunAndLogLines(map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"a b","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"info","msg":"c d","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
+
+		buf.Reset()
+	})
+
+	t.Run("multiline non json with json proxy on", func(t *testing.T) {
+		arg := `
+a b
+c d
+`
+		ex := NewExecutor("", "echo", []string{arg}, []string{}).
+			WithLogProxyHookJSON(true).
+			WithLogger(logger)
+
+		_, err := ex.RunAndLogLines(map[string]string{"foor": "baar"})
+		assert.NoError(t, err)
+		assert.Equal(t, buf.String(), `{"level":"warn","msg":"output is not json","error":"invalid character 'a' looking for beginning of value","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"info","msg":"a b","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
 			`{"level":"info","msg":"c d","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()

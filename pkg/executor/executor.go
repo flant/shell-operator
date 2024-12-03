@@ -158,7 +158,10 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 			return len(p), nil
 		}
 
-		return len(p), err
+		pl.logger.Warn("output is not json", slog.String("error", err.Error()))
+		pl.writerScanner(p)
+
+		return len(p), nil
 	}
 
 	logMap, ok := line.(map[string]interface{})
@@ -191,7 +194,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 	}
 
 	// logEntry.Log(log.FatalLevel, string(logLine))
-	logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", slog.Any("hook", logMap))
+	logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", log.RawJSON("hook", logLine))
 
 	return len(p), nil
 }
