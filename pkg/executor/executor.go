@@ -194,7 +194,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 	}
 
 	// logEntry.Log(log.FatalLevel, string(logLine))
-	logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", log.RawJSON("hook", logLine))
+	logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", slog.Any("hook", logMap))
 
 	return len(p), nil
 }
