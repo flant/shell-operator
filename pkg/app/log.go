@@ -16,7 +16,7 @@ var (
 	LogLevel         = "info"
 	LogNoTime        = false
 	LogType          = "text"
-	LogProxyHookJSON = true
+	LogProxyHookJSON = false
 )
 
 // ForcedDurationForDebugLevel - force expiration for debug level.
