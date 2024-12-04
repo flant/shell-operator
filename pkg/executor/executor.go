@@ -158,7 +158,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 			return len(p), nil
 		}
 
-		pl.logger.Warn("output is not json", slog.String("error", err.Error()))
+		pl.logger.Debug("output is not json", slog.String("error", err.Error()))
 		pl.writerScanner(p)
 
 		return len(p), nil
