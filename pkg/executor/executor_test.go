@@ -158,8 +158,7 @@ c d
 
 		_, err := ex.RunAndLogLines(map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
-		assert.Equal(t, buf.String(), `{"level":"warn","msg":"output is not json","error":"invalid character 'a' looking for beginning of value","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"info","msg":"a b","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+		assert.Equal(t, buf.String(), `{"level":"info","msg":"a b","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
 			`{"level":"info","msg":"c d","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
