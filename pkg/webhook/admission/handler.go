@@ -3,7 +3,6 @@ package admission
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -64,7 +63,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 
 	admissionResponse, err := h.handleReviewRequest(r.URL.Path, admissionReview.Request)
 	if err != nil {
-		log.Error("validation failed", "request", admissionReview.Request.UID, slog.String("error", err.Error()))
+		log.Error("validation failed", "request", admissionReview.Request.UID, log.Err(err))
 		admissionReview.Response = errored(err)
 	} else {
 		admissionReview.Response = admissionResponse

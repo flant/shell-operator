@@ -24,8 +24,8 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241106140903-258b93b3334e h1:QUQy+5Bv7/UzhfrytiG3c5gfLGhPppepVbRpbMisVIw=
-github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241106140903-258b93b3334e/go.mod h1:Mk5HRzkc5pIcDIZ2JJ6DPuuqnwhXVkb3you8M8Mg+4w=
+github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241205040953-7b376bae249c h1:dK30IW9uGg0DvSy+IcdQ6zwEBRV55R7tEtaruEKYkSA=
+github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241205040953-7b376bae249c/go.mod h1:Mk5HRzkc5pIcDIZ2JJ6DPuuqnwhXVkb3you8M8Mg+4w=
 github.com/docker/go-units v0.4.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/emicklei/go-restful/v3 v3.11.0 h1:rAQeMHw1c7zTmncogyy8VvRZwtkmkZ4FxERmMY4rD+g=
 github.com/emicklei/go-restful/v3 v3.11.0/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
