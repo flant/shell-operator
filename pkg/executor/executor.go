@@ -108,10 +108,10 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 	err := e.cmd.Run()
 	if err != nil {
 		if len(stdErr.Bytes()) > 0 {
-			return nil, fmt.Errorf("%s", stdErr.String())
+			return nil, fmt.Errorf("stderr: %s", stdErr.String())
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("cmd run: %w", err)
 	}
 
 	var usage *CmdUsage
@@ -129,7 +129,7 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 		}
 	}
 
-	return usage, err
+	return usage, nil
 }
 
 type proxyLogger struct {
@@ -175,7 +175,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 		// fall back to using the logger
 		pl.logger.Info(string(p))
 
-		return len(p), err
+		return len(p), nil
 	}
 
 	// logEntry.Log(log.FatalLevel, string(logLine))
