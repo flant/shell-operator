@@ -108,10 +108,10 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 	err := e.cmd.Run()
 	if err != nil {
 		if len(stdErr.Bytes()) > 0 {
-			return nil, fmt.Errorf("%s", stdErr.String())
+			return nil, fmt.Errorf("stderr: %s", stdErr.String())
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("cmd run: %w", err)
 	}
 
 	var usage *CmdUsage
@@ -129,7 +129,7 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 		}
 	}
 
-	return usage, err
+	return usage, nil
 }
 
 type proxyLogger struct {
@@ -158,7 +158,10 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 			return len(p), nil
 		}
 
-		return len(p), err
+		pl.logger.Debug("output is not json", log.Err(err))
+		pl.writerScanner(p)
+
+		return len(p), nil
 	}
 
 	logMap, ok := line.(map[string]interface{})
@@ -172,26 +175,11 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 		// fall back to using the logger
 		pl.logger.Info(string(p))
 
-		return len(p), err
-	}
-
-	logger := pl.logger.With(pl.proxyJsonLogKey, true)
-
-	logLineRaw, _ := json.Marshal(logMap)
-	logLine := string(logLineRaw)
-
-	if len(logLine) > 10000 {
-		logLine = fmt.Sprintf("%s:truncated", logLine[:10000])
-
-		logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", slog.Any("hook", map[string]any{
-			"truncated": logLine,
-		}))
-
 		return len(p), nil
 	}
 
 	// logEntry.Log(log.FatalLevel, string(logLine))
-	logger.Log(context.Background(), log.LevelFatal.Level(), "hook result", slog.Any("hook", logMap))
+	pl.mergeAndLogInputLog(context.TODO(), logMap, "hook")
 
 	return len(p), nil
 }
@@ -232,6 +220,49 @@ func (pl *proxyLogger) writerScanner(p []byte) {
 
 	// If there was an error while scanning the input, log an error
 	if err := scanner.Err(); err != nil {
-		pl.logger.Error("reading from scanner", slog.String("error", err.Error()))
+		pl.logger.Error("reading from scanner", log.Err(err))
 	}
+}
+
+// level = level
+// msg = msg
+// prefix for all fields hook_
+// source = hook_source
+// stacktrace = hook_stacktrace
+func (pl *proxyLogger) mergeAndLogInputLog(ctx context.Context, inputLog map[string]interface{}, prefix string) {
+	var lvl log.Level
+
+	lvlRaw, ok := inputLog[slog.LevelKey].(string)
+	if ok {
+		lvl = log.LogLevelFromStr(lvlRaw)
+		delete(inputLog, slog.LevelKey)
+	}
+
+	msg, ok := inputLog[slog.MessageKey].(string)
+	if !ok {
+		msg = "hook result"
+	}
+	delete(inputLog, slog.MessageKey)
+	delete(inputLog, slog.TimeKey)
+
+	logLineRaw, _ := json.Marshal(inputLog)
+	logLine := string(logLineRaw)
+
+	logger := pl.logger.With(pl.proxyJsonLogKey, true)
+
+	if len(logLine) > 10000 {
+		logLine = fmt.Sprintf("%s:truncated", logLine[:10000])
+
+		logger.Log(ctx, lvl.Level(), msg, slog.Any("hook", map[string]any{
+			"truncated": logLine,
+		}))
+
+		return
+	}
+
+	for key, val := range inputLog {
+		logger = logger.With(slog.Any(prefix+"_"+key, val))
+	}
+
+	logger.Log(ctx, lvl.Level(), msg)
 }

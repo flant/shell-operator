@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -67,7 +66,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 
 	conversionResponse, err := h.handleReviewRequest(crdName, convertReview.Request)
 	if err != nil {
-		log.Error("failed to convert", "request", convertReview.Request.UID, slog.String("error", err.Error()))
+		log.Error("failed to convert", "request", convertReview.Request.UID, log.Err(err))
 		convertReview.Response = errored(err)
 	} else {
 		convertReview.Response = conversionResponse

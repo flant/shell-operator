@@ -268,7 +268,7 @@ func (c *Config) callOnChange(name string, oldValue string, newValue string) {
 	err := c.params[name].onChange(oldValue, newValue)
 	if err != nil {
 		c.logger.Error("OnChange handler failed for parameter during value change values",
-			slog.String("parameter", name), slog.String("old_value", oldValue), slog.String("new_value", newValue), slog.String("error", err.Error()))
+			slog.String("parameter", name), slog.String("old_value", oldValue), slog.String("new_value", newValue), log.Err(err))
 	}
 	c.m.Lock()
 	delete(c.errors, name)
