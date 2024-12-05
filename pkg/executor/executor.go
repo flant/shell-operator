@@ -224,6 +224,11 @@ func (pl *proxyLogger) writerScanner(p []byte) {
 	}
 }
 
+// level = level
+// msg = msg
+// prefix for all fields hook_
+// source = hook_source
+// stacktrace = hook_stacktrace
 func (pl *proxyLogger) mergeAndLogInputLog(ctx context.Context, inputLog map[string]interface{}, prefix string) {
 	var lvl log.Level
 
