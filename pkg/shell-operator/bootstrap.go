@@ -3,7 +3,6 @@ package shell_operator
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -34,13 +33,13 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 
 	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "hooks directory is required", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "hooks directory is required", log.Err(err))
 		return nil, err
 	}
 
 	tempDir, err := utils.EnsureTempDirectory(app.TempDir)
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "temp directory", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "temp directory", log.Err(err))
 		return nil, err
 	}
 
@@ -49,7 +48,7 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 	// Debug server.
 	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "start Debug server", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "start Debug server", log.Err(err))
 		return nil, err
 	}
 
@@ -59,13 +58,13 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		"queue":   "",
 	})
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble common operator", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble common operator", log.Err(err))
 		return nil, err
 	}
 
 	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble shell operator", slog.String("error", err.Error()))
+		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble shell operator", log.Err(err))
 		return nil, err
 	}
 
