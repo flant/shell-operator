@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -383,7 +384,7 @@ func (q *TaskQueue) debugf(format string, args ...interface{}) {
 	if !q.debug {
 		return
 	}
-	log.Debugf(format, args...)
+	log.Debug("", fmt.Sprintf(format, args...))
 }
 
 func (q *TaskQueue) Stop() {
@@ -398,7 +399,7 @@ func (q *TaskQueue) Start() {
 	}
 
 	if q.Handler == nil {
-		log.Errorf("queue %s: should set handler before start", q.Name)
+		log.Error("should set handler before start in queue", slog.String("name", q.Name))
 		q.Status = "no handler set"
 		return
 	}
@@ -411,7 +412,7 @@ func (q *TaskQueue) Start() {
 			t := q.waitForTask(sleepDelay)
 			if t == nil {
 				q.Status = "stop"
-				log.Infof("queue '%s' stopped", q.Name)
+				log.Info("queue stopped", slog.String("name", q.Name))
 				return
 			}
 
@@ -424,10 +425,10 @@ func (q *TaskQueue) Start() {
 			q.Status = "run first task"
 			taskRes := q.Handler(t)
 
-			// Check Done channel after long running operation.
+			// Check Done channel after long-running operation.
 			select {
 			case <-q.ctx.Done():
-				log.Infof("queue '%s' stopped after task handling", q.Name)
+				log.Info("queue stopped after task handling", slog.String("name", q.Name))
 				q.Status = "stop"
 				return
 			default:

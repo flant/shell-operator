@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,7 +19,7 @@ func WaitForProcessInterruption(cb ...func()) {
 	interruptCh := make(chan os.Signal, 1)
 
 	forcedExit := func(s os.Signal) {
-		log.Infof("Forced shutdown by '%s' signal", s.String())
+		log.Info("Forced shutdown by signal", slog.String("name", s.String()))
 
 		signum := 0
 		if v, ok := s.(syscall.Signal); ok {
@@ -34,7 +35,7 @@ func WaitForProcessInterruption(cb ...func()) {
 		switch allowedCount {
 		case 0:
 			if len(cb) > 0 {
-				log.Infof("Grace shutdown by '%s' signal", sig.String())
+				log.Info("Grace shutdown by signal", slog.String("name", sig.String()))
 				cb[0]()
 			} else {
 				forcedExit(sig)

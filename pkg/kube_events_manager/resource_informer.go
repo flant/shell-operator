@@ -3,6 +3,7 @@ package kubeeventsmanager
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"runtime/trace"
 	"sync"
 	"time"
@@ -109,12 +110,18 @@ func (ei *resourceInformer) createSharedInformer() error {
 	var err error
 
 	// discover GroupVersionResource for informer
-	log.Debugf("%s: discover GVR for apiVersion '%s' kind '%s'...", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind)
+	log.Debug("discover GVR for apiVersion...",
+		slog.String("debugName", ei.Monitor.Metadata.DebugName),
+		slog.String("apiVersion", ei.Monitor.ApiVersion),
+		slog.String("kind", ei.Monitor.Kind))
 	if ei.GroupVersionResource, err = ei.KubeClient.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind); err != nil {
 		return fmt.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %w", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 	}
 
-	log.Debugf("%s: GVR for kind '%s' is '%s'", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.GroupVersionResource.String())
+	log.Debug("%GVR for kind",
+		slog.String("debugName", ei.Monitor.Metadata.DebugName),
+		slog.String("kind", ei.Monitor.Kind),
+		slog.String("GVR", ei.GroupVersionResource.String()))
 
 	// define tweakListOptions for informer
 	fmtLabelSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
@@ -189,18 +196,26 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		Namespace(ei.Namespace).
 		List(context.TODO(), ei.ListOptions)
 	if err != nil {
-		log.Errorf("%s: initial list resources of kind '%s': %v", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, err)
+		log.Error("%s: initial list resources of kind '%s': %v",
+			slog.String("debugName", ei.Monitor.Metadata.DebugName),
+			slog.String("kind", ei.Monitor.Kind),
+			log.Err(err))
 		return err
 	}
 
 	if objList == nil || len(objList.Items) == 0 {
-		log.Debugf("%s: Got no existing '%s' resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind)
+		log.Debug("Got no existing resources",
+			slog.String("debugName", ei.Monitor.Metadata.DebugName),
+			slog.String("kind", ei.Monitor.Kind))
 		return nil
 	}
 
 	// FIXME objList.Items has too much information for log
 	// log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
-	log.Debugf("%s: '%s' initial list: Got %d existing resources", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, len(objList.Items))
+	log.Debug("initial list: Got existing resources",
+		slog.String("debugName", ei.Monitor.Metadata.DebugName),
+		slog.String("kind", ei.Monitor.Kind),
+		slog.Int("count", len(objList.Items)))
 
 	filteredObjects := make(map[string]*kemtypes.ObjectAndFilterResult)
 
@@ -228,10 +243,10 @@ func (ei *resourceInformer) loadExistedObjects() error {
 
 		filteredObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
-		log.Debugf("%s: initial list: '%s' is cached with checksum %s",
-			ei.Monitor.Metadata.DebugName,
-			objFilterRes.Metadata.ResourceId,
-			objFilterRes.Metadata.Checksum)
+		log.Debug("initial list: cached with checksum",
+			slog.String("debugName", ei.Monitor.Metadata.DebugName),
+			slog.String("resourceId", objFilterRes.Metadata.ResourceId),
+			slog.String("checksum", objFilterRes.Metadata.Checksum))
 	}
 
 	// Save objects to the cache.
@@ -266,11 +281,11 @@ func (ei *resourceInformer) OnDelete(obj interface{}) {
 func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemtypes.WatchEventType) {
 	// check if stop
 	if ei.stopped {
-		log.Debugf("%s: received WATCH for a stopped %s/%s informer %s",
-			ei.Monitor.Metadata.DebugName,
-			ei.Namespace,
-			ei.Name,
-			eventType)
+		log.Debug("received WATCH for stopped informer",
+			slog.String("debugName", ei.Monitor.Metadata.DebugName),
+			slog.String("namespace", ei.Namespace),
+			slog.String("name", ei.Name),
+			slog.String("eventType", string(eventType)))
 		return
 	}
 
@@ -298,10 +313,10 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, obj)
 	}()
 	if err != nil {
-		log.Errorf("%s: WATCH %s: %s",
-			ei.Monitor.Metadata.DebugName,
-			eventType,
-			err)
+		log.Error("handleWatchEvent: applyFilter error",
+			slog.String("debugName", ei.Monitor.Metadata.DebugName),
+			slog.String("eventType", string(eventType)),
+			log.Err(err))
 		return
 	}
 
@@ -321,10 +336,10 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		skipEvent := false
 		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
 			// update object in cache and do not send event
-			log.Debugf("%s: %s %s: checksum is not changed, no KubeEvent",
-				ei.Monitor.Metadata.DebugName,
-				string(eventType),
-				resourceId,
+			log.Debug("skip KubeEvent",
+				slog.String("debugName", ei.Monitor.Metadata.DebugName),
+				slog.String("eventType", string(eventType)),
+				slog.String("resourceId", resourceId),
 			)
 			skipEvent = true
 		}
@@ -363,11 +378,10 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 
 	// Fire KubeEvent only if needed.
 	if ei.shouldFireEvent(eventType) {
-		log.Debugf("%s: %s %s: send KubeEvent",
-			ei.Monitor.Metadata.DebugName,
-			string(eventType),
-			resourceId,
-		)
+		log.Debug("send KubeEvent",
+			slog.String("debugName", ei.Monitor.Metadata.DebugName),
+			slog.String("eventType", string(eventType)),
+			slog.String("resourceId", resourceId))
 		// TODO: should be disabled by default and enabled by a debug feature switch
 		// log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
@@ -438,7 +452,7 @@ func (ei *resourceInformer) shouldFireEvent(checkEvent kemtypes.WatchEventType) 
 }
 
 func (ei *resourceInformer) start() {
-	log.Debugf("%s: RUN resource informer", ei.Monitor.Metadata.DebugName)
+	log.Debug("RUN resource informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 
 	go func() {
 		if ei.ctx != nil {
@@ -451,15 +465,15 @@ func (ei *resourceInformer) start() {
 	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage, ei.logger.Named("watch-error-handler"))
 	err := DefaultFactoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
-		ei.Monitor.Logger.Errorf("%s: cache is not synced for informer", ei.Monitor.Metadata.DebugName)
+		ei.Monitor.Logger.Error("cache is not synced for informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 		return
 	}
 
-	log.Debugf("%s: informer is ready", ei.Monitor.Metadata.DebugName)
+	log.Debug("informer is ready", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 }
 
 func (ei *resourceInformer) pauseHandleEvents() {
-	log.Debugf("%s: PAUSE resource informer", ei.Monitor.Metadata.DebugName)
+	log.Debug("PAUSE resource informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 	ei.stopped = true
 }
 

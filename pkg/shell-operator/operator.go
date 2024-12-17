@@ -3,6 +3,7 @@ package shell_operator
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -136,7 +137,7 @@ func (op *ShellOperator) initHookManager() error {
 			"binding":  string(types.OnKubernetesEvent),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry.Debugf("Create tasks for 'kubernetes' event '%s'", kubeEvent.String())
+		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
 
 		var tasks []task.Task
 		op.HookManager.HandleKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
@@ -154,7 +155,7 @@ func (op *ShellOperator) initHookManager() error {
 			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
 
 			logEntry.With("queue", info.QueueName).
-				Infof("queue task %s", newTask.GetDescription())
+				Info("queue task", slog.String("name", newTask.GetDescription()))
 		})
 
 		return tasks
@@ -165,7 +166,7 @@ func (op *ShellOperator) initHookManager() error {
 			"binding":  string(types.Schedule),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry.Debugf("Create tasks for 'schedule' event '%s'", crontab)
+		logEntry.Debug("Create tasks for 'schedule' event", slog.String("name", crontab))
 
 		var tasks []task.Task
 		op.HookManager.HandleScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
@@ -183,7 +184,7 @@ func (op *ShellOperator) initHookManager() error {
 			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
 
 			logEntry.With("queue", info.QueueName).
-				Infof("queue task %s", newTask.GetDescription())
+				Info("queue task", slog.String("name", newTask.GetDescription()))
 		})
 
 		return tasks
@@ -229,7 +230,10 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			"event":    string(eventBindingType),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry.Debugf("Handle '%s' event '%s' '%s'", eventBindingType, event.ConfigurationId, event.WebhookId)
+		logEntry.Debug("Handle event",
+			slog.String("type", string(eventBindingType)),
+			slog.String("configurationId", event.ConfigurationId),
+			slog.String("webhookID", event.WebhookId))
 
 		var admissionTask task.Task
 		op.HookManager.HandleAdmissionEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
@@ -248,7 +252,10 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 
 		// Assert exactly one task is created.
 		if admissionTask == nil {
-			logEntry.Errorf("Possible bug!!! No hook found for '%s' event '%s' '%s'", string(types.KubernetesValidating), event.ConfigurationId, event.WebhookId)
+			logEntry.Error("Possible bug!!! No hook found for event",
+				slog.String("type", string(types.KubernetesValidating)),
+				slog.String("configurationId", event.ConfigurationId),
+				slog.String("webhookID", event.WebhookId))
 			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
 		}
 
@@ -264,7 +271,8 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 		admissionProp := admissionTask.GetProp("admissionResponse")
 		admissionResponse, ok := admissionProp.(*admission.Response)
 		if !ok {
-			logEntry.Errorf("'admissionResponse' task prop is not of type *AdmissionResponse: %T", admissionProp)
+			logEntry.Error("'admissionResponse' task prop is not of type *AdmissionResponse",
+				slog.String("type", fmt.Sprintf("%T", admissionProp)))
 			return nil, fmt.Errorf("hook task prop error")
 		}
 		return admissionResponse, nil
@@ -318,7 +326,10 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 	logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 
 	sourceVersions := conversion.ExtractAPIVersions(request.Objects)
-	logEntry.Infof("Handle '%s' event for crd/%s: %d objects with versions %v", string(types.KubernetesConversion), crdName, len(request.Objects), sourceVersions)
+	logEntry.Info("Handle kubernetesCustomResourceConversion event for crd",
+		slog.String("name", crdName),
+		slog.Int("len", len(request.Objects)),
+		slog.Any("versions", sourceVersions))
 
 	done := false
 	for _, srcVer := range sourceVersions {
@@ -330,7 +341,9 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 		if len(convPath) == 0 {
 			continue
 		}
-		logEntry.Infof("Find conversion path for %s: %v", rule.String(), convPath)
+		logEntry.Info("Find conversion path for rule",
+			slog.String("name", rule.String()),
+			slog.Any("value", convPath))
 
 		for _, convRule := range convPath {
 			var convTask task.Task
@@ -364,7 +377,8 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 			prop := convTask.GetProp("conversionResponse")
 			response, ok := prop.(*conversion.Response)
 			if !ok {
-				logEntry.Errorf("'conversionResponse' task prop is not of type *conversion.Response: %T", prop)
+				logEntry.Error("'conversionResponse' task prop is not of type *conversion.Response",
+					slog.String("type", fmt.Sprintf("%T", prop)))
 				return nil, fmt.Errorf("hook task prop error")
 			}
 
@@ -422,7 +436,7 @@ func (op *ShellOperator) taskHandler(t task.Task) queue.TaskResult {
 
 		taskHook := op.HookManager.GetHook(hookMeta.HookName)
 		taskHook.HookController.EnableScheduleBindings()
-		taskLogEntry.Infof("Schedule binding for hook enabled successfully")
+		taskLogEntry.Info("Schedule binding for hook enabled successfully")
 		res.Status = "Success"
 	}
 
@@ -478,11 +492,14 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(t task.Task) queue.T
 	if err != nil {
 		errors = 1.0
 		t.UpdateFailureMessage(err.Error())
-		taskLogEntry.Errorf("Enable Kubernetes binding for hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
+		taskLogEntry.Error("Enable Kubernetes binding for hook failed. Will retry after delay.",
+			slog.Int("failedCount", t.GetFailureCount()+1),
+			log.Err(err))
 		res.Status = "Fail"
 	} else {
 		success = 1.0
-		taskLogEntry.Infof("Kubernetes bindings for hook are enabled successfully, %d tasks generated", len(hookRunTasks))
+		taskLogEntry.Info("Kubernetes bindings for hook are enabled successfully",
+			slog.Int("count", len(hookRunTasks)))
 		res.Status = "Success"
 		now := time.Now()
 		for _, t := range hookRunTasks {
@@ -580,18 +597,20 @@ func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
 		if err != nil {
 			if hookMeta.AllowFailure {
 				allowed = 1.0
-				taskLogEntry.Infof("Hook failed, but allowed to fail: %v", err)
+				taskLogEntry.Info("Hook failed, but allowed to fail", log.Err(err))
 				res.Status = "Success"
 			} else {
 				errors = 1.0
 				t.UpdateFailureMessage(err.Error())
 				t.WithQueuedAt(time.Now()) // Reset queueAt for correct results in 'task_wait_in_queue' metric.
-				taskLogEntry.Errorf("Hook failed. Will retry after delay. Failed count is %d. Error: %s", t.GetFailureCount()+1, err)
+				taskLogEntry.Error("Hook failed. Will retry after delay.",
+					slog.Int("failedCount", t.GetFailureCount()+1),
+					log.Err(err))
 				res.Status = "Fail"
 			}
 		} else {
 			success = 1.0
-			taskLogEntry.Infof("Hook executed successfully")
+			taskLogEntry.Info("Hook executed successfully")
 			res.Status = "Success"
 		}
 		op.MetricStorage.CounterAdd("{PREFIX}hook_run_allowed_errors_total", allowed, metricLabels)
@@ -612,7 +631,7 @@ func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
 
 func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMeta task_metadata.HookMetadata, taskLogEntry *log.Logger, hookLogLabels map[string]string, metricLabels map[string]string) error {
 	for _, info := range taskHook.HookController.SnapshotsInfo() {
-		taskLogEntry.Debugf("snapshot info: %s", info)
+		taskLogEntry.Debug("snapshot info", slog.String("info", info))
 	}
 
 	result, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
@@ -631,8 +650,12 @@ func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 		return err
 	}
 
-	if result != nil && result.Usage != nil {
-		taskLogEntry.Debugf("Usage: %+v", result.Usage)
+	if result == nil {
+		return nil
+	}
+
+	if result.Usage != nil {
+		taskLogEntry.Debug("Usage", slog.String("value", fmt.Sprintf("%+v", result.Usage)))
 		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", result.Usage.Sys.Seconds(), metricLabels, nil)
 		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", result.Usage.User.Seconds(), metricLabels, nil)
 		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(result.Usage.MaxRss)*1024, metricLabels)
@@ -661,19 +684,21 @@ func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 	// Save validatingResponse in task props for future use.
 	if result.AdmissionResponse != nil {
 		t.SetProp("admissionResponse", result.AdmissionResponse)
-		taskLogEntry.Infof("AdmissionResponse from hook: %s", result.AdmissionResponse.Dump())
+		taskLogEntry.Info("AdmissionResponse from hook",
+			slog.String("value", result.AdmissionResponse.Dump()))
 	}
 
 	// Save conversionResponse in task props for future use.
 	if result.ConversionResponse != nil {
 		t.SetProp("conversionResponse", result.ConversionResponse)
-		taskLogEntry.Infof("ConversionResponse from hook: %s", result.ConversionResponse.Dump())
+		taskLogEntry.Info("ConversionResponse from hook",
+			slog.String("value", result.ConversionResponse.Dump()))
 	}
 
 	return nil
 }
 
-// combineBindingContextForHook combines binding contexts from a sequence of task with similar
+// CombineBindingContextForHook combines binding contexts from a sequence of task with similar
 // hook name and task type into array of binding context and delete excess tasks from queue.
 //
 // Also, sequences of binding contexts with similar group are compacted in one binding context.
@@ -712,7 +737,7 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 		}
 		nextHookName := hm.(task_metadata.HookNameAccessor).GetHookName()
 		// Only tasks for the same hook and of the same type can be combined (HookRun cannot be combined with OnStartup).
-		// Using stopCombineFn function more stricter combine rules can be defined.
+		// Using stopCombineFn function stricter combine rules can be defined.
 		if nextHookName == hookName && t.GetType() == tsk.GetType() {
 			if stopCombineFn != nil {
 				stopIterate = stopCombineFn(tsk)
@@ -777,7 +802,11 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	} else {
 		compactMsg = fmt.Sprintf("are combined to %d contexts", len(combinedContext))
 	}
-	log.Infof("Binding contexts from %d tasks %s. %d tasks are dropped from queue '%s'", len(otherTasks)+1, compactMsg, len(tasksFilter)-1, t.GetQueueName())
+	log.Info("Binding contexts from tasks. Tasks are dropped from queue",
+		slog.Int("count", len(otherTasks)+1),
+		slog.String("tasks", compactMsg),
+		slog.Int("filteredCount", len(tasksFilter)-1),
+		slog.String("queueName", t.GetQueueName()))
 
 	res.BindingContexts = compactedContext
 	res.MonitorIDs = monitorIDs
@@ -798,7 +827,7 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 	// Add tasks to run OnStartup bindings
 	onStartupHooks, err := op.HookManager.GetHooksInOrder(types.OnStartup)
 	if err != nil {
-		logEntry.Errorf("%v", err)
+		logEntry.Error("add tasks to run OnStartup bindings", log.Err(err))
 		return
 	}
 
@@ -816,7 +845,9 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 			}).
 			WithQueuedAt(time.Now())
 		mainQueue.AddLast(newTask)
-		logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
+		logEntry.Info("queue task with hook",
+			slog.String("task", newTask.GetDescription()),
+			slog.String("hook", hookName))
 	}
 
 	// Add tasks to enable kubernetes monitors and schedules for each hook
@@ -831,7 +862,9 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 				}).
 				WithQueuedAt(time.Now())
 			mainQueue.AddLast(newTask)
-			logEntry.Infof("queue task %s for hook %s", newTask.GetDescription(), hookName)
+			logEntry.Info("queue task with hook",
+				slog.String("task", newTask.GetDescription()),
+				slog.String("hook", hookName))
 		}
 
 		if h.GetConfig().HasBinding(types.Schedule) {
@@ -842,7 +875,9 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 				}).
 				WithQueuedAt(time.Now())
 			mainQueue.AddLast(newTask)
-			logEntry.Infof("queue task %s with hook %s", newTask.GetDescription(), hookName)
+			logEntry.Info("queue task with hook",
+				slog.String("task", newTask.GetDescription()),
+				slog.String("hook", hookName))
 		}
 	}
 }

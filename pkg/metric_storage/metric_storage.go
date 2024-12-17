@@ -3,6 +3,7 @@ package metricstorage
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -94,7 +95,11 @@ func (m *MetricStorage) GaugeSet(metric string, value float64, labels map[string
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Errorf("Metric gauge set %s %v with %v: %v", m.resolveMetricName(metric), LabelNames(labels), labels, r)
+			m.logger.Error("Metric gauge set",
+				slog.String("metric", m.resolveMetricName(metric)),
+				slog.String("labels", strings.Join(LabelNames(labels), ", ")),
+				slog.String("labels_values", fmt.Sprintf("%v", labels)),
+				slog.String("recover", fmt.Sprintf("%v", r)))
 		}
 	}()
 
@@ -107,7 +112,11 @@ func (m *MetricStorage) GaugeAdd(metric string, value float64, labels map[string
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Errorf("Metric gauge add %s %v with %v: %v", m.resolveMetricName(metric), LabelNames(labels), labels, r)
+			m.logger.Error("Metric gauge add",
+				slog.String("metric", m.resolveMetricName(metric)),
+				slog.String("labels", strings.Join(LabelNames(labels), ", ")),
+				slog.String("labels_values", fmt.Sprintf("%v", labels)),
+				slog.String("recover", fmt.Sprintf("%v", r)))
 		}
 	}()
 
@@ -132,7 +141,11 @@ func (m *MetricStorage) RegisterGauge(metric string, labels map[string]string) *
 
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Errorf("Create metric gauge %s %v with %v: %v", metricName, LabelNames(labels), labels, r)
+			m.logger.Error("Create metric gauge",
+				slog.String("metric", m.resolveMetricName(metric)),
+				slog.String("labels", strings.Join(LabelNames(labels), ", ")),
+				slog.String("labels_values", fmt.Sprintf("%v", labels)),
+				slog.String("recover", fmt.Sprintf("%v", r)))
 		}
 	}()
 
@@ -144,7 +157,7 @@ func (m *MetricStorage) RegisterGauge(metric string, labels map[string]string) *
 		return vec
 	}
 
-	m.logger.Infof("Create metric gauge %s", metricName)
+	m.logger.Info("Create metric gauge", slog.String("name", metricName))
 	vec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: metricName,
@@ -165,13 +178,17 @@ func (m *MetricStorage) CounterAdd(metric string, value float64, labels map[stri
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Errorf("Metric counter add %s %v with %v: %v", m.resolveMetricName(metric), LabelNames(labels), labels, r)
+			m.logger.Error("Metric counter add",
+				slog.String("metric", m.resolveMetricName(metric)),
+				slog.String("labels", strings.Join(LabelNames(labels), ", ")),
+				slog.String("labels_values", fmt.Sprintf("%v", labels)),
+				slog.String("recover", fmt.Sprintf("%v", r)))
 		}
 	}()
 	m.Counter(metric, labels).With(labels).Add(value)
 }
 
-// Counter
+// Counter ...
 func (m *MetricStorage) Counter(metric string, labels map[string]string) *prometheus.CounterVec {
 	m.countersLock.RLock()
 	vec, ok := m.Counters[metric]
@@ -189,7 +206,11 @@ func (m *MetricStorage) RegisterCounter(metric string, labels map[string]string)
 
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Errorf("Create metric counter %s %v with %v: %v", metricName, LabelNames(labels), labels, r)
+			m.logger.Error("Create metric counter",
+				slog.String("metric", metricName),
+				slog.String("labels", strings.Join(LabelNames(labels), ", ")),
+				slog.String("labels_values", fmt.Sprintf("%v", labels)),
+				slog.String("recover", fmt.Sprintf("%v", r)))
 		}
 	}()
 
@@ -201,7 +222,7 @@ func (m *MetricStorage) RegisterCounter(metric string, labels map[string]string)
 		return vec
 	}
 
-	m.logger.Infof("Create metric counter %s", metricName)
+	m.logger.Info("Create metric counter", slog.String("name", metricName))
 	vec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: metricName,
@@ -215,13 +236,18 @@ func (m *MetricStorage) RegisterCounter(metric string, labels map[string]string)
 }
 
 // Histograms
+
 func (m *MetricStorage) HistogramObserve(metric string, value float64, labels map[string]string, buckets []float64) {
 	if m == nil {
 		return
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Errorf("Metric histogram observe %s %v with %v: %v", m.resolveMetricName(metric), LabelNames(labels), labels, r)
+			m.logger.Error("Metric histogram observe",
+				slog.String("metric", m.resolveMetricName(metric)),
+				slog.String("labels", strings.Join(LabelNames(labels), ", ")),
+				slog.String("labels_values", fmt.Sprintf("%v", labels)),
+				slog.String("recover", fmt.Sprintf("%v", r)))
 		}
 	}()
 	m.Histogram(metric, labels, buckets).With(labels).Observe(value)
@@ -242,7 +268,11 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Errorf("Create metric histogram %s %v with %v: %v", metricName, LabelNames(labels), labels, r)
+			m.logger.Error("Create metric histogram",
+				slog.String("metric", metricName),
+				slog.String("labels", strings.Join(LabelNames(labels), ", ")),
+				slog.String("labels_values", fmt.Sprintf("%v", labels)),
+				slog.String("recover", fmt.Sprintf("%v", r)))
 		}
 	}()
 
@@ -254,7 +284,7 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 		return vec
 	}
 
-	m.logger.Infof("Create metric histogram %s", metricName)
+	m.logger.Info("Create metric histogram", slog.String("name", metricName))
 	b, has := m.HistogramBuckets[metric]
 	// This shouldn't happen except when entering this concurrently
 	// If there are buckets for this histogram about to be registered, keep them

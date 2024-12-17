@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -45,7 +46,7 @@ func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
 
 	applyErrors := &multierror.Error{}
 	for _, op := range ops {
-		log.Debugf("Applying operation: %s", op.Description())
+		log.Debug("Applying operation", slog.String("name", op.Description()))
 		if err := o.ExecuteOperation(op); err != nil {
 			err = gerror.WithMessage(err, op.Description())
 			applyErrors = multierror.Append(applyErrors, err)

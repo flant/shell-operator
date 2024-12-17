@@ -2,6 +2,7 @@ package object_patch
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/hashicorp/go-multierror"
@@ -13,7 +14,7 @@ import (
 	"github.com/flant/shell-operator/pkg/filter/jq"
 )
 
-// A JSON and YAML representation of the operation for shell hooks
+// OperationSpec a JSON and YAML representation of the operation for shell hooks
 type OperationSpec struct {
 	Operation   OperationType `json:"operation" yaml:"operation"`
 	ApiVersion  string        `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
@@ -67,7 +68,7 @@ func GetPatchStatusOperationsOnHookError(operations []Operation) []Operation {
 }
 
 func ParseOperations(specBytes []byte) ([]Operation, error) {
-	log.Debugf("parsing patcher operations:\n%s", specBytes)
+	log.Debug("parsing patcher operations", slog.String("value", string(specBytes)))
 
 	specs, err := unmarshalFromJSONOrYAML(specBytes)
 	if err != nil {

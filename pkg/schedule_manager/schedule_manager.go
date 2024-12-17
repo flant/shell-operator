@@ -2,6 +2,7 @@ package schedulemanager
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
@@ -67,11 +68,11 @@ func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 		// The error can occur in case of bad format of crontab string.
 		// All crontab strings should be validated before add.
 		entryId, _ := sm.cron.AddFunc(newEntry.Crontab, func() {
-			logEntry.Debugf("fire schedule event for entry '%s'", newEntry.Crontab)
+			logEntry.Debug("fire schedule event for entry", slog.String("name", newEntry.Crontab))
 			sm.ScheduleCh <- newEntry.Crontab
 		})
 
-		logEntry.Debugf("entry '%s' added", newEntry.Crontab)
+		logEntry.Debug("entry added", slog.String("name", newEntry.Crontab))
 
 		sm.Entries[newEntry.Crontab] = CronEntry{
 			EntryID: entryId,
@@ -109,7 +110,8 @@ func (sm *scheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
 	if len(sm.Entries[delEntry.Crontab].Ids) == 0 {
 		sm.cron.Remove(sm.Entries[delEntry.Crontab].EntryID)
 		delete(sm.Entries, delEntry.Crontab)
-		sm.logger.With("operator.component", "scheduleManager").Debugf("entry '%s' deleted", delEntry.Crontab)
+		sm.logger.With("operator.component", "scheduleManager").
+			Debug("entry deleted", slog.String("name", delEntry.Crontab))
 	}
 }
 

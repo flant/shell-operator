@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -48,12 +49,13 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	defer r.Body.Close()
 
 	crdName := detectCrdName(r.URL.Path)
-	log.Infof("Got ConversionReview request for crd/%s", crdName)
+	log.Info("Got ConversionReview request for crd",
+		slog.String("name", crdName))
 
 	var convertReview v1.ConversionReview
 	err := json.NewDecoder(r.Body).Decode(&convertReview)
 	if err != nil {
-		log.Errorf("failed to read conversion request: %v", err)
+		log.Error("failed to read conversion request", log.Err(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -80,7 +82,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error json encoding ConversionReview"))
-		log.Errorf("Error json encoding ConversionReview: %v", err)
+		log.Error("Error json encoding ConversionReview", log.Err(err))
 		return
 	}
 }

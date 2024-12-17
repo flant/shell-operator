@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"log/slog"
+
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -9,7 +11,7 @@ import (
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
-// A link between a hook and a kube monitor
+// ConversionBindingToWebhookLink a link between a hook and a kube monitor
 type ConversionBindingToWebhookLink struct {
 	BindingName string
 	// Useful fields to create a BindingContext
@@ -60,7 +62,8 @@ func (c *ConversionBindingsController) EnableConversionBindings() {
 				ToVersion:        conv.ToVersion,
 			}
 		}
-		log.Infof("conversion binding controller: add webhook from config: %v", config)
+		log.Info("conversion binding controller: add webhook from config",
+			slog.String("name", config.Webhook.Metadata.Name))
 		c.webhookManager.AddWebhook(config.Webhook)
 	}
 }
@@ -81,7 +84,7 @@ func (c *ConversionBindingsController) CanHandleEvent(crdName string, _ *v1.Conv
 func (c *ConversionBindingsController) HandleEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule) BindingExecutionInfo {
 	_, hasKey := c.Links[crdName]
 	if !hasKey {
-		log.Errorf("Possible bug!!! No binding for conversion event for crd/%s", crdName)
+		log.Error("Possible bug!!! No binding for conversion event for crd", slog.String("name", crdName))
 		return BindingExecutionInfo{
 			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
@@ -89,7 +92,9 @@ func (c *ConversionBindingsController) HandleEvent(crdName string, request *v1.C
 	}
 	link, has := c.Links[crdName][rule]
 	if !has {
-		log.Errorf("Possible bug!!! Event has an unknown conversion rule %s for crd/%s: no binding was registered", rule.String(), crdName)
+		log.Error("Possible bug!!! Event has an unknown conversion rule: no binding was registered",
+			slog.String("rule", rule.String()),
+			slog.String("crd", crdName))
 		return BindingExecutionInfo{
 			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,

@@ -3,6 +3,7 @@ package kubeeventsmanager
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -82,14 +83,16 @@ func (m *monitor) CreateInformers() error {
 		With("binding.name", m.Config.Metadata.DebugName)
 
 	if m.Config.Kind == "" && m.Config.ApiVersion == "" {
-		logEntry.Debugf("Create Informers for Config with empty kind and apiVersion: %+v", m.Config)
+		logEntry.Debug("Create Informers for Config with empty kind and apiVersion",
+			slog.String("value", fmt.Sprintf("%+v", m.Config)))
 		return nil
 	}
 
-	logEntry.Debugf("Create Informers Config: %+v", m.Config)
+	logEntry.Debug("Create Informers Config: %+v",
+		slog.String("value", fmt.Sprintf("%+v", m.Config)))
 	nsNames := m.Config.namespaces()
 	if len(nsNames) > 0 {
-		logEntry.Debugf("create static ResourceInformers")
+		logEntry.Debug("create static ResourceInformers")
 
 		// create informers for each specified object name in each specified namespace
 		// This list of informers is static.
@@ -106,7 +109,7 @@ func (m *monitor) CreateInformers() error {
 	}
 
 	if m.Config.NamespaceSelector != nil && m.Config.NamespaceSelector.LabelSelector != nil {
-		logEntry.Debugf("Create NamespaceInformer for namespace.labelSelector")
+		logEntry.Debug("Create NamespaceInformer for namespace.labelSelector")
 		m.NamespaceInformer = NewNamespaceInformer(m.ctx, m.KubeClient, m.Config)
 		err := m.NamespaceInformer.createSharedInformer(
 			func(nsName string) {
@@ -121,12 +124,14 @@ func (m *monitor) CreateInformers() error {
 					return
 				}
 
-				logEntry.Infof("got ns/%s, create dynamic ResourceInformers", nsName)
+				logEntry.Info("got ns, create dynamic ResourceInformers", slog.String("name", nsName))
 
 				var err error
 				m.VaryingInformers[nsName], err = m.CreateInformersForNamespace(nsName)
 				if err != nil {
-					logEntry.Errorf("create ResourceInformers for ns/%s: %v", nsName, err)
+					logEntry.Error("create ResourceInformers for ns",
+						slog.String("name", nsName),
+						log.Err(err))
 				}
 
 				var ctx context.Context
@@ -142,7 +147,7 @@ func (m *monitor) CreateInformers() error {
 			},
 			func(nsName string) {
 				// Delete event: check, stop and remove informers for Ns
-				logEntry.Infof("deleted ns/%s, stop dynamic ResourceInformers", nsName)
+				logEntry.Info("deleted ns, stop dynamic ResourceInformers", slog.String("name", nsName))
 
 				// ignore statically specified namespaces
 				if _, ok := m.staticNamespaces[nsName]; ok {
@@ -167,7 +172,7 @@ func (m *monitor) CreateInformers() error {
 			return fmt.Errorf("create namespace informer: %v", err)
 		}
 		for nsName := range m.NamespaceInformer.getExistedObjects() {
-			logEntry.Infof("got ns/%s, create dynamic ResourceInformers", nsName)
+			logEntry.Info("got ns, create dynamic ResourceInformers", slog.String("name", nsName))
 
 			// ignore event if namespace is already has static ResourceInformers
 			if _, ok := m.staticNamespaces[nsName]; ok {
@@ -177,7 +182,9 @@ func (m *monitor) CreateInformers() error {
 			var err error
 			m.VaryingInformers[nsName], err = m.CreateInformersForNamespace(nsName)
 			if err != nil {
-				logEntry.Errorf("create ResourceInformers for ns/%s: %v", nsName, err)
+				logEntry.Error("create ResourceInformers for ns",
+					slog.String("name", nsName),
+					log.Err(err))
 			}
 		}
 	}

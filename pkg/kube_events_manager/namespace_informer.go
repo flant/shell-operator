@@ -5,6 +5,7 @@ package kubeeventsmanager
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/core/v1"
@@ -75,7 +76,7 @@ func (ni *namespaceInformer) createSharedInformer(addFn func(string), delFn func
 	tweakListOptions(&listOptions)
 	existedObjects, err := ni.KubeClient.CoreV1().Namespaces().List(context.TODO(), listOptions)
 	if err != nil {
-		log.Errorf("list existing namespaces: %v", err)
+		log.Error("Failed list existing namespaces", log.Err(err))
 		return err
 	}
 
@@ -95,7 +96,7 @@ func (ni *namespaceInformer) OnAdd(obj interface{}, _ bool) {
 		return
 	}
 	nsObj := obj.(*v1.Namespace)
-	log.Debugf("NamespaceInformer: Added ns/%s", nsObj.Name)
+	log.Debug("NamespaceInformer: Added ns", slog.String("name", nsObj.Name))
 	if ni.addFn != nil {
 		ni.addFn(nsObj.Name)
 	}
@@ -113,16 +114,17 @@ func (ni *namespaceInformer) OnDelete(obj interface{}) {
 		obj = staleObj.Obj
 	}
 	nsObj := obj.(*v1.Namespace)
-	log.Debugf("NamespaceInformer: Deleted ns/%s", nsObj.Name)
+	log.Debug("NamespaceInformer: Deleted ns", slog.String("name", nsObj.Name))
 	if ni.delFn != nil {
 		ni.delFn(nsObj.Name)
 	}
 }
 
 func (ni *namespaceInformer) start() {
-	log.Debugf("%s: Run namespace informer", ni.Monitor.Metadata.DebugName)
+	log.Debug("Run namespace informer", slog.String("name", ni.Monitor.Metadata.DebugName))
 	if ni.SharedInformer == nil {
-		log.Errorf("%s: Possible BUG!!! Start called before createSharedInformer, ShredInformer is nil", ni.Monitor.Metadata.DebugName)
+		log.Error("Possible BUG!!! Start called before createSharedInformer, ShredInformer is nil",
+			slog.String("name", ni.Monitor.Metadata.DebugName))
 		return
 	}
 	cctx, cancel := context.WithCancel(ni.ctx)
@@ -137,10 +139,11 @@ func (ni *namespaceInformer) start() {
 	if err := wait.PollUntilContextCancel(cctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 		return ni.SharedInformer.HasSynced(), nil
 	}); err != nil {
-		ni.Monitor.Logger.Errorf("%s: cache is not synced for informer", ni.Monitor.Metadata.DebugName)
+		ni.Monitor.Logger.Error("Cache is not synced for informer",
+			slog.String("name", ni.Monitor.Metadata.DebugName))
 	}
 
-	log.Debugf("%s: informer is ready", ni.Monitor.Metadata.DebugName)
+	log.Debug("Informer is ready", slog.String("name", ni.Monitor.Metadata.DebugName))
 }
 
 func (ni *namespaceInformer) pauseHandleEvents() {

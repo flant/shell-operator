@@ -3,6 +3,7 @@ package admission
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -50,7 +51,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	var admissionReview v1.AdmissionReview
 	err := json.NewDecoder(r.Body).Decode(&admissionReview)
 	if err != nil {
-		log.Errorf("failed to read admission request: %v", err)
+		log.Error("failed to read admission request", log.Err(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -77,14 +78,16 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error json encoding AdmissionReview"))
-		log.Errorf("Error json encoding AdmissionReview: %v", err)
+		log.Error("Error json encoding AdmissionReview", log.Err(err))
 		return
 	}
 }
 
 func (h *WebhookHandler) handleReviewRequest(path string, request *v1.AdmissionRequest) (*v1.AdmissionResponse, error) {
 	configurationID, webhookID := detectConfigurationAndWebhook(path)
-	log.Infof("Got AdmissionReview request for confId='%s' webhookId='%s'", configurationID, webhookID)
+	log.Info("Got AdmissionReview request",
+		slog.String("configurationID", configurationID),
+		slog.String("webhookID", webhookID))
 
 	if h.Handler == nil {
 		return nil, fmt.Errorf("AdmissionReview handler is not defined")
