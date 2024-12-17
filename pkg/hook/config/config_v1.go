@@ -71,7 +71,7 @@ type KubeFieldSelectorV1 kemtypes.FieldSelector
 
 type KubeNamespaceSelectorV1 kemtypes.NamespaceSelector
 
-// version 1 of kubernetes vali configuration
+// version 1 of kubernetes validation configuration
 type KubernetesAdmissionConfigV1 struct {
 	Name                 string                   `json:"name,omitempty"`
 	IncludeSnapshotsFrom []string                 `json:"includeSnapshotsFrom,omitempty"`
@@ -82,6 +82,7 @@ type KubernetesAdmissionConfigV1 struct {
 	Namespace            *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
 	SideEffects          *v1.SideEffectClass      `json:"sideEffects"`
 	TimeoutSeconds       *int32                   `json:"timeoutSeconds,omitempty"`
+	MatchConditions      []v1.MatchCondition      `json:"matchConditions,omitempty"`
 }
 
 // version 1 of kubernetes conversion configuration
@@ -460,6 +461,8 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (htypes.ValidatingConf
 		webhook.TimeoutSeconds = &DefaultTimeoutSeconds
 	}
 
+	webhook.MatchConditions = cfgV1.MatchConditions
+
 	cfg.Webhook = &admission.ValidatingWebhookConfig{
 		ValidatingWebhook: webhook,
 	}
@@ -505,6 +508,8 @@ func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (htypes.MutatingConfig, 
 	} else {
 		webhook.TimeoutSeconds = &DefaultTimeoutSeconds
 	}
+
+	webhook.MatchConditions = cfgV1.MatchConditions
 
 	cfg.Webhook = &admission.MutatingWebhookConfig{
 		MutatingWebhook: webhook,
