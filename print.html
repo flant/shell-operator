@@ -1346,6 +1346,9 @@ kubernetesValidating:
   failurePolicy: Ignore | Fail (default)
   sideEffects: None (default) | NoneOnDryRun
   timeoutSeconds: 2 (default is 10)
+  matchConditions:
+  - name: &quot;exclude-user&quot;
+    expression: '(&quot;system:apiserver&quot; != request.userInfo.username)'
 </code></pre>
 <h2 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h2>
 <ul>
@@ -1375,6 +1378,9 @@ kubernetesValidating:
 </li>
 <li>
 <p><code>timeoutSeconds</code> — a seconds API server should wait for a hook to respond before treating the call as a failure. See <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#timeouts">timeouts</a>. Default is 10 (seconds).</p>
+</li>
+<li>
+<p><code>matchConditions</code> — an optional list of <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchconditions">match conditions</a> for fine-grained request filtering. Available only since v1.27 of Kubernetes. </p>
 </li>
 </ul>
 <p>As you can see, it is the close copy of a <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#webhook-configuration">Webhook configuration</a>. Differences are:</p>
