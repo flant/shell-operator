@@ -50,7 +50,7 @@ func (bc BindingContext) Map() map[string]interface{} {
 	case "v1":
 		return bc.MapV1()
 	default:
-		log.Errorf("Possible bug!!! Call Map for BindingContext without version.")
+		log.Error("Possible bug!!! Call Map for BindingContext without version.")
 		return make(map[string]interface{})
 	}
 }

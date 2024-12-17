@@ -3,7 +3,9 @@ package shell_operator
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -32,11 +34,13 @@ func (bhs *baseHTTPServer) Start(ctx context.Context) {
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("base http server listen: %s\n", err)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal("base http server listen", log.Err(err))
 		}
 	}()
-	log.Infof("base http server started at %s:%s", bhs.address, bhs.port)
+	log.Info("base http server started",
+		slog.String("address", bhs.address),
+		slog.String("port", bhs.port))
 
 	go func() {
 		<-ctx.Done()
@@ -49,7 +53,7 @@ func (bhs *baseHTTPServer) Start(ctx context.Context) {
 		}()
 
 		if err := srv.Shutdown(cctx); err != nil {
-			log.Fatalf("base http server shutdown failed:%+v", err)
+			log.Fatal("base http server shutdown failed", log.Err(err))
 		}
 	}()
 }

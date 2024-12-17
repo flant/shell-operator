@@ -21,7 +21,7 @@ import (
 func Run(cmd *exec.Cmd) error {
 	// TODO context: hook name, hook phase, hook binding
 	// TODO observability
-	log.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
+	log.Debug("Executing command", slog.String("command", strings.Join(cmd.Args, " ")), slog.String("dir", cmd.Dir))
 
 	return cmd.Run()
 }
@@ -82,7 +82,7 @@ func NewExecutor(dir string, entrypoint string, args []string, envs []string) *E
 }
 
 func (e *Executor) Output() ([]byte, error) {
-	e.logger.Debugf("Executing command '%s' in '%s' dir", strings.Join(e.cmd.Args, " "), e.cmd.Dir)
+	e.logger.Debug("Executing command", strings.Join(e.cmd.Args, " "), e.cmd.Dir)
 	return e.cmd.Output()
 }
 
@@ -98,7 +98,7 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 	stdoutLogEntry := logEntry.With("output", "stdout")
 	stderrLogEntry := logEntry.With("output", "stderr")
 
-	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(e.cmd.Args, " "), e.cmd.Dir)
+	log.Debug("Executing command", slog.String("command", strings.Join(e.cmd.Args, " ")), slog.String("dir", e.cmd.Dir))
 
 	plo := &proxyLogger{e.logProxyHookJSON, e.proxyJsonKey, stdoutLogEntry, make([]byte, 0)}
 	ple := &proxyLogger{e.logProxyHookJSON, e.proxyJsonKey, stderrLogEntry, make([]byte, 0)}
