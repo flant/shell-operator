@@ -124,7 +124,7 @@ func (ni *namespaceInformer) start() {
 	log.Debug("Run namespace informer", slog.String("name", ni.Monitor.Metadata.DebugName))
 	if ni.SharedInformer == nil {
 		log.Error("Possible BUG!!! Start called before createSharedInformer, ShredInformer is nil",
-			slog.String("name", ni.Monitor.Metadata.DebugName))
+			slog.String("debugName", ni.Monitor.Metadata.DebugName))
 		return
 	}
 	cctx, cancel := context.WithCancel(ni.ctx)
@@ -140,10 +140,10 @@ func (ni *namespaceInformer) start() {
 		return ni.SharedInformer.HasSynced(), nil
 	}); err != nil {
 		ni.Monitor.Logger.Error("Cache is not synced for informer",
-			slog.String("name", ni.Monitor.Metadata.DebugName))
+			slog.String("debugName", ni.Monitor.Metadata.DebugName))
 	}
 
-	log.Debug("Informer is ready", slog.String("name", ni.Monitor.Metadata.DebugName))
+	log.Debug("Informer is ready", slog.String("debugName", ni.Monitor.Metadata.DebugName))
 }
 
 func (ni *namespaceInformer) pauseHandleEvents() {

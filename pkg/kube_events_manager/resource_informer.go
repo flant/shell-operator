@@ -117,11 +117,10 @@ func (ei *resourceInformer) createSharedInformer() error {
 	if ei.GroupVersionResource, err = ei.KubeClient.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind); err != nil {
 		return fmt.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %w", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 	}
-
-	log.Debug("%GVR for kind",
+	log.Debug("GVR for kind",
 		slog.String("debugName", ei.Monitor.Metadata.DebugName),
 		slog.String("kind", ei.Monitor.Kind),
-		slog.String("GVR", ei.GroupVersionResource.String()))
+		slog.String("gvr", ei.GroupVersionResource.String()))
 
 	// define tweakListOptions for informer
 	fmtLabelSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
@@ -196,7 +195,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		Namespace(ei.Namespace).
 		List(context.TODO(), ei.ListOptions)
 	if err != nil {
-		log.Error("%s: initial list resources of kind '%s': %v",
+		log.Error("initial list resources of kind",
 			slog.String("debugName", ei.Monitor.Metadata.DebugName),
 			slog.String("kind", ei.Monitor.Kind),
 			log.Err(err))
