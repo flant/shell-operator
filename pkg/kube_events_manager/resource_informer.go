@@ -121,10 +121,10 @@ func (ei *resourceInformer) createSharedInformer() (err error) {
 			log.Err(err))
 		return err
 	}
-	log.Debug("%GVR for kind",
+	log.Debug("GVR for kind",
 		slog.String("debugName", ei.Monitor.Metadata.DebugName),
 		slog.String("kind", ei.Monitor.Kind),
-		slog.String("GVR", ei.GroupVersionResource.String()))
+		slog.String("gvr", ei.GroupVersionResource.String()))
 
 	// define tweakListOptions for informer
 	fmtLabelSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
@@ -201,7 +201,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		Namespace(ei.Namespace).
 		List(context.TODO(), ei.ListOptions)
 	if err != nil {
-		log.Error("%s: initial list resources of kind '%s': %v",
+		log.Error("initial list resources of kind",
 			slog.String("debugName", ei.Monitor.Metadata.DebugName),
 			slog.String("kind", ei.Monitor.Kind),
 			log.Err(err))

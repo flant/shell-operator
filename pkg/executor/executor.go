@@ -82,7 +82,9 @@ func NewExecutor(dir string, entrypoint string, args []string, envs []string) *E
 }
 
 func (e *Executor) Output() ([]byte, error) {
-	e.logger.Debug("Executing command", strings.Join(e.cmd.Args, " "), e.cmd.Dir)
+	e.logger.Debug("Executing command",
+		slog.String("command", strings.Join(e.cmd.Args, " ")),
+		slog.String("dir", e.cmd.Dir))
 	return e.cmd.Output()
 }
 
@@ -98,7 +100,9 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 	stdoutLogEntry := logEntry.With("output", "stdout")
 	stderrLogEntry := logEntry.With("output", "stderr")
 
-	log.Debug("Executing command", slog.String("command", strings.Join(e.cmd.Args, " ")), slog.String("dir", e.cmd.Dir))
+	log.Debug("Executing command",
+		slog.String("command", strings.Join(e.cmd.Args, " ")),
+		slog.String("dir", e.cmd.Dir))
 
 	plo := &proxyLogger{e.logProxyHookJSON, e.proxyJsonKey, stdoutLogEntry, make([]byte, 0)}
 	ple := &proxyLogger{e.logProxyHookJSON, e.proxyJsonKey, stderrLogEntry, make([]byte, 0)}

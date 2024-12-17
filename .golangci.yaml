@@ -8,7 +8,7 @@ linters:
     - depguard
     - dogsled
     - durationcheck
-    - exportloopref
+    - copyloopvar
     - gci
     - gochecknoinits
     - gocritic

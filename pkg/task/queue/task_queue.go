@@ -365,7 +365,7 @@ func (q *TaskQueue) debugf(format string, args ...interface{}) {
 	if !q.debug {
 		return
 	}
-	log.Debug("", fmt.Sprintf(format, args...))
+	log.Debug("DEBUG", fmt.Sprintf(format, args...))
 }
 
 func (q *TaskQueue) Stop() {
