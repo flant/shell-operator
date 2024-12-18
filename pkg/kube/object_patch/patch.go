@@ -282,9 +282,9 @@ func (o *ObjectPatcher) executeDeleteOperation(op *deleteOperation) error {
 
 	log.Debug("Waiting for object deletion")
 
-	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, 20*time.Second, false, func(ctx context.Context) (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, 20*time.Second, false, func(ctx context.Context) (bool, error) {
 		log.Debug("Started Get API call")
-		_, err = o.kubeClient.Dynamic().
+		_, err := o.kubeClient.Dynamic().
 			Resource(gvk).
 			Namespace(op.namespace).
 			Get(ctx, op.name, metav1.GetOptions{})

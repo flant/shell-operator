@@ -161,22 +161,27 @@ func (q *TaskQueue) addFirst(t task.Task) {
 }
 
 // RemoveFirst deletes a head element, so head is moved.
-func (q *TaskQueue) RemoveFirst() (t task.Task) {
+func (q *TaskQueue) RemoveFirst() task.Task {
 	defer q.MeasureActionTime("RemoveFirst")()
+	var t task.Task
+
 	q.withLock(func() {
 		t = q.removeFirst()
 	})
+
 	return t
 }
 
 // removeFirst deletes a head element, so head is moved.
-func (q *TaskQueue) removeFirst() (t task.Task) {
+func (q *TaskQueue) removeFirst() task.Task {
 	if q.isEmpty() {
-		return
+		return nil
 	}
-	t = q.items[0]
+
+	t := q.items[0]
 	q.items = q.items[1:]
-	return
+
+	return t
 }
 
 // GetFirst returns a head element.
@@ -204,61 +209,74 @@ func (q *TaskQueue) addLast(t task.Task) {
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
-func (q *TaskQueue) RemoveLast() (t task.Task) {
+func (q *TaskQueue) RemoveLast() task.Task {
 	defer q.MeasureActionTime("RemoveLast")()
+	var t task.Task
+
 	q.withLock(func() {
 		t = q.removeLast()
 	})
+
 	return t
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
-func (q *TaskQueue) removeLast() (t task.Task) {
+func (q *TaskQueue) removeLast() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
-	t = q.items[len(q.items)-1]
+
+	t := q.items[len(q.items)-1]
 	if len(q.items) == 1 {
 		q.items = make([]task.Task, 0)
 	} else {
 		q.items = q.items[:len(q.items)-1]
 	}
+
 	return t
 }
 
 // GetLast returns a tail element.
-func (q *TaskQueue) GetLast() (t task.Task) {
+func (q *TaskQueue) GetLast() task.Task {
 	defer q.MeasureActionTime("GetLast")()
+	var t task.Task
+
 	q.withRLock(func() {
 		t = q.getLast()
 	})
+
 	return t
 }
 
 // GetLast returns a tail element.
-func (q *TaskQueue) getLast() (t task.Task) {
+func (q *TaskQueue) getLast() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
+
 	return q.items[len(q.items)-1]
 }
 
 // Get returns a task by id.
-func (q *TaskQueue) Get(id string) (t task.Task) {
+func (q *TaskQueue) Get(id string) task.Task {
 	defer q.MeasureActionTime("Get")()
+	var t task.Task
+
 	q.withRLock(func() {
 		t = q.get(id)
 	})
+
 	return t
 }
 
 // Get returns a task by id.
-func (q *TaskQueue) get(id string) (t task.Task) {
+func (q *TaskQueue) get(id string) task.Task {
 	for _, t := range q.items {
 		if t.GetId() == id {
 			return t
 		}
 	}
+
 	return nil
 }
 
@@ -328,19 +346,18 @@ func (q *TaskQueue) addBefore(id string, newTask task.Task) {
 }
 
 // Remove finds element by id and deletes it.
-func (q *TaskQueue) Remove(id string) (t task.Task) {
+func (q *TaskQueue) Remove(id string) task.Task {
 	defer q.MeasureActionTime("Remove")()
+	var t task.Task
 
 	q.withLock(func() {
 		t = q.remove(id)
 	})
-	if t == nil {
-		return
-	}
+
 	return t
 }
 
-func (q *TaskQueue) remove(id string) (t task.Task) {
+func (q *TaskQueue) remove(id string) task.Task {
 	delId := -1
 	for i, item := range q.items {
 		if item.GetId() == id {
@@ -351,8 +368,10 @@ func (q *TaskQueue) remove(id string) (t task.Task) {
 	if delId == -1 {
 		return nil
 	}
-	t = q.items[delId]
+
+	t := q.items[delId]
 	q.items = append(q.items[:delId], q.items[delId+1:]...)
+
 	return t
 }
 

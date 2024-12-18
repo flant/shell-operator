@@ -10,7 +10,7 @@ import (
 )
 
 // jqExec is a subprocess implementation of the jq filtering.
-func jqExec(jqFilter string, jsonData []byte, libPath string) (result string, err error) {
+func jqExec(jqFilter string, jsonData []byte, libPath string) (string, error) {
 	var cmd *exec.Cmd
 	if libPath == "" {
 		cmd = exec.Command("jq", jqFilter)
@@ -19,14 +19,16 @@ func jqExec(jqFilter string, jsonData []byte, libPath string) (result string, er
 	}
 
 	var stdinBuf bytes.Buffer
-	_, err = stdinBuf.WriteString(string(jsonData))
+	_, err := stdinBuf.WriteString(string(jsonData))
 	if err != nil {
 		panic(err)
 	}
-	cmd.Stdin = &stdinBuf
+
 	var stdoutBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
 	var stderrBuf bytes.Buffer
+
+	cmd.Stdin = &stdinBuf
+	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 
 	err = executor.Run(cmd)

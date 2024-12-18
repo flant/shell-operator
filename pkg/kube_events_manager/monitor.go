@@ -224,8 +224,8 @@ func (m *monitor) EnableKubeEventCb() {
 // it is only one informer. If matchName is specified, then multiple informers are created.
 //
 // If namespace is empty, then informer is bounded to all namespaces.
-func (m *monitor) CreateInformersForNamespace(namespace string) (informers []*resourceInformer, err error) {
-	informers = make([]*resourceInformer, 0)
+func (m *monitor) CreateInformersForNamespace(namespace string) ([]*resourceInformer, error) {
+	informers := make([]*resourceInformer, 0)
 	cfg := &resourceInformerConfig{
 		client:  m.KubeClient,
 		mstor:   m.metricStorage,
@@ -243,13 +243,13 @@ func (m *monitor) CreateInformersForNamespace(namespace string) (informers []*re
 	for _, objName := range objNames {
 		informer := newResourceInformer(namespace, objName, cfg)
 
-		err := informer.createSharedInformer()
-		if err != nil {
+		if err := informer.createSharedInformer(); err != nil {
 			return nil, err
 		}
 
 		informers = append(informers, informer)
 	}
+
 	return informers, nil
 }
 
@@ -303,9 +303,9 @@ func (m *monitor) PauseHandleEvents() {
 	}
 }
 
-func (m *monitor) SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo) {
-	total = &CachedObjectsInfo{}
-	last = &CachedObjectsInfo{}
+func (m *monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObjectsInfo /*last*/) {
+	total := &CachedObjectsInfo{}
+	last := &CachedObjectsInfo{}
 
 	for _, informer := range m.ResourceInformers {
 		total.add(informer.getCachedObjectsInfo())

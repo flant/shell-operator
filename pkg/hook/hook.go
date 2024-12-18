@@ -69,8 +69,8 @@ func (h *Hook) WithTmpDir(dir string) {
 	h.TmpDir = dir
 }
 
-func (h *Hook) LoadConfig(configOutput []byte) (hook *Hook, err error) {
-	err = h.Config.LoadAndValidate(configOutput)
+func (h *Hook) LoadConfig(configOutput []byte) (*Hook, error) {
+	err := h.Config.LoadAndValidate(configOutput)
 	if err != nil {
 		return h, fmt.Errorf("load hook '%s' config: %s\nhook --config output: %s", h.Name, err.Error(), configOutput)
 	}

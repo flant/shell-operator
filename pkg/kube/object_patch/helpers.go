@@ -85,12 +85,12 @@ func applyJQPatch(jqFilter string, fl filter.Filter, obj *unstructured.Unstructu
 	return retObj, nil
 }
 
-func generateSubresources(subresource string) (ret []string) {
+func generateSubresources(subresource string) []string {
 	if subresource != "" {
-		ret = append(ret, subresource)
+		return []string{subresource}
 	}
 
-	return
+	return nil
 }
 
 func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {

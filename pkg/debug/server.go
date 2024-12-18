@@ -43,33 +43,28 @@ func NewServer(prefix, socketPath, httpAddr string, logger *log.Logger) *Server 
 	}
 }
 
-func (s *Server) Init() (err error) {
+func (s *Server) Init() error {
 	address := s.SocketPath
 
-	err = os.MkdirAll(path.Dir(address), 0o700)
-	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to create socket '%s': %v", address, err)
-		return err
+	if err := os.MkdirAll(path.Dir(address), 0o700); err != nil {
+		return fmt.Errorf("Debug HTTP server fail to create socket '%s': %w", address, err)
 	}
 
 	exists, err := utils.FileExists(address)
 	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to check socket '%s': %v", address, err)
-		return err
+		return fmt.Errorf("Debug HTTP server fail to check socket '%s': %w", address, err)
 	}
+
 	if exists {
-		err = os.Remove(address)
-		if err != nil {
-			s.logger.Errorf("Debug HTTP server fail to remove existing socket '%s': %v", address, err)
-			return err
+		if err := os.Remove(address); err != nil {
+			return fmt.Errorf("Debug HTTP server fail to check socket '%s': %w", address, err)
 		}
 	}
 
 	// Check if socket is available
 	listener, err := net.Listen("unix", address)
 	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to listen on '%s': %v", address, err)
-		return err
+		return fmt.Errorf("Debug HTTP server fail to listen on '%s': %w", address, err)
 	}
 
 	s.logger.Infof("Debug endpoint listen on %s", address)
@@ -153,7 +148,9 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	}
 }
 
-func transformUsingFormat(w io.Writer, val interface{}, format string) (err error) {
+func transformUsingFormat(w io.Writer, val interface{}, format string) error {
+	var err error
+
 	switch format {
 	case "yaml":
 		enc := yaml.NewEncoder(w)

@@ -184,7 +184,7 @@ func LoadSchema(name string) (*spec.Schema, error) {
 }
 
 // See https://github.com/kubernetes/apiextensions-apiserver/blob/1bb376f70aa2c6f2dec9a8c7f05384adbfac7fbb/pkg/apiserver/validation/validation.go#L47
-func ValidateOperationSpec(obj interface{}, s *spec.Schema, rootName string) (multiErr error) {
+func ValidateOperationSpec(obj interface{}, s *spec.Schema, rootName string) error {
 	if s == nil {
 		return fmt.Errorf("validate kubernetes patch spec: schema is not provided")
 	}
