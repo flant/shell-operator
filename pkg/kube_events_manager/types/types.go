@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -67,15 +68,12 @@ func (o ObjectAndFilterResult) Map() map[string]interface{} {
 			return m
 		}
 
-		if filterResString == "" {
-			m["filterResult"] = nil
-			return m
-		}
-
 		// Convert string with jq output into Go object.
 		err := json.Unmarshal([]byte(filterResString), &filterResultValue)
 		if err != nil {
-			log.Errorf("Possible bug!!! Cannot unmarshal jq filter '%s' result: %s", o.Metadata.JqFilter, err)
+			log.Error("Possible bug!!! Cannot unmarshal jq filter result",
+				slog.String("jqFilter", o.Metadata.JqFilter),
+				log.Err(err))
 			m["filterResult"] = nil
 			return m
 		}

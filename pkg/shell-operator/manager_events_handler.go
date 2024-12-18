@@ -2,6 +2,7 @@ package shell_operator
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -81,7 +82,7 @@ func (m *ManagerEventsHandler) Start() {
 				}
 
 			case <-m.ctx.Done():
-				logEntry.Infof("Stop")
+				logEntry.Info("Stop")
 				return
 			}
 
@@ -89,7 +90,9 @@ func (m *ManagerEventsHandler) Start() {
 				for _, resTask := range tailTasks {
 					q := tqs.GetByName(resTask.GetQueueName())
 					if q == nil {
-						log.Errorf("Possible bug!!! Got task for queue '%s' but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
+						log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
+							slog.String("queueName", resTask.GetQueueName()),
+							slog.String("description", resTask.GetDescription()))
 					} else {
 						q.AddLast(resTask)
 					}

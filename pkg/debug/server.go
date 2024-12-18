@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -48,19 +49,19 @@ func (s *Server) Init() (err error) {
 
 	err = os.MkdirAll(path.Dir(address), 0o700)
 	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to create socket '%s': %v", address, err)
+		s.logger.Error("Debug HTTP server failed to create socket", slog.String("address", address), log.Err(err))
 		return err
 	}
 
 	exists, err := utils.FileExists(address)
 	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to check socket '%s': %v", address, err)
+		s.logger.Error("Debug HTTP server failed to check socket", slog.String("address", address), log.Err(err))
 		return err
 	}
 	if exists {
 		err = os.Remove(address)
 		if err != nil {
-			s.logger.Errorf("Debug HTTP server fail to remove existing socket '%s': %v", address, err)
+			s.logger.Error("Debug HTTP server failed to remove existing socket", slog.String("address", address), log.Err(err))
 			return err
 		}
 	}
@@ -68,15 +69,15 @@ func (s *Server) Init() (err error) {
 	// Check if socket is available
 	listener, err := net.Listen("unix", address)
 	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to listen on '%s': %v", address, err)
+		s.logger.Error("Debug HTTP server failed to listen on address", slog.String("address", address), log.Err(err))
 		return err
 	}
 
-	s.logger.Infof("Debug endpoint listen on %s", address)
+	s.logger.Info("Debug endpoint listen on address", slog.String("address", address))
 
 	go func() {
 		if err := http.Serve(listener, s.Router); err != nil {
-			s.logger.Errorf("Error starting Debug socket server: %s", err)
+			s.logger.Error("Error starting Debug socket server", log.Err(err))
 			os.Exit(1)
 		}
 	}()
@@ -84,7 +85,7 @@ func (s *Server) Init() (err error) {
 	if s.HttpAddr != "" {
 		go func() {
 			if err := http.ListenAndServe(s.HttpAddr, s.Router); err != nil {
-				s.logger.Errorf("Error starting Debug HTTP server: %s", err)
+				s.logger.Error("Error starting Debug HTTP server", log.Err(err))
 				os.Exit(1)
 			}
 		}()
@@ -135,7 +136,7 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	}
 
 	format := FormatFromRequest(request)
-	structuredLogger.GetLogEntry(request).Debugf("use format '%s'", format)
+	structuredLogger.GetLogEntry(request).Debug("used format", slog.String("format", format))
 
 	switch format {
 	case "text":
