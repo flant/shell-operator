@@ -247,7 +247,7 @@ type FinishAllMatchersSuccessfullyMatcher struct {
 	err      error
 }
 
-func (matcher *FinishAllMatchersSuccessfullyMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *FinishAllMatchersSuccessfullyMatcher) Match(actual interface{}) (bool, error) {
 	analyzer, ok := actual.(*JsonLogAnalyzer)
 	if !ok {
 		return false, fmt.Errorf("FinishAllMatchersSuccessfully must be passed a JsonLogAnalyzer. Got %T\n", actual)
@@ -259,24 +259,30 @@ func (matcher *FinishAllMatchersSuccessfullyMatcher) Match(actual interface{}) (
 	return matcher.finished && matcher.err == nil, nil
 }
 
-func (matcher *FinishAllMatchersSuccessfullyMatcher) FailureMessage(_ interface{}) (message string) {
-	msgs := []string{}
+func (matcher *FinishAllMatchersSuccessfullyMatcher) FailureMessage(_ interface{}) string {
+	msgs := make([]string, 0, 2)
+
 	if !matcher.finished {
 		msgs = append(msgs, "is finished")
 	}
+
 	if matcher.err != nil {
 		msgs = append(msgs, fmt.Sprintf("has no error. Got %v", matcher.err))
 	}
+
 	return fmt.Sprintf("Expected JsonLogAnalyzer %s", strings.Join(msgs, " and "))
 }
 
-func (matcher *FinishAllMatchersSuccessfullyMatcher) NegatedFailureMessage(_ interface{}) (message string) {
-	msgs := []string{}
+func (matcher *FinishAllMatchersSuccessfullyMatcher) NegatedFailureMessage(_ interface{}) string {
+	msgs := make([]string, 0, 2)
+
 	if matcher.finished {
 		msgs = append(msgs, "is not finished")
 	}
+
 	if matcher.err == nil {
 		msgs = append(msgs, "has error")
 	}
+
 	return fmt.Sprintf("Expected JsonLogAnalyzer %s", strings.Join(msgs, " or "))
 }

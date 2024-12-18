@@ -98,7 +98,7 @@ type BeShellOperatorStoppedMatcher struct {
 	err error
 }
 
-func (matcher *BeShellOperatorStoppedMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeShellOperatorStoppedMatcher) Match(actual interface{}) (bool, error) {
 	err, ok := actual.(error)
 	if !ok {
 		return false, fmt.Errorf("BeShellOperatorStopped must be passed an error. Got %T\n", actual)
@@ -109,10 +109,10 @@ func (matcher *BeShellOperatorStoppedMatcher) Match(actual interface{}) (success
 	return matcher.err != nil && strings.Contains(matcher.err.Error(), "command is stopped"), nil
 }
 
-func (matcher *BeShellOperatorStoppedMatcher) FailureMessage(_ interface{}) (message string) {
+func (matcher *BeShellOperatorStoppedMatcher) FailureMessage(_ interface{}) string {
 	return fmt.Sprintf("Expected ShellOperator stopped. Got error: %v", matcher.err)
 }
 
-func (matcher *BeShellOperatorStoppedMatcher) NegatedFailureMessage(_ interface{}) (message string) {
+func (matcher *BeShellOperatorStoppedMatcher) NegatedFailureMessage(_ interface{}) string {
 	return "Expected ShellOperator stopped with error"
 }
