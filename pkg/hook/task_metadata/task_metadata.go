@@ -48,18 +48,20 @@ var (
 	_ task.MetadataDescriptionGetter = HookMetadata{}
 )
 
-func HookMetadataAccessor(t task.Task) (hookMeta HookMetadata) {
+func HookMetadataAccessor(t task.Task) HookMetadata {
 	meta := t.GetMetadata()
 	if meta == nil {
 		log.Errorf("Possible Bug! task metadata is nil")
-		return
+		return HookMetadata{}
 	}
+
 	hookMeta, ok := meta.(HookMetadata)
 	if !ok {
 		log.Errorf("Possible Bug! task metadata is not of type HookMetadata: got %T", meta)
-		return
+		return HookMetadata{}
 	}
-	return
+
+	return hookMeta
 }
 
 func (m HookMetadata) GetHookName() string {

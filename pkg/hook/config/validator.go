@@ -10,7 +10,7 @@ import (
 )
 
 // See https://github.com/kubernetes/apiextensions-apiserver/blob/1bb376f70aa2c6f2dec9a8c7f05384adbfac7fbb/pkg/apiserver/validation/validation.go#L47
-func ValidateConfig(dataObj interface{}, s *spec.Schema, rootName string) (multiErr error) {
+func ValidateConfig(dataObj interface{}, s *spec.Schema, rootName string) error {
 	if s == nil {
 		return fmt.Errorf("validate config: schema is not provided")
 	}
@@ -26,9 +26,11 @@ func ValidateConfig(dataObj interface{}, s *spec.Schema, rootName string) (multi
 	for _, err := range result.Errors {
 		allErrs = multierror.Append(allErrs, err)
 	}
+
 	// NOTE: no validation errors, but config is not valid!
 	if allErrs.Len() == 0 {
 		allErrs = multierror.Append(allErrs, fmt.Errorf("configuration is not valid"))
 	}
+
 	return allErrs
 }

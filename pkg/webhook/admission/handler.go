@@ -129,7 +129,8 @@ func (h *WebhookHandler) handleReviewRequest(path string, request *v1.AdmissionR
 }
 
 // detectConfigurationAndWebhook extracts configurationID and a webhookID from the url path.
-func detectConfigurationAndWebhook(path string) (configurationID string, webhookID string) {
+func detectConfigurationAndWebhook(path string) (string /*configurationID*/, string /*webhookID*/) {
+	var configurationID string
 	parts := strings.Split(path, "/")
 	webhookParts := make([]string, 0)
 	for _, p := range parts {
@@ -142,9 +143,9 @@ func detectConfigurationAndWebhook(path string) (configurationID string, webhook
 		}
 		webhookParts = append(webhookParts, p)
 	}
-	webhookID = strings.Join(webhookParts, "/")
+	webhookID := strings.Join(webhookParts, "/")
 
-	return
+	return configurationID, webhookID
 }
 
 func errored(err error) *v1.AdmissionResponse {

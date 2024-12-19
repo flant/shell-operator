@@ -105,26 +105,27 @@ func (ei *resourceInformer) putEvent(ev kemtypes.KubeEvent) {
 	}
 }
 
-func (ei *resourceInformer) createSharedInformer() (err error) {
+func (ei *resourceInformer) createSharedInformer() error {
+	var err error
+
 	// discover GroupVersionResource for informer
 	log.Debugf("%s: discover GVR for apiVersion '%s' kind '%s'...", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind)
-	ei.GroupVersionResource, err = ei.KubeClient.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind)
-	if err != nil {
-		log.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %v", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
-		return err
+	if ei.GroupVersionResource, err = ei.KubeClient.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind); err != nil {
+		return fmt.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %w", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 	}
+
 	log.Debugf("%s: GVR for kind '%s' is '%s'", ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.GroupVersionResource.String())
 
 	// define tweakListOptions for informer
 	fmtLabelSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
 	if err != nil {
-		return fmt.Errorf("format label selector '%s': %s", ei.Monitor.LabelSelector.String(), err)
+		return fmt.Errorf("format label selector '%s': %w", ei.Monitor.LabelSelector.String(), err)
 	}
 
 	fieldSelector := ei.adjustFieldSelector(ei.Monitor.FieldSelector, ei.Name)
 	fmtFieldSelector, err := FormatFieldSelector(fieldSelector)
 	if err != nil {
-		return fmt.Errorf("format field selector '%+v': %s", fieldSelector, err)
+		return fmt.Errorf("format field selector '%+v': %w", fieldSelector, err)
 	}
 
 	ei.ListOptions = metav1.ListOptions{
@@ -139,10 +140,8 @@ func (ei *resourceInformer) createSharedInformer() (err error) {
 		LabelSelector: ei.ListOptions.LabelSelector,
 	}
 
-	err = ei.loadExistedObjects()
-	if err != nil {
-		log.Errorf("load existing objects: %v", err)
-		return err
+	if err = ei.loadExistedObjects(); err != nil {
+		return fmt.Errorf("load existing objects: %w", err)
 	}
 
 	return nil

@@ -8,7 +8,7 @@ linters:
     - depguard
     - dogsled
     - durationcheck
-    - exportloopref
+    - copyloopvar
     - gci
     - gochecknoinits
     - gocritic
@@ -20,6 +20,7 @@ linters:
     - ineffassign
     - misspell
     - nolintlint
+    - nonamedreturns
     - prealloc
     - revive
     - sloglint
@@ -78,6 +79,10 @@ linters-settings:
         deny:
           - pkg: "gopkg.in/satori/go.uuid.v1"
             desc: "Use https://github.com/gofrs/uuid instead. Satori/go.uuid is no longer maintained and has critical vulnerabilities."
+  nonamedreturns:
+    # Report named error if it is assigned inside defer.
+    # Default: false
+    report-error-in-defer: false
 issues:
   exclude-dirs:
     - test/integration

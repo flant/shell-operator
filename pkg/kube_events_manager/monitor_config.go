@@ -110,13 +110,13 @@ func (c *MonitorConfig) names() []string {
 // then empty string is returned to monitor all namespaces.
 //
 // If namespace.labelSelector is specified, then return empty array.
-func (c *MonitorConfig) namespaces() (nsNames []string) {
+func (c *MonitorConfig) namespaces() []string {
 	if c.NamespaceSelector == nil {
 		return []string{""}
 	}
 
 	if c.NamespaceSelector.LabelSelector != nil {
-		return []string{}
+		return nil
 	}
 
 	if c.NamespaceSelector.NameSelector == nil {
@@ -127,8 +127,7 @@ func (c *MonitorConfig) namespaces() (nsNames []string) {
 		return []string{""}
 	}
 
-	nsNames = c.NamespaceSelector.NameSelector.MatchNames
-	return nsNames
+	return c.NamespaceSelector.NameSelector.MatchNames
 }
 
 func (c *MonitorConfig) WithMode(mode kemtypes.KubeEventMode) {

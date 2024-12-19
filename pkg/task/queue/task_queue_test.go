@@ -96,19 +96,23 @@ func Test_ExponentialBackoff(t *testing.T) {
 	const fails = 10
 	failsCount := fails
 	queueStopCh := make(chan struct{}, 1)
-	q.WithHandler(func(t task.Task) (res TaskResult) {
+	q.WithHandler(func(t task.Task) TaskResult {
+		var res TaskResult
 		runsAt = append(runsAt, time.Now())
 		failureCounts = append(failureCounts, t.GetFailureCount())
 		if failsCount > 0 {
 			res.Status = Fail
 			failsCount--
-			return
+
+			return res
 		}
+
 		res.Status = Success
 		res.AfterHandle = func() {
 			close(queueStopCh)
 		}
-		return
+
+		return res
 	})
 
 	// Set exponential backoff to the constant delay just to wait more than DelayOnQueueIsEmpty.
@@ -139,19 +143,21 @@ func Test_ExponentialBackoff(t *testing.T) {
 		fails, mockExponentialDelay.String(), mean.Truncate(100*time.Microsecond).String())
 }
 
-func calculateMeanDelay(in []time.Time) (mean time.Duration, deltas []int64) {
+func calculateMeanDelay(in []time.Time) (time.Duration, []int64) {
 	var sum int64
 
 	// Calculate deltas from timestamps.
 	prev := in[0].UnixNano()
+	deltas := make([]int64, 0, len(in)-1)
 	for i := 1; i < len(in); i++ {
 		delta := in[i].UnixNano() - prev
 		prev = in[i].UnixNano()
 		deltas = append(deltas, delta)
 		sum += delta
 	}
-	mean = time.Duration(sum / int64(len(deltas)))
-	return
+	mean := time.Duration(sum / int64(len(deltas)))
+
+	return mean, deltas
 }
 
 func Test_CancelDelay(t *testing.T) {
@@ -177,7 +183,8 @@ func Test_CancelDelay(t *testing.T) {
 	endedAt := startedAt
 	delayStartsCh := make(chan struct{}, 1)
 	healingDoneCh := make(chan struct{}, 1)
-	q.WithHandler(func(t task.Task) (res TaskResult) {
+	q.WithHandler(func(t task.Task) TaskResult {
+		var res TaskResult
 		if t.GetId() == ErrTask.GetId() {
 			res.Status = Fail
 			// Close chan after first delay.
@@ -186,16 +193,20 @@ func Test_CancelDelay(t *testing.T) {
 					close(delayStartsCh)
 				}
 			}
-			return
+
+			return res
 		}
+
 		if t.GetId() == HealingTask.GetId() {
 			endedAt = time.Now()
 			res.AfterHandle = func() {
 				close(healingDoneCh)
 			}
 		}
+
 		res.Status = Success
-		return
+
+		return res
 	})
 
 	// Set exponential backoff to the constant delay just to wait more than DelayOnQueueIsEmpty.

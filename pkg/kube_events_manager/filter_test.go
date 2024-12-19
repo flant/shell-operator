@@ -19,10 +19,9 @@ func TestApplyFilter(t *testing.T) {
 	})
 }
 
-func filterFuncWithError(_ *unstructured.Unstructured) (result interface{}, err error) {
+func filterFuncWithError(_ *unstructured.Unstructured) (interface{}, error) {
 	var s []string
-
-	err = json.Unmarshal([]byte("asdasd"), &s)
+	err := json.Unmarshal([]byte("asdasd"), &s)
 
 	return s, err
 }

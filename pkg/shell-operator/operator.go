@@ -120,15 +120,13 @@ func (op *ShellOperator) Stop() {
 }
 
 // initHookManager load hooks from HooksDir and defines event handlers that emit tasks.
-func (op *ShellOperator) initHookManager() (err error) {
+func (op *ShellOperator) initHookManager() error {
 	if op.HookManager == nil {
-		return
+		return nil
 	}
 	// Search hooks and load their configurations
-	err = op.HookManager.Init()
-	if err != nil {
-		log.Errorf("MAIN Fatal: initialize hook manager: %s\n", err)
-		return err
+	if err := op.HookManager.Init(); err != nil {
+		return fmt.Errorf("MAIN Fatal: initialize hook manager: %w", err)
 	}
 
 	// Define event handlers for schedule event and kubernetes event.
@@ -196,9 +194,9 @@ func (op *ShellOperator) initHookManager() (err error) {
 
 // initValidatingWebhookManager adds kubernetesValidating hooks
 // to a WebhookManager and set a validating event handler.
-func (op *ShellOperator) initValidatingWebhookManager() (err error) {
+func (op *ShellOperator) initValidatingWebhookManager() error {
 	if op.HookManager == nil || op.AdmissionWebhookManager == nil {
-		return
+		return nil
 	}
 	// Do not init ValidatingWebhook if there are no KubernetesValidating hooks.
 	hookNamesV, _ := op.HookManager.GetHooksInOrder(types.KubernetesValidating)
@@ -210,13 +208,12 @@ func (op *ShellOperator) initValidatingWebhookManager() (err error) {
 	hookNames = append(hookNames, hookNamesM...)
 
 	if len(hookNames) == 0 {
-		return
+		return nil
 	}
 
-	err = op.AdmissionWebhookManager.Init()
+	err := op.AdmissionWebhookManager.Init()
 	if err != nil {
-		log.Errorf("ValidatingWebhookManager init: %v", err)
-		return err
+		return fmt.Errorf("ValidatingWebhookManager init: %w", err)
 	}
 
 	for _, hookName := range hookNames {
@@ -273,32 +270,31 @@ func (op *ShellOperator) initValidatingWebhookManager() (err error) {
 		return admissionResponse, nil
 	})
 
-	err = op.AdmissionWebhookManager.Start()
-	if err != nil {
-		log.Errorf("ValidatingWebhookManager start: %v", err)
+	if err := op.AdmissionWebhookManager.Start(); err != nil {
+		return fmt.Errorf("ValidatingWebhookManager start: %w", err)
 	}
-	return err
+
+	return nil
 }
 
 // initConversionWebhookManager creates and starts a conversion webhook manager.
-func (op *ShellOperator) initConversionWebhookManager() (err error) {
+func (op *ShellOperator) initConversionWebhookManager() error {
 	if op.HookManager == nil || op.ConversionWebhookManager == nil {
-		return
+		return nil
 	}
 
 	// Do not init ConversionWebhook if there are no KubernetesConversion hooks.
 	hookNames, _ := op.HookManager.GetHooksInOrder(types.KubernetesConversion)
 	if len(hookNames) == 0 {
-		return
+		return nil
 	}
 
 	// This handler is called when Kubernetes requests a conversion.
 	op.ConversionWebhookManager.EventHandlerFn = op.conversionEventHandler
 
-	err = op.ConversionWebhookManager.Init()
+	err := op.ConversionWebhookManager.Init()
 	if err != nil {
-		log.Errorf("ConversionWebhookManager init: %v", err)
-		return err
+		return fmt.Errorf("ConversionWebhookManager init: %w", err)
 	}
 
 	for _, hookName := range hookNames {
@@ -306,11 +302,11 @@ func (op *ShellOperator) initConversionWebhookManager() (err error) {
 		h.HookController.EnableConversionBindings()
 	}
 
-	err = op.ConversionWebhookManager.Start()
-	if err != nil {
-		log.Errorf("ConversionWebhookManager Start: %v", err)
+	if err = op.ConversionWebhookManager.Start(); err != nil {
+		return fmt.Errorf("ConversionWebhookManager Start: %w", err)
 	}
-	return err
+
+	return nil
 }
 
 // conversionEventHandler is called when Kubernetes requests a conversion.

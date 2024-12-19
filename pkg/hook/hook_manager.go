@@ -128,16 +128,15 @@ func (hm *Manager) Init() error {
 }
 
 // TODO move --config execution to a Hook method
-func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
+func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 	hookName, err := filepath.Rel(hm.workingDir, hookPath)
 	if err != nil {
 		return nil, err
 	}
-	hook = NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
 
+	hook := NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
 	hookEntry := hm.logger.With("hook", hook.Name).
 		With("phase", "config")
-
 	hookEntry.Infof("Load config from '%s'", hookPath)
 
 	envs := make([]string, 0)
@@ -147,12 +146,11 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			hookEntry.Errorf("Hook config stderr:\n%s", string(ee.Stderr))
 		}
-		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
+		return nil, fmt.Errorf("cannot get config for hook '%s': %w", hookPath, err)
 	}
 
-	_, err = hook.LoadConfig(configOutput)
-	if err != nil {
-		return nil, fmt.Errorf("creating hook '%s': %s", hookName, err.Error())
+	if _, err = hook.LoadConfig(configOutput); err != nil {
+		return nil, fmt.Errorf("creating hook '%s': %w", hookName, err)
 	}
 
 	// Add hook info as log labels, update MetricLabels
@@ -164,6 +162,7 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 			"queue":   kubeCfg.Queue,
 		}
 	}
+
 	for _, conversionCfg := range hook.GetConfig().KubernetesConversion {
 		conversionCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
 		conversionCfg.Webhook.Metadata.MetricLabels = map[string]string{
@@ -180,6 +179,7 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 		}
 		validatingCfg.Webhook.UpdateIds("", validatingCfg.BindingName)
 	}
+
 	for _, mutatingCfg := range hook.GetConfig().KubernetesMutating {
 		mutatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
 		mutatingCfg.Webhook.Metadata.MetricLabels = map[string]string{

@@ -8,15 +8,16 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 )
 
-func RequireExistingDirectory(inDir string) (dir string, err error) {
+func RequireExistingDirectory(inDir string) (string, error) {
 	if inDir == "" {
 		return "", fmt.Errorf("path is required but not set")
 	}
 
-	dir, err = filepath.Abs(inDir)
+	dir, err := filepath.Abs(inDir)
 	if err != nil {
-		return "", fmt.Errorf("get absolute path: %v", err)
+		return "", fmt.Errorf("get absolute path: %w", err)
 	}
+
 	if exists := DirExists(dir); !exists {
 		return "", fmt.Errorf("path '%s' not exist", dir)
 	}

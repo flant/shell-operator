@@ -43,30 +43,31 @@ type KubeNamespaceSelectorV0 struct {
 }
 
 // ConvertAndCheckV0 fills non-versioned structures and run inter-field checks not covered by OpenAPI schemas.
-func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) (err error) {
-	c.OnStartup, err = c.ConvertOnStartup(cv0.OnStartup)
-	if err != nil {
+func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) error {
+	var err error
+
+	if c.OnStartup, err = c.ConvertOnStartup(cv0.OnStartup); err != nil {
 		return err
 	}
 
 	c.Schedules = []htypes.ScheduleConfig{}
 	for i, rawSchedule := range cv0.Schedule {
-		err := cv0.CheckSchedule(rawSchedule)
-		if err != nil {
-			return fmt.Errorf("invalid schedule config [%d]: %v", i, err)
+		if err := cv0.CheckSchedule(rawSchedule); err != nil {
+			return fmt.Errorf("invalid schedule config [%d]: %w", i, err)
 		}
+
 		schedule, err := cv0.ConvertSchedule(rawSchedule)
 		if err != nil {
 			return err
 		}
+
 		c.Schedules = append(c.Schedules, schedule)
 	}
 
 	c.OnKubernetesEvents = []htypes.OnKubernetesEventConfig{}
 	for i, kubeCfg := range cv0.OnKubernetesEvent {
-		err := cv0.CheckOnKubernetesEvent(kubeCfg, fmt.Sprintf("onKubernetesEvent[%d]", i))
-		if err != nil {
-			return fmt.Errorf("invalid onKubernetesEvent config [%d]: %v", i, err)
+		if err := cv0.CheckOnKubernetesEvent(kubeCfg, fmt.Sprintf("onKubernetesEvent[%d]", i)); err != nil {
+			return fmt.Errorf("invalid onKubernetesEvent config [%d]: %w", i, err)
 		}
 
 		monitor := &kubeeventsmanager.MonitorConfig{}

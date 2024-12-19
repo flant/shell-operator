@@ -74,7 +74,7 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 // AssembleCommonOperator instantiate common dependencies. These dependencies
 // may be used for shell-operator derivatives, like addon-operator.
 // requires listenAddress, listenPort to run http server for operator APIs
-func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels map[string]string) (err error) {
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels map[string]string) error {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
@@ -83,6 +83,7 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	// metrics from user's hooks
 	op.setupHookMetricStorage()
 
+	var err error
 	// 'main' Kubernetes client.
 	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage, op.logger)
 	if err != nil {
@@ -112,7 +113,7 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 //   - hook manager
 //   - kubernetes events manager
 //   - schedule manager
-func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) (err error) {
+func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) error {
 	registerRootRoute(op)
 	// for shell-operator only
 	registerHookMetrics(op.HookMetricStorage)
@@ -125,21 +126,21 @@ func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, 
 	op.setupHookManagers(hooksDir, tempDir)
 
 	// Search and configure all hooks.
-	err = op.initHookManager()
+	err := op.initHookManager()
 	if err != nil {
-		return fmt.Errorf("initialize HookManager fail: %s", err)
+		return fmt.Errorf("initialize HookManager fail: %w", err)
 	}
 
 	// Load validation hooks.
 	err = op.initValidatingWebhookManager()
 	if err != nil {
-		return fmt.Errorf("initialize ValidatingWebhookManager fail: %s", err)
+		return fmt.Errorf("initialize ValidatingWebhookManager fail: %w", err)
 	}
 
 	// Load conversion hooks.
 	err = op.initConversionWebhookManager()
 	if err != nil {
-		return fmt.Errorf("initialize ConversionWebhookManager fail: %s", err)
+		return fmt.Errorf("initialize ConversionWebhookManager fail: %w", err)
 	}
 
 	return nil

@@ -21,8 +21,8 @@ type VersionedUntyped struct {
 func NewDefaultVersionedUntyped() *VersionedUntyped {
 	return &VersionedUntyped{
 		VersionKey: VersionKey,
-		VersionValidator: func(origVer string, found bool) (newVer string, err error) {
-			newVer = origVer
+		VersionValidator: func(origVer string, found bool) (string, error) {
+			newVer := origVer
 			if !found {
 				newVer = "v0"
 			}
@@ -71,18 +71,21 @@ func (u *VersionedUntyped) LoadConfigVersion() (string, error) {
 }
 
 // GetString returns string value by key
-func (u *VersionedUntyped) GetString(key string) (value string, found bool, err error) {
+func (u *VersionedUntyped) GetString(key string) (string, bool, error) {
 	val, found := u.Obj[key]
 
 	if !found {
 		return "", false, nil
 	}
+
 	if val == nil {
 		return "", true, fmt.Errorf("missing '%s' value", key)
 	}
+
 	value, ok := val.(string)
 	if !ok {
 		return "", true, fmt.Errorf("string value is expected for key '%s'", key)
 	}
+
 	return value, true, nil
 }
