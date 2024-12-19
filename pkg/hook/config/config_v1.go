@@ -518,15 +518,13 @@ func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (htypes.MutatingConfig, 
 }
 
 func (cv1 *HookConfigV1) CheckConversion(kubeConfigs []htypes.OnKubernetesEventConfig, cfgV1 KubernetesConversionConfigV1) error {
-	var allErr error
-
 	if len(cfgV1.IncludeSnapshotsFrom) > 0 {
 		if err := CheckIncludeSnapshots(kubeConfigs, cfgV1.IncludeSnapshotsFrom...); err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("includeSnapshotsFrom is invalid: %w", err))
+			return fmt.Errorf("includeSnapshotsFrom is invalid: %w", err)
 		}
 	}
 
-	return allErr
+	return nil
 }
 
 func (cv1 *HookConfigV1) ConvertConversion(cfgV1 KubernetesConversionConfigV1) (htypes.ConversionConfig, error) {

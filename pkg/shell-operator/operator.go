@@ -213,7 +213,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 
 	err := op.AdmissionWebhookManager.Init()
 	if err != nil {
-		return fmt.Errorf("ConversionWebhookManager init: %w", err)
+		return fmt.Errorf("ValidatingWebhookManager init: %w", err)
 	}
 
 	for _, hookName := range hookNames {

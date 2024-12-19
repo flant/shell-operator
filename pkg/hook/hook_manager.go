@@ -201,7 +201,7 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 	hook.WithTmpDir(hm.TempDir())
 
 	if hook.Config == nil {
-		return nil, fmt.Errorf("hook %s is marked as executable but doesn't contain config section", hook.Path)
+		return nil, fmt.Errorf("hook %q is marked as executable but doesn't contain config section", hook.Path)
 	}
 
 	hookEntry.Infof("Loaded config: %s", hook.GetConfigDescription())
