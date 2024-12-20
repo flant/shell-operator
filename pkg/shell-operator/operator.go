@@ -650,10 +650,6 @@ func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMet
 		return err
 	}
 
-	if result == nil {
-		return nil
-	}
-
 	if result.Usage != nil {
 		taskLogEntry.Debug("Usage", slog.String("value", fmt.Sprintf("%+v", result.Usage)))
 		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", result.Usage.Sys.Seconds(), metricLabels, nil)
