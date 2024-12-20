@@ -39,11 +39,6 @@ linters-settings:
     local-prefixes: github.com/flant/
   nolintlint:
     allow-unused: true
-  # TODO: replace deprecated methods
-  # ignore deprecated 
-  # https://staticcheck.dev/docs/checks/#SA1019
-  staticcheck:
-    checks: ["all","-SA1019"]
   sloglint:
       # Enforce not mixing key-value pairs and attributes.
       no-mixed-args: true

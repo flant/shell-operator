@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,7 +44,8 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 		}
 
 		if !isExecutableHookFile(f) {
-			log.Warnf("File '%s' is skipped: no executable permissions, chmod +x is required to run this hook", path)
+			log.Warn("File is skipped: no executable permissions, chmod +x is required to run this hook",
+				slog.String("file", path))
 			return nil
 		}
 
@@ -79,7 +81,8 @@ func RecursiveCheckLibDirectory(dir string) error {
 			return nil
 		}
 		if isExecutableHookFile(f) {
-			log.Warnf("File '%s' has executable permissions and is located in the ignored 'lib' directory", strings.TrimPrefix(path, dir))
+			log.Warn("File has executable permissions and is located in the ignored 'lib' directory",
+				slog.String("file", strings.TrimPrefix(path, dir)))
 		}
 
 		return nil

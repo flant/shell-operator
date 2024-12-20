@@ -2,6 +2,7 @@ package kubeeventsmanager
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -52,17 +53,19 @@ func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedIn
 	ctx, cancel := context.WithCancel(context.Background())
 	c.data[index] = Factory{
 		shared:               f,
-		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration, 0),
+		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
 		ctx:                  ctx,
 		cancel:               cancel,
 	}
-	log.Debugf("Factory store: added a new factory for %v index", index)
+	log.Debug("Factory store: added a new factory for index",
+		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 }
 
 func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory {
 	f, ok := c.data[index]
 	if ok {
-		log.Debugf("Factory store: the factory with %v index found", index)
+		log.Debug("Factory store: the factory with index found",
+			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 		return f
 	}
 
@@ -97,10 +100,14 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	_ = informer.SetWatchErrorHandler(errorHandler.handler)
 	registration, err := informer.AddEventHandler(handler)
 	if err != nil {
-		log.Warnf("Factory store: couldn't add event handler to the %v factory's informer: %v", index, err)
+		log.Warn("Factory store: couldn't add event handler to the factory's informer",
+			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()),
+			log.Err(err))
 	}
 	factory.handlerRegistrations[informerId] = registration
-	log.Debugf("Factory store: increased usage counter to %d of the factory with %v index", len(factory.handlerRegistrations), index)
+	log.Debug("Factory store: increased usage counter of the factory",
+		slog.Int("value", len(factory.handlerRegistrations)),
+		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 
 	if !informer.HasSynced() {
 		go informer.Run(factory.ctx.Done())
@@ -111,7 +118,8 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 			return err
 		}
 	}
-	log.Debugf("Factory store: started informer for %v index", index)
+	log.Debug("Factory store: started informer",
+		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 	return nil
 }
 
@@ -128,14 +136,19 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 	if handlerRegistration, found := f.handlerRegistrations[informerId]; found {
 		err := f.shared.ForResource(index.GVR).Informer().RemoveEventHandler(handlerRegistration)
 		if err != nil {
-			log.Warnf("Factory store: couldn't remove event handler from the %v factory's informer: %v", index, err)
+			log.Warn("Factory store: couldn't remove event handler from the factory's informer",
+				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()),
+				log.Err(err))
 		}
 		delete(f.handlerRegistrations, informerId)
-		log.Debugf("Factory store: decreased usage counter to %d of the factory with %v index", len(f.handlerRegistrations), index)
+		log.Debug("Factory store: decreased usage counter of the factory",
+			slog.Int("value", len(f.handlerRegistrations)),
+			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 		if len(f.handlerRegistrations) == 0 {
 			f.cancel()
 			delete(c.data, index)
-			log.Debugf("Factory store: deleted factory for %v index", index)
+			log.Debug("Factory store: deleted factory",
+				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 		}
 	}
 }

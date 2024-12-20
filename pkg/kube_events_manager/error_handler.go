@@ -1,7 +1,9 @@
 package kubeeventsmanager
 
 import (
+	"errors"
 	"io"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,16 +40,25 @@ func (weh *WatchErrorHandler) handler(_ *cache.Reflector, err error) {
 		// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 		// has a semantic that it returns data at least as fresh as provided RV.
 		// So first try to LIST with setting RV to resource version of last observed object.
-		weh.logger.Errorf("%s: Watch of %v closed with: %v", weh.description, weh.kind, err)
+		weh.logger.Error("Watch closed",
+			slog.String("description", weh.description),
+			slog.String("kind", weh.kind),
+			log.Err(err))
 		errorType = "expired"
 	case err == io.EOF:
 		// watch closed normally
 		errorType = "eof"
-	case err == io.ErrUnexpectedEOF:
-		weh.logger.Errorf("%s: Watch for %v closed with unexpected EOF: %v", weh.description, weh.kind, err)
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		weh.logger.Error("Watch closed with unexpected EOF",
+			slog.String("description", weh.description),
+			slog.String("kind", weh.kind),
+			log.Err(err))
 		errorType = "unexpected-eof"
 	case err != nil:
-		weh.logger.Errorf("%s: Failed to watch %v: %v", weh.description, weh.kind, err)
+		weh.logger.Error("Watch Failed",
+			slog.String("description", weh.description),
+			slog.String("kind", weh.kind),
+			log.Err(err))
 		errorType = "fail"
 	}
 
