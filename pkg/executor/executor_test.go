@@ -107,9 +107,8 @@ func TestRunAndLogLines(t *testing.T) {
 		_, err := ex.RunAndLogLines(map[string]string{"a": "b"})
 		assert.NoError(t, err)
 
-		assert.Equal(t, buf.String(), `{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:177","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:180","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
-
+		assert.Equal(t, buf.String(), `{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:200","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:203","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 		buf.Reset()
 	})
 
