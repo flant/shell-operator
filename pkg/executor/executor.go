@@ -56,8 +56,10 @@ func (e *Executor) WithLogger(logger *log.Logger) *Executor {
 }
 
 func (e *Executor) WithChroot(path string) *Executor {
-	e.cmd.SysProcAttr = &syscall.SysProcAttr{
-		Chroot: path,
+	if len(path) > 0 {
+		e.cmd.SysProcAttr = &syscall.SysProcAttr{
+			Chroot: path,
+		}
 	}
 
 	return e

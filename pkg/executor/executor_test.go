@@ -107,9 +107,9 @@ func TestRunAndLogLines(t *testing.T) {
 		_, err := ex.RunAndLogLines(map[string]string{"a": "b"})
 		assert.NoError(t, err)
 
-		assert.Equal(t, buf.String(), `{"level":"debug","msg":"Executing command 'echo [\"a\",\"b\",\"c\"]' in '' dir","source":"executor/executor.go:109","a":"b","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:181","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:184","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
+		assert.Equal(t, buf.String(), `{"level":"debug","msg":"Executing command 'echo [\"a\",\"b\",\"c\"]' in '' dir","source":"executor/executor.go:111","a":"b","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:183","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:186","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 
 		buf.Reset()
 	})
