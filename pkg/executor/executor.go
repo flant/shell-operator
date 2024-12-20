@@ -55,6 +55,14 @@ func (e *Executor) WithLogger(logger *log.Logger) *Executor {
 	return e
 }
 
+func (e *Executor) WithChroot(path string) *Executor {
+	e.cmd.SysProcAttr = &syscall.SysProcAttr{
+		Chroot: path,
+	}
+
+	return e
+}
+
 func (e *Executor) WithCMDStdout(w io.Writer) *Executor {
 	e.cmd.Stdout = w
 
