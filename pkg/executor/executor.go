@@ -60,6 +60,7 @@ func (e *Executor) WithChroot(path string) *Executor {
 		e.cmd.SysProcAttr = &syscall.SysProcAttr{
 			Chroot: path,
 		}
+		e.cmd.Path = strings.TrimPrefix(e.cmd.Path, path)
 	}
 
 	return e
