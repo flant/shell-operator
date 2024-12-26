@@ -55,6 +55,18 @@ func (e *Executor) WithLogger(logger *log.Logger) *Executor {
 	return e
 }
 
+func (e *Executor) WithWrapper(path string) *Executor {
+	if len(path) > 0 {
+		e.cmd.Path = path
+
+		newArgs := make([]string, 0, len(e.cmd.Args)+1)
+		newArgs[0] = path
+		e.cmd.Args = append(newArgs, e.cmd.Args...)
+	}
+
+	return e
+}
+
 func (e *Executor) WithChroot(path string) *Executor {
 	if len(path) > 0 {
 		e.cmd.SysProcAttr = &syscall.SysProcAttr{
