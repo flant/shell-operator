@@ -1,7 +1,9 @@
 package hook
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -92,7 +94,9 @@ func (hm *Manager) Init() error {
 	hm.hooksByName = make(map[string]*Hook)
 
 	if err := utils_file.RecursiveCheckLibDirectory(hm.workingDir); err != nil {
-		log.Errorf("failed to check lib directory %s: %v", hm.workingDir, err)
+		log.Error("failed to check lib directory",
+			slog.String("workingDir", hm.workingDir),
+			log.Err(err))
 	}
 
 	hooksRelativePaths, err := utils_file.RecursiveGetExecutablePaths(hm.workingDir)
@@ -102,7 +106,7 @@ func (hm *Manager) Init() error {
 
 	// sort hooks by path
 	sort.Strings(hooksRelativePaths)
-	log.Debugf("  Search hooks in this paths: %+v", hooksRelativePaths)
+	log.Debug("Search hooks in paths", slog.Any("paths", hooksRelativePaths))
 
 	for _, hookPath := range hooksRelativePaths {
 		hook, err := hm.loadHook(hookPath)
@@ -137,14 +141,16 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 	hook := NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
 	hookEntry := hm.logger.With("hook", hook.Name).
 		With("phase", "config")
-	hookEntry.Infof("Load config from '%s'", hookPath)
+
+	hookEntry.Info("Load config", slog.String("path", hookPath))
 
 	envs := make([]string, 0)
 	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
-		hookEntry.Errorf("Hook config output:\n%s", string(configOutput))
-		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
-			hookEntry.Errorf("Hook config stderr:\n%s", string(ee.Stderr))
+		hookEntry.Error("Hook config output", slog.String("value", string(configOutput)))
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
+			hookEntry.Error("Hook config stderr", slog.String("value", string(ee.Stderr)))
 		}
 		return nil, fmt.Errorf("cannot get config for hook '%s': %w", hookPath, err)
 	}
@@ -204,7 +210,7 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 		return nil, fmt.Errorf("hook %q is marked as executable but doesn't contain config section", hook.Path)
 	}
 
-	hookEntry.Infof("Loaded config: %s", hook.GetConfigDescription())
+	hookEntry.Info("Loaded config", slog.String("value", hook.GetConfigDescription()))
 
 	return hook, nil
 }
@@ -225,14 +231,14 @@ func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint str
 	debugEntry := hm.logger.With("hook", hookName).
 		With("cmd", strings.Join(args, " "))
 
-	debugEntry.Debugf("Executing hook in %s", dir)
+	debugEntry.Debug("Executing hook", slog.String("dir", dir))
 
 	output, err := hookCmd.Output()
 	if err != nil {
 		return output, err
 	}
 
-	debugEntry.Debugf("output:\n%s", string(output))
+	debugEntry.Debug("execCommandOutput", slog.String("output", string(output)))
 
 	return output, nil
 }
@@ -242,7 +248,7 @@ func (hm *Manager) GetHook(name string) *Hook {
 	if exists {
 		return hook
 	}
-	log.Errorf("Possible bug!!! Hook '%s' not found in hook manager", name)
+	log.Error("Possible bug!!! Hook not found in hook manager", slog.String("name", name))
 	return nil
 }
 
@@ -351,7 +357,12 @@ func (hm *Manager) DetectAdmissionEventType(event admission.Event) htypes.Bindin
 		}
 	}
 
-	log.Errorf("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s", event.ConfigurationId, event.WebhookId, event.Request.Kind, event.Request.Name, event.Request.Namespace)
+	log.Error("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s",
+		slog.String("configId", event.ConfigurationId),
+		slog.String("webhookId", event.WebhookId),
+		slog.String("kind", event.Request.Kind.String()),
+		slog.String("name", event.Request.Name),
+		slog.String("namespace", event.Request.Namespace))
 	return ""
 }
 

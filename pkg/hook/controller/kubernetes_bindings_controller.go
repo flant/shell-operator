@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -127,8 +128,10 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 	}
 
 	utils.EnrichLoggerWithLabels(c.logger, link.BindingConfig.Monitor.Metadata.LogLabels).
-		Infof("Monitor for '%s' is recreated with new kind=%s and apiVersion=%s",
-			link.BindingConfig.BindingName, link.BindingConfig.Monitor.Kind, link.BindingConfig.Monitor.ApiVersion)
+		Info("Monitor is recreated",
+			slog.String("bindingName", link.BindingConfig.BindingName),
+			slog.String("kind", link.BindingConfig.Monitor.Kind),
+			slog.String("apiVersion", link.BindingConfig.Monitor.ApiVersion))
 
 	// Synchronization has no meaning for UpdateMonitor. Just emit Added event to handle objects of
 	// a new kind.
@@ -159,7 +162,7 @@ func (c *kubernetesBindingsController) UnlockEvents() {
 func (c *kubernetesBindingsController) UnlockEventsFor(monitorID string) {
 	m := c.kubeEventsManager.GetMonitor(monitorID)
 	if m == nil {
-		log.Warnf("monitor %q was not found", monitorID)
+		log.Warn("monitor was not found", slog.String("monitorID", monitorID))
 		return
 	}
 	m.EnableKubeEventCb()
@@ -187,7 +190,7 @@ func (c *kubernetesBindingsController) CanHandleEvent(kubeEvent kemtypes.KubeEve
 func (c *kubernetesBindingsController) HandleEvent(kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
 	link, hasKey := c.BindingMonitorLinks[kubeEvent.MonitorId]
 	if !hasKey {
-		log.Errorf("Possible bug!!! Unknown kube event: no such monitor id '%s' registered", kubeEvent.MonitorId)
+		log.Error("Possible bug!!! Unknown kube event: no such monitor id registered", slog.String("monitorID", kubeEvent.MonitorId))
 		return BindingExecutionInfo{
 			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,

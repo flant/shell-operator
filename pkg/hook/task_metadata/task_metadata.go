@@ -2,6 +2,7 @@ package task_metadata
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -51,13 +52,14 @@ var (
 func HookMetadataAccessor(t task.Task) HookMetadata {
 	meta := t.GetMetadata()
 	if meta == nil {
-		log.Errorf("Possible Bug! task metadata is nil")
+		log.Error("Possible Bug! task metadata is nil")
 		return HookMetadata{}
 	}
 
 	hookMeta, ok := meta.(HookMetadata)
 	if !ok {
-		log.Errorf("Possible Bug! task metadata is not of type HookMetadata: got %T", meta)
+		log.Error("Possible Bug! task metadata is not of type HookMetadata",
+			slog.String("type", fmt.Sprintf("%T", meta)))
 		return HookMetadata{}
 	}
 

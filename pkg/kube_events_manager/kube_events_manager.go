@@ -2,6 +2,8 @@ package kubeeventsmanager
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"runtime/trace"
 	"sync"
 
@@ -67,7 +69,8 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor *metricstorage.MetricStora
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
-	log.Debugf("Add MONITOR %+v", monitorConfig)
+	log.Debug("Add MONITOR",
+		slog.String("config", fmt.Sprintf("%+v", monitorConfig)))
 	monitor := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,

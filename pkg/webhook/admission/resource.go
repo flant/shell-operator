@@ -2,6 +2,7 @@ package admission
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -58,7 +59,9 @@ func (w *ValidatingWebhookResource) Register() error {
 			CABundle: w.opts.CABundle,
 		}
 
-		log.Infof("Add '%s' path to '%s'", *webhook.ClientConfig.Service.Path, w.opts.ConfigurationName)
+		log.Info("Add path to config",
+			slog.String("path", *webhook.ClientConfig.Service.Path),
+			slog.String("configurationName", w.opts.ConfigurationName))
 
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.ValidatingWebhook)
 	}
@@ -101,14 +104,18 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 	if len(list.Items) == 0 {
 		_, err = client.Create(context.TODO(), conf, metav1.CreateOptions{})
 		if err != nil {
-			log.Errorf("Create ValidatingWebhookConfiguration/%s: %v", conf.Name, err)
+			log.Error("Create ValidatingWebhookConfiguration",
+				slog.String("name", conf.Name),
+				log.Err(err))
 		}
 	} else {
 		newConf := list.Items[0]
 		newConf.Webhooks = conf.Webhooks
 		_, err = client.Update(context.TODO(), &newConf, metav1.UpdateOptions{})
 		if err != nil {
-			log.Errorf("Replace ValidatingWebhookConfiguration/%s: %v", conf.Name, err)
+			log.Error("Replace ValidatingWebhookConfiguration",
+				slog.String("name", conf.Name),
+				log.Err(err))
 		}
 	}
 	return nil
@@ -153,7 +160,9 @@ func (w *MutatingWebhookResource) Register() error {
 			CABundle: w.opts.CABundle,
 		}
 
-		log.Infof("Add '%s' path to '%s'", *webhook.ClientConfig.Service.Path, w.opts.ConfigurationName)
+		log.Info("Add path to config",
+			slog.String("path", *webhook.ClientConfig.Service.Path),
+			slog.String("configurationName", w.opts.ConfigurationName))
 
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.MutatingWebhook)
 	}
@@ -179,14 +188,18 @@ func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) 
 	if len(list.Items) == 0 {
 		_, err = client.Create(context.TODO(), conf, metav1.CreateOptions{})
 		if err != nil {
-			log.Errorf("Create MutatingWebhookConfiguration/%s: %v", conf.Name, err)
+			log.Error("Create MutatingWebhookConfiguration",
+				slog.String("name", conf.Name),
+				log.Err(err))
 		}
 	} else {
 		newConf := list.Items[0]
 		newConf.Webhooks = conf.Webhooks
 		_, err = client.Update(context.TODO(), &newConf, metav1.UpdateOptions{})
 		if err != nil {
-			log.Errorf("Replace MutatingWebhookConfiguration/%s: %v", conf.Name, err)
+			log.Error("Replace MutatingWebhookConfiguration",
+				slog.String("name", conf.Name),
+				log.Err(err))
 		}
 	}
 	return nil

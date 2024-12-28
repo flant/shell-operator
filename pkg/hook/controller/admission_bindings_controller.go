@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"log/slog"
+
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admission/v1"
 
@@ -67,7 +69,9 @@ func (c *AdmissionBindingsController) EnableValidatingBindings() {
 			continue
 		}
 		if config.Webhook.Metadata.ConfigurationId != confId {
-			log.Errorf("Possible bug!!! kubernetesValidating has non-unique configurationIds: '%s' '%s'", config.Webhook.Metadata.ConfigurationId, confId)
+			log.Error("Possible bug!!! kubernetesValidating has non-unique configurationIds",
+				slog.String("configurationID", config.Webhook.Metadata.ConfigurationId),
+				slog.String("confID", confId))
 		}
 	}
 	c.ConfigurationId = confId
@@ -101,7 +105,9 @@ func (c *AdmissionBindingsController) EnableMutatingBindings() {
 			continue
 		}
 		if config.Webhook.Metadata.ConfigurationId != confId {
-			log.Errorf("Possible bug!!! kubernetesMutating has non-unique configurationIds: '%s' '%s'", config.Webhook.Metadata.ConfigurationId, confId)
+			log.Error("Possible bug!!! kubernetesMutating has non-unique configurationIds",
+				slog.String("configurationID", config.Webhook.Metadata.ConfigurationId),
+				slog.String("confID", confId))
 		}
 	}
 	c.ConfigurationId = confId
@@ -137,7 +143,9 @@ func (c *AdmissionBindingsController) CanHandleEvent(event admission.Event) bool
 
 func (c *AdmissionBindingsController) HandleEvent(event admission.Event) BindingExecutionInfo {
 	if c.ConfigurationId != event.ConfigurationId {
-		log.Errorf("Possible bug!!! Unknown validating event: no binding for configurationId '%s' (webhookId '%s')", event.ConfigurationId, event.WebhookId)
+		log.Error("Possible bug!!! Unknown validating event: no binding for configurationId",
+			slog.String("configurationId", event.ConfigurationId),
+			slog.String("webhookId", event.WebhookId))
 		return BindingExecutionInfo{
 			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
@@ -146,7 +154,9 @@ func (c *AdmissionBindingsController) HandleEvent(event admission.Event) Binding
 
 	link, hasKey := c.AdmissionLinks[event.WebhookId]
 	if !hasKey {
-		log.Errorf("Possible bug!!! Unknown validating event: no binding for configurationId '%s', webhookId '%s'", event.ConfigurationId, event.WebhookId)
+		log.Error("Possible bug!!! Unknown validating event: no binding for configurationId",
+			slog.String("configurationId", event.ConfigurationId),
+			slog.String("webhookId", event.WebhookId))
 		return BindingExecutionInfo{
 			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,

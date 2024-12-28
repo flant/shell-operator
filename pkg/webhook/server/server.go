@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -80,10 +81,10 @@ func (s *WebhookServer) Start() error {
 	}
 
 	go func() {
-		log.Infof("Webhook server listens on %s", listenAddr)
+		log.Info("Webhook server listens", slog.String("address", listenAddr))
 		err := srv.ServeTLS(listener, "", "")
 		if err != nil {
-			log.Errorf("Error starting Webhook https server: %v", err)
+			log.Error("Error starting Webhook https server", log.Err(err))
 			// Stop process if server can't start.
 			os.Exit(1)
 		}
