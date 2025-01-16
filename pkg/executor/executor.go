@@ -73,6 +73,7 @@ func (e *Executor) WithChroot(path string) *Executor {
 			Chroot: path,
 		}
 		e.cmd.Path = strings.TrimPrefix(e.cmd.Path, path)
+		e.cmd.Dir = "/"
 	}
 
 	return e
