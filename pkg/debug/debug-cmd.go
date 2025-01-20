@@ -39,7 +39,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("\033[2J\rOn%s\n%s", parseErrStr, string(out))
+				fmt.Printf("\033[H\033[2J\r%s\n%s", parseErrStr, string(out))
 
 				if !watch {
 					break
