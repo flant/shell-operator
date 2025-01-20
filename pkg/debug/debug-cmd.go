@@ -12,7 +12,8 @@ import (
 var (
 	outputFormat  = "text"
 	showEmpty     = false
-	watchInterval = "0s"
+	watch         = false
+	watchInterval = "1s"
 )
 
 func DefineDebugCommands(kpApp *kingpin.Application) {
@@ -21,9 +22,13 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(_ *kingpin.ParseContext) error {
-			dur, err := time.ParseDuration(watchInterval)
-			if err != nil {
-				return fmt.Errorf("couldn't parse watch interval: %w", err)
+			var dur time.Duration
+			if watch {
+				var err error
+				dur, err = time.ParseDuration(watchInterval)
+				if err != nil {
+					return fmt.Errorf("couldn't parse watch refresh interval: %w", err)
+				}
 			}
 			for {
 				out, err := Queue(DefaultClient()).List(outputFormat, showEmpty)
@@ -31,7 +36,8 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 					return err
 				}
 				fmt.Println(string(out))
-				if dur == 0 {
+
+				if !watch {
 					break
 				}
 				time.Sleep(dur)
@@ -42,6 +48,9 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 		Default("false").
 		BoolVar(&showEmpty)
 	queueListCmd.Flag("watch", "Keep watching.").Short('w').
+		Default("false").
+		BoolVar(&watch)
+	queueListCmd.Flag("watchInterval", "Watch refresh interval.").Short('t').
 		Default(watchInterval).
 		StringVar(&watchInterval)
 	AddOutputJsonYamlTextFlag(queueListCmd)
