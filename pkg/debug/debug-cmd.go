@@ -22,10 +22,10 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(_ *kingpin.ParseContext) error {
-			var dur time.Duration
+			var refreshInterval time.Duration
 			if watch {
 				var err error
-				dur, err = time.ParseDuration(watchInterval)
+				refreshInterval, err = time.ParseDuration(watchInterval)
 				if err != nil {
 					return fmt.Errorf("couldn't parse watch refresh interval: %w", err)
 				}
@@ -40,7 +40,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				if !watch {
 					break
 				}
-				time.Sleep(dur)
+				time.Sleep(refreshInterval)
 			}
 			return nil
 		})
