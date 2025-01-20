@@ -22,13 +22,16 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(_ *kingpin.ParseContext) error {
-			var refreshInterval time.Duration
+			var (
+				refreshInterval time.Duration
+				parseErrStr     string
+			)
 			if watch {
 				var err error
 				refreshInterval, err = time.ParseDuration(watchInterval)
 				if err != nil {
-					fmt.Printf("couldn't parse watch refresh interval: %s, default 1s applied\n", err)
-					refreshInterval = time.Duration(1 * time.Second)
+					parseErrStr = fmt.Sprintf("couldn't parse watch refresh interval: %s, default 1s applied\n", err)
+					refreshInterval = time.Duration(time.Second)
 				}
 			}
 			for {
@@ -36,7 +39,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("\x0cOn %s", string(out))
+				fmt.Printf("\033[2J\rOn%s\n%s", parseErrStr, string(out))
 
 				if !watch {
 					break
