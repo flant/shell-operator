@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/buger/goterm"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -25,12 +24,10 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 		Action(func(_ *kingpin.ParseContext) error {
 			var refreshInterval time.Duration
 			if watch {
-				goterm.Clear()
-				goterm.MoveCursor(1, 1)
 				var err error
 				refreshInterval, err = time.ParseDuration(watchInterval)
 				if err != nil {
-					goterm.Println(fmt.Sprintf("couldn't parse watch refresh interval: %s, default 1s applied\n", err))
+					fmt.Printf("couldn't parse watch refresh interval: %s, default 1s applied\n", err)
 					refreshInterval = time.Duration(1 * time.Second)
 				}
 			}
@@ -39,15 +36,12 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				if err != nil {
 					return err
 				}
-				goterm.Println(string(out))
-				goterm.Flush()
+				fmt.Printf("\rOn %s", string(out))
 
 				if !watch {
 					break
 				}
 				time.Sleep(refreshInterval)
-				goterm.MoveCursor(1, 1)
-				goterm.Clear()
 			}
 			return nil
 		})
