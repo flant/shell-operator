@@ -33,7 +33,10 @@ require (
 // Remove 'in body' from errors, fix for Go 1.16 (https://github.com/go-openapi/validate/pull/138).
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.12-flant.0
 
-require github.com/gojuno/minimock/v3 v3.4.3
+require (
+	github.com/buger/goterm v1.0.4
+	github.com/gojuno/minimock/v3 v3.4.3
+)
 
 require (
 	github.com/DataDog/gostackparse v0.7.0 // indirect
