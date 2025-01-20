@@ -36,7 +36,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("\rOn %s", string(out))
+				fmt.Printf("\x0cOn %s", string(out))
 
 				if !watch {
 					break
