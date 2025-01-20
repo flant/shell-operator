@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	outputFormat = "text"
-	showEmpty    = false
+	outputFormat  = "text"
+	showEmpty     = false
+	watchInterval = "0s"
 )
 
 func DefineDebugCommands(kpApp *kingpin.Application) {
@@ -20,16 +21,29 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(_ *kingpin.ParseContext) error {
-			out, err := Queue(DefaultClient()).List(outputFormat, showEmpty)
+			dur, err := time.ParseDuration(watchInterval)
 			if err != nil {
-				return err
+				return fmt.Errorf("couldn't parse watch interval: %w", err)
 			}
-			fmt.Println(string(out))
+			for {
+				out, err := Queue(DefaultClient()).List(outputFormat, showEmpty)
+				if err != nil {
+					return err
+				}
+				fmt.Println(string(out))
+				if dur == 0 {
+					break
+				}
+				time.Sleep(dur)
+			}
 			return nil
 		})
 	queueListCmd.Flag("show-empty", "Show empty queues.").Short('e').
 		Default("false").
 		BoolVar(&showEmpty)
+	queueListCmd.Flag("watch", "Keep watching.").Short('w').
+		Default(watchInterval).
+		StringVar(&watchInterval)
 	AddOutputJsonYamlTextFlag(queueListCmd)
 	app.DefineDebugUnixSocketFlag(queueListCmd)
 
