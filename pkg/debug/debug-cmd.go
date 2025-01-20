@@ -47,6 +47,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				}
 				time.Sleep(refreshInterval)
 				goterm.MoveCursor(1, 1)
+				goterm.Clear()
 			}
 			return nil
 		})
