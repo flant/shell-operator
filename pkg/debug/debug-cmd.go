@@ -26,6 +26,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 			var refreshInterval time.Duration
 			if watch {
 				goterm.Clear()
+				goterm.MoveCursor(1, 1)
 				var err error
 				refreshInterval, err = time.ParseDuration(watchInterval)
 				if err != nil {
