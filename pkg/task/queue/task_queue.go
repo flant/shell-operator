@@ -563,12 +563,12 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 		}
 
 		// Wait loop still in progress: update queue status.
-		waitSeconds := time.Since(waitBegin).Truncate(time.Second)
+		waitTime := time.Since(waitBegin).Truncate(time.Second)
 		if sleepDelay == 0 {
-			q.Status = fmt.Sprintf("waiting for task %s", waitSeconds.String())
+			q.Status = fmt.Sprintf("waiting for task %s", waitTime.String())
 		} else {
 			delay := sleepDelay.Truncate(time.Second)
-			q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, (delay - waitSeconds).String(), delay.String())
+			q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, (delay - waitTime).String(), delay.String())
 		}
 	}
 }
