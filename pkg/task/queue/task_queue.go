@@ -568,7 +568,7 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			q.Status = fmt.Sprintf("waiting for task %s", waitSeconds.String())
 		} else {
 			delay := sleepDelay.Truncate(time.Second)
-			q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, (delay-waitSeconds).String(), delay.String())
+			q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, (delay - waitSeconds).String(), delay.String())
 		}
 	}
 }
