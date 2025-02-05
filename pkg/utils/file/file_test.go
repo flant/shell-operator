@@ -143,7 +143,7 @@ func TestRecursiveCheckLibDirectory(t *testing.T) {
 
 			assert.Equal(t,
 				buf.String(),
-				`{"level":"warn","msg":"File has executable permissions and is located in the ignored 'lib' directory","file":"/lib.py","time":"2006-01-02T15:04:05Z"}`+"\n")
+				`{"level":"warn","msg":"file has executable permissions and is located in the ignored 'lib' directory","file":"/lib.py","time":"2006-01-02T15:04:05Z"}`+"\n")
 		})
 	}
 
