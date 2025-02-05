@@ -55,6 +55,18 @@ func (e *Executor) WithLogger(logger *log.Logger) *Executor {
 	return e
 }
 
+func (e *Executor) WithChroot(path string) *Executor {
+	if len(path) > 0 {
+		e.cmd.SysProcAttr = &syscall.SysProcAttr{
+			Chroot: path,
+		}
+		e.cmd.Path = strings.TrimPrefix(e.cmd.Path, path)
+		e.cmd.Dir = "/"
+	}
+
+	return e
+}
+
 func (e *Executor) WithCMDStdout(w io.Writer) *Executor {
 	e.cmd.Stdout = w
 
