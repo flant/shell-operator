@@ -22,7 +22,7 @@ func FileExists(path string) (bool, error) {
 	return true, nil
 }
 
-func IsFileExecutable(f os.FileInfo) error {
+func CheckExecutablePermissions(f os.FileInfo) error {
 	if f.Mode()&0o111 == 0 {
 		return ErrFileNoExecutablePermissions
 	}
@@ -48,7 +48,7 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 			return nil
 		}
 
-		if err := isExecutableHookFile(f); err != nil {
+		if err := checkExecutableHookFile(f); err != nil {
 			if errors.Is(err, ErrFileNoExecutablePermissions) {
 				log.Warn("file is skipped", slog.String("path", path), log.Err(err))
 
@@ -92,7 +92,7 @@ func RecursiveCheckLibDirectory(dir string) error {
 			return nil
 		}
 
-		if err := isExecutableHookFile(f); err == nil {
+		if err := checkExecutableHookFile(f); err == nil {
 			log.Warn("file has executable permissions and is located in the ignored 'lib' directory",
 				slog.String("file", strings.TrimPrefix(path, dir)))
 		}
@@ -112,7 +112,7 @@ var (
 	ErrFileNoExecutablePermissions = errors.New("no executable permissions, chmod +x is required to run this hook")
 )
 
-func isExecutableHookFile(f os.FileInfo) error {
+func checkExecutableHookFile(f os.FileInfo) error {
 	// ignore hidden files
 	if strings.HasPrefix(f.Name(), ".") {
 		return ErrFileIsHidden
@@ -124,5 +124,5 @@ func isExecutableHookFile(f os.FileInfo) error {
 		return ErrFileHasWrongExtension
 	}
 
-	return IsFileExecutable(f)
+	return CheckExecutablePermissions(f)
 }
