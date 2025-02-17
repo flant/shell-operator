@@ -116,6 +116,8 @@ func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
 		return
 	}
 
+	tqs.m.RLock()
+	defer tqs.m.RUnlock()
 	if len(tqs.Queues) == 0 {
 		return
 	}
@@ -126,14 +128,11 @@ func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
 	}
 	// TODO sort names
 
-	tqs.m.RLock()
 	for _, q := range tqs.Queues {
 		if q.Name != tqs.MainName {
 			doFn(q)
 		}
 	}
-
-	tqs.m.RUnlock()
 }
 
 func (tqs *TaskQueueSet) Remove(name string) {
