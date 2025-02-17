@@ -20,14 +20,13 @@ type TaskQueueSet struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	m      *sync.RWMutex
+	m      sync.RWMutex
 	Queues map[string]*TaskQueue
 }
 
 func NewTaskQueueSet() *TaskQueueSet {
 	return &TaskQueueSet{
 		Queues:   make(map[string]*TaskQueue),
-		m:        new(sync.RWMutex),
 		MainName: MainQueueName,
 	}
 }
