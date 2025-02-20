@@ -48,12 +48,11 @@ type resourceInformer struct {
 
 	// Events buffer for "Synchronization" mode: it stores events between CachedObjects call and enableKubeEventCb call
 	// to replay them when "Synchronization" hook is done.
-	eventBuf     []kemtypes.KubeEvent
-	eventBufLock sync.Mutex
-
+	eventBuf []kemtypes.KubeEvent
 	// A callback function that define custom handling of Kubernetes events.
 	eventCb        func(kemtypes.KubeEvent)
 	eventCbEnabled bool
+	eventBufLock   sync.Mutex
 
 	// TODO resourceInformer should be stoppable (think of deleted namespaces and disabled modules in addon-operator)
 	ctx    context.Context
@@ -163,20 +162,20 @@ func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult 
 	ei.cacheLock.RUnlock()
 
 	// Reset eventBuf if needed.
+	ei.eventBufLock.Lock()
 	if !ei.eventCbEnabled {
-		ei.eventBufLock.Lock()
 		ei.eventBuf = nil
-		ei.eventBufLock.Unlock()
 	}
+	ei.eventBufLock.Unlock()
 	return res
 }
 
 func (ei *resourceInformer) enableKubeEventCb() {
+	ei.eventBufLock.Lock()
+	defer ei.eventBufLock.Unlock()
 	if ei.eventCbEnabled {
 		return
 	}
-	ei.eventBufLock.Lock()
-	defer ei.eventBufLock.Unlock()
 	ei.eventCbEnabled = true
 	for _, kubeEvent := range ei.eventBuf {
 		// Handle saved kube events.
