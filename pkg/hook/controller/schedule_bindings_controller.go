@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"sync"
+
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
@@ -29,14 +31,15 @@ type ScheduleBindingsController interface {
 
 // scheduleHooksController is a main implementation of KubernetesHooksController
 type scheduleBindingsController struct {
+	// dependencies
+	scheduleManager schedulemanager.ScheduleManager
+
+	l sync.RWMutex
 	// All hooks with 'kubernetes' bindings
 	ScheduleLinks map[string]*ScheduleBindingToCrontabLink
 
 	// bindings configurations
 	ScheduleBindings []htypes.ScheduleConfig
-
-	// dependencies
-	scheduleManager schedulemanager.ScheduleManager
 }
 
 // kubernetesHooksController should implement the KubernetesHooksController
@@ -54,10 +57,14 @@ func (c *scheduleBindingsController) WithScheduleBindings(bindings []htypes.Sche
 }
 
 func (c *scheduleBindingsController) WithScheduleManager(scheduleManager schedulemanager.ScheduleManager) {
+	c.l.Lock()
 	c.scheduleManager = scheduleManager
+	c.l.Unlock()
 }
 
 func (c *scheduleBindingsController) CanHandleEvent(crontab string) bool {
+	c.l.RLock()
+	defer c.l.RUnlock()
 	for _, link := range c.ScheduleLinks {
 		if link.Crontab == crontab {
 			return true
@@ -69,6 +76,7 @@ func (c *scheduleBindingsController) CanHandleEvent(crontab string) bool {
 func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecutionInfo {
 	res := []BindingExecutionInfo{}
 
+	c.l.RLock()
 	for _, link := range c.ScheduleLinks {
 		if link.Crontab == crontab {
 			bc := bctx.BindingContext{
@@ -89,11 +97,13 @@ func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecut
 			res = append(res, info)
 		}
 	}
+	c.l.RUnlock()
 
 	return res
 }
 
 func (c *scheduleBindingsController) EnableScheduleBindings() {
+	c.l.Lock()
 	for _, config := range c.ScheduleBindings {
 		c.ScheduleLinks[config.ScheduleEntry.Id] = &ScheduleBindingToCrontabLink{
 			BindingName:      config.BindingName,
@@ -105,11 +115,14 @@ func (c *scheduleBindingsController) EnableScheduleBindings() {
 		}
 		c.scheduleManager.Add(config.ScheduleEntry)
 	}
+	c.l.Unlock()
 }
 
 func (c *scheduleBindingsController) DisableScheduleBindings() {
+	c.l.Lock()
 	for _, config := range c.ScheduleBindings {
 		c.scheduleManager.Remove(config.ScheduleEntry)
 		delete(c.ScheduleLinks, config.ScheduleEntry.Id)
 	}
+	c.l.Unlock()
 }

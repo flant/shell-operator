@@ -130,6 +130,19 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 	return q.measureActionFn
 }
 
+func (q *TaskQueue) GetStatus() string {
+	defer q.MeasureActionTime("GetStatus")()
+	q.m.RLock()
+	defer q.m.RUnlock()
+	return q.Status
+}
+
+func (q *TaskQueue) SetStatus(status string) {
+	q.m.Lock()
+	q.Status = status
+	q.m.Unlock()
+}
+
 func (q *TaskQueue) IsEmpty() bool {
 	defer q.MeasureActionTime("IsEmpty")()
 	q.m.RLock()
@@ -400,18 +413,18 @@ func (q *TaskQueue) Start() {
 
 	if q.Handler == nil {
 		log.Error("should set handler before start in queue", slog.String("name", q.Name))
-		q.Status = "no handler set"
+		q.SetStatus("no handler set")
 		return
 	}
 
 	go func() {
-		q.Status = ""
+		q.SetStatus("")
 		var sleepDelay time.Duration
 		for {
 			q.debugf("queue %s: wait for task, delay %d", q.Name, sleepDelay)
 			t := q.waitForTask(sleepDelay)
 			if t == nil {
-				q.Status = "stop"
+				q.SetStatus("stop")
 				log.Info("queue stopped", slog.String("name", q.Name))
 				return
 			}
@@ -422,14 +435,14 @@ func (q *TaskQueue) Start() {
 
 			// Now the task can be handled!
 			var nextSleepDelay time.Duration
-			q.Status = "run first task"
+			q.SetStatus("run first task")
 			taskRes := q.Handler(t)
 
 			// Check Done channel after long-running operation.
 			select {
 			case <-q.ctx.Done():
 				log.Info("queue stopped after task handling", slog.String("name", q.Name))
-				q.Status = "stop"
+				q.SetStatus("stop")
 				return
 			default:
 			}
@@ -439,7 +452,7 @@ func (q *TaskQueue) Start() {
 				// Exponential backoff delay before retry.
 				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
 				t.IncrementFailureCount()
-				q.Status = fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String())
+				q.SetStatus(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
@@ -461,16 +474,16 @@ func (q *TaskQueue) Start() {
 						q.addLast(newTask)
 					}
 				})
-				q.Status = ""
+				q.SetStatus("")
 			case Repeat:
 				// repeat a current task after a small delay
 				nextSleepDelay = q.DelayOnRepeat
-				q.Status = "repeat head task"
+				q.SetStatus("repeat head task")
 			}
 
 			if taskRes.DelayBeforeNextTask != 0 {
 				nextSleepDelay = taskRes.DelayBeforeNextTask
-				q.Status = fmt.Sprintf("sleep for %s", nextSleepDelay.String())
+				q.SetStatus(fmt.Sprintf("sleep for %s", nextSleepDelay.String()))
 			}
 
 			sleepDelay = nextSleepDelay
@@ -514,7 +527,7 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	q.cancelDelay = false
 	q.waitMu.Unlock()
 
-	origStatus := q.Status
+	origStatus := q.GetStatus()
 
 	defer func() {
 		checkTicker.Stop()
@@ -522,7 +535,7 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 		q.waitInProgress = false
 		q.cancelDelay = false
 		q.waitMu.Unlock()
-		q.Status = origStatus
+		q.SetStatus(origStatus)
 	}()
 
 	// Wait for the queued task with some delay.
@@ -565,10 +578,10 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 		// Wait loop still in progress: update queue status.
 		waitTime := time.Since(waitBegin).Truncate(time.Second)
 		if sleepDelay == 0 {
-			q.Status = fmt.Sprintf("waiting for task %s", waitTime.String())
+			q.SetStatus(fmt.Sprintf("waiting for task %s", waitTime.String()))
 		} else {
 			delay := sleepDelay.Truncate(time.Second)
-			q.Status = fmt.Sprintf("%s (%s left of %s delay)", origStatus, (delay - waitTime).String(), delay.String())
+			q.SetStatus(fmt.Sprintf("%s (%s left of %s delay)", origStatus, (delay - waitTime).String(), delay.String()))
 		}
 	}
 }
