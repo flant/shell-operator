@@ -158,6 +158,10 @@ func transformUsingFormat(w io.Writer, val interface{}, format string) error {
 	switch format {
 	case "png":
 		switch v := val.(type) {
+		case string:
+			_, err = w.Write([]byte(v))
+		case fmt.Stringer:
+			_, err = w.Write([]byte(v.String()))
 		case []byte:
 			_, err = w.Write(v)
 		default:
@@ -193,9 +197,11 @@ func transformUsingFormat(w io.Writer, val interface{}, format string) error {
 
 func FormatFromRequest(request *http.Request) string {
 	format := chi.URLParam(request, "format")
-	fmt.Println("fetch format", format)
 	if format == "" {
-		format = "text"
+		format = request.URL.Query().Get("format")
+		if format == "" {
+			format = "text"
+		}
 	}
 	return format
 }
