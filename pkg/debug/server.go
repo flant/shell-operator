@@ -10,10 +10,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"gopkg.in/yaml.v3"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
@@ -140,6 +141,8 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		writer.Header().Set("Content-Type", "application/json")
 	case "yaml":
 		writer.Header().Set("Content-Type", "application/yaml")
+	case "png":
+		writer.Header().Set("Content-Type", "image/png")
 	}
 	writer.WriteHeader(http.StatusOK)
 
@@ -153,6 +156,13 @@ func transformUsingFormat(w io.Writer, val interface{}, format string) error {
 	var err error
 
 	switch format {
+	case "png":
+		switch v := val.(type) {
+		case []byte:
+			_, err = w.Write(v)
+		default:
+			err = fmt.Errorf("unsupported type %T", val)
+		}
 	case "yaml":
 		enc := yaml.NewEncoder(w)
 		enc.SetIndent(2)
@@ -183,6 +193,7 @@ func transformUsingFormat(w io.Writer, val interface{}, format string) error {
 
 func FormatFromRequest(request *http.Request) string {
 	format := chi.URLParam(request, "format")
+	fmt.Println("fetch format", format)
 	if format == "" {
 		format = "text"
 	}
