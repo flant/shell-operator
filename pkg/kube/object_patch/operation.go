@@ -116,10 +116,16 @@ func (op *CreateOperation) Description() string {
 	return "Create object"
 }
 
-func (op *CreateOperation) ApplyOptions(opts PatchCollectorCreateOptions) {
-	op.subresource = opts.Subresource
-	op.ignoreIfExists = opts.IgnoreIfExists
-	op.updateIfExists = opts.UpdateIfExists
+func (op *CreateOperation) WithSubresource(subresource string) {
+	op.subresource = subresource
+}
+
+func (op *CreateOperation) WithIgnoreIfExists(ignore bool) {
+	op.ignoreIfExists = ignore
+}
+
+func (op *CreateOperation) WithUpdateIfExists(update bool) {
+	op.updateIfExists = update
 }
 
 type DeleteOperation struct {
@@ -138,8 +144,8 @@ func (op *DeleteOperation) Description() string {
 	return fmt.Sprintf("Delete object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
 }
 
-func (op *DeleteOperation) ApplyOptions(opts PatchCollectorDeleteOptions) {
-	op.subresource = opts.Subresource
+func (op *DeleteOperation) WithSubresource(subresource string) {
+	op.subresource = subresource
 }
 
 type PatchOperation struct {
@@ -161,10 +167,16 @@ func (op *PatchOperation) Description() string {
 	return fmt.Sprintf("Patch object %s/%s/%s/%s using %s patch", op.apiVersion, op.kind, op.namespace, op.name, op.patchType)
 }
 
-func (op *PatchOperation) ApplyOptions(opts *PatchCollectorPatchOptions) {
-	op.subresource = opts.Subresource
-	op.ignoreMissingObject = opts.IgnoreMissingObjects
-	op.ignoreHookError = opts.IgnoreHookError
+func (op *PatchOperation) WithSubresource(subresource string) {
+	op.subresource = subresource
+}
+
+func (op *PatchOperation) WithIgnoreMissingObject(ignore bool) {
+	op.ignoreMissingObject = ignore
+}
+
+func (op *PatchOperation) WithIgnoreHookError(ignore bool) {
+	op.ignoreHookError = ignore
 }
 
 type FilterOperation struct {
@@ -185,55 +197,61 @@ func (op *FilterOperation) Description() string {
 	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
 }
 
-func (op *FilterOperation) ApplyOptions(opts PatchCollectorFilterOptions) {
-	op.subresource = opts.Subresource
-	op.ignoreMissingObject = opts.IgnoreMissingObjects
-	op.ignoreHookError = opts.IgnoreHookError
+func (op *FilterOperation) WithSubresource(subresource string) {
+	op.subresource = subresource
+}
+
+func (op *FilterOperation) WithIgnoreMissingObject(ignore bool) {
+	op.ignoreMissingObject = ignore
+}
+
+func (op *FilterOperation) WithIgnoreHookError(ignore bool) {
+	op.ignoreHookError = ignore
 }
 
 func NewFromOperationSpec(spec OperationSpec) Operation {
 	switch spec.Operation {
 	case Create:
 		return NewCreateOperation(spec.Object,
-			WithSubresource(spec.Subresource))
+			CreateWithSubresource(spec.Subresource))
 	case CreateIfNotExists:
 		return NewCreateIfNotExistsOperation(spec.Object,
-			WithSubresource(spec.Subresource),
-			IgnoreIfExists(true))
+			CreateWithSubresource(spec.Subresource),
+			CreateWithIgnoreIfExists(true))
 	case CreateOrUpdate:
 		return NewCreateOrUpdateOperation(spec.Object,
-			WithSubresource(spec.Subresource),
-			UpdateIfExists(true))
+			CreateWithSubresource(spec.Subresource),
+			CreateWithUpdateIfExists(true))
 	case Delete:
 		return NewDeleteOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			WithSubresource(spec.Subresource))
+			DeleteWithSubresource(spec.Subresource))
 	case DeleteInBackground:
 		return NewDeleteInBackgroundOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			WithSubresource(spec.Subresource))
+			DeleteWithSubresource(spec.Subresource))
 	case DeleteNonCascading:
 		return NewDeleteNonCascadingOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			WithSubresource(spec.Subresource))
+			DeleteWithSubresource(spec.Subresource))
 	case JQPatch:
 		return NewJQPatchOperation(
 			spec.JQFilter,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			WithSubresource(spec.Subresource),
-			WithIgnoreMissingObject(spec.IgnoreMissingObject),
-			WithIgnoreHookError(spec.IgnoreHookError),
+			FilterWithSubresource(spec.Subresource),
+			FilterWithIgnoreMissingObject(spec.IgnoreMissingObject),
+			FilterWithIgnoreHookError(spec.IgnoreHookError),
 		)
 	case MergePatch:
 		return NewMergePatchOperation(spec.MergePatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			WithSubresource(spec.Subresource),
-			WithIgnoreMissingObject(spec.IgnoreMissingObject),
-			WithIgnoreHookError(spec.IgnoreHookError),
+			PatchWithSubresource(spec.Subresource),
+			PatchWithIgnoreMissingObject(spec.IgnoreMissingObject),
+			PatchWithIgnoreHookError(spec.IgnoreHookError),
 		)
 	case JSONPatch:
 		return NewJSONPatchOperation(spec.JSONPatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			WithSubresource(spec.Subresource),
-			WithIgnoreMissingObject(spec.IgnoreMissingObject),
-			WithIgnoreHookError(spec.IgnoreHookError),
+			PatchWithSubresource(spec.Subresource),
+			PatchWithIgnoreMissingObject(spec.IgnoreMissingObject),
+			PatchWithIgnoreHookError(spec.IgnoreHookError),
 		)
 	}
 
@@ -267,10 +285,9 @@ func newCreateOperation(operation OperationType, obj any, opts ...PatchCollector
 		op.ignoreIfExists = true
 	}
 
-	createOpts := PatchCollectorCreateOptions{}
-	createOpts.ApplyOptions(opts)
-
-	op.ApplyOptions(createOpts)
+	for _, opt := range opts {
+		opt.Apply(op)
+	}
 
 	return op
 }
@@ -296,10 +313,9 @@ func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind
 		deletionPropagation: propagation,
 	}
 
-	deleteOpts := PatchCollectorDeleteOptions{}
-	deleteOpts.ApplyOptions(opts)
-
-	op.ApplyOptions(deleteOpts)
+	for _, opt := range opts {
+		opt.Apply(op)
+	}
 
 	return op
 }
@@ -322,12 +338,9 @@ func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, n
 		patchType:  patchType,
 	}
 
-	patchOpts := &PatchCollectorPatchOptions{}
-	patchOpts.ApplyOptions(opts)
-
-	op.ApplyOptions(patchOpts)
-
-	fmt.Printf("%+v\n", op)
+	for _, opt := range opts {
+		opt.Apply(op)
+	}
 
 	return op
 }
@@ -352,10 +365,9 @@ func newFilterOperation(filterFunc func(*unstructured.Unstructured) (*unstructur
 		filterFunc: filterFunc,
 	}
 
-	filterOpts := PatchCollectorFilterOptions{}
-	filterOpts.ApplyOptions(opts)
-
-	op.ApplyOptions(filterOpts)
+	for _, opt := range opts {
+		opt.Apply(op)
+	}
 
 	return op
 }
