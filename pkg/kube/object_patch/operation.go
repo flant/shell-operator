@@ -53,11 +53,11 @@ func GetPatchStatusOperationsOnHookError(operations []Operation) []Operation {
 	patchStatusOperations := make([]Operation, 0)
 	for _, op := range operations {
 		switch operation := op.(type) {
-		case *filterOperation:
+		case *FilterOperation:
 			if operation.subresource == "/status" && operation.ignoreHookError {
 				patchStatusOperations = append(patchStatusOperations, operation)
 			}
-		case *patchOperation:
+		case *PatchOperation:
 			if operation.subresource == "/status" && operation.ignoreHookError {
 				patchStatusOperations = append(patchStatusOperations, operation)
 			}
@@ -104,7 +104,7 @@ type Operation interface {
 	Description() string
 }
 
-type createOperation struct {
+type CreateOperation struct {
 	object      interface{}
 	subresource string
 
@@ -112,11 +112,17 @@ type createOperation struct {
 	updateIfExists bool
 }
 
-func (op *createOperation) Description() string {
+func (op *CreateOperation) Description() string {
 	return "Create object"
 }
 
-type deleteOperation struct {
+func (op *CreateOperation) ApplyOptions(opts PatchCollectorCreateOptions) {
+	op.subresource = opts.Subresource
+	op.ignoreIfExists = opts.IgnoreIfExists
+	op.updateIfExists = opts.UpdateIfExists
+}
+
+type DeleteOperation struct {
 	// Object coordinates.
 	apiVersion  string
 	kind        string
@@ -128,11 +134,15 @@ type deleteOperation struct {
 	deletionPropagation metav1.DeletionPropagation
 }
 
-func (op *deleteOperation) Description() string {
+func (op *DeleteOperation) Description() string {
 	return fmt.Sprintf("Delete object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
 }
 
-type patchOperation struct {
+func (op *DeleteOperation) ApplyOptions(opts PatchCollectorDeleteOptions) {
+	op.subresource = opts.Subresource
+}
+
+type PatchOperation struct {
 	// Object coordinates for patch and delete.
 	apiVersion  string
 	kind        string
@@ -147,11 +157,17 @@ type patchOperation struct {
 	ignoreHookError     bool
 }
 
-func (op *patchOperation) Description() string {
+func (op *PatchOperation) Description() string {
 	return fmt.Sprintf("Patch object %s/%s/%s/%s using %s patch", op.apiVersion, op.kind, op.namespace, op.name, op.patchType)
 }
 
-type filterOperation struct {
+func (op *PatchOperation) ApplyOptions(opts *PatchCollectorPatchOptions) {
+	op.subresource = opts.Subresource
+	op.ignoreMissingObject = opts.IgnoreMissingObjects
+	op.ignoreHookError = opts.IgnoreHookError
+}
+
+type FilterOperation struct {
 	// Object coordinates for patch and delete.
 	apiVersion  string
 	kind        string
@@ -165,8 +181,14 @@ type filterOperation struct {
 	ignoreHookError     bool
 }
 
-func (op *filterOperation) Description() string {
+func (op *FilterOperation) Description() string {
 	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
+}
+
+func (op *FilterOperation) ApplyOptions(opts PatchCollectorFilterOptions) {
+	op.subresource = opts.Subresource
+	op.ignoreMissingObject = opts.IgnoreMissingObjects
+	op.ignoreHookError = opts.IgnoreHookError
 }
 
 func NewFromOperationSpec(spec OperationSpec) Operation {
@@ -175,30 +197,25 @@ func NewFromOperationSpec(spec OperationSpec) Operation {
 		return NewCreateOperation(spec.Object,
 			WithSubresource(spec.Subresource))
 	case CreateIfNotExists:
-		return NewCreateOperation(spec.Object,
+		return NewCreateIfNotExistsOperation(spec.Object,
 			WithSubresource(spec.Subresource),
-			IgnoreIfExists())
+			IgnoreIfExists(true))
 	case CreateOrUpdate:
-		return NewCreateOperation(spec.Object,
+		return NewCreateOrUpdateOperation(spec.Object,
 			WithSubresource(spec.Subresource),
-			UpdateIfExists())
+			UpdateIfExists(true))
 	case Delete:
 		return NewDeleteOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource))
 	case DeleteInBackground:
-		return NewDeleteOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			WithSubresource(spec.Subresource),
-			InBackground())
+		return NewDeleteInBackgroundOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
+			WithSubresource(spec.Subresource))
 	case DeleteNonCascading:
-		return NewDeleteOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			WithSubresource(spec.Subresource),
-			NonCascading())
+		return NewDeleteNonCascadingOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
+			WithSubresource(spec.Subresource))
 	case JQPatch:
-		return NewFilterPatchOperation(
-			func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-				filter := jq.NewFilter(app.JqLibraryPath)
-				return applyJQPatch(spec.JQFilter, filter, u)
-			},
+		return NewJQPatchOperation(
+			spec.JQFilter,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
 			WithIgnoreMissingObject(spec.IgnoreMissingObject),
@@ -224,70 +241,121 @@ func NewFromOperationSpec(spec OperationSpec) Operation {
 	return nil
 }
 
-func NewCreateOperation(obj interface{}, options ...CreateOption) Operation {
-	op := &createOperation{
+func NewCreateOperation(obj any, opts ...PatchCollectorCreateOption) Operation {
+	return newCreateOperation(Create, obj, opts...)
+}
+
+func NewCreateOrUpdateOperation(obj any, opts ...PatchCollectorCreateOption) Operation {
+	return newCreateOperation(CreateOrUpdate, obj, opts...)
+}
+
+func NewCreateIfNotExistsOperation(obj any, opts ...PatchCollectorCreateOption) Operation {
+	return newCreateOperation(CreateIfNotExists, obj, opts...)
+}
+
+func newCreateOperation(operation OperationType, obj any, opts ...PatchCollectorCreateOption) Operation {
+	op := &CreateOperation{
 		object: obj,
 	}
-	for _, option := range options {
-		option.applyToCreate(op)
+
+	switch operation {
+	case Create:
+		// pass
+	case CreateOrUpdate:
+		op.updateIfExists = true
+	case CreateIfNotExists:
+		op.ignoreIfExists = true
 	}
+
+	createOpts := PatchCollectorCreateOptions{}
+	createOpts.ApplyOptions(opts)
+
+	op.ApplyOptions(createOpts)
+
 	return op
 }
 
-func NewDeleteOperation(apiVersion, kind, namespace, name string, options ...DeleteOption) Operation {
-	op := &deleteOperation{
+func NewDeleteOperation(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption) Operation {
+	return newDeleteOperation(metav1.DeletePropagationForeground, apiVersion, kind, namespace, name, opts...)
+}
+
+func NewDeleteInBackgroundOperation(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption) Operation {
+	return newDeleteOperation(metav1.DeletePropagationBackground, apiVersion, kind, namespace, name, opts...)
+}
+
+func NewDeleteNonCascadingOperation(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption) Operation {
+	return newDeleteOperation(metav1.DeletePropagationOrphan, apiVersion, kind, namespace, name, opts...)
+}
+
+func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind, namespace, name string, opts ...PatchCollectorDeleteOption) Operation {
+	op := &DeleteOperation{
 		apiVersion:          apiVersion,
 		kind:                kind,
 		namespace:           namespace,
 		name:                name,
-		deletionPropagation: metav1.DeletePropagationForeground,
+		deletionPropagation: propagation,
 	}
-	for _, option := range options {
-		option.applyToDelete(op)
-	}
+
+	deleteOpts := PatchCollectorDeleteOptions{}
+	deleteOpts.ApplyOptions(opts)
+
+	op.ApplyOptions(deleteOpts)
+
 	return op
 }
 
-func NewMergePatchOperation(mergePatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) Operation {
-	op := &patchOperation{
+func NewMergePatchOperation(mergePatch any, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorPatchOption) Operation {
+	return newPatchOperation(types.MergePatchType, mergePatch, apiVersion, kind, namespace, name, opts...)
+}
+
+func NewJSONPatchOperation(jsonpatch any, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorPatchOption) Operation {
+	return newPatchOperation(types.JSONPatchType, jsonpatch, apiVersion, kind, namespace, name, opts...)
+}
+
+func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, namespace, name string, opts ...PatchCollectorPatchOption) Operation {
+	op := &PatchOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
 		namespace:  namespace,
 		name:       name,
-		patch:      mergePatch,
-		patchType:  types.MergePatchType,
+		patch:      patch,
+		patchType:  patchType,
 	}
-	for _, option := range options {
-		option.applyToPatch(op)
-	}
+
+	patchOpts := &PatchCollectorPatchOptions{}
+	patchOpts.ApplyOptions(opts)
+
+	op.ApplyOptions(patchOpts)
+
+	fmt.Printf("%+v\n", op)
+
 	return op
 }
 
-func NewJSONPatchOperation(jsonPatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) Operation {
-	op := &patchOperation{
+func NewJQPatchOperation(jqfilter string, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorFilterOption) Operation {
+	return newFilterOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+		filter := jq.NewFilter(app.JqLibraryPath)
+		return applyJQPatch(jqfilter, filter, u)
+	}, apiVersion, kind, namespace, name, opts...)
+}
+
+func NewFilterPatchOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorFilterOption) Operation {
+	return newFilterOperation(filterFunc, apiVersion, kind, namespace, name, opts...)
+}
+
+func newFilterOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, opts ...PatchCollectorFilterOption) Operation {
+	op := &FilterOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
 		namespace:  namespace,
 		name:       name,
-		patch:      jsonPatch,
-		patchType:  types.JSONPatchType,
+		filterFunc: filterFunc,
 	}
-	for _, option := range options {
-		option.applyToPatch(op)
-	}
-	return op
-}
 
-func NewFilterPatchOperation(filter func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, options ...FilterOption) Operation {
-	op := &filterOperation{
-		apiVersion: apiVersion,
-		kind:       kind,
-		namespace:  namespace,
-		name:       name,
-		filterFunc: filter,
-	}
-	for _, option := range options {
-		option.applyToFilter(op)
-	}
+	filterOpts := PatchCollectorFilterOptions{}
+	filterOpts.ApplyOptions(opts)
+
+	op.ApplyOptions(filterOpts)
+
 	return op
 }

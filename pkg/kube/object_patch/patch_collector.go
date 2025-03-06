@@ -5,13 +5,24 @@ import (
 )
 
 type IPatchCollector interface {
-	Create(object interface{}, options ...CreateOption)
-	Delete(apiVersion string, kind string, namespace string, name string, options ...DeleteOption)
-	Filter(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, options ...FilterOption)
-	JSONPatch(jsonPatch interface{}, apiVersion string, kind string, namespace string, name string, options ...PatchOption)
-	MergePatch(mergePatch interface{}, apiVersion string, kind string, namespace string, name string, options ...PatchOption)
+	Create(object interface{}, opts ...PatchCollectorCreateOption)
+	CreateIfNotExists(object interface{}, opts ...PatchCollectorCreateOption)
+	CreateOrUpdate(object interface{}, opts ...PatchCollectorCreateOption)
+
+	Delete(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption)
+	DeleteInBackground(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption)
+	DeleteNonCascading(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption)
+
+	Filter(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorFilterOption)
+	JQFilter(jqfilter string, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorFilterOption)
+
+	JSONPatch(jsonPatch any, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorPatchOption)
+	MergePatch(mergePatch any, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorPatchOption)
+
 	Operations() []Operation
 }
+
+var _ IPatchCollector = (*PatchCollector)(nil)
 
 type PatchCollector struct {
 	patchOperations []Operation
@@ -24,27 +35,61 @@ func NewPatchCollector() *PatchCollector {
 	}
 }
 
+// Create an object.
+//
+// Options:
+//   - WithSubresource - create a specified subresource
+func (dop *PatchCollector) Create(object interface{}, opts ...PatchCollectorCreateOption) {
+	dop.add(NewCreateOperation(object, opts...))
+}
+
 // Create or update an object.
 //
 // Options:
 //   - WithSubresource - create a specified subresource
-//   - IgnoreIfExists - do not return error if the specified object exists
-//   - UpdateIfExists - call Update if the specified object exists
-func (dop *PatchCollector) Create(object interface{}, options ...CreateOption) {
-	dop.add(NewCreateOperation(object, options...))
+func (dop *PatchCollector) CreateOrUpdate(object interface{}, opts ...PatchCollectorCreateOption) {
+	dop.add(NewCreateOrUpdateOperation(object, opts...))
+}
+
+// Create if not exists an object.
+//
+// Options:
+//   - WithSubresource - create a specified subresource
+func (dop *PatchCollector) CreateIfNotExists(object interface{}, opts ...PatchCollectorCreateOption) {
+	dop.add(NewCreateIfNotExistsOperation(object, opts...))
 }
 
 // Delete uses apiVersion, kind, namespace and name to delete object from cluster.
+// remove object when all dependants are removed
 //
 // Options:
 //   - WithSubresource - delete a specified subresource
-//   - InForeground -  remove object when all dependants are removed (default)
-//   - InBackground - remove object immediately, dependants remove in background
-//   - NonCascading - remove object, dependants become orphan
 //
 // Missing object is ignored by default.
-func (dop *PatchCollector) Delete(apiVersion, kind, namespace, name string, options ...DeleteOption) {
-	dop.add(NewDeleteOperation(apiVersion, kind, namespace, name, options...))
+func (dop *PatchCollector) Delete(apiVersion, kind, namespace, name string, opts ...PatchCollectorDeleteOption) {
+	dop.add(NewDeleteOperation(apiVersion, kind, namespace, name, opts...))
+}
+
+// Delete uses apiVersion, kind, namespace and name to delete object from cluster.
+// remove object immediately, dependants remove in background
+//
+// Options:
+//   - WithSubresource - delete a specified subresource
+//
+// Missing object is ignored by default.
+func (dop *PatchCollector) DeleteInBackground(apiVersion, kind, namespace, name string, opts ...PatchCollectorDeleteOption) {
+	dop.add(NewDeleteInBackgroundOperation(apiVersion, kind, namespace, name, opts...))
+}
+
+// Delete uses apiVersion, kind, namespace and name to delete object from cluster.
+// remove object, dependants become orphan
+//
+// Options:
+//   - WithSubresource - delete a specified subresource
+//
+// Missing object is ignored by default.
+func (dop *PatchCollector) DeleteNonCascading(apiVersion, kind, namespace, name string, opts ...PatchCollectorDeleteOption) {
+	dop.add(NewDeleteNonCascadingOperation(apiVersion, kind, namespace, name, opts...))
 }
 
 // MergePatch applies a merge patch to the specified object using API call Patch.
@@ -53,8 +98,8 @@ func (dop *PatchCollector) Delete(apiVersion, kind, namespace, name string, opti
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
 //   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
-func (dop *PatchCollector) MergePatch(mergePatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) {
-	dop.add(NewMergePatchOperation(mergePatch, apiVersion, kind, namespace, name, options...))
+func (dop *PatchCollector) MergePatch(mergePatch any, apiVersion, kind, namespace, name string, opts ...PatchCollectorPatchOption) {
+	dop.add(NewMergePatchOperation(mergePatch, apiVersion, kind, namespace, name, opts...))
 }
 
 // JSONPatch applies a json patch to the specified object using API call Patch.
@@ -63,8 +108,8 @@ func (dop *PatchCollector) MergePatch(mergePatch interface{}, apiVersion, kind, 
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
 //   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
-func (dop *PatchCollector) JSONPatch(jsonPatch interface{}, apiVersion, kind, namespace, name string, options ...PatchOption) {
-	dop.add(NewJSONPatchOperation(jsonPatch, apiVersion, kind, namespace, name, options...))
+func (dop *PatchCollector) JSONPatch(jsonPatch any, apiVersion, kind, namespace, name string, opts ...PatchCollectorPatchOption) {
+	dop.add(NewJSONPatchOperation(jsonPatch, apiVersion, kind, namespace, name, opts...))
 }
 
 // Filter retrieves a specified object, modified it with
@@ -79,9 +124,22 @@ func (dop *PatchCollector) JSONPatch(jsonPatch interface{}, apiVersion, kind, na
 // use FromUnstructured to instantiate a concrete type or modify after DeepCopy.
 func (dop *PatchCollector) Filter(
 	filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error),
-	apiVersion, kind, namespace, name string, options ...FilterOption,
+	apiVersion, kind, namespace, name string, opts ...PatchCollectorFilterOption,
 ) {
-	dop.add(NewFilterPatchOperation(filterFunc, apiVersion, kind, namespace, name, options...))
+	dop.add(NewFilterPatchOperation(filterFunc, apiVersion, kind, namespace, name, opts...))
+}
+
+// Filter retrieves a specified object, modified it with
+// filterFunc and calls update.
+//
+// Options:
+//   - WithSubresource — a subresource argument for Patch call.
+//   - IgnoreMissingObject — do not return error if the specified object is missing.
+//   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
+func (dop *PatchCollector) JQFilter(
+	jqfilter, apiVersion, kind, namespace, name string, opts ...PatchCollectorFilterOption,
+) {
+	dop.add(NewJQPatchOperation(jqfilter, apiVersion, kind, namespace, name, opts...))
 }
 
 // Operations returns all collected operations

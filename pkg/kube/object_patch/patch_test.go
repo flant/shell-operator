@@ -145,7 +145,7 @@ data:
 				return patcher.ExecuteOperation(NewMergePatchOperation(
 					fmt.Sprintf(`{"data":{"%s":"%s"}}`, newField, newValue),
 					"v1", "ConfigMap", namespace, missingName,
-					IgnoreMissingObject(),
+					IgnoreMissingObjects(true),
 				))
 			},
 			shouldNotAdd,
@@ -295,7 +295,7 @@ mergePatch: |
 				return patcher.ExecuteOperation(NewJSONPatchOperation(
 					fmt.Sprintf(`[{ "op": "add", "path": "/data/%s", "value": "%s"}]`, newField, newValue),
 					"v1", "ConfigMap", namespace, missingName,
-					IgnoreMissingObject(),
+					IgnoreMissingObjects(true),
 				))
 			},
 			shouldNotAdd,
@@ -412,7 +412,7 @@ jsonPatch: |
 				return patcher.ExecuteOperation(NewFilterPatchOperation(
 					filter,
 					"v1", "ConfigMap", namespace, missingName,
-					IgnoreMissingObject(),
+					IgnoreMissingObjects(true),
 				))
 			},
 			shouldNotAdd,
@@ -489,7 +489,7 @@ data:
   foo: "bar"
   %s: "%s"
 `, namespace, name, newField, newValue)).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, UpdateIfExists()))
+				return patcher.ExecuteOperation(NewCreateOperation(obj, UpdateIfExists(true)))
 			},
 			shouldAdd,
 			shouldNotBeError,
@@ -526,7 +526,7 @@ object:
 
 			// Apply MergePatch: add a new field in data section.
 			patcher := NewObjectPatcher(cluster.Client, log.NewNop())
-
+			fmt.Println(tt.name)
 			err := tt.fn(patcher)
 
 			// Check error expectation.
@@ -598,7 +598,7 @@ data:
 			"create new object ignore existing object",
 			func(patcher *ObjectPatcher) error {
 				obj := manifest.MustFromYAML(newConfigMap).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, IgnoreIfExists()))
+				return patcher.ExecuteOperation(NewCreateOperation(obj, IgnoreIfExists(true)))
 			},
 			shouldCreateNew,
 			shouldNotBeError,
@@ -616,7 +616,7 @@ data:
 			"create ignore existing object",
 			func(patcher *ObjectPatcher) error {
 				obj := manifest.MustFromYAML(existingConfigMap).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, IgnoreIfExists()))
+				return patcher.ExecuteOperation(NewCreateOperation(obj, IgnoreIfExists(true)))
 			},
 			shouldNotCreateNew,
 			shouldNotBeError,

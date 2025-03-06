@@ -62,20 +62,20 @@ func (o *ObjectPatcher) ExecuteOperation(operation Operation) error {
 	}
 
 	switch v := operation.(type) {
-	case *createOperation:
+	case *CreateOperation:
 		return o.executeCreateOperation(v)
-	case *deleteOperation:
+	case *DeleteOperation:
 		return o.executeDeleteOperation(v)
-	case *patchOperation:
+	case *PatchOperation:
 		return o.executePatchOperation(v)
-	case *filterOperation:
+	case *FilterOperation:
 		return o.executeFilterOperation(v)
 	}
 
 	return nil
 }
 
-func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
+func (o *ObjectPatcher) executeCreateOperation(op *CreateOperation) error {
 	if op.object == nil {
 		return fmt.Errorf("cannot create empty object")
 	}
@@ -154,7 +154,7 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 // - WithSubresource — a subresource argument for Patch or Update API call.
 // - IgnoreMissingObject — do not return error if the specified object is missing.
 // - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
-func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
+func (o *ObjectPatcher) executePatchOperation(op *PatchOperation) error {
 	if op.patchType == types.MergePatchType {
 		log.Debug("Started MergePatchObject")
 		defer log.Debug("Finished MergePatchObject")
@@ -197,7 +197,7 @@ func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 // - WithSubresource — a subresource argument for Patch or Update API call.
 // - IgnoreMissingObject — do not return error if the specified object is missing.
 // - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
-func (o *ObjectPatcher) executeFilterOperation(op *filterOperation) error {
+func (o *ObjectPatcher) executeFilterOperation(op *FilterOperation) error {
 	var err error
 
 	if op.filterFunc == nil {
@@ -256,7 +256,7 @@ func (o *ObjectPatcher) executeFilterOperation(op *filterOperation) error {
 	return err
 }
 
-func (o *ObjectPatcher) executeDeleteOperation(op *deleteOperation) error {
+func (o *ObjectPatcher) executeDeleteOperation(op *DeleteOperation) error {
 	gvk, err := o.kubeClient.GroupVersionResource(op.apiVersion, op.kind)
 	if err != nil {
 		return err

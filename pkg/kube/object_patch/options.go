@@ -1,137 +1,153 @@
 package object_patch
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-type CreateOption interface {
-	applyToCreate(operation *createOperation)
+func WithSubresource(str string) Subresource {
+	return Subresource(str)
 }
 
-type DeleteOption interface {
-	applyToDelete(operation *deleteOperation)
+// Subresource is a configuration option for specifying a subresource.
+type Subresource string
+
+// ApplyToCreate applies this configuration to the given list options.
+func (s Subresource) ApplyToCreate(opts *PatchCollectorCreateOptions) {
+	opts.Subresource = string(s)
 }
 
-type PatchOption interface {
-	applyToPatch(operation *patchOperation)
+// ApplyToDelete applies this configuration to the given list options.
+func (s Subresource) ApplyToDelete(opts *PatchCollectorDeleteOptions) {
+	opts.Subresource = string(s)
 }
 
-type FilterOption interface {
-	applyToFilter(operation *filterOperation)
+// ApplyToPatch applies this configuration to the given list options.
+func (s Subresource) ApplyToPatch(opts *PatchCollectorPatchOptions) {
+	opts.Subresource = string(s)
 }
 
-type subresourceHolder struct {
-	subresource string
+func (s Subresource) ApplyToFilter(opts *PatchCollectorFilterOptions) {
+	opts.Subresource = string(s)
 }
 
-// WithSubresource options specifies a subresource to operate on.
-func WithSubresource(s string) *subresourceHolder {
-	return &subresourceHolder{subresource: s}
+func WithIgnoreHookError(ignore bool) IgnoreHookError {
+	return IgnoreHookError(ignore)
 }
 
-func (s *subresourceHolder) applyToCreate(operation *createOperation) {
-	operation.subresource = s.subresource
+// IgnoreHookError is a configuration option for ignoring hook errors.
+type IgnoreHookError bool
+
+// ApplyToPatch applies this configuration to the given list options.
+func (i IgnoreHookError) ApplyToPatch(opts *PatchCollectorPatchOptions) {
+	opts.IgnoreHookError = bool(i)
 }
 
-func (s *subresourceHolder) applyToDelete(operation *deleteOperation) {
-	operation.subresource = s.subresource
+func (i IgnoreHookError) ApplyToFilter(opts *PatchCollectorFilterOptions) {
+	opts.IgnoreHookError = bool(i)
 }
 
-func (s *subresourceHolder) applyToPatch(operation *patchOperation) {
-	operation.subresource = s.subresource
+func WithIgnoreMissingObject(ignore bool) IgnoreMissingObjects {
+	return IgnoreMissingObjects(ignore)
 }
 
-func (s *subresourceHolder) applyToFilter(operation *filterOperation) {
-	operation.subresource = s.subresource
+// IgnoreMissingObjects is a configuration option for ignoring missing objects.
+type IgnoreMissingObjects bool
+
+// ApplyToPatch applies this configuration to the given list options.
+func (m IgnoreMissingObjects) ApplyToPatch(opts *PatchCollectorPatchOptions) {
+	opts.IgnoreMissingObjects = bool(m)
 }
 
-type ignoreHookError struct {
-	ignoreError bool
+func (m IgnoreMissingObjects) ApplyToFilter(opts *PatchCollectorFilterOptions) {
+	opts.IgnoreMissingObjects = bool(m)
 }
 
-// IgnoreHookError allows applying patches for a Status subresource even if the hook fails
-func IgnoreHookError() *ignoreHookError {
-	return WithIgnoreHookError(true)
-}
+// IgnoreIfExists is a configuration option for ignoring if object already exists.
+type IgnoreIfExists bool
 
-func WithIgnoreHookError(ignoreError bool) *ignoreHookError {
-	return &ignoreHookError{ignoreError: ignoreError}
-}
-
-type ignoreMissingObject struct {
-	ignore bool
-}
-
-func (i *ignoreHookError) applyToPatch(operation *patchOperation) {
-	operation.ignoreHookError = i.ignoreError
-}
-
-func (i *ignoreHookError) applyToFilter(operation *filterOperation) {
-	operation.ignoreHookError = i.ignoreError
-}
-
-// IgnoreMissingObject do not return error if object exists for Patch and Filter operations.
-func IgnoreMissingObject() *ignoreMissingObject {
-	return WithIgnoreMissingObject(true)
-}
-
-func WithIgnoreMissingObject(ignore bool) *ignoreMissingObject {
-	return &ignoreMissingObject{ignore: ignore}
-}
-
-func (i *ignoreMissingObject) applyToPatch(operation *patchOperation) {
-	operation.ignoreMissingObject = i.ignore
-}
-
-func (i *ignoreMissingObject) applyToFilter(operation *filterOperation) {
-	operation.ignoreMissingObject = i.ignore
-}
-
-type ignoreIfExists struct {
-	ignore bool
-}
-
-// IgnoreIfExists is an option for Create to not return error if object is already exists.
-func IgnoreIfExists() CreateOption {
-	return &ignoreIfExists{ignore: true}
-}
-
-func (i *ignoreIfExists) applyToCreate(operation *createOperation) {
-	operation.ignoreIfExists = i.ignore
-}
-
-type updateIfExists struct {
-	update bool
+// ApplyToPatch applies this configuration to the given list options.
+func (m IgnoreIfExists) ApplyToCreate(opts *PatchCollectorCreateOptions) {
+	opts.IgnoreIfExists = bool(m)
 }
 
 // UpdateIfExists is an option for Create to update object if it already exists.
-func UpdateIfExists() CreateOption {
-	return &updateIfExists{update: true}
+type UpdateIfExists bool
+
+// ApplyToPatch applies this configuration to the given list options.
+func (m UpdateIfExists) ApplyToCreate(opts *PatchCollectorCreateOptions) {
+	opts.UpdateIfExists = bool(m)
 }
 
-func (u *updateIfExists) applyToCreate(operation *createOperation) {
-	operation.updateIfExists = u.update
+type PatchCollectorCreateOption interface {
+	ApplyToCreate(*PatchCollectorCreateOptions)
 }
 
-type deletePropogation struct {
-	propagation metav1.DeletionPropagation
+type PatchCollectorCreateOptions struct {
+	Subresource    string
+	IgnoreIfExists bool
+	UpdateIfExists bool
 }
 
-func (d *deletePropogation) applyToDelete(operation *deleteOperation) {
-	operation.deletionPropagation = d.propagation
+// ApplyOptions applies the given list options on these options,
+// and then returns itself (for convenient chaining).
+func (o *PatchCollectorCreateOptions) ApplyOptions(opts []PatchCollectorCreateOption) *PatchCollectorCreateOptions {
+	for _, opt := range opts {
+		opt.ApplyToCreate(o)
+	}
+
+	return o
 }
 
-// InForeground is a default propagation option for Delete
-func InForeground() DeleteOption {
-	return &deletePropogation{propagation: metav1.DeletePropagationForeground}
+type PatchCollectorDeleteOption interface {
+	ApplyToDelete(*PatchCollectorDeleteOptions)
 }
 
-// InBackground is a propagation option for Delete
-func InBackground() DeleteOption {
-	return &deletePropogation{propagation: metav1.DeletePropagationBackground}
+type PatchCollectorDeleteOptions struct {
+	Subresource string
 }
 
-// NonCascading is a propagation option for Delete
-func NonCascading() DeleteOption {
-	return &deletePropogation{propagation: metav1.DeletePropagationOrphan}
+// ApplyOptions applies the given list options on these options,
+// and then returns itself (for convenient chaining).
+func (o *PatchCollectorDeleteOptions) ApplyOptions(opts []PatchCollectorDeleteOption) *PatchCollectorDeleteOptions {
+	for _, opt := range opts {
+		opt.ApplyToDelete(o)
+	}
+
+	return o
+}
+
+type PatchCollectorPatchOption interface {
+	ApplyToPatch(*PatchCollectorPatchOptions)
+}
+
+type PatchCollectorPatchOptions struct {
+	Subresource          string
+	IgnoreMissingObjects bool
+	IgnoreHookError      bool
+}
+
+// ApplyOptions applies the given list options on these options,
+// and then returns itself (for convenient chaining).
+func (o *PatchCollectorPatchOptions) ApplyOptions(opts []PatchCollectorPatchOption) *PatchCollectorPatchOptions {
+	for _, opt := range opts {
+		opt.ApplyToPatch(o)
+	}
+
+	return o
+}
+
+type PatchCollectorFilterOption interface {
+	ApplyToFilter(*PatchCollectorFilterOptions)
+}
+
+type PatchCollectorFilterOptions struct {
+	Subresource          string
+	IgnoreMissingObjects bool
+	IgnoreHookError      bool
+}
+
+// ApplyOptions applies the given list options on these options,
+// and then returns itself (for convenient chaining).
+func (o *PatchCollectorFilterOptions) ApplyOptions(opts []PatchCollectorFilterOption) *PatchCollectorFilterOptions {
+	for _, opt := range opts {
+		opt.ApplyToFilter(o)
+	}
+
+	return o
 }
