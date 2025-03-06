@@ -105,7 +105,7 @@ data:
 	// Filter func to add a new field.
 	filter := func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		res := u.DeepCopy()
-		data := res.Object["data"].(map[string]interface{})
+		data := res.Object["data"].(map[string]any)
 		data[newField] = newValue
 		res.Object["data"] = data
 		return res, nil
@@ -155,8 +155,8 @@ data:
 			"merge patch using map",
 			func(patcher *ObjectPatcher) error {
 				return patcher.ExecuteOperation(NewMergePatchOperation(
-					map[string]interface{}{
-						"data": map[string]interface{}{
+					map[string]any{
+						"data": map[string]any{
 							newField: newValue,
 						},
 					},
@@ -923,7 +923,7 @@ func newFakeClusterWithNamespaceAndObjects(t *testing.T, ns string, objects ...s
 	return cluster
 }
 
-func fetchObject(t *testing.T, cluster *fake.Cluster, ns string, objYAML string, object interface{}) {
+func fetchObject(t *testing.T, cluster *fake.Cluster, ns string, objYAML string, object any) {
 	t.Helper()
 	mft, err := manifest.NewFromYAML(objYAML)
 	require.NoError(t, err)

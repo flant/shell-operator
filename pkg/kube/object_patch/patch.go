@@ -80,7 +80,7 @@ func (o *ObjectPatcher) executeCreateOperation(op *CreateOperation) error {
 		return fmt.Errorf("cannot create empty object")
 	}
 
-	// Convert object from interface{}.
+	// Convert object from any.
 	object, err := toUnstructured(op.object)
 	if err != nil {
 		return err
