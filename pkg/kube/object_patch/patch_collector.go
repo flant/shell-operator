@@ -5,9 +5,9 @@ import (
 )
 
 type IPatchCollector interface {
-	Create(object interface{}, opts ...PatchCollectorCreateOption)
-	CreateIfNotExists(object interface{}, opts ...PatchCollectorCreateOption)
-	CreateOrUpdate(object interface{}, opts ...PatchCollectorCreateOption)
+	Create(object any, opts ...PatchCollectorCreateOption)
+	CreateIfNotExists(object any, opts ...PatchCollectorCreateOption)
+	CreateOrUpdate(object any, opts ...PatchCollectorCreateOption)
 
 	Delete(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption)
 	DeleteInBackground(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption)
@@ -39,7 +39,7 @@ func NewPatchCollector() *PatchCollector {
 //
 // Options:
 //   - WithSubresource - create a specified subresource
-func (dop *PatchCollector) Create(object interface{}, opts ...PatchCollectorCreateOption) {
+func (dop *PatchCollector) Create(object any, opts ...PatchCollectorCreateOption) {
 	dop.add(NewCreateOperation(object, opts...))
 }
 
@@ -47,7 +47,7 @@ func (dop *PatchCollector) Create(object interface{}, opts ...PatchCollectorCrea
 //
 // Options:
 //   - WithSubresource - create a specified subresource
-func (dop *PatchCollector) CreateOrUpdate(object interface{}, opts ...PatchCollectorCreateOption) {
+func (dop *PatchCollector) CreateOrUpdate(object any, opts ...PatchCollectorCreateOption) {
 	dop.add(NewCreateOrUpdateOperation(object, opts...))
 }
 
@@ -55,7 +55,7 @@ func (dop *PatchCollector) CreateOrUpdate(object interface{}, opts ...PatchColle
 //
 // Options:
 //   - WithSubresource - create a specified subresource
-func (dop *PatchCollector) CreateIfNotExists(object interface{}, opts ...PatchCollectorCreateOption) {
+func (dop *PatchCollector) CreateIfNotExists(object any, opts ...PatchCollectorCreateOption) {
 	dop.add(NewCreateIfNotExistsOperation(object, opts...))
 }
 
