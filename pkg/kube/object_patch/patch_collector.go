@@ -14,13 +14,13 @@ type IPatchCollector interface {
 var _ IPatchCollector = (*PatchCollector)(nil)
 
 type PatchCollector struct {
-	patchOperations []Operation
+	patchOperations []sdkpkg.PatchCollectorOperation
 }
 
 // NewPatchCollector creates Operation collector to use within Go hooks.
 func NewPatchCollector() *PatchCollector {
 	return &PatchCollector{
-		patchOperations: make([]Operation, 0),
+		patchOperations: make([]sdkpkg.PatchCollectorOperation, 0),
 	}
 }
 
@@ -133,15 +133,9 @@ func (dop *PatchCollector) JQFilter(
 
 // Operations returns all collected operations
 func (dop *PatchCollector) Operations() []sdkpkg.PatchCollectorOperation {
-	operations := make([]sdkpkg.PatchCollectorOperation, 0, len(dop.patchOperations))
-
-	for _, object := range dop.patchOperations {
-		operations = append(operations, object)
-	}
-
-	return operations
+	return dop.patchOperations
 }
 
-func (dop *PatchCollector) add(operation Operation) {
+func (dop *PatchCollector) add(operation sdkpkg.PatchCollectorOperation) {
 	dop.patchOperations = append(dop.patchOperations, operation)
 }

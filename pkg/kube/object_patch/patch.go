@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	sdkpkg "github.com/deckhouse/module-sdk/pkg"
 	"github.com/hashicorp/go-multierror"
 	gerror "github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -40,7 +41,7 @@ func NewObjectPatcher(kubeClient KubeClient, logger *log.Logger) *ObjectPatcher 
 	}
 }
 
-func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
+func (o *ObjectPatcher) ExecuteOperations(ops []sdkpkg.PatchCollectorOperation) error {
 	log.Debug("Starting execute operations process")
 	defer log.Debug("Finished execute operations process")
 
@@ -56,7 +57,7 @@ func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
 	return applyErrors.ErrorOrNil()
 }
 
-func (o *ObjectPatcher) ExecuteOperation(operation Operation) error {
+func (o *ObjectPatcher) ExecuteOperation(operation sdkpkg.PatchCollectorOperation) error {
 	if operation == nil {
 		return nil
 	}
