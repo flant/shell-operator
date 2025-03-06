@@ -78,7 +78,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			unstructuredNewTestCM, err := generateUnstructured(newTestCM)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredNewTestCM, objectpatch.CreateWithUpdateIfExists(true)))
+			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredNewTestCM))
 			Expect(err).To(Succeed())
 
 			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), newTestCM.Name, metav1.GetOptions{})
@@ -93,7 +93,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			unstructuredSeparateTestCM, err := generateUnstructured(separateTestCM)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredSeparateTestCM, objectpatch.CreateWithUpdateIfExists(true)))
+			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredSeparateTestCM))
 			Expect(err).To(Succeed())
 
 			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), separateTestCM.Name, metav1.GetOptions{})
@@ -203,7 +203,7 @@ func ensureNamespace(name string) error {
 		panic(err)
 	}
 
-	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredNS, objectpatch.CreateWithUpdateIfExists(true)))
+	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredNS))
 }
 
 func ensureTestObject(_ string, obj interface{}) error {
@@ -212,7 +212,7 @@ func ensureTestObject(_ string, obj interface{}) error {
 		panic(err)
 	}
 
-	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredObj, objectpatch.CreateWithUpdateIfExists(true)))
+	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredObj))
 }
 
 func removeNamespace(name string) error {
