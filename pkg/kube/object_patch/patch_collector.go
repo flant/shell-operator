@@ -1,25 +1,14 @@
 package object_patch
 
 import (
+	sdkpkg "github.com/deckhouse/module-sdk/pkg"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type IPatchCollector interface {
-	Create(object any, opts ...PatchCollectorCreateOption)
-	CreateIfNotExists(object any, opts ...PatchCollectorCreateOption)
-	CreateOrUpdate(object any, opts ...PatchCollectorCreateOption)
+	sdkpkg.PatchCollector
 
-	Delete(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption)
-	DeleteInBackground(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption)
-	DeleteNonCascading(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption)
-
-	Filter(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorFilterOption)
-	JQFilter(jqfilter string, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorFilterOption)
-
-	JSONPatch(jsonPatch any, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorPatchOption)
-	MergePatch(mergePatch any, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorPatchOption)
-
-	Operations() []Operation
+	Filter(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorFilterOption)
 }
 
 var _ IPatchCollector = (*PatchCollector)(nil)
@@ -39,7 +28,7 @@ func NewPatchCollector() *PatchCollector {
 //
 // Options:
 //   - WithSubresource - create a specified subresource
-func (dop *PatchCollector) Create(object any, opts ...PatchCollectorCreateOption) {
+func (dop *PatchCollector) Create(object any, opts ...sdkpkg.PatchCollectorCreateOption) {
 	dop.add(NewCreateOperation(object, opts...))
 }
 
@@ -47,7 +36,7 @@ func (dop *PatchCollector) Create(object any, opts ...PatchCollectorCreateOption
 //
 // Options:
 //   - WithSubresource - create a specified subresource
-func (dop *PatchCollector) CreateOrUpdate(object any, opts ...PatchCollectorCreateOption) {
+func (dop *PatchCollector) CreateOrUpdate(object any, opts ...sdkpkg.PatchCollectorCreateOption) {
 	dop.add(NewCreateOrUpdateOperation(object, opts...))
 }
 
@@ -55,7 +44,7 @@ func (dop *PatchCollector) CreateOrUpdate(object any, opts ...PatchCollectorCrea
 //
 // Options:
 //   - WithSubresource - create a specified subresource
-func (dop *PatchCollector) CreateIfNotExists(object any, opts ...PatchCollectorCreateOption) {
+func (dop *PatchCollector) CreateIfNotExists(object any, opts ...sdkpkg.PatchCollectorCreateOption) {
 	dop.add(NewCreateIfNotExistsOperation(object, opts...))
 }
 
@@ -66,7 +55,7 @@ func (dop *PatchCollector) CreateIfNotExists(object any, opts ...PatchCollectorC
 //   - WithSubresource - delete a specified subresource
 //
 // Missing object is ignored by default.
-func (dop *PatchCollector) Delete(apiVersion, kind, namespace, name string, opts ...PatchCollectorDeleteOption) {
+func (dop *PatchCollector) Delete(apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorDeleteOption) {
 	dop.add(NewDeleteOperation(apiVersion, kind, namespace, name, opts...))
 }
 
@@ -77,7 +66,7 @@ func (dop *PatchCollector) Delete(apiVersion, kind, namespace, name string, opts
 //   - WithSubresource - delete a specified subresource
 //
 // Missing object is ignored by default.
-func (dop *PatchCollector) DeleteInBackground(apiVersion, kind, namespace, name string, opts ...PatchCollectorDeleteOption) {
+func (dop *PatchCollector) DeleteInBackground(apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorDeleteOption) {
 	dop.add(NewDeleteInBackgroundOperation(apiVersion, kind, namespace, name, opts...))
 }
 
@@ -88,7 +77,7 @@ func (dop *PatchCollector) DeleteInBackground(apiVersion, kind, namespace, name 
 //   - WithSubresource - delete a specified subresource
 //
 // Missing object is ignored by default.
-func (dop *PatchCollector) DeleteNonCascading(apiVersion, kind, namespace, name string, opts ...PatchCollectorDeleteOption) {
+func (dop *PatchCollector) DeleteNonCascading(apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorDeleteOption) {
 	dop.add(NewDeleteNonCascadingOperation(apiVersion, kind, namespace, name, opts...))
 }
 
@@ -98,7 +87,7 @@ func (dop *PatchCollector) DeleteNonCascading(apiVersion, kind, namespace, name 
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
 //   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
-func (dop *PatchCollector) MergePatch(mergePatch any, apiVersion, kind, namespace, name string, opts ...PatchCollectorPatchOption) {
+func (dop *PatchCollector) MergePatch(mergePatch any, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorPatchOption) {
 	dop.add(NewMergePatchOperation(mergePatch, apiVersion, kind, namespace, name, opts...))
 }
 
@@ -108,7 +97,7 @@ func (dop *PatchCollector) MergePatch(mergePatch any, apiVersion, kind, namespac
 //   - WithSubresource — a subresource argument for Patch call.
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
 //   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
-func (dop *PatchCollector) JSONPatch(jsonPatch any, apiVersion, kind, namespace, name string, opts ...PatchCollectorPatchOption) {
+func (dop *PatchCollector) JSONPatch(jsonPatch any, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorPatchOption) {
 	dop.add(NewJSONPatchOperation(jsonPatch, apiVersion, kind, namespace, name, opts...))
 }
 
@@ -124,7 +113,7 @@ func (dop *PatchCollector) JSONPatch(jsonPatch any, apiVersion, kind, namespace,
 // use FromUnstructured to instantiate a concrete type or modify after DeepCopy.
 func (dop *PatchCollector) Filter(
 	filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error),
-	apiVersion, kind, namespace, name string, opts ...PatchCollectorFilterOption,
+	apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorFilterOption,
 ) {
 	dop.add(NewFilterPatchOperation(filterFunc, apiVersion, kind, namespace, name, opts...))
 }
@@ -137,14 +126,20 @@ func (dop *PatchCollector) Filter(
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
 //   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
 func (dop *PatchCollector) JQFilter(
-	jqfilter, apiVersion, kind, namespace, name string, opts ...PatchCollectorFilterOption,
+	jqfilter, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorFilterOption,
 ) {
 	dop.add(NewJQPatchOperation(jqfilter, apiVersion, kind, namespace, name, opts...))
 }
 
 // Operations returns all collected operations
-func (dop *PatchCollector) Operations() []Operation {
-	return dop.patchOperations
+func (dop *PatchCollector) Operations() []sdkpkg.PatchCollectorOperation {
+	operations := make([]sdkpkg.PatchCollectorOperation, 0, len(dop.patchOperations))
+
+	for _, object := range dop.patchOperations {
+		operations = append(operations, object)
+	}
+
+	return operations
 }
 
 func (dop *PatchCollector) add(operation Operation) {

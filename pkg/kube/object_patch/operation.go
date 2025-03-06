@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	sdkpkg "github.com/deckhouse/module-sdk/pkg"
 	"github.com/hashicorp/go-multierror"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -259,19 +260,19 @@ func NewFromOperationSpec(spec OperationSpec) Operation {
 	return nil
 }
 
-func NewCreateOperation(obj any, opts ...PatchCollectorCreateOption) Operation {
+func NewCreateOperation(obj any, opts ...sdkpkg.PatchCollectorCreateOption) Operation {
 	return newCreateOperation(Create, obj, opts...)
 }
 
-func NewCreateOrUpdateOperation(obj any, opts ...PatchCollectorCreateOption) Operation {
+func NewCreateOrUpdateOperation(obj any, opts ...sdkpkg.PatchCollectorCreateOption) Operation {
 	return newCreateOperation(CreateOrUpdate, obj, opts...)
 }
 
-func NewCreateIfNotExistsOperation(obj any, opts ...PatchCollectorCreateOption) Operation {
+func NewCreateIfNotExistsOperation(obj any, opts ...sdkpkg.PatchCollectorCreateOption) Operation {
 	return newCreateOperation(CreateIfNotExists, obj, opts...)
 }
 
-func newCreateOperation(operation OperationType, obj any, opts ...PatchCollectorCreateOption) Operation {
+func newCreateOperation(operation OperationType, obj any, opts ...sdkpkg.PatchCollectorCreateOption) Operation {
 	op := &CreateOperation{
 		object: obj,
 	}
@@ -292,19 +293,19 @@ func newCreateOperation(operation OperationType, obj any, opts ...PatchCollector
 	return op
 }
 
-func NewDeleteOperation(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption) Operation {
+func NewDeleteOperation(apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorDeleteOption) Operation {
 	return newDeleteOperation(metav1.DeletePropagationForeground, apiVersion, kind, namespace, name, opts...)
 }
 
-func NewDeleteInBackgroundOperation(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption) Operation {
+func NewDeleteInBackgroundOperation(apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorDeleteOption) Operation {
 	return newDeleteOperation(metav1.DeletePropagationBackground, apiVersion, kind, namespace, name, opts...)
 }
 
-func NewDeleteNonCascadingOperation(apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorDeleteOption) Operation {
+func NewDeleteNonCascadingOperation(apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorDeleteOption) Operation {
 	return newDeleteOperation(metav1.DeletePropagationOrphan, apiVersion, kind, namespace, name, opts...)
 }
 
-func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind, namespace, name string, opts ...PatchCollectorDeleteOption) Operation {
+func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorDeleteOption) Operation {
 	op := &DeleteOperation{
 		apiVersion:          apiVersion,
 		kind:                kind,
@@ -320,15 +321,15 @@ func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind
 	return op
 }
 
-func NewMergePatchOperation(mergePatch any, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorPatchOption) Operation {
+func NewMergePatchOperation(mergePatch any, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorPatchOption) Operation {
 	return newPatchOperation(types.MergePatchType, mergePatch, apiVersion, kind, namespace, name, opts...)
 }
 
-func NewJSONPatchOperation(jsonpatch any, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorPatchOption) Operation {
+func NewJSONPatchOperation(jsonpatch any, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorPatchOption) Operation {
 	return newPatchOperation(types.JSONPatchType, jsonpatch, apiVersion, kind, namespace, name, opts...)
 }
 
-func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, namespace, name string, opts ...PatchCollectorPatchOption) Operation {
+func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorPatchOption) Operation {
 	op := &PatchOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
@@ -345,18 +346,18 @@ func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, n
 	return op
 }
 
-func NewJQPatchOperation(jqfilter string, apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorFilterOption) Operation {
+func NewJQPatchOperation(jqfilter string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorFilterOption) Operation {
 	return newFilterOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		filter := jq.NewFilter(app.JqLibraryPath)
 		return applyJQPatch(jqfilter, filter, u)
 	}, apiVersion, kind, namespace, name, opts...)
 }
 
-func NewFilterPatchOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...PatchCollectorFilterOption) Operation {
+func NewFilterPatchOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorFilterOption) Operation {
 	return newFilterOperation(filterFunc, apiVersion, kind, namespace, name, opts...)
 }
 
-func newFilterOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, opts ...PatchCollectorFilterOption) Operation {
+func newFilterOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorFilterOption) Operation {
 	op := &FilterOperation{
 		apiVersion: apiVersion,
 		kind:       kind,

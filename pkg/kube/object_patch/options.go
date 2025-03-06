@@ -1,123 +1,89 @@
 package object_patch
 
-type PatchCollectorCreateOption interface {
-	Apply(PatchCollectorCreateOptionApplier)
-}
+import (
+	sdkpkg "github.com/deckhouse/module-sdk/pkg"
+)
 
-type PatchCollectorCreateOptionApplier interface {
-	WithSubresource(subresource string)
-	WithIgnoreIfExists(ignore bool)
-	WithUpdateIfExists(update bool)
-}
+type CreateOption func(o sdkpkg.PatchCollectorCreateOptionApplier)
 
-type CreateOption func(o PatchCollectorCreateOptionApplier)
-
-func (opt CreateOption) Apply(o PatchCollectorCreateOptionApplier) {
+func (opt CreateOption) Apply(o sdkpkg.PatchCollectorCreateOptionApplier) {
 	opt(o)
 }
 
 func CreateWithSubresource(subresource string) CreateOption {
-	return func(o PatchCollectorCreateOptionApplier) {
+	return func(o sdkpkg.PatchCollectorCreateOptionApplier) {
 		o.WithSubresource(subresource)
 	}
 }
 
 func CreateWithIgnoreIfExists(ignore bool) CreateOption {
-	return func(o PatchCollectorCreateOptionApplier) {
+	return func(o sdkpkg.PatchCollectorCreateOptionApplier) {
 		o.WithIgnoreIfExists(ignore)
 	}
 }
 
 func CreateWithUpdateIfExists(ignore bool) CreateOption {
-	return func(o PatchCollectorCreateOptionApplier) {
+	return func(o sdkpkg.PatchCollectorCreateOptionApplier) {
 		o.WithUpdateIfExists(ignore)
 	}
 }
 
-type PatchCollectorDeleteOption interface {
-	Apply(PatchCollectorDeleteOptionApplier)
-}
+type DeleteOption func(o sdkpkg.PatchCollectorDeleteOptionApplier)
 
-type PatchCollectorDeleteOptionApplier interface {
-	WithSubresource(subresource string)
-}
-
-type DeleteOption func(o PatchCollectorDeleteOptionApplier)
-
-func (opt DeleteOption) Apply(o PatchCollectorDeleteOptionApplier) {
+func (opt DeleteOption) Apply(o sdkpkg.PatchCollectorDeleteOptionApplier) {
 	opt(o)
 }
 
 func DeleteWithSubresource(subresource string) DeleteOption {
-	return func(o PatchCollectorDeleteOptionApplier) {
+	return func(o sdkpkg.PatchCollectorDeleteOptionApplier) {
 		o.WithSubresource(subresource)
 	}
 }
 
-type PatchCollectorPatchOption interface {
-	Apply(PatchCollectorPatchOptionApplier)
-}
+type PatchOption func(o sdkpkg.PatchCollectorPatchOptionApplier)
 
-type PatchCollectorPatchOptionApplier interface {
-	WithSubresource(subresource string)
-	WithIgnoreMissingObject(ignore bool)
-	WithIgnoreHookError(update bool)
-}
-
-type PatchOption func(o PatchCollectorPatchOptionApplier)
-
-func (opt PatchOption) Apply(o PatchCollectorPatchOptionApplier) {
+func (opt PatchOption) Apply(o sdkpkg.PatchCollectorPatchOptionApplier) {
 	opt(o)
 }
 
 func PatchWithSubresource(subresource string) PatchOption {
-	return func(o PatchCollectorPatchOptionApplier) {
+	return func(o sdkpkg.PatchCollectorPatchOptionApplier) {
 		o.WithSubresource(subresource)
 	}
 }
 
 func PatchWithIgnoreMissingObject(ignore bool) PatchOption {
-	return func(o PatchCollectorPatchOptionApplier) {
+	return func(o sdkpkg.PatchCollectorPatchOptionApplier) {
 		o.WithIgnoreMissingObject(ignore)
 	}
 }
 
 func PatchWithIgnoreHookError(ignore bool) PatchOption {
-	return func(o PatchCollectorPatchOptionApplier) {
+	return func(o sdkpkg.PatchCollectorPatchOptionApplier) {
 		o.WithIgnoreHookError(ignore)
 	}
 }
 
-type PatchCollectorFilterOption interface {
-	Apply(PatchCollectorFilterOptionApplier)
-}
+type FilterOption func(o sdkpkg.PatchCollectorFilterOptionApplier)
 
-type PatchCollectorFilterOptionApplier interface {
-	WithSubresource(subresource string)
-	WithIgnoreMissingObject(ignore bool)
-	WithIgnoreHookError(update bool)
-}
-
-type FilterOption func(o PatchCollectorFilterOptionApplier)
-
-func (opt FilterOption) Apply(o PatchCollectorFilterOptionApplier) {
+func (opt FilterOption) Apply(o sdkpkg.PatchCollectorFilterOptionApplier) {
 	opt(o)
 }
 
 func FilterWithSubresource(subresource string) FilterOption {
-	return func(o PatchCollectorFilterOptionApplier) {
+	return func(o sdkpkg.PatchCollectorFilterOptionApplier) {
 		o.WithSubresource(subresource)
 	}
 }
 
 func FilterWithIgnoreMissingObject(ignore bool) FilterOption {
-	return func(o PatchCollectorFilterOptionApplier) {
+	return func(o sdkpkg.PatchCollectorFilterOptionApplier) {
 		o.WithIgnoreMissingObject(ignore)
 	}
 }
 
 func FilterWithIgnoreHookError(ignore bool) FilterOption {
-	return func(o PatchCollectorFilterOptionApplier) {
+	return func(o sdkpkg.PatchCollectorFilterOptionApplier) {
 		o.WithIgnoreHookError(ignore)
 	}
 }
