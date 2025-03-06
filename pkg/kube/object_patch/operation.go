@@ -54,11 +54,11 @@ func GetPatchStatusOperationsOnHookError(operations []sdkpkg.PatchCollectorOpera
 	patchStatusOperations := make([]sdkpkg.PatchCollectorOperation, 0)
 	for _, op := range operations {
 		switch operation := op.(type) {
-		case *FilterOperation:
+		case *filterOperation:
 			if operation.subresource == "/status" && operation.ignoreHookError {
 				patchStatusOperations = append(patchStatusOperations, operation)
 			}
-		case *PatchOperation:
+		case *patchOperation:
 			if operation.subresource == "/status" && operation.ignoreHookError {
 				patchStatusOperations = append(patchStatusOperations, operation)
 			}
@@ -90,7 +90,7 @@ func ParseOperations(specBytes []byte) ([]sdkpkg.PatchCollectorOperation, error)
 	return ops, validationErrors.ErrorOrNil()
 }
 
-type CreateOperation struct {
+type сreateOperation struct {
 	object      any
 	subresource string
 
@@ -98,23 +98,23 @@ type CreateOperation struct {
 	updateIfExists bool
 }
 
-func (op *CreateOperation) Description() string {
+func (op *сreateOperation) Description() string {
 	return "Create object"
 }
 
-func (op *CreateOperation) WithSubresource(subresource string) {
+func (op *сreateOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
-func (op *CreateOperation) WithIgnoreIfExists(ignore bool) {
+func (op *сreateOperation) WithIgnoreIfExists(ignore bool) {
 	op.ignoreIfExists = ignore
 }
 
-func (op *CreateOperation) WithUpdateIfExists(update bool) {
+func (op *сreateOperation) WithUpdateIfExists(update bool) {
 	op.updateIfExists = update
 }
 
-type DeleteOperation struct {
+type deleteOperation struct {
 	// Object coordinates.
 	apiVersion  string
 	kind        string
@@ -126,15 +126,15 @@ type DeleteOperation struct {
 	deletionPropagation metav1.DeletionPropagation
 }
 
-func (op *DeleteOperation) Description() string {
+func (op *deleteOperation) Description() string {
 	return fmt.Sprintf("Delete object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
 }
 
-func (op *DeleteOperation) WithSubresource(subresource string) {
+func (op *deleteOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
-type PatchOperation struct {
+type patchOperation struct {
 	// Object coordinates for patch and delete.
 	apiVersion  string
 	kind        string
@@ -149,23 +149,23 @@ type PatchOperation struct {
 	ignoreHookError     bool
 }
 
-func (op *PatchOperation) Description() string {
+func (op *patchOperation) Description() string {
 	return fmt.Sprintf("Patch object %s/%s/%s/%s using %s patch", op.apiVersion, op.kind, op.namespace, op.name, op.patchType)
 }
 
-func (op *PatchOperation) WithSubresource(subresource string) {
+func (op *patchOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
-func (op *PatchOperation) WithIgnoreMissingObject(ignore bool) {
+func (op *patchOperation) WithIgnoreMissingObject(ignore bool) {
 	op.ignoreMissingObject = ignore
 }
 
-func (op *PatchOperation) WithIgnoreHookError(ignore bool) {
+func (op *patchOperation) WithIgnoreHookError(ignore bool) {
 	op.ignoreHookError = ignore
 }
 
-type FilterOperation struct {
+type filterOperation struct {
 	// Object coordinates for patch and delete.
 	apiVersion  string
 	kind        string
@@ -179,19 +179,19 @@ type FilterOperation struct {
 	ignoreHookError     bool
 }
 
-func (op *FilterOperation) Description() string {
+func (op *filterOperation) Description() string {
 	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
 }
 
-func (op *FilterOperation) WithSubresource(subresource string) {
+func (op *filterOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
-func (op *FilterOperation) WithIgnoreMissingObject(ignore bool) {
+func (op *filterOperation) WithIgnoreMissingObject(ignore bool) {
 	op.ignoreMissingObject = ignore
 }
 
-func (op *FilterOperation) WithIgnoreHookError(ignore bool) {
+func (op *filterOperation) WithIgnoreHookError(ignore bool) {
 	op.ignoreHookError = ignore
 }
 
@@ -256,7 +256,7 @@ func NewCreateIfNotExistsOperation(obj any, opts ...sdkpkg.PatchCollectorCreateO
 }
 
 func newCreateOperation(operation OperationType, obj any, opts ...sdkpkg.PatchCollectorCreateOption) sdkpkg.PatchCollectorOperation {
-	op := &CreateOperation{
+	op := &сreateOperation{
 		object: obj,
 	}
 
@@ -289,7 +289,7 @@ func NewDeleteNonCascadingOperation(apiVersion string, kind string, namespace st
 }
 
 func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorDeleteOption) sdkpkg.PatchCollectorOperation {
-	op := &DeleteOperation{
+	op := &deleteOperation{
 		apiVersion:          apiVersion,
 		kind:                kind,
 		namespace:           namespace,
@@ -313,7 +313,7 @@ func NewJSONPatchOperation(jsonpatch any, apiVersion string, kind string, namesp
 }
 
 func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorPatchOption) sdkpkg.PatchCollectorOperation {
-	op := &PatchOperation{
+	op := &patchOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
 		namespace:  namespace,
@@ -341,7 +341,7 @@ func NewFilterPatchOperation(filterFunc func(*unstructured.Unstructured) (*unstr
 }
 
 func newFilterOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorFilterOption) sdkpkg.PatchCollectorOperation {
-	op := &FilterOperation{
+	op := &filterOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
 		namespace:  namespace,
