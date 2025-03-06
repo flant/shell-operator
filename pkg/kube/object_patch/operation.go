@@ -202,12 +202,10 @@ func NewFromOperationSpec(spec OperationSpec) sdkpkg.PatchCollectorOperation {
 			CreateWithSubresource(spec.Subresource))
 	case CreateIfNotExists:
 		return NewCreateIfNotExistsOperation(spec.Object,
-			CreateWithSubresource(spec.Subresource),
-			CreateWithIgnoreIfExists(true))
+			CreateWithSubresource(spec.Subresource))
 	case CreateOrUpdate:
 		return NewCreateOrUpdateOperation(spec.Object,
-			CreateWithSubresource(spec.Subresource),
-			CreateWithUpdateIfExists(true))
+			CreateWithSubresource(spec.Subresource))
 	case Delete:
 		return NewDeleteOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			DeleteWithSubresource(spec.Subresource))

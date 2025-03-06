@@ -489,7 +489,7 @@ data:
   foo: "bar"
   %s: "%s"
 `, namespace, name, newField, newValue)).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, CreateWithUpdateIfExists(true)))
+				return patcher.ExecuteOperation(NewCreateOrUpdateOperation(obj))
 			},
 			shouldAdd,
 			shouldNotBeError,
@@ -598,7 +598,7 @@ data:
 			"create new object ignore existing object",
 			func(patcher *ObjectPatcher) error {
 				obj := manifest.MustFromYAML(newConfigMap).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, CreateWithIgnoreIfExists(true)))
+				return patcher.ExecuteOperation(NewCreateIfNotExistsOperation(obj))
 			},
 			shouldCreateNew,
 			shouldNotBeError,
@@ -616,7 +616,7 @@ data:
 			"create ignore existing object",
 			func(patcher *ObjectPatcher) error {
 				obj := manifest.MustFromYAML(existingConfigMap).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, CreateWithIgnoreIfExists(true)))
+				return patcher.ExecuteOperation(NewCreateIfNotExistsOperation(obj))
 			},
 			shouldNotCreateNew,
 			shouldNotBeError,

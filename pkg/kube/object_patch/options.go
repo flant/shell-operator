@@ -16,18 +16,6 @@ func CreateWithSubresource(subresource string) CreateOption {
 	}
 }
 
-func CreateWithIgnoreIfExists(ignore bool) CreateOption {
-	return func(o sdkpkg.PatchCollectorCreateOptionApplier) {
-		o.WithIgnoreIfExists(ignore)
-	}
-}
-
-func CreateWithUpdateIfExists(ignore bool) CreateOption {
-	return func(o sdkpkg.PatchCollectorCreateOptionApplier) {
-		o.WithUpdateIfExists(ignore)
-	}
-}
-
 type DeleteOption func(o sdkpkg.PatchCollectorDeleteOptionApplier)
 
 func (opt DeleteOption) Apply(o sdkpkg.PatchCollectorDeleteOptionApplier) {
