@@ -54,10 +54,6 @@ func GetPatchStatusOperationsOnHookError(operations []sdkpkg.PatchCollectorOpera
 	patchStatusOperations := make([]sdkpkg.PatchCollectorOperation, 0)
 	for _, op := range operations {
 		switch operation := op.(type) {
-		case *filterOperation:
-			if operation.subresource == "/status" && operation.ignoreHookError {
-				patchStatusOperations = append(patchStatusOperations, operation)
-			}
 		case *patchOperation:
 			if operation.subresource == "/status" && operation.ignoreHookError {
 				patchStatusOperations = append(patchStatusOperations, operation)
@@ -143,14 +139,22 @@ type patchOperation struct {
 	subresource string
 
 	// Patch options.
-	patchType           types.PatchType
-	patch               any
+	patchType types.PatchType
+	patch     any
+
+	// using only if not JSON or Merge patch type
+	filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error)
+
 	ignoreMissingObject bool
 	ignoreHookError     bool
 }
 
 func (op *patchOperation) Description() string {
-	return fmt.Sprintf("Patch object %s/%s/%s/%s using %s patch", op.apiVersion, op.kind, op.namespace, op.name, op.patchType)
+	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
+}
+
+func (op *patchOperation) HasFilterFn() bool {
+	return op.filterFunc != nil
 }
 
 func (op *patchOperation) WithSubresource(subresource string) {
@@ -165,77 +169,41 @@ func (op *patchOperation) WithIgnoreHookError(ignore bool) {
 	op.ignoreHookError = ignore
 }
 
-type filterOperation struct {
-	// Object coordinates for patch and delete.
-	apiVersion  string
-	kind        string
-	namespace   string
-	name        string
-	subresource string
-
-	// Patch options.
-	filterFunc          func(*unstructured.Unstructured) (*unstructured.Unstructured, error)
-	ignoreMissingObject bool
-	ignoreHookError     bool
-}
-
-func (op *filterOperation) Description() string {
-	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
-}
-
-func (op *filterOperation) WithSubresource(subresource string) {
-	op.subresource = subresource
-}
-
-func (op *filterOperation) WithIgnoreMissingObject(ignore bool) {
-	op.ignoreMissingObject = ignore
-}
-
-func (op *filterOperation) WithIgnoreHookError(ignore bool) {
-	op.ignoreHookError = ignore
-}
-
 func NewFromOperationSpec(spec OperationSpec) sdkpkg.PatchCollectorOperation {
 	switch spec.Operation {
 	case Create:
-		return NewCreateOperation(spec.Object,
-			CreateWithSubresource(spec.Subresource))
+		return NewCreateOperation(spec.Object)
 	case CreateIfNotExists:
-		return NewCreateIfNotExistsOperation(spec.Object,
-			CreateWithSubresource(spec.Subresource))
+		return NewCreateIfNotExistsOperation(spec.Object)
 	case CreateOrUpdate:
-		return NewCreateOrUpdateOperation(spec.Object,
-			CreateWithSubresource(spec.Subresource))
+		return NewCreateOrUpdateOperation(spec.Object)
 	case Delete:
-		return NewDeleteOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			DeleteWithSubresource(spec.Subresource))
+		return NewDeleteOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name)
 	case DeleteInBackground:
-		return NewDeleteInBackgroundOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			DeleteWithSubresource(spec.Subresource))
+		return NewDeleteInBackgroundOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name)
 	case DeleteNonCascading:
-		return NewDeleteNonCascadingOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			DeleteWithSubresource(spec.Subresource))
+		return NewDeleteNonCascadingOperation(spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name)
 	case JQPatch:
-		return NewJQPatchOperation(
+		return NewPatchWithJQOperation(
 			spec.JQFilter,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			FilterWithSubresource(spec.Subresource),
-			FilterWithIgnoreMissingObject(spec.IgnoreMissingObject),
-			FilterWithIgnoreHookError(spec.IgnoreHookError),
+			WithSubresource(spec.Subresource),
+			WithIgnoreMissingObject(spec.IgnoreMissingObject),
+			WithIgnoreHookError(spec.IgnoreHookError),
 		)
 	case MergePatch:
 		return NewMergePatchOperation(spec.MergePatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			PatchWithSubresource(spec.Subresource),
-			PatchWithIgnoreMissingObject(spec.IgnoreMissingObject),
-			PatchWithIgnoreHookError(spec.IgnoreHookError),
+			WithSubresource(spec.Subresource),
+			WithIgnoreMissingObject(spec.IgnoreMissingObject),
+			WithIgnoreHookError(spec.IgnoreHookError),
 		)
 	case JSONPatch:
 		return NewJSONPatchOperation(spec.JSONPatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
-			PatchWithSubresource(spec.Subresource),
-			PatchWithIgnoreMissingObject(spec.IgnoreMissingObject),
-			PatchWithIgnoreHookError(spec.IgnoreHookError),
+			WithSubresource(spec.Subresource),
+			WithIgnoreMissingObject(spec.IgnoreMissingObject),
+			WithIgnoreHookError(spec.IgnoreHookError),
 		)
 	}
 
@@ -243,19 +211,19 @@ func NewFromOperationSpec(spec OperationSpec) sdkpkg.PatchCollectorOperation {
 	return nil
 }
 
-func NewCreateOperation(obj any, opts ...sdkpkg.PatchCollectorCreateOption) sdkpkg.PatchCollectorOperation {
-	return newCreateOperation(Create, obj, opts...)
+func NewCreateOperation(obj any) sdkpkg.PatchCollectorOperation {
+	return newCreateOperation(Create, obj)
 }
 
-func NewCreateOrUpdateOperation(obj any, opts ...sdkpkg.PatchCollectorCreateOption) sdkpkg.PatchCollectorOperation {
-	return newCreateOperation(CreateOrUpdate, obj, opts...)
+func NewCreateOrUpdateOperation(obj any) sdkpkg.PatchCollectorOperation {
+	return newCreateOperation(CreateOrUpdate, obj)
 }
 
-func NewCreateIfNotExistsOperation(obj any, opts ...sdkpkg.PatchCollectorCreateOption) sdkpkg.PatchCollectorOperation {
-	return newCreateOperation(CreateIfNotExists, obj, opts...)
+func NewCreateIfNotExistsOperation(obj any) sdkpkg.PatchCollectorOperation {
+	return newCreateOperation(CreateIfNotExists, obj)
 }
 
-func newCreateOperation(operation OperationType, obj any, opts ...sdkpkg.PatchCollectorCreateOption) sdkpkg.PatchCollectorOperation {
+func newCreateOperation(operation OperationType, obj any) sdkpkg.PatchCollectorOperation {
 	op := &createOperation{
 		object: obj,
 	}
@@ -269,26 +237,22 @@ func newCreateOperation(operation OperationType, obj any, opts ...sdkpkg.PatchCo
 		op.ignoreIfExists = true
 	}
 
-	for _, opt := range opts {
-		opt.Apply(op)
-	}
-
 	return op
 }
 
-func NewDeleteOperation(apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorDeleteOption) sdkpkg.PatchCollectorOperation {
-	return newDeleteOperation(metav1.DeletePropagationForeground, apiVersion, kind, namespace, name, opts...)
+func NewDeleteOperation(apiVersion string, kind string, namespace string, name string) sdkpkg.PatchCollectorOperation {
+	return newDeleteOperation(metav1.DeletePropagationForeground, apiVersion, kind, namespace, name)
 }
 
-func NewDeleteInBackgroundOperation(apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorDeleteOption) sdkpkg.PatchCollectorOperation {
-	return newDeleteOperation(metav1.DeletePropagationBackground, apiVersion, kind, namespace, name, opts...)
+func NewDeleteInBackgroundOperation(apiVersion string, kind string, namespace string, name string) sdkpkg.PatchCollectorOperation {
+	return newDeleteOperation(metav1.DeletePropagationBackground, apiVersion, kind, namespace, name)
 }
 
-func NewDeleteNonCascadingOperation(apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorDeleteOption) sdkpkg.PatchCollectorOperation {
-	return newDeleteOperation(metav1.DeletePropagationOrphan, apiVersion, kind, namespace, name, opts...)
+func NewDeleteNonCascadingOperation(apiVersion string, kind string, namespace string, name string) sdkpkg.PatchCollectorOperation {
+	return newDeleteOperation(metav1.DeletePropagationOrphan, apiVersion, kind, namespace, name)
 }
 
-func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorDeleteOption) sdkpkg.PatchCollectorOperation {
+func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind, namespace, name string) sdkpkg.PatchCollectorOperation {
 	op := &deleteOperation{
 		apiVersion:          apiVersion,
 		kind:                kind,
@@ -297,22 +261,18 @@ func newDeleteOperation(propagation metav1.DeletionPropagation, apiVersion, kind
 		deletionPropagation: propagation,
 	}
 
-	for _, opt := range opts {
-		opt.Apply(op)
-	}
-
 	return op
 }
 
-func NewMergePatchOperation(mergePatch any, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorPatchOption) sdkpkg.PatchCollectorOperation {
+func NewMergePatchOperation(mergePatch any, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newPatchOperation(types.MergePatchType, mergePatch, apiVersion, kind, namespace, name, opts...)
 }
 
-func NewJSONPatchOperation(jsonpatch any, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorPatchOption) sdkpkg.PatchCollectorOperation {
+func NewJSONPatchOperation(jsonpatch any, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newPatchOperation(types.JSONPatchType, jsonpatch, apiVersion, kind, namespace, name, opts...)
 }
 
-func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorPatchOption) sdkpkg.PatchCollectorOperation {
+func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	op := &patchOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
@@ -329,24 +289,24 @@ func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, n
 	return op
 }
 
-func NewJQPatchOperation(jqfilter string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorFilterOption) sdkpkg.PatchCollectorOperation {
+func NewPatchWithJQOperation(jqfilter string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newFilterOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		filter := jq.NewFilter(app.JqLibraryPath)
 		return applyJQPatch(jqfilter, filter, u)
 	}, apiVersion, kind, namespace, name, opts...)
 }
 
-func NewFilterPatchOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorFilterOption) sdkpkg.PatchCollectorOperation {
-	return newFilterOperation(filterFunc, apiVersion, kind, namespace, name, opts...)
+func NewPatchWithMutatingFuncOperation(fn MutatingFunc, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
+	return newFilterOperation(fn, apiVersion, kind, namespace, name, opts...)
 }
 
-func newFilterOperation(filterFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorFilterOption) sdkpkg.PatchCollectorOperation {
-	op := &filterOperation{
+func newFilterOperation(fn MutatingFunc, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
+	op := &patchOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
 		namespace:  namespace,
 		name:       name,
-		filterFunc: filterFunc,
+		filterFunc: fn,
 	}
 
 	for _, opt := range opts {

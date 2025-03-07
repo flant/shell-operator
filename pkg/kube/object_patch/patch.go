@@ -68,9 +68,11 @@ func (o *ObjectPatcher) ExecuteOperation(operation sdkpkg.PatchCollectorOperatio
 	case *deleteOperation:
 		return o.executeDeleteOperation(v)
 	case *patchOperation:
+		if v.HasFilterFn() {
+			return o.executeFilterOperation(v)
+		}
+
 		return o.executePatchOperation(v)
-	case *filterOperation:
-		return o.executeFilterOperation(v)
 	}
 
 	return nil
@@ -193,12 +195,12 @@ func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 
 // executeFilterOperation retrieves a specified object, modified it with
 // filterFunc and calls update.
-
+//
 // Other options:
 // - WithSubresource — a subresource argument for Patch or Update API call.
 // - IgnoreMissingObject — do not return error if the specified object is missing.
 // - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
-func (o *ObjectPatcher) executeFilterOperation(op *filterOperation) error {
+func (o *ObjectPatcher) executeFilterOperation(op *patchOperation) error {
 	var err error
 
 	if op.filterFunc == nil {

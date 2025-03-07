@@ -37,6 +37,14 @@ github.com/deckhouse/module-sdk v0.1.1-0.20250306145537-568677f7eac7 h1:piuIR7WR
 github.com/deckhouse/module-sdk v0.1.1-0.20250306145537-568677f7eac7/go.mod h1:xZuqvKXZunp9VNAiF70fgYiN/HQkLDo8tvGymXNpu0o=
 github.com/deckhouse/module-sdk v0.1.1-0.20250306155143-efc505c729d0 h1:sZfJrKecyiGCxAP8sS7442psVMib08YpjtoSZkfDHJk=
 github.com/deckhouse/module-sdk v0.1.1-0.20250306155143-efc505c729d0/go.mod h1:xZuqvKXZunp9VNAiF70fgYiN/HQkLDo8tvGymXNpu0o=
+github.com/deckhouse/module-sdk v0.1.1-0.20250307114432-dbe2909556e3 h1:rOahjUWSShztMsDp7QohP3OqkOZ5AI9aCndrPRxm5io=
+github.com/deckhouse/module-sdk v0.1.1-0.20250307114432-dbe2909556e3/go.mod h1:xZuqvKXZunp9VNAiF70fgYiN/HQkLDo8tvGymXNpu0o=
+github.com/deckhouse/module-sdk v0.1.1-0.20250307120731-88e19e901be5 h1:77S9lqE4y+7TpRDtZ0T1yJuYJgoIyKvgg+jfm3A9fgo=
+github.com/deckhouse/module-sdk v0.1.1-0.20250307120731-88e19e901be5/go.mod h1:xZuqvKXZunp9VNAiF70fgYiN/HQkLDo8tvGymXNpu0o=
+github.com/deckhouse/module-sdk v0.1.1-0.20250307125652-e02edd325a3a h1:1fiGJctX45krnbqZwrzYuSpIn0IwBHI7dGQHvmEiDHM=
+github.com/deckhouse/module-sdk v0.1.1-0.20250307125652-e02edd325a3a/go.mod h1:xZuqvKXZunp9VNAiF70fgYiN/HQkLDo8tvGymXNpu0o=
+github.com/deckhouse/module-sdk v0.1.1-0.20250307130634-9796dba9b13b h1:jfJJrdXq4I+OpXJGFo5ogDYnm04hXTKM45xmIYmIs1w=
+github.com/deckhouse/module-sdk v0.1.1-0.20250307130634-9796dba9b13b/go.mod h1:xZuqvKXZunp9VNAiF70fgYiN/HQkLDo8tvGymXNpu0o=
 github.com/docker/cli v24.0.0+incompatible h1:0+1VshNwBQzQAx9lOl+OYCTCEAD8fKs/qeXMx3O0wqM=
 github.com/docker/cli v24.0.0+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/distribution v2.8.2+incompatible h1:T3de5rq0dB1j30rp0sA2rER+m322EBzniBPB6ZIzuh8=

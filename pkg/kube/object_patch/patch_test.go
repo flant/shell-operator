@@ -145,7 +145,7 @@ data:
 				return patcher.ExecuteOperation(NewMergePatchOperation(
 					fmt.Sprintf(`{"data":{"%s":"%s"}}`, newField, newValue),
 					"v1", "ConfigMap", namespace, missingName,
-					PatchWithIgnoreMissingObject(true),
+					WithIgnoreMissingObject(true),
 				))
 			},
 			shouldNotAdd,
@@ -295,7 +295,7 @@ mergePatch: |
 				return patcher.ExecuteOperation(NewJSONPatchOperation(
 					fmt.Sprintf(`[{ "op": "add", "path": "/data/%s", "value": "%s"}]`, newField, newValue),
 					"v1", "ConfigMap", namespace, missingName,
-					PatchWithIgnoreMissingObject(true),
+					WithIgnoreMissingObject(true),
 				))
 			},
 			shouldNotAdd,
@@ -387,7 +387,7 @@ jsonPatch: |
 		{
 			"filter patch",
 			func(patcher *ObjectPatcher) error {
-				return patcher.ExecuteOperation(NewFilterPatchOperation(
+				return patcher.ExecuteOperation(NewPatchWithMutatingFuncOperation(
 					filter,
 					"v1", "ConfigMap", namespace, name,
 				))
@@ -398,7 +398,7 @@ jsonPatch: |
 		{
 			"filter patch missing object",
 			func(patcher *ObjectPatcher) error {
-				return patcher.ExecuteOperation(NewFilterPatchOperation(
+				return patcher.ExecuteOperation(NewPatchWithMutatingFuncOperation(
 					filter,
 					"v1", "ConfigMap", namespace, missingName,
 				))
@@ -409,10 +409,10 @@ jsonPatch: |
 		{
 			"filter patch with ignoreMissingObject",
 			func(patcher *ObjectPatcher) error {
-				return patcher.ExecuteOperation(NewFilterPatchOperation(
+				return patcher.ExecuteOperation(NewPatchWithMutatingFuncOperation(
 					filter,
 					"v1", "ConfigMap", namespace, missingName,
-					FilterWithIgnoreMissingObject(true),
+					WithIgnoreMissingObject(true),
 				))
 			},
 			shouldNotAdd,
