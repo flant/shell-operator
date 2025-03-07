@@ -78,7 +78,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			unstructuredNewTestCM, err := generateUnstructured(newTestCM)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredNewTestCM, objectpatch.UpdateIfExists()))
+			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredNewTestCM))
 			Expect(err).To(Succeed())
 
 			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), newTestCM.Name, metav1.GetOptions{})
@@ -93,7 +93,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			unstructuredSeparateTestCM, err := generateUnstructured(separateTestCM)
 			Expect(err).To(Succeed())
 
-			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredSeparateTestCM, objectpatch.UpdateIfExists()))
+			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredSeparateTestCM))
 			Expect(err).To(Succeed())
 
 			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), separateTestCM.Name, metav1.GetOptions{})
@@ -117,9 +117,8 @@ var _ = Describe("Kubernetes API object patching", func() {
 		})
 
 		It("should successfully delete an object", func() {
-			err := ObjectPatcher.ExecuteOperation(objectpatch.NewDeleteOperation(
-				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name,
-				objectpatch.InBackground()))
+			err := ObjectPatcher.ExecuteOperation(objectpatch.NewDeleteInBackgroundOperation(
+				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
 			Expect(err).Should(Succeed())
 
 			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), testCM.Name, metav1.GetOptions{})
@@ -204,7 +203,7 @@ func ensureNamespace(name string) error {
 		panic(err)
 	}
 
-	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredNS, objectpatch.UpdateIfExists()))
+	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredNS))
 }
 
 func ensureTestObject(_ string, obj interface{}) error {
@@ -213,7 +212,7 @@ func ensureTestObject(_ string, obj interface{}) error {
 		panic(err)
 	}
 
-	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredObj, objectpatch.UpdateIfExists()))
+	return ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredObj))
 }
 
 func removeNamespace(name string) error {
