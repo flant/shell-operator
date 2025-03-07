@@ -5,12 +5,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type MutatingFunc func(*unstructured.Unstructured) (*unstructured.Unstructured, error)
-
 type IPatchCollector interface {
 	sdkpkg.PatchCollector
 
-	PatchWithMutatingFunc(fn MutatingFunc, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption)
+	PatchWithMutatingFunc(fn func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption)
 }
 
 var _ IPatchCollector = (*PatchCollector)(nil)
@@ -114,7 +112,7 @@ func (dop *PatchCollector) JSONPatch(jsonPatch any, apiVersion, kind, namespace,
 // Note: do not modify and return argument in filterFunc,
 // use FromUnstructured to instantiate a concrete type or modify after DeepCopy.
 func (dop *PatchCollector) PatchWithMutatingFunc(
-	fn MutatingFunc,
+	fn func(*unstructured.Unstructured) (*unstructured.Unstructured, error),
 	apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorOption,
 ) {
 	dop.add(NewPatchWithMutatingFuncOperation(fn, apiVersion, kind, namespace, name, opts...))

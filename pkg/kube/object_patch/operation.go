@@ -296,11 +296,11 @@ func NewPatchWithJQOperation(jqfilter string, apiVersion string, kind string, na
 	}, apiVersion, kind, namespace, name, opts...)
 }
 
-func NewPatchWithMutatingFuncOperation(fn MutatingFunc, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
+func NewPatchWithMutatingFuncOperation(fn func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newFilterOperation(fn, apiVersion, kind, namespace, name, opts...)
 }
 
-func newFilterOperation(fn MutatingFunc, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
+func newFilterOperation(fn func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	op := &patchOperation{
 		apiVersion: apiVersion,
 		kind:       kind,
