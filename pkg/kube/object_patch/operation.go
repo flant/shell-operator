@@ -90,7 +90,7 @@ func ParseOperations(specBytes []byte) ([]sdkpkg.PatchCollectorOperation, error)
 	return ops, validationErrors.ErrorOrNil()
 }
 
-type сreateOperation struct {
+type createOperation struct {
 	object      any
 	subresource string
 
@@ -98,19 +98,19 @@ type сreateOperation struct {
 	updateIfExists bool
 }
 
-func (op *сreateOperation) Description() string {
+func (op *createOperation) Description() string {
 	return "Create object"
 }
 
-func (op *сreateOperation) WithSubresource(subresource string) {
+func (op *createOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
-func (op *сreateOperation) WithIgnoreIfExists(ignore bool) {
+func (op *createOperation) WithIgnoreIfExists(ignore bool) {
 	op.ignoreIfExists = ignore
 }
 
-func (op *сreateOperation) WithUpdateIfExists(update bool) {
+func (op *createOperation) WithUpdateIfExists(update bool) {
 	op.updateIfExists = update
 }
 
@@ -256,7 +256,7 @@ func NewCreateIfNotExistsOperation(obj any, opts ...sdkpkg.PatchCollectorCreateO
 }
 
 func newCreateOperation(operation OperationType, obj any, opts ...sdkpkg.PatchCollectorCreateOption) sdkpkg.PatchCollectorOperation {
-	op := &сreateOperation{
+	op := &createOperation{
 		object: obj,
 	}
 

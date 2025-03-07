@@ -63,7 +63,7 @@ func (o *ObjectPatcher) ExecuteOperation(operation sdkpkg.PatchCollectorOperatio
 	}
 
 	switch v := operation.(type) {
-	case *сreateOperation:
+	case *createOperation:
 		return o.executeCreateOperation(v)
 	case *deleteOperation:
 		return o.executeDeleteOperation(v)
@@ -76,7 +76,7 @@ func (o *ObjectPatcher) ExecuteOperation(operation sdkpkg.PatchCollectorOperatio
 	return nil
 }
 
-func (o *ObjectPatcher) executeCreateOperation(op *сreateOperation) error {
+func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 	if op.object == nil {
 		return fmt.Errorf("cannot create empty object")
 	}
