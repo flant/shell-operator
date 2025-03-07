@@ -53,11 +53,9 @@ const (
 func GetPatchStatusOperationsOnHookError(operations []sdkpkg.PatchCollectorOperation) []sdkpkg.PatchCollectorOperation {
 	patchStatusOperations := make([]sdkpkg.PatchCollectorOperation, 0)
 	for _, op := range operations {
-		switch operation := op.(type) {
-		case *patchOperation:
-			if operation.subresource == "/status" && operation.ignoreHookError {
-				patchStatusOperations = append(patchStatusOperations, operation)
-			}
+		operation, ok := op.(*patchOperation)
+		if ok && operation.subresource == "/status" && operation.ignoreHookError {
+			patchStatusOperations = append(patchStatusOperations, operation)
 		}
 	}
 
