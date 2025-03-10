@@ -287,10 +287,10 @@ func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, n
 	return op
 }
 
-func NewPatchWithJQOperation(jqfilter string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
+func NewPatchWithJQOperation(jqQuery string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newFilterOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		filter := jq.NewFilter(app.JqLibraryPath)
-		return applyJQPatch(jqfilter, filter, u)
+		return applyJQPatch(jqQuery, filter, u)
 	}, apiVersion, kind, namespace, name, opts...)
 }
 
