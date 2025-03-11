@@ -2,8 +2,6 @@ module github.com/flant/shell-operator
 
 go 1.23.1
 
-toolchain go1.24.1
-
 require (
 	github.com/deckhouse/deckhouse/pkg/log v0.0.0-20241205040953-7b376bae249c
 	github.com/flant/kube-client v1.2.2
@@ -47,7 +45,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/deckhouse/module-sdk v0.1.1-0.20250310120231-e366f9e48468 // indirect
+	github.com/deckhouse/module-sdk v0.1.1-0.20250311074906-5e718f6c084a // indirect
 	github.com/docker/cli v24.0.0+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/docker v24.0.0+incompatible // indirect
