@@ -12,7 +12,7 @@ import (
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/mock"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -20,7 +20,7 @@ import (
 func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 	g := NewWithT(t)
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)
@@ -125,7 +125,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 	g := NewWithT(t)
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)
@@ -195,7 +195,7 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 	g := NewWithT(t)
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)
@@ -308,7 +308,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	g := NewWithT(t)
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)

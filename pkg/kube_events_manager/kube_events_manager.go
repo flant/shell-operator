@@ -10,12 +10,12 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
-	"github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metric"
 )
 
 type KubeEventsManager interface {
-	WithMetricStorage(mstor pkg.MetricStorage)
+	WithMetricStorage(mstor metric.Storage)
 	AddMonitor(monitorConfig *MonitorConfig) error
 	HasMonitor(monitorID string) bool
 	GetMonitor(monitorID string) Monitor
@@ -35,7 +35,7 @@ type kubeEventsManager struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage pkg.MetricStorage
+	metricStorage metric.Storage
 
 	m        sync.RWMutex
 	Monitors map[string]Monitor
@@ -61,7 +61,7 @@ func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *lo
 	return em
 }
 
-func (mgr *kubeEventsManager) WithMetricStorage(mstor pkg.MetricStorage) {
+func (mgr *kubeEventsManager) WithMetricStorage(mstor metric.Storage) {
 	mgr.metricStorage = mstor
 }
 

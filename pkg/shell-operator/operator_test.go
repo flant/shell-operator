@@ -10,7 +10,7 @@ import (
 
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/mock"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 )
@@ -21,7 +21,7 @@ func Test_Operator_startup_tasks(t *testing.T) {
 	hooksDir, err := utils.RequireExistingDirectory("testdata/startup_tasks/hooks")
 	g.Expect(err).ShouldNot(HaveOccurred())
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)

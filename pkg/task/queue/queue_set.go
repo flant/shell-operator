@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -15,7 +15,7 @@ const MainQueueName = "main"
 type TaskQueueSet struct {
 	MainName string
 
-	metricStorage pkg.MetricStorage
+	metricStorage metric.Storage
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -39,7 +39,7 @@ func (tqs *TaskQueueSet) WithContext(ctx context.Context) {
 	tqs.ctx, tqs.cancel = context.WithCancel(ctx)
 }
 
-func (tqs *TaskQueueSet) WithMetricStorage(mstor pkg.MetricStorage) *TaskQueueSet {
+func (tqs *TaskQueueSet) WithMetricStorage(mstor metric.Storage) *TaskQueueSet {
 	tqs.metricStorage = mstor
 
 	return tqs

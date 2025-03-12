@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/flant/shell-operator/pkg/mock"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -27,7 +27,7 @@ func DumpTaskIds(q *TaskQueue) string {
 func Test_TasksQueue_Remove(t *testing.T) {
 	g := NewWithT(t)
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)
@@ -92,7 +92,7 @@ func Test_TasksQueue_Remove(t *testing.T) {
 func Test_ExponentialBackoff(t *testing.T) {
 	g := NewWithT(t)
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)
@@ -189,7 +189,7 @@ func calculateMeanDelay(in []time.Time) (time.Duration, []int64) {
 func Test_CancelDelay(t *testing.T) {
 	g := NewWithT(t)
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)

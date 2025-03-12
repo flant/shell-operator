@@ -14,7 +14,7 @@ import (
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/mock"
+	"github.com/flant/shell-operator/pkg/metric"
 )
 
 func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
@@ -39,7 +39,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	}
 	objsFromEvents := make([]string, 0)
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		metrics := []string{
 			"{PREFIX}kube_event_duration_seconds",

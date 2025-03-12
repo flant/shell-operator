@@ -10,7 +10,7 @@ import (
 
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/mock"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -46,7 +46,7 @@ func Test_HookMetadata_QueueDump_Task_Description(t *testing.T) {
 		"hook": "hook1.sh",
 	}
 
-	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
 		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
 		assert.NotZero(t, value)

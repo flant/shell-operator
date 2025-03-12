@@ -5,6 +5,7 @@ package metric
 //go:generate minimock -i github.com/flant/shell-operator/pkg/metric.Storage -o storage_mock.go -n StorageMock -p metric
 
 import (
+	"net/http"
 	"sync"
 	mm_atomic "sync/atomic"
 	mm_time "time"
@@ -67,6 +68,13 @@ type StorageMock struct {
 	afterGroupedCounter  uint64
 	beforeGroupedCounter uint64
 	GroupedMock          mStorageMockGrouped
+
+	funcHandler          func() (h1 http.Handler)
+	funcHandlerOrigin    string
+	inspectFuncHandler   func()
+	afterHandlerCounter  uint64
+	beforeHandlerCounter uint64
+	HandlerMock          mStorageMockHandler
 
 	funcHistogram          func(metric string, labels map[string]string, buckets []float64) (hp1 *prometheus.HistogramVec)
 	funcHistogramOrigin    string
@@ -138,6 +146,8 @@ func NewStorageMock(t minimock.Tester) *StorageMock {
 	m.GaugeSetMock.callArgs = []*StorageMockGaugeSetParams{}
 
 	m.GroupedMock = mStorageMockGrouped{mock: m}
+
+	m.HandlerMock = mStorageMockHandler{mock: m}
 
 	m.HistogramMock = mStorageMockHistogram{mock: m}
 	m.HistogramMock.callArgs = []*StorageMockHistogramParams{}
@@ -2465,6 +2475,192 @@ func (m *StorageMock) MinimockGroupedInspect() {
 	}
 }
 
+type mStorageMockHandler struct {
+	optional           bool
+	mock               *StorageMock
+	defaultExpectation *StorageMockHandlerExpectation
+	expectations       []*StorageMockHandlerExpectation
+
+	expectedInvocations       uint64
+	expectedInvocationsOrigin string
+}
+
+// StorageMockHandlerExpectation specifies expectation struct of the Storage.Handler
+type StorageMockHandlerExpectation struct {
+	mock *StorageMock
+
+	results      *StorageMockHandlerResults
+	returnOrigin string
+	Counter      uint64
+}
+
+// StorageMockHandlerResults contains results of the Storage.Handler
+type StorageMockHandlerResults struct {
+	h1 http.Handler
+}
+
+// Marks this method to be optional. The default behavior of any method with Return() is '1 or more', meaning
+// the test will fail minimock's automatic final call check if the mocked method was not called at least once.
+// Optional() makes method check to work in '0 or more' mode.
+// It is NOT RECOMMENDED to use this option unless you really need it, as default behaviour helps to
+// catch the problems when the expected method call is totally skipped during test run.
+func (mmHandler *mStorageMockHandler) Optional() *mStorageMockHandler {
+	mmHandler.optional = true
+	return mmHandler
+}
+
+// Expect sets up expected params for Storage.Handler
+func (mmHandler *mStorageMockHandler) Expect() *mStorageMockHandler {
+	if mmHandler.mock.funcHandler != nil {
+		mmHandler.mock.t.Fatalf("StorageMock.Handler mock is already set by Set")
+	}
+
+	if mmHandler.defaultExpectation == nil {
+		mmHandler.defaultExpectation = &StorageMockHandlerExpectation{}
+	}
+
+	return mmHandler
+}
+
+// Inspect accepts an inspector function that has same arguments as the Storage.Handler
+func (mmHandler *mStorageMockHandler) Inspect(f func()) *mStorageMockHandler {
+	if mmHandler.mock.inspectFuncHandler != nil {
+		mmHandler.mock.t.Fatalf("Inspect function is already set for StorageMock.Handler")
+	}
+
+	mmHandler.mock.inspectFuncHandler = f
+
+	return mmHandler
+}
+
+// Return sets up results that will be returned by Storage.Handler
+func (mmHandler *mStorageMockHandler) Return(h1 http.Handler) *StorageMock {
+	if mmHandler.mock.funcHandler != nil {
+		mmHandler.mock.t.Fatalf("StorageMock.Handler mock is already set by Set")
+	}
+
+	if mmHandler.defaultExpectation == nil {
+		mmHandler.defaultExpectation = &StorageMockHandlerExpectation{mock: mmHandler.mock}
+	}
+	mmHandler.defaultExpectation.results = &StorageMockHandlerResults{h1}
+	mmHandler.defaultExpectation.returnOrigin = minimock.CallerInfo(1)
+	return mmHandler.mock
+}
+
+// Set uses given function f to mock the Storage.Handler method
+func (mmHandler *mStorageMockHandler) Set(f func() (h1 http.Handler)) *StorageMock {
+	if mmHandler.defaultExpectation != nil {
+		mmHandler.mock.t.Fatalf("Default expectation is already set for the Storage.Handler method")
+	}
+
+	if len(mmHandler.expectations) > 0 {
+		mmHandler.mock.t.Fatalf("Some expectations are already set for the Storage.Handler method")
+	}
+
+	mmHandler.mock.funcHandler = f
+	mmHandler.mock.funcHandlerOrigin = minimock.CallerInfo(1)
+	return mmHandler.mock
+}
+
+// Times sets number of times Storage.Handler should be invoked
+func (mmHandler *mStorageMockHandler) Times(n uint64) *mStorageMockHandler {
+	if n == 0 {
+		mmHandler.mock.t.Fatalf("Times of StorageMock.Handler mock can not be zero")
+	}
+	mm_atomic.StoreUint64(&mmHandler.expectedInvocations, n)
+	mmHandler.expectedInvocationsOrigin = minimock.CallerInfo(1)
+	return mmHandler
+}
+
+func (mmHandler *mStorageMockHandler) invocationsDone() bool {
+	if len(mmHandler.expectations) == 0 && mmHandler.defaultExpectation == nil && mmHandler.mock.funcHandler == nil {
+		return true
+	}
+
+	totalInvocations := mm_atomic.LoadUint64(&mmHandler.mock.afterHandlerCounter)
+	expectedInvocations := mm_atomic.LoadUint64(&mmHandler.expectedInvocations)
+
+	return totalInvocations > 0 && (expectedInvocations == 0 || expectedInvocations == totalInvocations)
+}
+
+// Handler implements Storage
+func (mmHandler *StorageMock) Handler() (h1 http.Handler) {
+	mm_atomic.AddUint64(&mmHandler.beforeHandlerCounter, 1)
+	defer mm_atomic.AddUint64(&mmHandler.afterHandlerCounter, 1)
+
+	mmHandler.t.Helper()
+
+	if mmHandler.inspectFuncHandler != nil {
+		mmHandler.inspectFuncHandler()
+	}
+
+	if mmHandler.HandlerMock.defaultExpectation != nil {
+		mm_atomic.AddUint64(&mmHandler.HandlerMock.defaultExpectation.Counter, 1)
+
+		mm_results := mmHandler.HandlerMock.defaultExpectation.results
+		if mm_results == nil {
+			mmHandler.t.Fatal("No results are set for the StorageMock.Handler")
+		}
+		return (*mm_results).h1
+	}
+	if mmHandler.funcHandler != nil {
+		return mmHandler.funcHandler()
+	}
+	mmHandler.t.Fatalf("Unexpected call to StorageMock.Handler.")
+	return
+}
+
+// HandlerAfterCounter returns a count of finished StorageMock.Handler invocations
+func (mmHandler *StorageMock) HandlerAfterCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmHandler.afterHandlerCounter)
+}
+
+// HandlerBeforeCounter returns a count of StorageMock.Handler invocations
+func (mmHandler *StorageMock) HandlerBeforeCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmHandler.beforeHandlerCounter)
+}
+
+// MinimockHandlerDone returns true if the count of the Handler invocations corresponds
+// the number of defined expectations
+func (m *StorageMock) MinimockHandlerDone() bool {
+	if m.HandlerMock.optional {
+		// Optional methods provide '0 or more' call count restriction.
+		return true
+	}
+
+	for _, e := range m.HandlerMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			return false
+		}
+	}
+
+	return m.HandlerMock.invocationsDone()
+}
+
+// MinimockHandlerInspect logs each unmet expectation
+func (m *StorageMock) MinimockHandlerInspect() {
+	for _, e := range m.HandlerMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			m.t.Error("Expected call to StorageMock.Handler")
+		}
+	}
+
+	afterHandlerCounter := mm_atomic.LoadUint64(&m.afterHandlerCounter)
+	// if default expectation was set then invocations count should be greater than zero
+	if m.HandlerMock.defaultExpectation != nil && afterHandlerCounter < 1 {
+		m.t.Errorf("Expected call to StorageMock.Handler at\n%s", m.HandlerMock.defaultExpectation.returnOrigin)
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcHandler != nil && afterHandlerCounter < 1 {
+		m.t.Errorf("Expected call to StorageMock.Handler at\n%s", m.funcHandlerOrigin)
+	}
+
+	if !m.HandlerMock.invocationsDone() && afterHandlerCounter > 0 {
+		m.t.Errorf("Expected %d calls to StorageMock.Handler at\n%s but found %d calls",
+			mm_atomic.LoadUint64(&m.HandlerMock.expectedInvocations), m.HandlerMock.expectedInvocationsOrigin, afterHandlerCounter)
+	}
+}
+
 type mStorageMockHistogram struct {
 	optional           bool
 	mock               *StorageMock
@@ -4652,6 +4848,8 @@ func (m *StorageMock) MinimockFinish() {
 
 			m.MinimockGroupedInspect()
 
+			m.MinimockHandlerInspect()
+
 			m.MinimockHistogramInspect()
 
 			m.MinimockHistogramObserveInspect()
@@ -4693,6 +4891,7 @@ func (m *StorageMock) minimockDone() bool {
 		m.MinimockGaugeAddDone() &&
 		m.MinimockGaugeSetDone() &&
 		m.MinimockGroupedDone() &&
+		m.MinimockHandlerDone() &&
 		m.MinimockHistogramDone() &&
 		m.MinimockHistogramObserveDone() &&
 		m.MinimockRegisterCounterDone() &&
