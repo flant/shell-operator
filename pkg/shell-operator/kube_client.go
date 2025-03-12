@@ -6,9 +6,9 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/app"
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -19,7 +19,7 @@ var (
 
 // defaultMainKubeClient creates a Kubernetes client for hooks. No timeout specified, because
 // timeout will reset connections for Watchers.
-func defaultMainKubeClient(metricStorage *metricstorage.MetricStorage, metricLabels map[string]string, logger *log.Logger) *klient.Client {
+func defaultMainKubeClient(metricStorage pkg.MetricStorage, metricLabels map[string]string, logger *log.Logger) *klient.Client {
 	client := klient.New(klient.WithLogger(logger))
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
@@ -29,7 +29,7 @@ func defaultMainKubeClient(metricStorage *metricstorage.MetricStorage, metricLab
 	return client
 }
 
-func initDefaultMainKubeClient(metricStorage *metricstorage.MetricStorage, logger *log.Logger) (*klient.Client, error) {
+func initDefaultMainKubeClient(metricStorage pkg.MetricStorage, logger *log.Logger) (*klient.Client, error) {
 	//nolint:staticcheck
 	klient.RegisterKubernetesClientMetrics(metricStorage, defaultMainKubeClientMetricLabels)
 	kubeClient := defaultMainKubeClient(metricStorage, defaultMainKubeClientMetricLabels, logger.Named("main-kube-client"))
@@ -41,7 +41,7 @@ func initDefaultMainKubeClient(metricStorage *metricstorage.MetricStorage, logge
 }
 
 // defaultObjectPatcherKubeClient initializes a Kubernetes client for ObjectPatcher. Timeout is specified here.
-func defaultObjectPatcherKubeClient(metricStorage *metricstorage.MetricStorage, metricLabels map[string]string, logger *log.Logger) *klient.Client {
+func defaultObjectPatcherKubeClient(metricStorage pkg.MetricStorage, metricLabels map[string]string, logger *log.Logger) *klient.Client {
 	client := klient.New(klient.WithLogger(logger))
 	client.WithContextName(app.KubeContext)
 	client.WithConfigPath(app.KubeConfig)
@@ -52,7 +52,7 @@ func defaultObjectPatcherKubeClient(metricStorage *metricstorage.MetricStorage, 
 	return client
 }
 
-func initDefaultObjectPatcher(metricStorage *metricstorage.MetricStorage, logger *log.Logger) (*objectpatch.ObjectPatcher, error) {
+func initDefaultObjectPatcher(metricStorage pkg.MetricStorage, logger *log.Logger) (*objectpatch.ObjectPatcher, error) {
 	patcherKubeClient := defaultObjectPatcherKubeClient(metricStorage, defaultObjectPatcherKubeClientMetricLabels, logger.Named("object-patcher-kube-client"))
 	err := patcherKubeClient.Init()
 	if err != nil {

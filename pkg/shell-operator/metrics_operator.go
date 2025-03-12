@@ -3,6 +3,7 @@ package shell_operator
 import (
 	"net/http"
 
+	"github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/app"
 	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 )
@@ -23,13 +24,13 @@ func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels map[string]s
 
 // registerCommonMetrics register base metric
 // This function is used in the addon-operator
-func registerCommonMetrics(metricStorage *metricstorage.MetricStorage) {
+func registerCommonMetrics(metricStorage pkg.MetricStorage) {
 	metricStorage.RegisterCounter("{PREFIX}live_ticks", map[string]string{})
 }
 
 // registerTaskQueueMetrics
 // This function is used in the addon-operator
-func registerTaskQueueMetrics(metricStorage *metricstorage.MetricStorage) {
+func registerTaskQueueMetrics(metricStorage pkg.MetricStorage) {
 	metricStorage.RegisterHistogram(
 		"{PREFIX}tasks_queue_action_duration_seconds",
 		map[string]string{
@@ -50,7 +51,7 @@ func registerTaskQueueMetrics(metricStorage *metricstorage.MetricStorage) {
 
 // registerKubeEventsManagerMetrics registers metrics for kube_event_manager
 // This function is used in the addon-operator
-func registerKubeEventsManagerMetrics(metricStorage *metricstorage.MetricStorage, labels map[string]string) {
+func registerKubeEventsManagerMetrics(metricStorage pkg.MetricStorage, labels map[string]string) {
 	// Count of objects in snapshot for one kubernets bindings.
 	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
 	// Duration of jqFilter applying.

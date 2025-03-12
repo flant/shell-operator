@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/mock"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -43,7 +45,19 @@ func Test_HookMetadata_QueueDump_Task_Description(t *testing.T) {
 	logLabels := map[string]string{
 		"hook": "hook1.sh",
 	}
-	q := queue.NewTasksQueue()
+
+	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddLast",
+			"queue_name":   "",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+
+	q := queue.NewTasksQueue().WithMetricStorage(metricStorage)
 
 	q.AddLast(task.NewTask(EnableKubernetesBindings).
 		WithMetadata(HookMetadata{

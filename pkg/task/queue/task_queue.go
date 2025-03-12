@@ -11,7 +11,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
 	"github.com/flant/shell-operator/pkg/utils/measure"
@@ -57,7 +57,7 @@ type TaskResult struct {
 
 type TaskQueue struct {
 	m             sync.RWMutex
-	metricStorage *metricstorage.MetricStorage
+	metricStorage pkg.MetricStorage
 	ctx           context.Context
 	cancel        context.CancelFunc
 
@@ -102,8 +102,10 @@ func (q *TaskQueue) WithContext(ctx context.Context) {
 	q.ctx, q.cancel = context.WithCancel(ctx)
 }
 
-func (q *TaskQueue) WithMetricStorage(mstor *metricstorage.MetricStorage) {
+func (q *TaskQueue) WithMetricStorage(mstor pkg.MetricStorage) *TaskQueue {
 	q.metricStorage = mstor
+
+	return q
 }
 
 func (q *TaskQueue) WithName(name string) *TaskQueue {

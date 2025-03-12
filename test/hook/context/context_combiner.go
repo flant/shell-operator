@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
@@ -29,7 +31,8 @@ type ContextCombiner struct {
 
 func NewContextCombiner() *ContextCombiner {
 	op := &shell_operator.ShellOperator{}
-	op.TaskQueues = queue.NewTaskQueueSet()
+	op.MetricStorage = metricstorage.NewMetricStorage(context.Background(), "test-prefix", false, log.NewNop())
+	op.TaskQueues = queue.NewTaskQueueSet().WithMetricStorage(op.MetricStorage)
 	op.TaskQueues.WithContext(context.Background())
 	op.TaskQueues.NewNamedQueue(TestQueueName, nil)
 

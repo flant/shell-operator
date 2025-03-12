@@ -9,8 +9,8 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -46,12 +46,12 @@ type monitor struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage *metricstorage.MetricStorage
+	metricStorage pkg.MetricStorage
 
 	logger *log.Logger
 }
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor *metricstorage.MetricStorage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor pkg.MetricStorage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{

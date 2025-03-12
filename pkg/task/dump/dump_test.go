@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/yaml"
 
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
+	"github.com/flant/shell-operator/pkg/mock"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -69,7 +71,31 @@ func Test_Dump(t *testing.T) {
 		mainTasks   = 5
 		activeTasks = 4
 	)
-	tqs := queue.NewTaskQueueSet()
+
+	metricStorage := mock.NewMetricStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.NotZero(t, value)
+
+		mapSlice := []map[string]string{
+			{
+				"queue_action": "Length",
+				"queue_name":   "main",
+			},
+			{
+				"queue_action": "AddFirst",
+				"queue_name":   "active-queue",
+			},
+			{
+				"queue_action": "IsEmpty",
+				"queue_name":   "empty",
+			},
+		}
+		assert.Contains(t, mapSlice, labels)
+		assert.Nil(t, buckets)
+	})
+
+	tqs := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	tqs.WithMainName("main")
 	tqs.WithContext(context.Background())
 
