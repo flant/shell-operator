@@ -3,9 +3,10 @@ package pkg
 import (
 	"net/http"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type MetricStorage interface {

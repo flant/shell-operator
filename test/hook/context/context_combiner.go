@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
