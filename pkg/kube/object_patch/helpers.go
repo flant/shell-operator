@@ -93,7 +93,7 @@ func generateSubresources(subresource string) []string {
 	return nil
 }
 
-func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
+func toUnstructured(obj any) (*unstructured.Unstructured, error) {
 	switch v := obj.(type) {
 	case []byte:
 		mft, err := manifest.NewFromYAML(string(v))
@@ -107,7 +107,7 @@ func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 			return nil, err
 		}
 		return mft.Unstructured(), nil
-	case map[string]interface{}:
+	case map[string]any:
 		return &unstructured.Unstructured{Object: v}, nil
 	default:
 		objectContent, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
@@ -118,9 +118,9 @@ func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 	}
 }
 
-func convertPatchToBytes(patch interface{}) ([]byte, error) {
+func convertPatchToBytes(patch any) ([]byte, error) {
 	var err error
-	var intermediate interface{}
+	var intermediate any
 	switch v := patch.(type) {
 	case []byte:
 		err = k8yaml.Unmarshal(v, &intermediate)
