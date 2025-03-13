@@ -68,7 +68,7 @@ func (o *ObjectPatcher) ExecuteOperation(operation sdkpkg.PatchCollectorOperatio
 	case *deleteOperation:
 		return o.executeDeleteOperation(v)
 	case *patchOperation:
-		if v.HasFilterFn() {
+		if v.hasFilterFn() {
 			return o.executeFilterOperation(v)
 		}
 

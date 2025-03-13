@@ -151,7 +151,7 @@ func (op *patchOperation) Description() string {
 	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
 }
 
-func (op *patchOperation) HasFilterFn() bool {
+func (op *patchOperation) hasFilterFn() bool {
 	return op.filterFunc != nil
 }
 
