@@ -186,22 +186,22 @@ func NewFromOperationSpec(spec OperationSpec) sdkpkg.PatchCollectorOperation {
 			spec.JQFilter,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
-			WithIgnoreMissingObject(spec.IgnoreMissingObject),
-			WithIgnoreHookError(spec.IgnoreHookError),
+			withIgnoreMissingObject(spec.IgnoreMissingObject),
+			withIgnoreHookError(spec.IgnoreHookError),
 		)
 	case MergePatch:
 		return NewMergePatchOperation(spec.MergePatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
-			WithIgnoreMissingObject(spec.IgnoreMissingObject),
-			WithIgnoreHookError(spec.IgnoreHookError),
+			withIgnoreMissingObject(spec.IgnoreMissingObject),
+			withIgnoreHookError(spec.IgnoreHookError),
 		)
 	case JSONPatch:
 		return NewJSONPatchOperation(spec.JSONPatch,
 			spec.ApiVersion, spec.Kind, spec.Namespace, spec.Name,
 			WithSubresource(spec.Subresource),
-			WithIgnoreMissingObject(spec.IgnoreMissingObject),
-			WithIgnoreHookError(spec.IgnoreHookError),
+			withIgnoreMissingObject(spec.IgnoreMissingObject),
+			withIgnoreHookError(spec.IgnoreHookError),
 		)
 	}
 

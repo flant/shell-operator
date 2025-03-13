@@ -16,14 +16,22 @@ func WithSubresource(subresource string) Option {
 	}
 }
 
-func WithIgnoreMissingObject(ignore bool) Option {
+func withIgnoreMissingObject(ignore bool) Option {
 	return func(o sdkpkg.PatchCollectorOptionApplier) {
 		o.WithIgnoreMissingObject(ignore)
 	}
 }
 
-func WithIgnoreHookError(ignore bool) Option {
+func WithIgnoreMissingObject() Option {
+	return withIgnoreMissingObject(true)
+}
+
+func withIgnoreHookError(ignore bool) Option {
 	return func(o sdkpkg.PatchCollectorOptionApplier) {
 		o.WithIgnoreHookError(ignore)
 	}
+}
+
+func WithIgnoreHookError() Option {
+	return withIgnoreHookError(true)
 }
