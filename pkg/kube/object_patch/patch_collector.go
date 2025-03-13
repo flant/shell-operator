@@ -5,13 +5,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type IPatchCollector interface {
+type iPatchCollector interface {
 	sdkpkg.PatchCollector
 
 	PatchWithMutatingFunc(fn func(*unstructured.Unstructured) (*unstructured.Unstructured, error), apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption)
 }
 
-var _ IPatchCollector = (*PatchCollector)(nil)
+var _ iPatchCollector = (*PatchCollector)(nil)
 
 type PatchCollector struct {
 	patchOperations []sdkpkg.PatchCollectorOperation
