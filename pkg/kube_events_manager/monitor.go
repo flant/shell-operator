@@ -10,7 +10,7 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/metric"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -46,12 +46,12 @@ type monitor struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage *metricstorage.MetricStorage
+	metricStorage metric.Storage
 
 	logger *log.Logger
 }
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor *metricstorage.MetricStorage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{

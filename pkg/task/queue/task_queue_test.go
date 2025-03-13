@@ -8,7 +8,9 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -24,7 +26,19 @@ func DumpTaskIds(q *TaskQueue) string {
 
 func Test_TasksQueue_Remove(t *testing.T) {
 	g := NewWithT(t)
-	q := NewTasksQueue()
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddFirst",
+			"queue_name":   "",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+
+	q := NewTasksQueue().WithMetricStorage(metricStorage)
 
 	// Remove just one element
 	Task := &task.BaseTask{Id: "First one"}
@@ -77,8 +91,20 @@ func Test_TasksQueue_Remove(t *testing.T) {
 
 func Test_ExponentialBackoff(t *testing.T) {
 	g := NewWithT(t)
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddFirst",
+			"queue_name":   "test-queue",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+
 	// Init and prefill queue.
-	q := NewTasksQueue()
+	q := NewTasksQueue().WithMetricStorage(metricStorage)
 	q.WithContext(context.TODO())
 	q.WithName("test-queue")
 	// Since we don't want the test to run for too long, we don't
@@ -162,8 +188,20 @@ func calculateMeanDelay(in []time.Time) (time.Duration, []int64) {
 
 func Test_CancelDelay(t *testing.T) {
 	g := NewWithT(t)
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddFirst",
+			"queue_name":   "test-queue",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+
 	// Init and prefill queue.
-	q := NewTasksQueue()
+	q := NewTasksQueue().WithMetricStorage(metricStorage)
 	q.WithContext(context.TODO())
 	q.WithName("test-queue")
 	// Since we don't want the test to run for too long, we don't

@@ -19,7 +19,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
@@ -58,7 +58,7 @@ type resourceInformer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	metricStorage *metricstorage.MetricStorage
+	metricStorage metric.Storage
 
 	// a flag to stop handle events after Stop()
 	stopped bool
@@ -69,7 +69,7 @@ type resourceInformer struct {
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
 	client  *klient.Client
-	mstor   *metricstorage.MetricStorage
+	mstor   metric.Storage
 	eventCb func(kemtypes.KubeEvent)
 	monitor *MonitorConfig
 

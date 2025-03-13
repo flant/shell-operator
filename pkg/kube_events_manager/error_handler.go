@@ -9,19 +9,19 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/metric"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type WatchErrorHandler struct {
 	description   string
 	kind          string
-	metricStorage *metricstorage.MetricStorage
+	metricStorage metric.Storage
 
 	logger *log.Logger
 }
 
-func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage *metricstorage.MetricStorage, logger *log.Logger) *WatchErrorHandler {
+func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage metric.Storage, logger *log.Logger) *WatchErrorHandler {
 	return &WatchErrorHandler{
 		description:   description,
 		kind:          kind,

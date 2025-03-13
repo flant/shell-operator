@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/metric"
 	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 )
 
@@ -17,7 +18,7 @@ func (op *ShellOperator) setupHookMetricStorage() {
 }
 
 // specific metrics for shell-operator HookManager
-func registerHookMetrics(metricStorage *metricstorage.MetricStorage) {
+func registerHookMetrics(metricStorage metric.Storage) {
 	// Metrics for enable kubernetes bindings.
 	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", map[string]string{"hook": ""})
 	metricStorage.RegisterCounter("{PREFIX}hook_enable_kubernetes_bindings_errors_total", map[string]string{"hook": ""})

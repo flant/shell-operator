@@ -19,7 +19,7 @@ import (
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemTypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/metric"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
@@ -41,9 +41,9 @@ type ShellOperator struct {
 	APIServer *baseHTTPServer
 
 	// MetricStorage collects and store metrics for built-in operator primitives, hook execution
-	MetricStorage *metricstorage.MetricStorage
+	MetricStorage metric.Storage
 	// HookMetricStorage separate metric storage for metrics, which are returned by user hooks
-	HookMetricStorage *metricstorage.MetricStorage
+	HookMetricStorage metric.Storage
 	KubeClient        *klient.Client
 	ObjectPatcher     *objectpatch.ObjectPatcher
 
