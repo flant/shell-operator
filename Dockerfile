@@ -2,7 +2,7 @@
 FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl as libjq
 
 # Go builder.
-FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.22-alpine3.19 AS builder
+FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.23-alpine3.21 AS builder
 
 ARG appVersion=latest
 RUN apk --no-cache add git ca-certificates gcc musl-dev libc-dev
