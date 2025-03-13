@@ -145,7 +145,7 @@ data:
 				return patcher.ExecuteOperation(NewMergePatchOperation(
 					fmt.Sprintf(`{"data":{"%s":"%s"}}`, newField, newValue),
 					"v1", "ConfigMap", namespace, missingName,
-					WithIgnoreMissingObject(true),
+					WithIgnoreMissingObject(),
 				))
 			},
 			shouldNotAdd,
@@ -295,7 +295,7 @@ mergePatch: |
 				return patcher.ExecuteOperation(NewJSONPatchOperation(
 					fmt.Sprintf(`[{ "op": "add", "path": "/data/%s", "value": "%s"}]`, newField, newValue),
 					"v1", "ConfigMap", namespace, missingName,
-					WithIgnoreMissingObject(true),
+					WithIgnoreMissingObject(),
 				))
 			},
 			shouldNotAdd,
@@ -412,7 +412,7 @@ jsonPatch: |
 				return patcher.ExecuteOperation(NewPatchWithMutatingFuncOperation(
 					filter,
 					"v1", "ConfigMap", namespace, missingName,
-					WithIgnoreMissingObject(true),
+					WithIgnoreMissingObject(),
 				))
 			},
 			shouldNotAdd,
