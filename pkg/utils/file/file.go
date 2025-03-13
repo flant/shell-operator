@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -32,8 +33,9 @@ func CheckExecutablePermissions(f os.FileInfo) error {
 
 // RecursiveGetExecutablePaths finds recursively all executable files
 // inside a dir directory. Hidden directories and files are ignored.
-func RecursiveGetExecutablePaths(dir string) ([]string, error) {
+func RecursiveGetExecutablePaths(dir string, excludedDirs ...string) ([]string, error) {
 	paths := make([]string, 0)
+	excludedDirs = append(excludedDirs, "lib")
 	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -41,7 +43,7 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 
 		if f.IsDir() {
 			// Skip hidden and lib directories inside initial directory
-			if strings.HasPrefix(f.Name(), ".") || f.Name() == "lib" {
+			if strings.HasPrefix(f.Name(), ".") || slices.Contains(excludedDirs, f.Name()) {
 				return filepath.SkipDir
 			}
 
