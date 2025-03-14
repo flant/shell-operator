@@ -285,7 +285,7 @@ func (hm *Manager) GetHooksInOrder(bindingType htypes.BindingType) ([]string, er
 	return hooksNames, nil
 }
 
-func (hm *Manager) HandleCreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
+func (hm *Manager) CreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	kubeHooks, _ := hm.GetHooksInOrder(htypes.OnKubernetesEvent)
 	tasks := make([]task.Task, 0)
 
@@ -293,7 +293,7 @@ func (hm *Manager) HandleCreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, 
 		h := hm.GetHook(hookName)
 
 		if h.HookController.CanHandleKubeEvent(kubeEvent) {
-			task := h.HookController.HandleCreateTaskFromKubeEvent(kubeEvent, func(info controller.BindingExecutionInfo) task.Task {
+			task := h.HookController.HandleKubeEventWithFormTask(kubeEvent, func(info controller.BindingExecutionInfo) task.Task {
 				if createTaskFn != nil {
 					return createTaskFn(h, info)
 				}
@@ -317,7 +317,7 @@ func (hm *Manager) HandleCreateTasksFromScheduleEvent(crontab string, createTask
 	for _, hookName := range schHooks {
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleScheduleEvent(crontab) {
-			newTasks := h.HookController.HandleCreateTasksFromScheduleEvent(crontab, func(info controller.BindingExecutionInfo) task.Task {
+			newTasks := h.HookController.HandleScheduleEventWithFormTasks(crontab, func(info controller.BindingExecutionInfo) task.Task {
 				if createTaskFn != nil {
 					return createTaskFn(h, info)
 				}

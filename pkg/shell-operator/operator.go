@@ -139,7 +139,7 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
 
-		return op.HookManager.HandleCreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
+		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
 				WithMetadata(task_metadata.HookMetadata{
 					HookName:       hook.Name,

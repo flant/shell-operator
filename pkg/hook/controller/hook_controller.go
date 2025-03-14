@@ -171,7 +171,7 @@ func (hc *HookController) HandleKubeEvent(event kemtypes.KubeEvent, handlerFunc 
 	}
 }
 
-func (hc *HookController) HandleCreateTaskFromKubeEvent(event kemtypes.KubeEvent, createTasksFn func(BindingExecutionInfo) task.Task) task.Task {
+func (hc *HookController) HandleKubeEventWithFormTask(event kemtypes.KubeEvent, createTasksFn func(BindingExecutionInfo) task.Task) task.Task {
 	if hc.KubernetesController != nil {
 		execInfo := hc.KubernetesController.HandleEvent(event)
 		if createTasksFn != nil {
@@ -217,7 +217,7 @@ func (hc *HookController) HandleScheduleEvent(crontab string, handlerFunc func(B
 	}
 }
 
-func (hc *HookController) HandleCreateTasksFromScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo) task.Task) []task.Task {
+func (hc *HookController) HandleScheduleEventWithFormTasks(crontab string, createTasksFn func(BindingExecutionInfo) task.Task) []task.Task {
 	if hc.ScheduleController == nil {
 		return nil
 	}
