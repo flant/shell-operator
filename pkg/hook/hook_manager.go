@@ -20,6 +20,7 @@ import (
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
+	"github.com/flant/shell-operator/pkg/task"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
@@ -284,34 +285,53 @@ func (hm *Manager) GetHooksInOrder(bindingType htypes.BindingType) ([]string, er
 	return hooksNames, nil
 }
 
-func (hm *Manager) HandleKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) CreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	kubeHooks, _ := hm.GetHooksInOrder(htypes.OnKubernetesEvent)
+	tasks := make([]task.Task, 0)
 
 	for _, hookName := range kubeHooks {
 		h := hm.GetHook(hookName)
 
 		if h.HookController.CanHandleKubeEvent(kubeEvent) {
-			h.HookController.HandleKubeEvent(kubeEvent, func(info controller.BindingExecutionInfo) {
+			task := h.HookController.HandleCreateTaskFromKubeEvent(kubeEvent, func(info controller.BindingExecutionInfo) task.Task {
 				if createTaskFn != nil {
-					createTaskFn(h, info)
+					return createTaskFn(h, info)
 				}
+
+				return nil
 			})
+
+			if task != nil {
+				tasks = append(tasks, task)
+			}
 		}
 	}
+
+	return tasks
 }
 
-func (hm *Manager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) CreateTasksFromScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	schHooks, _ := hm.GetHooksInOrder(htypes.Schedule)
+	tasks := make([]task.Task, 0)
+
 	for _, hookName := range schHooks {
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleScheduleEvent(crontab) {
-			h.HookController.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
+			newTasks := h.HookController.HandleCreateTasksFromScheduleEvent(crontab, func(info controller.BindingExecutionInfo) task.Task {
 				if createTaskFn != nil {
-					createTaskFn(h, info)
+					return createTaskFn(h, info)
 				}
+
+				return nil
 			})
+
+			if len(newTasks) > 0 {
+				tasks = append(tasks, newTasks...)
+			}
 		}
 	}
+
+	return tasks
 }
 
 func (hm *Manager) HandleAdmissionEvent(event admission.Event, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
