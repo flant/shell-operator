@@ -285,7 +285,7 @@ func (hm *Manager) GetHooksInOrder(bindingType htypes.BindingType) ([]string, er
 	return hooksNames, nil
 }
 
-func (hm *Manager) CreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
+func (hm *Manager) HandleCreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	kubeHooks, _ := hm.GetHooksInOrder(htypes.OnKubernetesEvent)
 	tasks := make([]task.Task, 0)
 
@@ -310,7 +310,7 @@ func (hm *Manager) CreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, create
 	return tasks
 }
 
-func (hm *Manager) CreateTasksFromScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
+func (hm *Manager) HandleCreateTasksFromScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	schHooks, _ := hm.GetHooksInOrder(htypes.Schedule)
 	tasks := make([]task.Task, 0)
 
