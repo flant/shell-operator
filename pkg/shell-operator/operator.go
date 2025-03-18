@@ -100,7 +100,7 @@ func (op *ShellOperator) Start() {
 	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
 	op.bootstrapMainQueue(op.TaskQueues)
 	// Start main task queue handler
-	op.TaskQueues.StartMain()
+	op.TaskQueues.StartMain(op.ctx)
 	op.initAndStartHookQueues()
 
 	// Start emit "live" metrics
@@ -255,7 +255,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
 		}
 
-		res := op.taskHandler(admissionTask)
+		res := op.taskHandler(op.ctx, admissionTask)
 
 		if res.Status == "Fail" {
 			return &admission.Response{
@@ -361,7 +361,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 				return nil, fmt.Errorf("no hook found for '%s' event for crd/%s", string(types.KubernetesConversion), crdName)
 			}
 
-			res := op.taskHandler(convTask)
+			res := op.taskHandler(op.ctx, convTask)
 
 			if res.Status == "Fail" {
 				return &conversion.Response{
@@ -409,7 +409,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 }
 
 // taskHandler
-func (op *ShellOperator) taskHandler(t task.Task) queue.TaskResult {
+func (op *ShellOperator) taskHandler(_ context.Context, t task.Task) queue.TaskResult {
 	logEntry := op.logger.With("operator.component", "taskRunner")
 	hookMeta := task_metadata.HookMetadataAccessor(t)
 	var res queue.TaskResult
@@ -882,7 +882,7 @@ func (op *ShellOperator) initAndStartHookQueues() {
 		for _, hookBinding := range h.Config.Schedules {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
 				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler)
-				op.TaskQueues.GetByName(hookBinding.Queue).Start()
+				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
 		}
 	}
@@ -893,7 +893,7 @@ func (op *ShellOperator) initAndStartHookQueues() {
 		for _, hookBinding := range h.Config.OnKubernetesEvents {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
 				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler)
-				op.TaskQueues.GetByName(hookBinding.Queue).Start()
+				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
 		}
 	}
