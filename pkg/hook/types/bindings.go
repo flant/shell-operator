@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"time"
 
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -9,7 +10,13 @@ import (
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
+var _ fmt.Stringer = (*BindingType)(nil)
+
 type BindingType string
+
+func (bt BindingType) String() string {
+	return string(bt)
+}
 
 const (
 	Schedule             BindingType = "schedule"
