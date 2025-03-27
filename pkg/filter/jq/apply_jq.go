@@ -42,5 +42,5 @@ func (f *Filter) ApplyFilter(jqFilter string, jsonData []byte) (string, error) {
 }
 
 func (f *Filter) FilterInfo() string {
-	return "jqFilter implementation: use jq binary from $PATH"
+	return "jqFilter implementation: using itchyny/gojq"
 }
