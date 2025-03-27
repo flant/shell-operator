@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 )
 
@@ -289,7 +288,7 @@ func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, n
 
 func NewPatchWithJQOperation(jqQuery string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newFilterOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-		filter := jq.NewFilter(app.JqLibraryPath)
+		filter := jq.NewFilter()
 		return applyJQPatch(jqQuery, filter, u)
 	}, apiVersion, kind, namespace, name, opts...)
 }
