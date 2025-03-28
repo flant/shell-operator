@@ -1,6 +1,8 @@
 package jq
 
 import (
+	"errors"
+
 	"github.com/itchyny/gojq"
 	"k8s.io/apimachinery/pkg/util/json"
 
@@ -34,8 +36,12 @@ func (f *Filter) ApplyFilter(jqFilter string, jsonData []byte) (string, error) {
 		if !ok {
 			break
 		}
-		if v == nil {
-			continue
+		if err, ok := v.(error); ok {
+			var errGoJq *gojq.HaltError
+			if errors.As(err, &errGoJq) && errGoJq.Value() == nil {
+				break
+			}
+			return "", err
 		}
 		bytes, err := json.Marshal(v.(map[string]any))
 		if err != nil {
