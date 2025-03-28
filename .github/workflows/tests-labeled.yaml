@@ -87,10 +87,6 @@ jobs:
           go mod download
           echo -n "Go modules unpacked size is: " && du -sh $HOME/go/pkg/mod
 
-      - name: Download prebuilt libjq static libraries
-        run: |
-          curl -sSfL https://github.com/flant/libjq-go/releases/download/jq-b6be13d5-0/libjq-glibc-amd64.tgz | tar zxf -
-
       - name: Install ginkgo
         run: |
           go install github.com/onsi/ginkgo/ginkgo
@@ -109,9 +105,6 @@ jobs:
         env:
           CLUSTER_NAME: ${{ matrix.cluster_name }}
         run: |
-          export CGO_ENABLED=1
-          export CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
-          export CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
           export GOOS=linux
 
           ginkgo \
