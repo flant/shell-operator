@@ -43,11 +43,13 @@ func (f *Filter) ApplyFilter(jqFilter string, jsonData []byte) (string, error) {
 			}
 			return "", err
 		}
-		bytes, err := json.Marshal(v.(map[string]any))
-		if err != nil {
-			return "", err
+		if resultMap, ok := v.(map[string]any); ok {
+			bytes, err := json.Marshal(resultMap)
+			if err != nil {
+				return "", err
+			}
+			result += string(bytes)
 		}
-		result += string(bytes)
 	}
 
 	return result, nil
