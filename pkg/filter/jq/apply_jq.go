@@ -1,9 +1,8 @@
 package jq
 
 import (
-	"fmt"
-
 	"github.com/itchyny/gojq"
+	"k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/flant/shell-operator/pkg/filter"
 )
@@ -22,7 +21,13 @@ func (f *Filter) ApplyFilter(jqFilter string, jsonData []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	iter := query.Run(jsonData)
+
+	var data map[string]any
+	if err := json.Unmarshal(jsonData, &data); err != nil {
+		return "", err
+	}
+
+	iter := query.Run(data)
 	var result string
 	for {
 		v, ok := iter.Next()
@@ -32,10 +37,11 @@ func (f *Filter) ApplyFilter(jqFilter string, jsonData []byte) (string, error) {
 		if v == nil {
 			continue
 		}
-		if _, ok := v.(error); ok {
-			continue
+		bytes, err := json.Marshal(v.(map[string]any))
+		if err != nil {
+			return "", err
 		}
-		result += fmt.Sprintf("%v", v)
+		result += string(bytes)
 	}
 
 	return result, nil
