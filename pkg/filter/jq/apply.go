@@ -4,8 +4,9 @@ import (
 	"errors"
 	"maps"
 
-	"github.com/flant/shell-operator/pkg/filter"
 	"github.com/itchyny/gojq"
+
+	"github.com/flant/shell-operator/pkg/filter"
 )
 
 var _ filter.Filter = (*Filter)(nil)
@@ -24,7 +25,7 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]a
 	}
 
 	iter := query.Run(data)
-	var result = make(map[string]any)
+	result := make(map[string]any)
 	for {
 		v, ok := iter.Next()
 		if !ok {
