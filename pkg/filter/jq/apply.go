@@ -24,7 +24,7 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]a
 	}
 
 	iter := query.Run(data)
-	var result map[string]any
+	var result = make(map[string]any)
 	for {
 		v, ok := iter.Next()
 		if !ok {
