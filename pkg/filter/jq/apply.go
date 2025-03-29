@@ -2,11 +2,10 @@ package jq
 
 import (
 	"errors"
-
-	"github.com/itchyny/gojq"
-	"k8s.io/apimachinery/pkg/util/json"
+	"maps"
 
 	"github.com/flant/shell-operator/pkg/filter"
+	"github.com/itchyny/gojq"
 )
 
 var _ filter.Filter = (*Filter)(nil)
@@ -18,19 +17,14 @@ func NewFilter() *Filter {
 type Filter struct{}
 
 // ApplyFilter runs jq expression provided in jqFilter with jsonData as input.
-func (f *Filter) ApplyFilter(jqFilter string, jsonData []byte) (string, error) {
+func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]any, error) {
 	query, err := gojq.Parse(jqFilter)
 	if err != nil {
-		return "", err
-	}
-
-	var data map[string]any
-	if err := json.Unmarshal(jsonData, &data); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	iter := query.Run(data)
-	var result string
+	var result map[string]any
 	for {
 		v, ok := iter.Next()
 		if !ok {
@@ -41,14 +35,10 @@ func (f *Filter) ApplyFilter(jqFilter string, jsonData []byte) (string, error) {
 			if errors.As(err, &errGoJq) && errGoJq.Value() == nil {
 				break
 			}
-			return "", err
+			return nil, err
 		}
 		if resultMap, ok := v.(map[string]any); ok {
-			bytes, err := json.Marshal(resultMap)
-			if err != nil {
-				return "", err
-			}
-			result += string(bytes)
+			maps.Copy(result, resultMap)
 		}
 	}
 
