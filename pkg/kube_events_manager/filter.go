@@ -64,9 +64,8 @@ func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructu
 		if err != nil {
 			return nil, fmt.Errorf("jqFilter: %v", err)
 		}
-		filteredStr := string(bytes)
-		res.FilterResult = filteredStr
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(filteredStr)
+		res.FilterResult = filtered
+		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(bytes))
 	}
 
 	return res, nil
