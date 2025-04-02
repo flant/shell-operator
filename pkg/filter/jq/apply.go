@@ -1,6 +1,7 @@
 package jq
 
 import (
+	"encoding/json"
 	"errors"
 	"maps"
 
@@ -25,8 +26,7 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]a
 	}
 
 	// gojs will normalize numbers in the input data, we should create new map for prevent changes in input data
-	workData := make(map[string]any)
-	maps.Copy(workData, data)
+	workData := deepCopy(data)
 	iter := query.Run(workData)
 	result := make(map[string]any)
 	for {
@@ -51,4 +51,11 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]a
 
 func (f *Filter) FilterInfo() string {
 	return "jqFilter implementation: using itchyny/gojq"
+}
+
+func deepCopy(input map[string]any) map[string]any {
+	data, _ := json.Marshal(input)
+	var output map[string]any
+	_ = json.Unmarshal(data, &output)
+	return output
 }

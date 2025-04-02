@@ -72,3 +72,26 @@ func Test_ApplyFilter_InvalidJson(t *testing.T) {
 	g.Expect(err).Should(BeNil())
 	g.Expect(result).ShouldNot(BeNil())
 }
+
+func Test_deepCopy(t *testing.T) {
+	g := NewWithT(t)
+
+	original := map[string]any{
+		"name": "John",
+		"age":  30.0,
+		"address": map[string]any{
+			"city":  "New York",
+			"state": "NY",
+		},
+	}
+
+	cp := deepCopy(original)
+
+	g.Expect(cp).Should(Equal(original))
+
+	cp["name"] = "Jane"
+	cp["address"].(map[string]any)["city"] = "Los Angeles"
+
+	g.Expect(original["name"]).Should(Equal("John"))
+	g.Expect(original["address"].(map[string]any)["city"]).Should(Equal("New York"))
+}
