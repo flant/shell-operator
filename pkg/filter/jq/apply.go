@@ -24,7 +24,10 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]a
 		return nil, err
 	}
 
-	iter := query.Run(data)
+	// gojs will normalize numbers in the input data, we should create new map for prevent changes in input data
+	workData := make(map[string]any)
+	maps.Copy(workData, data)
+	iter := query.Run(workData)
 	result := make(map[string]any)
 	for {
 		v, ok := iter.Next()
