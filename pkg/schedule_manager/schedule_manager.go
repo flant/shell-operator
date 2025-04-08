@@ -10,20 +10,12 @@ import (
 	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
-type ScheduleManager interface {
-	Stop()
-	Start()
-	Add(entry smtypes.ScheduleEntry)
-	Remove(entry smtypes.ScheduleEntry)
-	Ch() chan string
-}
-
 type CronEntry struct {
 	EntryID cron.EntryID
 	Ids     map[string]bool
 }
 
-type scheduleManager struct {
+type ScheduleManager struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	cron       *cron.Cron
@@ -33,11 +25,9 @@ type scheduleManager struct {
 	logger *log.Logger
 }
 
-var _ ScheduleManager = &scheduleManager{}
-
-func NewScheduleManager(ctx context.Context, logger *log.Logger) *scheduleManager {
+func NewScheduleManager(ctx context.Context, logger *log.Logger) *ScheduleManager {
 	cctx, cancel := context.WithCancel(ctx)
-	sm := &scheduleManager{
+	sm := &ScheduleManager{
 		ctx:        cctx,
 		cancel:     cancel,
 		ScheduleCh: make(chan string, 1),
@@ -49,7 +39,7 @@ func NewScheduleManager(ctx context.Context, logger *log.Logger) *scheduleManage
 	return sm
 }
 
-func (sm *scheduleManager) Stop() {
+func (sm *ScheduleManager) Stop() {
 	if sm.cancel != nil {
 		sm.cancel()
 	}
@@ -58,7 +48,7 @@ func (sm *scheduleManager) Stop() {
 // Add create entry for crontab and id and start scheduled function.
 // Crontab string should be validated with cron.Parse
 // function before pass to Add.
-func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
+func (sm *ScheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	logEntry := sm.logger.With("operator.component", "scheduleManager")
 
 	cronEntry, hasCronEntry := sm.Entries[newEntry.Crontab]
@@ -89,7 +79,7 @@ func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	}
 }
 
-func (sm *scheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
+func (sm *ScheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
 	cronEntry, hasCronEntry := sm.Entries[delEntry.Crontab]
 
 	// Nothing to Remove
@@ -115,7 +105,7 @@ func (sm *scheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
 	}
 }
 
-func (sm *scheduleManager) Start() {
+func (sm *ScheduleManager) Start() {
 	sm.cron.Start()
 	go func() {
 		<-sm.ctx.Done()
@@ -123,6 +113,6 @@ func (sm *scheduleManager) Start() {
 	}()
 }
 
-func (sm *scheduleManager) Ch() chan string {
+func (sm *ScheduleManager) Ch() chan string {
 	return sm.ScheduleCh
 }

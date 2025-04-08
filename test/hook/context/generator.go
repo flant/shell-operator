@@ -36,7 +36,7 @@ type BindingContextController struct {
 
 	Controller        *StateController
 	KubeEventsManager *kubeeventsmanager.KubeEventsManager
-	ScheduleManager   schedulemanager.ScheduleManager
+	ScheduleManager   *schedulemanager.ScheduleManager
 
 	fakeCluster *fake.Cluster
 

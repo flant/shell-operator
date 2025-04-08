@@ -30,7 +30,7 @@ type Manager struct {
 	workingDir               string
 	tempDir                  string
 	kubeEventsManager        *kubeeventsmanager.KubeEventsManager
-	scheduleManager          schedulemanager.ScheduleManager
+	scheduleManager          *schedulemanager.ScheduleManager
 	conversionWebhookManager *conversion.WebhookManager
 	admissionWebhookManager  *admission.WebhookManager
 
@@ -53,7 +53,7 @@ type ManagerConfig struct {
 	WorkingDir string
 	TempDir    string
 	Kmgr       *kubeeventsmanager.KubeEventsManager
-	Smgr       schedulemanager.ScheduleManager
+	Smgr       *schedulemanager.ScheduleManager
 	Wmgr       *admission.WebhookManager
 	Cmgr       *conversion.WebhookManager
 

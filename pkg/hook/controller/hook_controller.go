@@ -66,7 +66,7 @@ func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesE
 	hc.logger = logger
 }
 
-func (hc *HookController) InitScheduleBindings(bindings []htypes.ScheduleConfig, scheduleMgr schedulemanager.ScheduleManager) {
+func (hc *HookController) InitScheduleBindings(bindings []htypes.ScheduleConfig, scheduleMgr *schedulemanager.ScheduleManager) {
 	if len(bindings) == 0 {
 		return
 	}

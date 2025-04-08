@@ -16,7 +16,7 @@ import (
 type managerEventsHandlerConfig struct {
 	tqs  *queue.TaskQueueSet
 	mgr  *kubeeventsmanager.KubeEventsManager
-	smgr schedulemanager.ScheduleManager
+	smgr *schedulemanager.ScheduleManager
 
 	logger *log.Logger
 }
@@ -26,7 +26,7 @@ type ManagerEventsHandler struct {
 	cancel context.CancelFunc
 
 	kubeEventsManager *kubeeventsmanager.KubeEventsManager
-	scheduleManager   schedulemanager.ScheduleManager
+	scheduleManager   *schedulemanager.ScheduleManager
 
 	kubeEventCb func(kubeEvent kemtypes.KubeEvent) []task.Task
 	scheduleCb  func(crontab string) []task.Task
