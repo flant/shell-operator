@@ -40,8 +40,8 @@ func NewHookController() *HookController {
 }
 
 type HookController struct {
-	KubernetesController KubernetesBindingsController
-	ScheduleController   ScheduleBindingsController
+	KubernetesController *KubernetesBindingsController
+	ScheduleController   *ScheduleBindingsController
 	AdmissionController  *AdmissionBindingsController
 	ConversionController *ConversionBindingsController
 	kubernetesBindings   []htypes.OnKubernetesEventConfig
@@ -53,7 +53,7 @@ type HookController struct {
 	logger *log.Logger
 }
 
-func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesEventConfig, kubeEventMgr kubeeventsmanager.KubeEventsManager, logger *log.Logger) {
+func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesEventConfig, kubeEventMgr *kubeeventsmanager.KubeEventsManager, logger *log.Logger) {
 	if len(bindings) == 0 {
 		return
 	}

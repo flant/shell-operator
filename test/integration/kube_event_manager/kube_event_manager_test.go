@@ -24,7 +24,7 @@ func Test(t *testing.T) {
 }
 
 var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent objects", func() {
-	var KubeEventsManager kubeeventsmanager.KubeEventsManager
+	var KubeEventsManager *kubeeventsmanager.KubeEventsManager
 
 	BeforeEach(func() {
 		KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(context.Background(), KubeClient, log.NewNop())

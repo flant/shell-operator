@@ -20,33 +20,13 @@ type KubernetesBindingToMonitorLink struct {
 	BindingConfig htypes.OnKubernetesEventConfig
 }
 
-// KubernetesBindingsController handles kubernetes bindings for one hook.
-type KubernetesBindingsController interface {
-	WithKubernetesBindings([]htypes.OnKubernetesEventConfig)
-	WithKubeEventsManager(kubeeventsmanager.KubeEventsManager)
-	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
-	UpdateMonitor(monitorId string, kind, apiVersion string) error
-	UnlockEvents()
-	UnlockEventsFor(monitorID string)
-	StopMonitors()
-	CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool
-	HandleEvent(kubeEvent kemtypes.KubeEvent) BindingExecutionInfo
-	BindingNames() []string
-
-	SnapshotsFrom(bindingNames ...string) map[string][]kemtypes.ObjectAndFilterResult
-	SnapshotsFor(bindingName string) []kemtypes.ObjectAndFilterResult
-	Snapshots() map[string][]kemtypes.ObjectAndFilterResult
-	SnapshotsInfo() []string
-	SnapshotsDump() map[string]interface{}
-}
-
-// kubernetesHooksController is a main implementation of KubernetesHooksController
-type kubernetesBindingsController struct {
+// KubernetesHooksController is a main implementation of KubernetesHooksController
+type KubernetesBindingsController struct {
 	// bindings configurations
 	KubernetesBindings []htypes.OnKubernetesEventConfig
 
 	// dependencies
-	kubeEventsManager kubeeventsmanager.KubeEventsManager
+	kubeEventsManager *kubeeventsmanager.KubeEventsManager
 
 	logger *log.Logger
 
@@ -55,29 +35,26 @@ type kubernetesBindingsController struct {
 	BindingMonitorLinks map[string]*KubernetesBindingToMonitorLink
 }
 
-// kubernetesHooksController should implement the KubernetesHooksController
-var _ KubernetesBindingsController = &kubernetesBindingsController{}
-
 // NewKubernetesBindingsController returns an implementation of KubernetesBindingsController
-var NewKubernetesBindingsController = func(logger *log.Logger) *kubernetesBindingsController {
-	return &kubernetesBindingsController{
+var NewKubernetesBindingsController = func(logger *log.Logger) *KubernetesBindingsController {
+	return &KubernetesBindingsController{
 		BindingMonitorLinks: make(map[string]*KubernetesBindingToMonitorLink),
 		logger:              logger,
 	}
 }
 
-func (c *kubernetesBindingsController) WithKubernetesBindings(bindings []htypes.OnKubernetesEventConfig) {
+func (c *KubernetesBindingsController) WithKubernetesBindings(bindings []htypes.OnKubernetesEventConfig) {
 	c.KubernetesBindings = bindings
 }
 
-func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager kubeeventsmanager.KubeEventsManager) {
+func (c *KubernetesBindingsController) WithKubeEventsManager(kubeEventsManager *kubeeventsmanager.KubeEventsManager) {
 	c.kubeEventsManager = kubeEventsManager
 }
 
 // EnableKubernetesBindings adds a monitor for each 'kubernetes' binding. This method
 // returns an array of BindingExecutionInfo to help construct initial tasks to run hooks.
 // Informers in each monitor are started immediately to keep up the "fresh" state of object caches.
-func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
+func (c *KubernetesBindingsController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
 	res := make([]BindingExecutionInfo, 0)
 
 	for _, config := range c.KubernetesBindings {
@@ -102,7 +79,7 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 	return res, nil
 }
 
-func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
+func (c *KubernetesBindingsController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
 	// Find binding for monitorId
 	link, ok := c.getBindingMonitorLinksById(monitorId)
 	if !ok {
@@ -153,7 +130,7 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 }
 
 // UnlockEvents turns on eventCb for all monitors to emit events after Synchronization.
-func (c *kubernetesBindingsController) UnlockEvents() {
+func (c *KubernetesBindingsController) UnlockEvents() {
 	c.iterateBindingMonitorLinks(func(monitorID string) bool {
 		m := c.kubeEventsManager.GetMonitor(monitorID)
 		m.EnableKubeEventCb()
@@ -162,7 +139,7 @@ func (c *kubernetesBindingsController) UnlockEvents() {
 }
 
 // UnlockEventsFor turns on eventCb for matched monitor to emit events after Synchronization.
-func (c *kubernetesBindingsController) UnlockEventsFor(monitorID string) {
+func (c *KubernetesBindingsController) UnlockEventsFor(monitorID string) {
 	m := c.kubeEventsManager.GetMonitor(monitorID)
 	if m == nil {
 		log.Warn("monitor was not found", slog.String("monitorID", monitorID))
@@ -173,14 +150,14 @@ func (c *kubernetesBindingsController) UnlockEventsFor(monitorID string) {
 
 // StopMonitors stops all monitors for the hook.
 // TODO handle error!
-func (c *kubernetesBindingsController) StopMonitors() {
+func (c *KubernetesBindingsController) StopMonitors() {
 	c.iterateBindingMonitorLinks(func(monitorID string) bool {
 		_ = c.kubeEventsManager.StopMonitor(monitorID)
 		return false
 	})
 }
 
-func (c *kubernetesBindingsController) CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool {
+func (c *KubernetesBindingsController) CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool {
 	var canHandleEvent bool
 
 	c.iterateBindingMonitorLinks(func(monitorID string) bool {
@@ -194,7 +171,7 @@ func (c *kubernetesBindingsController) CanHandleEvent(kubeEvent kemtypes.KubeEve
 	return canHandleEvent
 }
 
-func (c *kubernetesBindingsController) iterateBindingMonitorLinks(doFn func(monitorID string) bool) {
+func (c *KubernetesBindingsController) iterateBindingMonitorLinks(doFn func(monitorID string) bool) {
 	c.l.RLock()
 	for monitorID := range c.BindingMonitorLinks {
 		if exit := doFn(monitorID); exit {
@@ -204,14 +181,14 @@ func (c *kubernetesBindingsController) iterateBindingMonitorLinks(doFn func(moni
 	c.l.RUnlock()
 }
 
-func (c *kubernetesBindingsController) getBindingMonitorLinksById(monitorId string) (*KubernetesBindingToMonitorLink, bool) {
+func (c *KubernetesBindingsController) getBindingMonitorLinksById(monitorId string) (*KubernetesBindingToMonitorLink, bool) {
 	c.l.RLock()
 	link, found := c.BindingMonitorLinks[monitorId]
 	c.l.RUnlock()
 	return link, found
 }
 
-func (c *kubernetesBindingsController) setBindingMonitorLinks(monitorId string, link *KubernetesBindingToMonitorLink) {
+func (c *KubernetesBindingsController) setBindingMonitorLinks(monitorId string, link *KubernetesBindingToMonitorLink) {
 	c.l.Lock()
 	c.BindingMonitorLinks[monitorId] = link
 	c.l.Unlock()
@@ -219,7 +196,7 @@ func (c *kubernetesBindingsController) setBindingMonitorLinks(monitorId string, 
 
 // HandleEvent receives event from KubeEventManager and returns a BindingExecutionInfo
 // to help create a new task to run a hook.
-func (c *kubernetesBindingsController) HandleEvent(kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
+func (c *KubernetesBindingsController) HandleEvent(kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
 	link, hasKey := c.getBindingMonitorLinksById(kubeEvent.MonitorId)
 	if !hasKey {
 		log.Error("Possible bug!!! Unknown kube event: no such monitor id registered", slog.String("monitorID", kubeEvent.MonitorId))
@@ -243,7 +220,7 @@ func (c *kubernetesBindingsController) HandleEvent(kubeEvent kemtypes.KubeEvent)
 	return bInfo
 }
 
-func (c *kubernetesBindingsController) BindingNames() []string {
+func (c *KubernetesBindingsController) BindingNames() []string {
 	names := []string{}
 	for _, binding := range c.KubernetesBindings {
 		names = append(names, binding.BindingName)
@@ -253,7 +230,7 @@ func (c *kubernetesBindingsController) BindingNames() []string {
 
 // SnapshotsFor returns snapshot for single onKubernetes binding.
 // It finds a monitorId for a binding name and returns an array of objects.
-func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []kemtypes.ObjectAndFilterResult {
+func (c *KubernetesBindingsController) SnapshotsFor(bindingName string) []kemtypes.ObjectAndFilterResult {
 	for _, binding := range c.KubernetesBindings {
 		if bindingName == binding.BindingName {
 			monitorID := binding.Monitor.Metadata.MonitorId
@@ -269,7 +246,7 @@ func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []kemtyp
 // SnapshotsFrom returns snapshot for several binding names.
 // It finds a monitorId for each binding name and get its Snapshot,
 // then returns a map of object arrays for each binding name.
-func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]kemtypes.ObjectAndFilterResult {
+func (c *KubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map[string][]kemtypes.ObjectAndFilterResult {
 	res := map[string][]kemtypes.ObjectAndFilterResult{}
 
 	for _, bindingName := range bindingNames {
@@ -285,11 +262,11 @@ func (c *kubernetesBindingsController) SnapshotsFrom(bindingNames ...string) map
 	return res
 }
 
-func (c *kubernetesBindingsController) Snapshots() map[string][]kemtypes.ObjectAndFilterResult {
+func (c *KubernetesBindingsController) Snapshots() map[string][]kemtypes.ObjectAndFilterResult {
 	return c.SnapshotsFrom(c.BindingNames()...)
 }
 
-func (c *kubernetesBindingsController) SnapshotsInfo() []string {
+func (c *KubernetesBindingsController) SnapshotsInfo() []string {
 	infos := make([]string, 0)
 	for _, binding := range c.KubernetesBindings {
 		monitorID := binding.Monitor.Metadata.MonitorId
@@ -314,7 +291,7 @@ func (c *kubernetesBindingsController) SnapshotsInfo() []string {
 	return infos
 }
 
-func (c *kubernetesBindingsController) SnapshotsDump() map[string]interface{} {
+func (c *KubernetesBindingsController) SnapshotsDump() map[string]interface{} {
 	dumps := make(map[string]interface{})
 	for _, binding := range c.KubernetesBindings {
 		monitorID := binding.Monitor.Metadata.MonitorId

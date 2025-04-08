@@ -48,7 +48,7 @@ type ShellOperator struct {
 	ObjectPatcher     *objectpatch.ObjectPatcher
 
 	ScheduleManager   schedulemanager.ScheduleManager
-	KubeEventsManager kubeeventsmanager.KubeEventsManager
+	KubeEventsManager *kubeeventsmanager.KubeEventsManager
 
 	TaskQueues *queue.TaskQueueSet
 

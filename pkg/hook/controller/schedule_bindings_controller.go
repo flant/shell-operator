@@ -8,7 +8,7 @@ import (
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
-// A link between a hook and a kube monitor
+// ScheduleBindingToCrontabLink a link between a hook and a kube monitor
 type ScheduleBindingToCrontabLink struct {
 	BindingName string
 	Crontab     string
@@ -19,18 +19,8 @@ type ScheduleBindingToCrontabLink struct {
 	Group            string
 }
 
-// ScheduleBindingsController handles schedule bindings for one hook.
-type ScheduleBindingsController interface {
-	WithScheduleBindings([]htypes.ScheduleConfig)
-	WithScheduleManager(schedulemanager.ScheduleManager)
-	EnableScheduleBindings()
-	DisableScheduleBindings()
-	CanHandleEvent(crontab string) bool
-	HandleEvent(crontab string) []BindingExecutionInfo
-}
-
-// scheduleHooksController is a main implementation of KubernetesHooksController
-type scheduleBindingsController struct {
+// ScheduleBindingsController is a main implementation of KubernetesHooksController
+type ScheduleBindingsController struct {
 	// dependencies
 	scheduleManager schedulemanager.ScheduleManager
 
@@ -42,27 +32,24 @@ type scheduleBindingsController struct {
 	ScheduleBindings []htypes.ScheduleConfig
 }
 
-// kubernetesHooksController should implement the KubernetesHooksController
-var _ ScheduleBindingsController = &scheduleBindingsController{}
-
 // NewScheduleBindingsController returns an implementation of ScheduleBindingsController
-var NewScheduleBindingsController = func() *scheduleBindingsController {
-	return &scheduleBindingsController{
+var NewScheduleBindingsController = func() *ScheduleBindingsController {
+	return &ScheduleBindingsController{
 		ScheduleLinks: make(map[string]*ScheduleBindingToCrontabLink),
 	}
 }
 
-func (c *scheduleBindingsController) WithScheduleBindings(bindings []htypes.ScheduleConfig) {
+func (c *ScheduleBindingsController) WithScheduleBindings(bindings []htypes.ScheduleConfig) {
 	c.ScheduleBindings = bindings
 }
 
-func (c *scheduleBindingsController) WithScheduleManager(scheduleManager schedulemanager.ScheduleManager) {
+func (c *ScheduleBindingsController) WithScheduleManager(scheduleManager schedulemanager.ScheduleManager) {
 	c.l.Lock()
 	c.scheduleManager = scheduleManager
 	c.l.Unlock()
 }
 
-func (c *scheduleBindingsController) CanHandleEvent(crontab string) bool {
+func (c *ScheduleBindingsController) CanHandleEvent(crontab string) bool {
 	c.l.RLock()
 	defer c.l.RUnlock()
 	for _, link := range c.ScheduleLinks {
@@ -73,7 +60,7 @@ func (c *scheduleBindingsController) CanHandleEvent(crontab string) bool {
 	return false
 }
 
-func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecutionInfo {
+func (c *ScheduleBindingsController) HandleEvent(crontab string) []BindingExecutionInfo {
 	res := []BindingExecutionInfo{}
 
 	c.l.RLock()
@@ -102,7 +89,7 @@ func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecut
 	return res
 }
 
-func (c *scheduleBindingsController) EnableScheduleBindings() {
+func (c *ScheduleBindingsController) EnableScheduleBindings() {
 	c.l.Lock()
 	for _, config := range c.ScheduleBindings {
 		c.ScheduleLinks[config.ScheduleEntry.Id] = &ScheduleBindingToCrontabLink{
@@ -118,7 +105,7 @@ func (c *scheduleBindingsController) EnableScheduleBindings() {
 	c.l.Unlock()
 }
 
-func (c *scheduleBindingsController) DisableScheduleBindings() {
+func (c *ScheduleBindingsController) DisableScheduleBindings() {
 	c.l.Lock()
 	for _, config := range c.ScheduleBindings {
 		c.scheduleManager.Remove(config.ScheduleEntry)

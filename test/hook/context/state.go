@@ -24,7 +24,7 @@ type StateController struct {
 }
 
 // NewStateController creates controller to apply state changes
-func NewStateController(fc *fake.Cluster, ev kubeeventsmanager.KubeEventsManager) *StateController {
+func NewStateController(fc *fake.Cluster, ev *kubeeventsmanager.KubeEventsManager) *StateController {
 	c := &StateController{
 		CurrentState: make(map[string]manifest.Manifest),
 		fakeCluster:  fc,
