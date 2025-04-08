@@ -21,7 +21,7 @@ type Monitor struct {
 	Config     *MonitorConfig
 	KubeClient *klient.Client
 	// Static list of informers
-	ResourceInformers []*resourceInformer
+	ResourceInformers []*ResourceInformer
 	// Namespace informer to get new namespaces
 	NamespaceInformer *namespaceInformer
 	// map of dynamically starting informers
@@ -51,7 +51,7 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage
 		metricStorage:     mstor,
 		Config:            config,
 		eventCb:           eventCb,
-		ResourceInformers: make([]*resourceInformer, 0),
+		ResourceInformers: make([]*ResourceInformer, 0),
 		VaryingInformers:  sync.Map{},
 		cancelForNs:       sync.Map{},
 		staticNamespaces:  sync.Map{},
@@ -192,7 +192,7 @@ func (m *Monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 	}
 
 	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*resourceInformer); ok {
+		if value, ok := value.([]*ResourceInformer); ok {
 			for _, informer := range value {
 				objects = append(objects, informer.getCachedObjects()...)
 			}
@@ -214,7 +214,7 @@ func (m *Monitor) EnableKubeEventCb() {
 	}
 	// Execute eventCb for events accumulated during "Synchronization" phase.
 	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*resourceInformer); ok {
+		if value, ok := value.([]*ResourceInformer); ok {
 			for _, informer := range value {
 				informer.enableKubeEventCb()
 			}
@@ -229,8 +229,8 @@ func (m *Monitor) EnableKubeEventCb() {
 // it is only one informer. If matchName is specified, then multiple informers are created.
 //
 // If namespace is empty, then informer is bounded to all namespaces.
-func (m *Monitor) CreateInformersForNamespace(namespace string) ([]*resourceInformer, error) {
-	informers := make([]*resourceInformer, 0)
+func (m *Monitor) CreateInformersForNamespace(namespace string) ([]*ResourceInformer, error) {
+	informers := make([]*ResourceInformer, 0)
 	cfg := &resourceInformerConfig{
 		client:  m.KubeClient,
 		mstor:   m.metricStorage,
@@ -274,7 +274,7 @@ func (m *Monitor) Start(parentCtx context.Context) {
 		}
 		ctx, cancelForNs := context.WithCancel(m.ctx)
 		m.cancelForNs.Store(nsName, cancelForNs)
-		if value, ok := value.([]*resourceInformer); ok {
+		if value, ok := value.([]*ResourceInformer); ok {
 			for _, informer := range value {
 				informer.withContext(ctx)
 				informer.start()
@@ -305,7 +305,7 @@ func (m *Monitor) PauseHandleEvents() {
 	}
 
 	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*resourceInformer); ok {
+		if value, ok := value.([]*ResourceInformer); ok {
 			for _, informer := range value {
 				informer.pauseHandleEvents()
 			}
@@ -328,7 +328,7 @@ func (m *Monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObj
 	}
 
 	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*resourceInformer); ok {
+		if value, ok := value.([]*ResourceInformer); ok {
 			for _, informer := range value {
 				total.add(informer.getCachedObjectsInfo())
 				last.add(informer.getCachedObjectsInfoIncrement())

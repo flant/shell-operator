@@ -23,7 +23,7 @@ import (
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
-type resourceInformer struct {
+type ResourceInformer struct {
 	id         string
 	KubeClient *klient.Client
 	Monitor    *MonitorConfig
@@ -54,7 +54,7 @@ type resourceInformer struct {
 	eventCbEnabled bool
 	eventBufLock   sync.Mutex
 
-	// TODO resourceInformer should be stoppable (think of deleted namespaces and disabled modules in addon-operator)
+	// TODO ResourceInformer should be stoppable (think of deleted namespaces and disabled modules in addon-operator)
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -66,7 +66,7 @@ type resourceInformer struct {
 	logger *log.Logger
 }
 
-// resourceInformer should implement ResourceInformer
+// ResourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
 	client  *klient.Client
 	mstor   metric.Storage
@@ -76,8 +76,8 @@ type resourceInformerConfig struct {
 	logger *log.Logger
 }
 
-func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resourceInformer {
-	informer := &resourceInformer{
+func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *ResourceInformer {
+	informer := &ResourceInformer{
 		id:                     uuid.Must(uuid.NewV4()).String(),
 		KubeClient:             cfg.client,
 		metricStorage:          cfg.mstor,
@@ -95,17 +95,17 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 	return informer
 }
 
-func (ei *resourceInformer) withContext(ctx context.Context) {
+func (ei *ResourceInformer) withContext(ctx context.Context) {
 	ei.ctx, ei.cancel = context.WithCancel(ctx)
 }
 
-func (ei *resourceInformer) putEvent(ev kemtypes.KubeEvent) {
+func (ei *ResourceInformer) putEvent(ev kemtypes.KubeEvent) {
 	if ei.eventCb != nil {
 		ei.eventCb(ev)
 	}
 }
 
-func (ei *resourceInformer) createSharedInformer() error {
+func (ei *ResourceInformer) createSharedInformer() error {
 	var err error
 
 	// discover GroupVersionResource for informer
@@ -153,7 +153,7 @@ func (ei *resourceInformer) createSharedInformer() error {
 }
 
 // Snapshot returns all cached objects for this informer
-func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
+func (ei *ResourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
 	ei.cacheLock.RLock()
 	res := make([]kemtypes.ObjectAndFilterResult, 0)
 	for _, obj := range ei.cachedObjects {
@@ -170,7 +170,7 @@ func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult 
 	return res
 }
 
-func (ei *resourceInformer) enableKubeEventCb() {
+func (ei *ResourceInformer) enableKubeEventCb() {
 	ei.eventBufLock.Lock()
 	defer ei.eventBufLock.Unlock()
 	if ei.eventCbEnabled {
@@ -186,7 +186,7 @@ func (ei *resourceInformer) enableKubeEventCb() {
 
 // loadExistedObjects get a list of existed objects in namespace that match selectors and
 // fills Checksum map with checksums of existing objects.
-func (ei *resourceInformer) loadExistedObjects() error {
+func (ei *ResourceInformer) loadExistedObjects() error {
 	defer trace.StartRegion(context.Background(), "loadExistedObjects").End()
 
 	objList, err := ei.KubeClient.Dynamic().
@@ -260,23 +260,23 @@ func (ei *resourceInformer) loadExistedObjects() error {
 	return nil
 }
 
-func (ei *resourceInformer) OnAdd(obj interface{}, _ bool) {
+func (ei *ResourceInformer) OnAdd(obj interface{}, _ bool) {
 	ei.handleWatchEvent(obj, kemtypes.WatchEventAdded)
 }
 
-func (ei *resourceInformer) OnUpdate(_, newObj interface{}) {
+func (ei *ResourceInformer) OnUpdate(_, newObj interface{}) {
 	ei.handleWatchEvent(newObj, kemtypes.WatchEventModified)
 }
 
-func (ei *resourceInformer) OnDelete(obj interface{}) {
+func (ei *ResourceInformer) OnDelete(obj interface{}) {
 	ei.handleWatchEvent(obj, kemtypes.WatchEventDeleted)
 }
 
 // HandleKubeEvent register object in cache. Pass object to callback if object's checksum is changed.
 // TODO refactor: pass KubeEvent as argument
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
-// func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
-func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemtypes.WatchEventType) {
+// func (ei *ResourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
+func (ei *ResourceInformer) handleWatchEvent(object interface{}, eventType kemtypes.WatchEventType) {
 	// check if stop
 	if ei.stopped {
 		log.Debug("received WATCH for stopped informer",
@@ -411,7 +411,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	}
 }
 
-func (ei *resourceInformer) adjustFieldSelector(selector *kemtypes.FieldSelector, objName string) *kemtypes.FieldSelector {
+func (ei *ResourceInformer) adjustFieldSelector(selector *kemtypes.FieldSelector, objName string) *kemtypes.FieldSelector {
 	var selectorCopy *kemtypes.FieldSelector
 
 	if selector != nil {
@@ -440,7 +440,7 @@ func (ei *resourceInformer) adjustFieldSelector(selector *kemtypes.FieldSelector
 	return selectorCopy
 }
 
-func (ei *resourceInformer) shouldFireEvent(checkEvent kemtypes.WatchEventType) bool {
+func (ei *ResourceInformer) shouldFireEvent(checkEvent kemtypes.WatchEventType) bool {
 	for _, event := range ei.Monitor.EventTypes {
 		if event == checkEvent {
 			return true
@@ -449,7 +449,7 @@ func (ei *resourceInformer) shouldFireEvent(checkEvent kemtypes.WatchEventType) 
 	return false
 }
 
-func (ei *resourceInformer) start() {
+func (ei *ResourceInformer) start() {
 	log.Debug("RUN resource informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 
 	go func() {
@@ -470,20 +470,20 @@ func (ei *resourceInformer) start() {
 	log.Debug("informer is ready", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 }
 
-func (ei *resourceInformer) pauseHandleEvents() {
+func (ei *ResourceInformer) pauseHandleEvents() {
 	log.Debug("PAUSE resource informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 	ei.stopped = true
 }
 
 // CachedObjectsInfo returns info accumulated from start.
-func (ei *resourceInformer) getCachedObjectsInfo() CachedObjectsInfo {
+func (ei *ResourceInformer) getCachedObjectsInfo() CachedObjectsInfo {
 	ei.cacheLock.RLock()
 	defer ei.cacheLock.RUnlock()
 	return *ei.cachedObjectsInfo
 }
 
 // getCachedObjectsInfoIncrement returns info accumulated from last call and clean it.
-func (ei *resourceInformer) getCachedObjectsInfoIncrement() CachedObjectsInfo {
+func (ei *ResourceInformer) getCachedObjectsInfoIncrement() CachedObjectsInfo {
 	ei.cacheLock.Lock()
 	defer ei.cacheLock.Unlock()
 	info := *ei.cachedObjectsIncrement
