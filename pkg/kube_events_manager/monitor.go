@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -35,7 +36,7 @@ type monitor struct {
 	// Namespace informer to get new namespaces
 	NamespaceInformer *namespaceInformer
 	// map of dynamically starting informers
-	VaryingInformers map[string][]*resourceInformer
+	VaryingInformers sync.Map
 
 	eventCb       func(kemtypes.KubeEvent)
 	eventsEnabled bool
@@ -62,7 +63,7 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage
 		Config:            config,
 		eventCb:           eventCb,
 		ResourceInformers: make([]*resourceInformer, 0),
-		VaryingInformers:  make(map[string][]*resourceInformer),
+		VaryingInformers:  sync.Map{},
 		cancelForNs:       make(map[string]context.CancelFunc),
 		staticNamespaces:  make(map[string]bool),
 		logger:            logger,
@@ -119,25 +120,25 @@ func (m *monitor) CreateInformers() error {
 					return
 				}
 				// ignore already started informers
-				_, ok := m.VaryingInformers[nsName]
+				_, ok := m.VaryingInformers.Load(nsName)
 				if ok {
 					return
 				}
 
 				logEntry.Info("got ns, create dynamic ResourceInformers", slog.String("name", nsName))
 
-				var err error
-				m.VaryingInformers[nsName], err = m.CreateInformersForNamespace(nsName)
+				varyingInformers, err := m.CreateInformersForNamespace(nsName)
 				if err != nil {
 					logEntry.Error("create ResourceInformers for ns",
 						slog.String("name", nsName),
 						log.Err(err))
 				}
+				m.VaryingInformers.Store(nsName, varyingInformers)
 
 				var ctx context.Context
 				ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
 
-				for _, informer := range m.VaryingInformers[nsName] {
+				for _, informer := range varyingInformers {
 					informer.withContext(ctx)
 					if m.eventsEnabled {
 						informer.enableKubeEventCb()
@@ -164,7 +165,7 @@ func (m *monitor) CreateInformers() error {
 
 				// TODO wait
 
-				delete(m.VaryingInformers, nsName)
+				m.VaryingInformers.Delete(nsName)
 				delete(m.cancelForNs, nsName)
 			},
 		)
@@ -179,13 +180,13 @@ func (m *monitor) CreateInformers() error {
 				continue
 			}
 
-			var err error
-			m.VaryingInformers[nsName], err = m.CreateInformersForNamespace(nsName)
+			varyingInformers, err := m.CreateInformersForNamespace(nsName)
 			if err != nil {
 				logEntry.Error("create ResourceInformers for ns",
 					slog.String("name", nsName),
 					log.Err(err))
 			}
+			m.VaryingInformers.Store(nsName, varyingInformers)
 		}
 	}
 
@@ -200,11 +201,14 @@ func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 		objects = append(objects, informer.getCachedObjects()...)
 	}
 
-	for nsName := range m.VaryingInformers {
-		for _, informer := range m.VaryingInformers[nsName] {
-			objects = append(objects, informer.getCachedObjects()...)
+	m.VaryingInformers.Range(func(key, value any) bool {
+		if value, ok := value.([]*resourceInformer); ok {
+			for _, informer := range value {
+				objects = append(objects, informer.getCachedObjects()...)
+			}
 		}
-	}
+		return true
+	})
 
 	// Sort objects by namespace and name
 	sort.Sort(kemtypes.ByNamespaceAndName(objects))
@@ -218,11 +222,15 @@ func (m *monitor) EnableKubeEventCb() {
 	for _, informer := range m.ResourceInformers {
 		informer.enableKubeEventCb()
 	}
-	for nsName := range m.VaryingInformers {
-		for _, informer := range m.VaryingInformers[nsName] {
-			informer.enableKubeEventCb()
+	// Execute eventCb for events accumulated during "Synchronization" phase.
+	m.VaryingInformers.Range(func(key, value any) bool {
+		if value, ok := value.([]*resourceInformer); ok {
+			for _, informer := range value {
+				informer.enableKubeEventCb()
+			}
 		}
-	}
+		return true
+	})
 	// Enable events for future VaryingInformers.
 	m.eventsEnabled = true
 }
@@ -269,14 +277,21 @@ func (m *monitor) Start(parentCtx context.Context) {
 		informer.start()
 	}
 
-	for nsName := range m.VaryingInformers {
+	m.VaryingInformers.Range(func(key, value any) bool {
+		nsName, ok := key.(string)
+		if !ok {
+			return false
+		}
 		var ctx context.Context
 		ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
-		for _, informer := range m.VaryingInformers[nsName] {
-			informer.withContext(ctx)
-			informer.start()
+		if value, ok := value.([]*resourceInformer); ok {
+			for _, informer := range value {
+				informer.withContext(ctx)
+				informer.start()
+			}
 		}
-	}
+		return true
+	})
 
 	if m.NamespaceInformer != nil {
 		m.NamespaceInformer.withContext(m.ctx)
@@ -299,11 +314,14 @@ func (m *monitor) PauseHandleEvents() {
 		informer.pauseHandleEvents()
 	}
 
-	for _, informers := range m.VaryingInformers {
-		for _, informer := range informers {
-			informer.pauseHandleEvents()
+	m.VaryingInformers.Range(func(key, value any) bool {
+		if value, ok := value.([]*resourceInformer); ok {
+			for _, informer := range value {
+				informer.pauseHandleEvents()
+			}
 		}
-	}
+		return true
+	})
 
 	if m.NamespaceInformer != nil {
 		m.NamespaceInformer.pauseHandleEvents()
@@ -319,12 +337,15 @@ func (m *monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObj
 		last.add(informer.getCachedObjectsInfoIncrement())
 	}
 
-	for nsName := range m.VaryingInformers {
-		for _, informer := range m.VaryingInformers[nsName] {
-			total.add(informer.getCachedObjectsInfo())
-			last.add(informer.getCachedObjectsInfoIncrement())
+	m.VaryingInformers.Range(func(key, value any) bool {
+		if value, ok := value.([]*resourceInformer); ok {
+			for _, informer := range value {
+				total.add(informer.getCachedObjectsInfo())
+				last.add(informer.getCachedObjectsInfoIncrement())
+			}
 		}
-	}
+		return true
+	})
 
 	return total, last
 }
