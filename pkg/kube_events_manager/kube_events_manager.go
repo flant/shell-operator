@@ -47,7 +47,7 @@ type kubeEventsManager struct {
 var _ KubeEventsManager = (*kubeEventsManager)(nil)
 
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
-func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) *kubeEventsManager {
+func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) KubeEventsManager {
 	cctx, cancel := context.WithCancel(ctx)
 	em := &kubeEventsManager{
 		ctx:         cctx,

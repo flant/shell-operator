@@ -41,9 +41,9 @@ type monitor struct {
 	eventCb       func(kemtypes.KubeEvent)
 	eventsEnabled bool
 	// Index of namespaces statically defined in monitor configuration
-	staticNamespaces map[string]bool
+	staticNamespaces sync.Map
 
-	cancelForNs map[string]context.CancelFunc
+	cancelForNs sync.Map
 
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -52,7 +52,7 @@ type monitor struct {
 	logger *log.Logger
 }
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) Monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{
@@ -64,8 +64,8 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage
 		eventCb:           eventCb,
 		ResourceInformers: make([]*resourceInformer, 0),
 		VaryingInformers:  sync.Map{},
-		cancelForNs:       make(map[string]context.CancelFunc),
-		staticNamespaces:  make(map[string]bool),
+		cancelForNs:       sync.Map{},
+		staticNamespaces:  sync.Map{},
 		logger:            logger,
 	}
 }
@@ -99,7 +99,7 @@ func (m *monitor) CreateInformers() error {
 		// This list of informers is static.
 		for _, nsName := range nsNames {
 			if nsName != "" {
-				m.staticNamespaces[nsName] = true
+				m.staticNamespaces.Store(nsName, true)
 			}
 			informers, err := m.CreateInformersForNamespace(nsName)
 			if err != nil {
@@ -116,12 +116,11 @@ func (m *monitor) CreateInformers() error {
 			func(nsName string) {
 				// Added/Modified event: check, create and run informers for Ns
 				// ignore event if namespace is already has static ResourceInformers
-				if _, ok := m.staticNamespaces[nsName]; ok {
+				if _, ok := m.staticNamespaces.Load(nsName); ok {
 					return
 				}
 				// ignore already started informers
-				_, ok := m.VaryingInformers.Load(nsName)
-				if ok {
+				if _, ok := m.VaryingInformers.Load(nsName); ok {
 					return
 				}
 
@@ -135,8 +134,8 @@ func (m *monitor) CreateInformers() error {
 				}
 				m.VaryingInformers.Store(nsName, varyingInformers)
 
-				var ctx context.Context
-				ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
+				ctx, cancelForNs := context.WithCancel(m.ctx)
+				m.cancelForNs.Store(nsName, cancelForNs)
 
 				for _, informer := range varyingInformers {
 					informer.withContext(ctx)
@@ -151,22 +150,24 @@ func (m *monitor) CreateInformers() error {
 				logEntry.Info("deleted ns, stop dynamic ResourceInformers", slog.String("name", nsName))
 
 				// ignore statically specified namespaces
-				if _, ok := m.staticNamespaces[nsName]; ok {
+				if _, ok := m.staticNamespaces.Load(nsName); ok {
 					return
 				}
 
 				// ignore already stopped informers
-				_, ok := m.cancelForNs[nsName]
-				if !ok {
+				if _, ok := m.cancelForNs.Load(nsName); !ok {
 					return
 				}
 
-				m.cancelForNs[nsName]()
+				fn, _ := m.cancelForNs.Load(nsName)
+				if fn, ok := fn.(context.CancelFunc); ok {
+					fn()
+				}
 
 				// TODO wait
 
 				m.VaryingInformers.Delete(nsName)
-				delete(m.cancelForNs, nsName)
+				m.cancelForNs.Delete(nsName)
 			},
 		)
 		if err != nil {
@@ -176,7 +177,7 @@ func (m *monitor) CreateInformers() error {
 			logEntry.Info("got ns, create dynamic ResourceInformers", slog.String("name", nsName))
 
 			// ignore event if namespace is already has static ResourceInformers
-			if _, ok := m.staticNamespaces[nsName]; ok {
+			if _, ok := m.staticNamespaces.Load(nsName); ok {
 				continue
 			}
 
@@ -282,8 +283,8 @@ func (m *monitor) Start(parentCtx context.Context) {
 		if !ok {
 			return true
 		}
-		var ctx context.Context
-		ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
+		ctx, cancelForNs := context.WithCancel(m.ctx)
+		m.cancelForNs.Store(nsName, cancelForNs)
 		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				informer.withContext(ctx)
