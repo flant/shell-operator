@@ -66,8 +66,6 @@ func NewBindingContextController(config string, logger *log.Logger, version ...f
 
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client, b.logger.Named("kube-events-manager"))
 	b.KubeEventsManager.WithMetricStorage(metricstorage.NewMetricStorage(ctx, "metrics-prefix", false, log.NewNop()))
-	// Re-create factory to drop informers created using different b.fakeCluster.Client.
-	kubeeventsmanager.DefaultFactoryStore = kubeeventsmanager.NewFactoryStore()
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager(ctx, b.logger.Named("schedule-manager"))
 
@@ -93,11 +91,12 @@ func (b *BindingContextController) RegisterCRD(group, version, kind string, name
 // Run generates binding contexts for hook tests
 func (b *BindingContextController) Run(initialState string) (GeneratedBindingContexts, error) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	if b.started {
-		return GeneratedBindingContexts{}, fmt.Errorf("attempt to runner started runner, it cannot be started twice")
+		b.mu.Unlock()
+		return GeneratedBindingContexts{}, fmt.Errorf("attempt to start an already started runner, it cannot be started twice")
 	}
+	b.started = true
+	b.mu.Unlock()
 
 	err := b.Controller.SetInitialState(initialState)
 	if err != nil {
@@ -131,7 +130,6 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	b.HookCtrl.UnlockKubernetesEvents()
-	b.started = true
 
 	time.Sleep(50 * time.Millisecond)
 	return cc.CombinedAndUpdated(b.HookCtrl)
