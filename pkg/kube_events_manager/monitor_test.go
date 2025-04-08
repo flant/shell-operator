@@ -3,6 +3,7 @@ package kubeeventsmanager
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -39,6 +40,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 		},
 	}
 	objsFromEvents := make([]string, 0)
+	var objsMutex sync.Mutex
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
@@ -56,7 +58,9 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	metricStorage.GaugeSetMock.When("{PREFIX}kube_snapshot_objects", 3, map[string]string(nil)).Then()
 
 	mon := NewMonitor(context.Background(), fc.Client, metricStorage, monitorCfg, func(ev kemtypes.KubeEvent) {
+		objsMutex.Lock()
 		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
+		objsMutex.Unlock()
 	}, log.NewNop())
 
 	// Start monitor.
@@ -96,7 +100,11 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	mon.EnableKubeEventCb()
 
 	// Should catch 2 events for cm-2 and cm-3.
-	g.Eventually(func() []string { return objsFromEvents }, "6s", "10ms").
+	g.Eventually(func() []string {
+		objsMutex.Lock()
+		defer objsMutex.Unlock()
+		return objsFromEvents
+	}, "6s", "10ms").
 		Should(SatisfyAll(
 			ContainElement("test-ns-1/ConfigMap/cm-2"),
 			ContainElement("test-ns-1/ConfigMap/cm-3"),
@@ -129,8 +137,12 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	}, "5s", "10ms").Should(ContainElement("test-ns-2/ConfigMap/cm-2-1"), "Should update snapshot on new ConfigMap after Synchronization")
 
 	// Should catch event for cm-2-1.
-	g.Eventually(func() []string { return objsFromEvents }, "5s", "10ms").
-		Should(ContainElement("test-ns-2/ConfigMap/cm-2-1"), "Should fire KubeEvent for new ConfigMap after Synchronization", objsFromEvents)
+	g.Eventually(func() []string {
+		objsMutex.Lock()
+		defer objsMutex.Unlock()
+		return objsFromEvents
+	}, "5s", "10ms").
+		Should(ContainElement("test-ns-2/ConfigMap/cm-2-1"), "Should fire KubeEvent for new ConfigMap after Synchronization")
 
 	// Add non-matched Namespace.
 	createNsWithLabels(fc, "test-ns-non-matched", map[string]string{"non-matched-label": ""})
