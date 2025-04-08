@@ -201,7 +201,7 @@ func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 		objects = append(objects, informer.getCachedObjects()...)
 	}
 
-	m.VaryingInformers.Range(func(key, value any) bool {
+	m.VaryingInformers.Range(func(_, value any) bool {
 		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				objects = append(objects, informer.getCachedObjects()...)
@@ -223,7 +223,7 @@ func (m *monitor) EnableKubeEventCb() {
 		informer.enableKubeEventCb()
 	}
 	// Execute eventCb for events accumulated during "Synchronization" phase.
-	m.VaryingInformers.Range(func(key, value any) bool {
+	m.VaryingInformers.Range(func(_, value any) bool {
 		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				informer.enableKubeEventCb()
@@ -280,7 +280,7 @@ func (m *monitor) Start(parentCtx context.Context) {
 	m.VaryingInformers.Range(func(key, value any) bool {
 		nsName, ok := key.(string)
 		if !ok {
-			return false
+			return true
 		}
 		var ctx context.Context
 		ctx, m.cancelForNs[nsName] = context.WithCancel(m.ctx)
@@ -314,7 +314,7 @@ func (m *monitor) PauseHandleEvents() {
 		informer.pauseHandleEvents()
 	}
 
-	m.VaryingInformers.Range(func(key, value any) bool {
+	m.VaryingInformers.Range(func(_, value any) bool {
 		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				informer.pauseHandleEvents()
@@ -337,7 +337,7 @@ func (m *monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObj
 		last.add(informer.getCachedObjectsInfoIncrement())
 	}
 
-	m.VaryingInformers.Range(func(key, value any) bool {
+	m.VaryingInformers.Range(func(_, value any) bool {
 		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				total.add(informer.getCachedObjectsInfo())
