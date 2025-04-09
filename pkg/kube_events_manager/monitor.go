@@ -15,13 +15,24 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
+type Monitor interface {
+	CreateInformers() error
+	Start(context.Context)
+	Stop()
+	PauseHandleEvents()
+	Snapshot() []kemtypes.ObjectAndFilterResult
+	EnableKubeEventCb()
+	GetConfig() *MonitorConfig
+	SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo)
+}
+
 // Monitor holds informers for resources and a namespace informer
-type Monitor struct {
+type monitor struct {
 	Name       string
 	Config     *MonitorConfig
 	KubeClient *klient.Client
 	// Static list of informers
-	ResourceInformers []*ResourceInformer
+	ResourceInformers []*resourceInformer
 	// Namespace informer to get new namespaces
 	NamespaceInformer *namespaceInformer
 	// map of dynamically starting informers
@@ -41,17 +52,17 @@ type Monitor struct {
 	logger *log.Logger
 }
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *Monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) Monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
-	return &Monitor{
+	return &monitor{
 		ctx:               cctx,
 		cancel:            cancel,
 		KubeClient:        client,
 		metricStorage:     mstor,
 		Config:            config,
 		eventCb:           eventCb,
-		ResourceInformers: make([]*ResourceInformer, 0),
+		ResourceInformers: make([]*resourceInformer, 0),
 		VaryingInformers:  sync.Map{},
 		cancelForNs:       sync.Map{},
 		staticNamespaces:  sync.Map{},
@@ -59,7 +70,7 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage
 	}
 }
 
-func (m *Monitor) GetConfig() *MonitorConfig {
+func (m *monitor) GetConfig() *MonitorConfig {
 	return m.Config
 }
 
@@ -68,7 +79,7 @@ func (m *Monitor) GetConfig() *MonitorConfig {
 // If MonitorConfig.NamespaceSelector.MatchNames is defined, then
 // multiple informers are created for each namespace.
 // If no NamespaceSelector defined, then one informer is created.
-func (m *Monitor) CreateInformers() error {
+func (m *monitor) CreateInformers() error {
 	logEntry := utils.EnrichLoggerWithLabels(m.logger, m.Config.Metadata.LogLabels).
 		With("binding.name", m.Config.Metadata.DebugName)
 
@@ -184,7 +195,7 @@ func (m *Monitor) CreateInformers() error {
 }
 
 // Snapshot returns all existed objects from all created informers
-func (m *Monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
+func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 	objects := make([]kemtypes.ObjectAndFilterResult, 0)
 
 	for _, informer := range m.ResourceInformers {
@@ -192,7 +203,7 @@ func (m *Monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 	}
 
 	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*ResourceInformer); ok {
+		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				objects = append(objects, informer.getCachedObjects()...)
 			}
@@ -208,13 +219,13 @@ func (m *Monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 
 // EnableKubeEventCb allows execution of event callback for all informers.
 // Also executes eventCb for events accumulated during "Synchronization" phase.
-func (m *Monitor) EnableKubeEventCb() {
+func (m *monitor) EnableKubeEventCb() {
 	for _, informer := range m.ResourceInformers {
 		informer.enableKubeEventCb()
 	}
 	// Execute eventCb for events accumulated during "Synchronization" phase.
 	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*ResourceInformer); ok {
+		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				informer.enableKubeEventCb()
 			}
@@ -229,8 +240,8 @@ func (m *Monitor) EnableKubeEventCb() {
 // it is only one informer. If matchName is specified, then multiple informers are created.
 //
 // If namespace is empty, then informer is bounded to all namespaces.
-func (m *Monitor) CreateInformersForNamespace(namespace string) ([]*ResourceInformer, error) {
-	informers := make([]*ResourceInformer, 0)
+func (m *monitor) CreateInformersForNamespace(namespace string) ([]*resourceInformer, error) {
+	informers := make([]*resourceInformer, 0)
 	cfg := &resourceInformerConfig{
 		client:  m.KubeClient,
 		mstor:   m.metricStorage,
@@ -259,7 +270,7 @@ func (m *Monitor) CreateInformersForNamespace(namespace string) ([]*ResourceInfo
 }
 
 // Start calls Run on all informers.
-func (m *Monitor) Start(parentCtx context.Context) {
+func (m *monitor) Start(parentCtx context.Context) {
 	m.ctx, m.cancel = context.WithCancel(parentCtx)
 
 	for _, informer := range m.ResourceInformers {
@@ -274,7 +285,7 @@ func (m *Monitor) Start(parentCtx context.Context) {
 		}
 		ctx, cancelForNs := context.WithCancel(m.ctx)
 		m.cancelForNs.Store(nsName, cancelForNs)
-		if value, ok := value.([]*ResourceInformer); ok {
+		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				informer.withContext(ctx)
 				informer.start()
@@ -290,7 +301,7 @@ func (m *Monitor) Start(parentCtx context.Context) {
 }
 
 // Stop stops all informers
-func (m *Monitor) Stop() {
+func (m *monitor) Stop() {
 	if m.cancel != nil {
 		m.cancel()
 	}
@@ -299,13 +310,13 @@ func (m *Monitor) Stop() {
 // PauseHandleEvents set flags for all informers to ignore incoming events.
 // Useful for shutdown without panicking.
 // Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
-func (m *Monitor) PauseHandleEvents() {
+func (m *monitor) PauseHandleEvents() {
 	for _, informer := range m.ResourceInformers {
 		informer.pauseHandleEvents()
 	}
 
 	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*ResourceInformer); ok {
+		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				informer.pauseHandleEvents()
 			}
@@ -318,7 +329,7 @@ func (m *Monitor) PauseHandleEvents() {
 	}
 }
 
-func (m *Monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObjectsInfo /*last*/) {
+func (m *monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObjectsInfo /*last*/) {
 	total := &CachedObjectsInfo{}
 	last := &CachedObjectsInfo{}
 
@@ -328,7 +339,7 @@ func (m *Monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObj
 	}
 
 	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*ResourceInformer); ok {
+		if value, ok := value.([]*resourceInformer); ok {
 			for _, informer := range value {
 				total.add(informer.getCachedObjectsInfo())
 				last.add(informer.getCachedObjectsInfoIncrement())

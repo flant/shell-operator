@@ -1,8 +1,9 @@
 package controller
 
 import (
-	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
@@ -40,8 +41,8 @@ func NewHookController() *HookController {
 }
 
 type HookController struct {
-	KubernetesController *KubernetesBindingsController
-	ScheduleController   *ScheduleBindingsController
+	KubernetesController KubernetesBindingsController
+	ScheduleController   ScheduleBindingsController
 	AdmissionController  *AdmissionBindingsController
 	ConversionController *ConversionBindingsController
 	kubernetesBindings   []htypes.OnKubernetesEventConfig
@@ -53,7 +54,7 @@ type HookController struct {
 	logger *log.Logger
 }
 
-func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesEventConfig, kubeEventMgr *kubeeventsmanager.KubeEventsManager, logger *log.Logger) {
+func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesEventConfig, kubeEventMgr kubeeventsmanager.KubeEventsManager, logger *log.Logger) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -66,7 +67,7 @@ func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesE
 	hc.logger = logger
 }
 
-func (hc *HookController) InitScheduleBindings(bindings []htypes.ScheduleConfig, scheduleMgr *schedulemanager.ScheduleManager) {
+func (hc *HookController) InitScheduleBindings(bindings []htypes.ScheduleConfig, scheduleMgr schedulemanager.ScheduleManager) {
 	if len(bindings) == 0 {
 		return
 	}

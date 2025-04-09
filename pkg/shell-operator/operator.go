@@ -6,9 +6,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/gofrs/uuid/v5"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/hook"
@@ -47,8 +48,8 @@ type ShellOperator struct {
 	KubeClient        *klient.Client
 	ObjectPatcher     *objectpatch.ObjectPatcher
 
-	ScheduleManager   *schedulemanager.ScheduleManager
-	KubeEventsManager *kubeeventsmanager.KubeEventsManager
+	ScheduleManager   schedulemanager.ScheduleManager
+	KubeEventsManager kubeeventsmanager.KubeEventsManager
 
 	TaskQueues *queue.TaskQueueSet
 
@@ -87,9 +88,6 @@ func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 	if so.logger == nil {
 		so.logger = log.NewLogger(log.Options{}).Named("shell-operator")
 	}
-
-	so.ScheduleManager = &schedulemanager.ScheduleManager{}
-	so.KubeEventsManager = &kubeeventsmanager.KubeEventsManager{}
 
 	return so
 }

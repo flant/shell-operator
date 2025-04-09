@@ -36,8 +36,8 @@ type BindingContextController struct {
 	HookConfig string
 
 	Controller        *StateController
-	KubeEventsManager *kubeeventsmanager.KubeEventsManager
-	ScheduleManager   *schedulemanager.ScheduleManager
+	KubeEventsManager kubeeventsmanager.KubeEventsManager
+	ScheduleManager   schedulemanager.ScheduleManager
 
 	fakeCluster *fake.Cluster
 

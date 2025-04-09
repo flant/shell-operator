@@ -4,8 +4,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
@@ -15,7 +16,14 @@ type CronEntry struct {
 	Ids     map[string]bool
 }
 
-type ScheduleManager struct {
+type ScheduleManager interface {
+	Stop()
+	Start()
+	Add(entry smtypes.ScheduleEntry)
+	Remove(entry smtypes.ScheduleEntry)
+	Ch() chan string
+}
+type scheduleManager struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	cron       *cron.Cron
@@ -25,9 +33,9 @@ type ScheduleManager struct {
 	logger *log.Logger
 }
 
-func NewScheduleManager(ctx context.Context, logger *log.Logger) *ScheduleManager {
+func NewScheduleManager(ctx context.Context, logger *log.Logger) ScheduleManager {
 	cctx, cancel := context.WithCancel(ctx)
-	sm := &ScheduleManager{
+	sm := &scheduleManager{
 		ctx:        cctx,
 		cancel:     cancel,
 		ScheduleCh: make(chan string, 1),
@@ -39,7 +47,7 @@ func NewScheduleManager(ctx context.Context, logger *log.Logger) *ScheduleManage
 	return sm
 }
 
-func (sm *ScheduleManager) Stop() {
+func (sm *scheduleManager) Stop() {
 	if sm.cancel != nil {
 		sm.cancel()
 	}
@@ -48,7 +56,7 @@ func (sm *ScheduleManager) Stop() {
 // Add create entry for crontab and id and start scheduled function.
 // Crontab string should be validated with cron.Parse
 // function before pass to Add.
-func (sm *ScheduleManager) Add(newEntry smtypes.ScheduleEntry) {
+func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	logEntry := sm.logger.With("operator.component", "scheduleManager")
 
 	cronEntry, hasCronEntry := sm.Entries[newEntry.Crontab]
@@ -79,7 +87,7 @@ func (sm *ScheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	}
 }
 
-func (sm *ScheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
+func (sm *scheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
 	cronEntry, hasCronEntry := sm.Entries[delEntry.Crontab]
 
 	// Nothing to Remove
@@ -105,7 +113,7 @@ func (sm *ScheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
 	}
 }
 
-func (sm *ScheduleManager) Start() {
+func (sm *scheduleManager) Start() {
 	sm.cron.Start()
 	go func() {
 		<-sm.ctx.Done()
@@ -113,6 +121,6 @@ func (sm *ScheduleManager) Start() {
 	}()
 }
 
-func (sm *ScheduleManager) Ch() chan string {
+func (sm *scheduleManager) Ch() chan string {
 	return sm.ScheduleCh
 }

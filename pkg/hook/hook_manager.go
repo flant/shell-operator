@@ -10,8 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
@@ -29,8 +30,8 @@ type Manager struct {
 	// dependencies
 	workingDir               string
 	tempDir                  string
-	kubeEventsManager        *kubeeventsmanager.KubeEventsManager
-	scheduleManager          *schedulemanager.ScheduleManager
+	kubeEventsManager        kubeeventsmanager.KubeEventsManager
+	scheduleManager          schedulemanager.ScheduleManager
 	conversionWebhookManager *conversion.WebhookManager
 	admissionWebhookManager  *admission.WebhookManager
 
@@ -52,8 +53,8 @@ type Manager struct {
 type ManagerConfig struct {
 	WorkingDir string
 	TempDir    string
-	Kmgr       *kubeeventsmanager.KubeEventsManager
-	Smgr       *schedulemanager.ScheduleManager
+	Kmgr       kubeeventsmanager.KubeEventsManager
+	Smgr       schedulemanager.ScheduleManager
 	Wmgr       *admission.WebhookManager
 	Cmgr       *conversion.WebhookManager
 

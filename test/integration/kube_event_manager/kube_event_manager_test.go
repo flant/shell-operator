@@ -11,12 +11,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/flant/shell-operator/pkg/app"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	. "github.com/flant/shell-operator/test/integration/suite"
 	testutils "github.com/flant/shell-operator/test/utils"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 )
 
 func Test(t *testing.T) {
@@ -24,7 +24,7 @@ func Test(t *testing.T) {
 }
 
 var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent objects", func() {
-	var KubeEventsManager *kubeeventsmanager.KubeEventsManager
+	var KubeEventsManager kubeeventsmanager.KubeEventsManager
 
 	BeforeEach(func() {
 		KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(context.Background(), KubeClient, log.NewNop())
