@@ -6,12 +6,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"

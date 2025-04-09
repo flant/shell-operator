@@ -42,8 +42,11 @@ type scheduleBindingsController struct {
 	ScheduleBindings []htypes.ScheduleConfig
 }
 
+// kubernetesHooksController should implement the KubernetesHooksController
+var _ ScheduleBindingsController = (*scheduleBindingsController)(nil)
+
 // NewScheduleBindingsController returns an implementation of ScheduleBindingsController
-var NewScheduleBindingsController = func() ScheduleBindingsController {
+var NewScheduleBindingsController = func() *scheduleBindingsController {
 	return &scheduleBindingsController{
 		ScheduleLinks: make(map[string]*ScheduleBindingToCrontabLink),
 	}

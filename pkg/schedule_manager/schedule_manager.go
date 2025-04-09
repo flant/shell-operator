@@ -11,11 +11,6 @@ import (
 	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
-type CronEntry struct {
-	EntryID cron.EntryID
-	Ids     map[string]bool
-}
-
 type ScheduleManager interface {
 	Stop()
 	Start()
@@ -23,6 +18,12 @@ type ScheduleManager interface {
 	Remove(entry smtypes.ScheduleEntry)
 	Ch() chan string
 }
+
+type CronEntry struct {
+	EntryID cron.EntryID
+	Ids     map[string]bool
+}
+
 type scheduleManager struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -33,7 +34,9 @@ type scheduleManager struct {
 	logger *log.Logger
 }
 
-func NewScheduleManager(ctx context.Context, logger *log.Logger) ScheduleManager {
+var _ ScheduleManager = (*scheduleManager)(nil)
+
+func NewScheduleManager(ctx context.Context, logger *log.Logger) *scheduleManager {
 	cctx, cancel := context.WithCancel(ctx)
 	sm := &scheduleManager{
 		ctx:        cctx,

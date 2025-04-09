@@ -8,13 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/gofrs/uuid/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
-
-	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/app"
@@ -67,7 +66,7 @@ type resourceInformer struct {
 	logger *log.Logger
 }
 
-// resourceInformer should implement resourceInformer
+// resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
 	client  *klient.Client
 	mstor   metric.Storage

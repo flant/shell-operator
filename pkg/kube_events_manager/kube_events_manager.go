@@ -26,7 +26,7 @@ type KubeEventsManager interface {
 	PauseHandleEvents()
 }
 
-// KubeEventsManager is a main implementation of KubeEventsManager.
+// kubeEventsManager is a main implementation of KubeEventsManager.
 type kubeEventsManager struct {
 	// channel to emit KubeEvent objects
 	KubeEventCh chan kemtypes.KubeEvent
@@ -43,8 +43,11 @@ type kubeEventsManager struct {
 	logger *log.Logger
 }
 
+// kubeEventsManager should implement KubeEventsManager.
+var _ KubeEventsManager = (*kubeEventsManager)(nil)
+
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
-func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) KubeEventsManager {
+func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) *kubeEventsManager {
 	cctx, cancel := context.WithCancel(ctx)
 	em := &kubeEventsManager{
 		ctx:         cctx,
