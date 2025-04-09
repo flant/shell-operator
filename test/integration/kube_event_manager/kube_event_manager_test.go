@@ -14,7 +14,8 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	testutils "github.com/flant/shell-operator/test/utils"
+	. "github.com/flant/shell-operator/test/integration/suite"
+
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 )
