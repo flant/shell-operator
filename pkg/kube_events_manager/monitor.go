@@ -36,20 +36,88 @@ type monitor struct {
 	// Namespace informer to get new namespaces
 	NamespaceInformer *namespaceInformer
 	// map of dynamically starting informers
-	VaryingInformers sync.Map
+	VaryingInformers varyingInformers
 
 	eventCb       func(kemtypes.KubeEvent)
 	eventsEnabled bool
 	// Index of namespaces statically defined in monitor configuration
 	staticNamespaces sync.Map
 
-	cancelForNs sync.Map
+	cancelForNs cancelForNs
 
 	ctx           context.Context
 	cancel        context.CancelFunc
 	metricStorage metric.Storage
 
 	logger *log.Logger
+}
+
+type varyingInformers struct {
+	value sync.Map
+}
+
+func (v *varyingInformers) Store(key string, value []*resourceInformer) {
+	v.value.Store(key, value)
+}
+
+func (v *varyingInformers) Load(key string) ([]*resourceInformer, bool) {
+	value, ok := v.value.Load(key)
+	if !ok {
+		return nil, false
+	}
+	if value, ok := value.([]*resourceInformer); ok {
+		return value, true
+	}
+	return nil, false
+}
+
+func (v *varyingInformers) Range(f func(key string, value []*resourceInformer) bool) {
+	v.value.Range(func(key, value any) bool {
+		if key, ok := key.(string); ok {
+			if value, ok := value.([]*resourceInformer); ok {
+				return f(key, value)
+			}
+		}
+		return true
+	})
+}
+
+func (v *varyingInformers) Delete(key string) {
+	v.value.Delete(key)
+}
+
+type cancelForNs struct {
+	value sync.Map
+}
+
+func (c *cancelForNs) Store(key string, value context.CancelFunc) {
+	c.value.Store(key, value)
+}
+
+func (c *cancelForNs) Load(key string) (context.CancelFunc, bool) {
+	value, ok := c.value.Load(key)
+	if !ok {
+		return nil, false
+	}
+	if value, ok := value.(context.CancelFunc); ok {
+		return value, true
+	}
+	return nil, false
+}
+
+func (c *cancelForNs) Range(f func(key string, value context.CancelFunc) bool) {
+	c.value.Range(func(key, value any) bool {
+		if key, ok := key.(string); ok {
+			if value, ok := value.(context.CancelFunc); ok {
+				return f(key, value)
+			}
+		}
+		return true
+	})
+}
+
+func (c *cancelForNs) Delete(key string) {
+	c.value.Delete(key)
 }
 
 var _ Monitor = (*monitor)(nil)
@@ -65,8 +133,8 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage
 		Config:            config,
 		eventCb:           eventCb,
 		ResourceInformers: make([]*resourceInformer, 0),
-		VaryingInformers:  sync.Map{},
-		cancelForNs:       sync.Map{},
+		VaryingInformers:  varyingInformers{value: sync.Map{}},
+		cancelForNs:       cancelForNs{value: sync.Map{}},
 		staticNamespaces:  sync.Map{},
 		logger:            logger,
 	}
@@ -162,9 +230,7 @@ func (m *monitor) CreateInformers() error {
 				}
 
 				fn, _ := m.cancelForNs.Load(nsName)
-				if fn, ok := fn.(context.CancelFunc); ok {
-					fn()
-				}
+				fn()
 
 				// TODO wait
 
@@ -204,11 +270,9 @@ func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 		objects = append(objects, informer.getCachedObjects()...)
 	}
 
-	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*resourceInformer); ok {
-			for _, informer := range value {
-				objects = append(objects, informer.getCachedObjects()...)
-			}
+	m.VaryingInformers.Range(func(_ string, value []*resourceInformer) bool {
+		for _, informer := range value {
+			objects = append(objects, informer.getCachedObjects()...)
 		}
 		return true
 	})
@@ -226,11 +290,9 @@ func (m *monitor) EnableKubeEventCb() {
 		informer.enableKubeEventCb()
 	}
 	// Execute eventCb for events accumulated during "Synchronization" phase.
-	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*resourceInformer); ok {
-			for _, informer := range value {
-				informer.enableKubeEventCb()
-			}
+	m.VaryingInformers.Range(func(_ string, value []*resourceInformer) bool {
+		for _, informer := range value {
+			informer.enableKubeEventCb()
 		}
 		return true
 	})
@@ -280,18 +342,12 @@ func (m *monitor) Start(parentCtx context.Context) {
 		informer.start()
 	}
 
-	m.VaryingInformers.Range(func(key, value any) bool {
-		nsName, ok := key.(string)
-		if !ok {
-			return true
-		}
+	m.VaryingInformers.Range(func(nsName string, value []*resourceInformer) bool {
 		ctx, cancelForNs := context.WithCancel(m.ctx)
 		m.cancelForNs.Store(nsName, cancelForNs)
-		if value, ok := value.([]*resourceInformer); ok {
-			for _, informer := range value {
-				informer.withContext(ctx)
-				informer.start()
-			}
+		for _, informer := range value {
+			informer.withContext(ctx)
+			informer.start()
 		}
 		return true
 	})
@@ -317,11 +373,9 @@ func (m *monitor) PauseHandleEvents() {
 		informer.pauseHandleEvents()
 	}
 
-	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*resourceInformer); ok {
-			for _, informer := range value {
-				informer.pauseHandleEvents()
-			}
+	m.VaryingInformers.Range(func(_ string, value []*resourceInformer) bool {
+		for _, informer := range value {
+			informer.pauseHandleEvents()
 		}
 		return true
 	})
@@ -340,12 +394,10 @@ func (m *monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObj
 		last.add(informer.getCachedObjectsInfoIncrement())
 	}
 
-	m.VaryingInformers.Range(func(_, value any) bool {
-		if value, ok := value.([]*resourceInformer); ok {
-			for _, informer := range value {
-				total.add(informer.getCachedObjectsInfo())
-				last.add(informer.getCachedObjectsInfoIncrement())
-			}
+	m.VaryingInformers.Range(func(_ string, value []*resourceInformer) bool {
+		for _, informer := range value {
+			total.add(informer.getCachedObjectsInfo())
+			last.add(informer.getCachedObjectsInfoIncrement())
 		}
 		return true
 	})
