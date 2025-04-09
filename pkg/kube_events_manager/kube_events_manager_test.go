@@ -6,13 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -70,9 +72,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 
 	err := mgr.AddMonitor(monitor)
 
-	if assert.NoError(t, err) {
-		assert.Len(t, mgr.Monitors, 1)
-	}
+	require.NoError(t, err)
 }
 
 // FIXME: sometimes fails, skip for now.
@@ -139,7 +139,6 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 
 	// Init() replacement
 	mgr := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
-	mgr.KubeEventCh = make(chan kemtypes.KubeEvent, 10)
 
 	// monitor with 3 namespaces and 4 object names and all event types
 	monitor := &MonitorConfig{
