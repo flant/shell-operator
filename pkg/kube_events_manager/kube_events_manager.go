@@ -98,7 +98,12 @@ func (mgr *KubeEventsManager) GetMonitor(monitorID string) *Monitor {
 // StartMonitor starts all informers for the monitor.
 func (mgr *KubeEventsManager) StartMonitor(monitorID string) {
 	mgr.m.RLock()
-	monitor := mgr.Monitors[monitorID]
+	monitor, ok := mgr.Monitors[monitorID]
+	if !ok {
+		mgr.m.RUnlock()
+		mgr.logger.Error("Monitor not found", slog.String("monitorID", monitorID))
+		return
+	}
 	mgr.m.RUnlock()
 	monitor.Start(mgr.ctx)
 }
