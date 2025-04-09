@@ -11,13 +11,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/flant/shell-operator/pkg/app"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	. "github.com/flant/shell-operator/test/integration/suite"
-
-
-	"github.com/deckhouse/deckhouse/pkg/log"
+	testutils "github.com/flant/shell-operator/test/utils"
 )
 
 func Test(t *testing.T) {

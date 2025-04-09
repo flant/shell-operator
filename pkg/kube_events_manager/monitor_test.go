@@ -6,11 +6,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/deckhouse/deckhouse/pkg/log"
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
@@ -76,8 +77,11 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	createNsWithLabels(fc, "test-ns-1", map[string]string{"test-label": ""})
 
 	// Wait until informers appears.
-	g.Eventually(&mon.VaryingInformers, "5s", "10ms").
-		Should(HaveKey("test-ns-1"), "Should create informer for new namespace")
+	g.Eventually(func() bool {
+		_, ok := mon.VaryingInformers.Load("test-ns-1")
+		return ok
+	}, "5s", "10ms").
+		Should(BeTrue(), "Should create informer for new namespace")
 
 	createCM(fc, "test-ns-1", testCM("cm-1"))
 
@@ -118,8 +122,11 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	createNsWithLabels(fc, "test-ns-2", map[string]string{"test-label": ""})
 
 	// Monitor should create new configmap informer for new namespace.
-	g.Eventually(&mon.VaryingInformers, "5s", "10ms").
-		Should(HaveKey("test-ns-2"), "Should create informer for ns/test-ns-2")
+	g.Eventually(func() bool {
+		_, ok := mon.VaryingInformers.Load("test-ns-2")
+		return ok
+	}, "5s", "10ms").
+		Should(BeTrue(), "Should create informer for ns/test-ns-2")
 
 	// Create new ConfigMap after Synchronization.
 	createCM(fc, "test-ns-2", testCM("cm-2-1"))
@@ -141,8 +148,11 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	createNsWithLabels(fc, "test-ns-non-matched", map[string]string{"non-matched-label": ""})
 
 	// Monitor should create new configmap informer for new namespace.
-	g.Eventually(&mon.VaryingInformers, "5s", "10ms").
-		ShouldNot(HaveKey("test-ns-non-matched"), "Should not create informer for non-mathed Namespace")
+	g.Eventually(func() bool {
+		_, ok := mon.VaryingInformers.Load("test-ns-non-matched")
+		return ok
+	}, "5s", "10ms").
+		ShouldNot(BeTrue(), "Should not create informer for non-mathed Namespace")
 }
 
 func createNsWithLabels(fc *fake.Cluster, name string, labels map[string]string) {
