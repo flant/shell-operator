@@ -82,6 +82,15 @@ func (v *varyingInformers) Range(f func(key string, value []*resourceInformer) b
 	})
 }
 
+func (v *varyingInformers) RangeValue(f func(value []*resourceInformer)) {
+	v.value.Range(func(_, value any) bool {
+		if value, ok := value.([]*resourceInformer); ok {
+			f(value)
+		}
+		return true
+	})
+}
+
 func (v *varyingInformers) Delete(key string) {
 	v.value.Delete(key)
 }
@@ -270,11 +279,10 @@ func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 		objects = append(objects, informer.getCachedObjects()...)
 	}
 
-	m.VaryingInformers.Range(func(_ string, value []*resourceInformer) bool {
+	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
 		for _, informer := range value {
 			objects = append(objects, informer.getCachedObjects()...)
 		}
-		return true
 	})
 
 	// Sort objects by namespace and name
@@ -290,11 +298,10 @@ func (m *monitor) EnableKubeEventCb() {
 		informer.enableKubeEventCb()
 	}
 	// Execute eventCb for events accumulated during "Synchronization" phase.
-	m.VaryingInformers.Range(func(_ string, value []*resourceInformer) bool {
+	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
 		for _, informer := range value {
 			informer.enableKubeEventCb()
 		}
-		return true
 	})
 	// Enable events for future VaryingInformers.
 	m.eventsEnabled = true
@@ -373,11 +380,10 @@ func (m *monitor) PauseHandleEvents() {
 		informer.pauseHandleEvents()
 	}
 
-	m.VaryingInformers.Range(func(_ string, value []*resourceInformer) bool {
+	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
 		for _, informer := range value {
 			informer.pauseHandleEvents()
 		}
-		return true
 	})
 
 	if m.NamespaceInformer != nil {
@@ -394,12 +400,11 @@ func (m *monitor) SnapshotOperations() (*CachedObjectsInfo /*total*/, *CachedObj
 		last.add(informer.getCachedObjectsInfoIncrement())
 	}
 
-	m.VaryingInformers.Range(func(_ string, value []*resourceInformer) bool {
+	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
 		for _, informer := range value {
 			total.add(informer.getCachedObjectsInfo())
 			last.add(informer.getCachedObjectsInfoIncrement())
 		}
-		return true
 	})
 
 	return total, last
