@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -41,7 +42,7 @@ type BindingContextController struct {
 	fakeCluster *fake.Cluster
 
 	mu      sync.Mutex
-	started bool
+	started atomic.Bool
 
 	logger *log.Logger
 }
@@ -91,12 +92,10 @@ func (b *BindingContextController) RegisterCRD(group, version, kind string, name
 // Run generates binding contexts for hook tests
 func (b *BindingContextController) Run(initialState string) (GeneratedBindingContexts, error) {
 	b.mu.Lock()
-	if b.started {
-		b.mu.Unlock()
+	defer b.mu.Unlock()
+	if b.started.Load() {
 		return GeneratedBindingContexts{}, fmt.Errorf("attempt to start an already started runner, it cannot be started twice")
 	}
-	b.started = true
-	b.mu.Unlock()
 
 	err := b.Controller.SetInitialState(initialState)
 	if err != nil {
@@ -130,6 +129,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	b.HookCtrl.UnlockKubernetesEvents()
+	b.started.Swap(true)
 
 	time.Sleep(50 * time.Millisecond)
 	return cc.CombinedAndUpdated(b.HookCtrl)
