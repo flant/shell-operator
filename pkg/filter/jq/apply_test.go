@@ -15,7 +15,7 @@ func Test_ApplyFilter_SingleDocumentModification(t *testing.T) {
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"name": "John", "age": 30})
 
 	g.Expect(err).Should(BeNil())
-	g.Expect(result).Should(Equal(map[string]any{"name": "John", "age": 30, "status": "active"}))
+	g.Expect(result).Should(Equal(map[string]any{"name": "John", "age": 30.0, "status": "active"}))
 }
 
 func Test_ApplyFilter_ExtractValuesFromDocument(t *testing.T) {
