@@ -28,7 +28,7 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 
 	// Log version and jq filtering implementation.
 	logger.Info(app.AppStartMessage)
-	fl := jq.NewFilter(app.JqLibraryPath)
+	fl := jq.NewFilter()
 	logger.Debug(fl.FilterInfo())
 
 	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
