@@ -151,7 +151,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 		_, ok := mon.VaryingInformers.Load("test-ns-non-matched")
 		return ok
 	}, "5s", "10ms").
-		ShouldNot(BeTrue(), "Should not create informer for non-mathed Namespace")
+		ShouldNot(BeTrue(), "Should not create informer for non-matched Namespace")
 }
 
 func createNsWithLabels(fc *fake.Cluster, name string, labels map[string]string) {
