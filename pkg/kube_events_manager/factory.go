@@ -15,7 +15,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var DefaultSyncTime = 100 * time.Millisecond
+var (
+	DefaultFactoryStore *FactoryStore
+	DefaultSyncTime     = 100 * time.Millisecond
+)
+
+func init() {
+	DefaultFactoryStore = NewFactoryStore()
+}
 
 type FactoryIndex struct {
 	GVR           schema.GroupVersionResource
@@ -40,6 +47,12 @@ func NewFactoryStore() *FactoryStore {
 	return &FactoryStore{
 		data: make(map[FactoryIndex]Factory),
 	}
+}
+
+func (c *FactoryStore) Reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data = make(map[FactoryIndex]Factory)
 }
 
 func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
