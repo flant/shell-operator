@@ -37,6 +37,7 @@ type resourceInformer struct {
 	GroupVersionResource schema.GroupVersionResource
 	ListOptions          metav1.ListOptions
 
+	defaultFactoryStore *FactoryStore
 	// A cache of objects and filterResults. It is a part of the Monitor's snapshot.
 	cachedObjects map[string]*kemtypes.ObjectAndFilterResult
 	cacheLock     sync.RWMutex
@@ -91,6 +92,7 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		cachedObjectsInfo:      &CachedObjectsInfo{},
 		cachedObjectsIncrement: &CachedObjectsInfo{},
 		logger:                 cfg.logger,
+		defaultFactoryStore:    NewFactoryStore(),
 	}
 	return informer
 }
@@ -455,13 +457,13 @@ func (ei *resourceInformer) start() {
 	go func() {
 		if ei.ctx != nil {
 			<-ei.ctx.Done()
-			DefaultFactoryStore.Stop(ei.id, ei.FactoryIndex)
+			ei.defaultFactoryStore.Stop(ei.id, ei.FactoryIndex)
 		}
 	}()
 
 	// TODO: separate handler and informer
 	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage, ei.logger.Named("watch-error-handler"))
-	err := DefaultFactoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
+	err := ei.defaultFactoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
 		ei.Monitor.Logger.Error("cache is not synced for informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 		return

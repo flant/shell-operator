@@ -15,14 +15,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var (
-	DefaultFactoryStore *FactoryStore
-	DefaultSyncTime     = 100 * time.Millisecond
-)
-
-func init() {
-	DefaultFactoryStore = NewFactoryStore()
-}
+var DefaultSyncTime = 100 * time.Millisecond
 
 type FactoryIndex struct {
 	GVR           schema.GroupVersionResource

@@ -67,8 +67,6 @@ func NewBindingContextController(config string, logger *log.Logger, version ...f
 
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client, b.logger.Named("kube-events-manager"))
 	b.KubeEventsManager.WithMetricStorage(metricstorage.NewMetricStorage(ctx, "metrics-prefix", false, log.NewNop()))
-	// Re-create factory to drop informers created using different b.fakeCluster.Client.
-	// kubeeventsmanager.DefaultFactoryStore = kubeeventsmanager.NewFactoryStore()
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager(ctx, b.logger.Named("schedule-manager"))
 
