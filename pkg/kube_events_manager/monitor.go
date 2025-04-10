@@ -238,8 +238,9 @@ func (m *monitor) CreateInformers() error {
 					return
 				}
 
-				fn, _ := m.cancelForNs.Load(nsName)
-				fn()
+				if fn, ok := m.cancelForNs.Load(nsName); ok {
+					fn()
+				}
 
 				// TODO wait
 
