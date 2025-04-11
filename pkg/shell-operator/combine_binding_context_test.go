@@ -33,7 +33,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
-	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ task.Task) queue.TaskResult {
+	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{
 			Status: "Success",
 		}
@@ -138,7 +138,7 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
-	TaskQueues.NewNamedQueue("test_no_combine", func(_ task.Task) queue.TaskResult {
+	TaskQueues.NewNamedQueue("test_no_combine", func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{
 			Status: "Success",
 		}
@@ -208,7 +208,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
-	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ task.Task) queue.TaskResult {
+	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{
 			Status: "Success",
 		}
@@ -321,7 +321,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
-	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ task.Task) queue.TaskResult {
+	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{
 			Status: "Success",
 		}

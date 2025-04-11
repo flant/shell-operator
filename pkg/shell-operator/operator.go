@@ -100,7 +100,7 @@ func (op *ShellOperator) Start() {
 	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
 	op.bootstrapMainQueue(op.TaskQueues)
 	// Start main task queue handler
-	op.TaskQueues.StartMain()
+	op.TaskQueues.StartMain(op.ctx)
 	op.initAndStartHookQueues()
 
 	// Start emit "live" metrics
@@ -139,8 +139,7 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
 
-		var tasks []task.Task
-		op.HookManager.HandleKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
 				WithMetadata(task_metadata.HookMetadata{
 					HookName:       hook.Name,
@@ -152,13 +151,12 @@ func (op *ShellOperator) initHookManager() error {
 				}).
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
-			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
 
 			logEntry.With("queue", info.QueueName).
 				Info("queue task", slog.String("name", newTask.GetDescription()))
-		})
 
-		return tasks
+			return newTask.WithQueuedAt(time.Now())
+		})
 	})
 	op.ManagerEventsHandler.WithScheduleEventHandler(func(crontab string) []task.Task {
 		logLabels := map[string]string{
@@ -168,8 +166,7 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'schedule' event", slog.String("name", crontab))
 
-		var tasks []task.Task
-		op.HookManager.HandleScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+		return op.HookManager.HandleCreateTasksFromScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
 				WithMetadata(task_metadata.HookMetadata{
 					HookName:       hook.Name,
@@ -181,13 +178,12 @@ func (op *ShellOperator) initHookManager() error {
 				}).
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
-			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
 
 			logEntry.With("queue", info.QueueName).
 				Info("queue task", slog.String("name", newTask.GetDescription()))
-		})
 
-		return tasks
+			return newTask.WithQueuedAt(time.Now())
+		})
 	})
 
 	return nil
@@ -259,7 +255,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
 		}
 
-		res := op.taskHandler(admissionTask)
+		res := op.taskHandler(op.ctx, admissionTask)
 
 		if res.Status == "Fail" {
 			return &admission.Response{
@@ -365,7 +361,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 				return nil, fmt.Errorf("no hook found for '%s' event for crd/%s", string(types.KubernetesConversion), crdName)
 			}
 
-			res := op.taskHandler(convTask)
+			res := op.taskHandler(op.ctx, convTask)
 
 			if res.Status == "Fail" {
 				return &conversion.Response{
@@ -413,7 +409,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 }
 
 // taskHandler
-func (op *ShellOperator) taskHandler(t task.Task) queue.TaskResult {
+func (op *ShellOperator) taskHandler(_ context.Context, t task.Task) queue.TaskResult {
 	logEntry := op.logger.With("operator.component", "taskRunner")
 	hookMeta := task_metadata.HookMetadataAccessor(t)
 	var res queue.TaskResult
@@ -886,7 +882,7 @@ func (op *ShellOperator) initAndStartHookQueues() {
 		for _, hookBinding := range h.Config.Schedules {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
 				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler)
-				op.TaskQueues.GetByName(hookBinding.Queue).Start()
+				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
 		}
 	}
@@ -897,7 +893,7 @@ func (op *ShellOperator) initAndStartHookQueues() {
 		for _, hookBinding := range h.Config.OnKubernetesEvents {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
 				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler)
-				op.TaskQueues.GetByName(hookBinding.Queue).Start()
+				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
 		}
 	}

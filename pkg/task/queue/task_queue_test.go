@@ -122,7 +122,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 	const fails = 10
 	failsCount := fails
 	queueStopCh := make(chan struct{}, 1)
-	q.WithHandler(func(t task.Task) TaskResult {
+	q.WithHandler(func(_ context.Context, t task.Task) TaskResult {
 		var res TaskResult
 		runsAt = append(runsAt, time.Now())
 		failureCounts = append(failureCounts, t.GetFailureCount())
@@ -148,7 +148,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 		return mockExponentialDelay
 	}
 
-	q.Start()
+	q.Start(context.TODO())
 
 	// Expect taskHandler returns Success result.
 	g.Eventually(queueStopCh, "5s", "20ms").Should(BeClosed(), "Should handle first task in queue successfully")
@@ -221,7 +221,7 @@ func Test_CancelDelay(t *testing.T) {
 	endedAt := startedAt
 	delayStartsCh := make(chan struct{}, 1)
 	healingDoneCh := make(chan struct{}, 1)
-	q.WithHandler(func(t task.Task) TaskResult {
+	q.WithHandler(func(_ context.Context, t task.Task) TaskResult {
 		var res TaskResult
 		if t.GetId() == ErrTask.GetId() {
 			res.Status = Fail
@@ -255,7 +255,7 @@ func Test_CancelDelay(t *testing.T) {
 	}
 
 	// Start handling 'erroneous' task.
-	q.Start()
+	q.Start(context.TODO())
 
 	// Expect taskHandler returns Success result.
 	g.Eventually(delayStartsCh, "5s", "20ms").Should(BeClosed(), "Should handle failed task and starts a delay")

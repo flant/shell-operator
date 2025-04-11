@@ -9,6 +9,7 @@ import (
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
+	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -161,13 +162,24 @@ func (hc *HookController) HandleEnableKubernetesBindings(createTasksFn func(Bind
 	return nil
 }
 
-func (hc *HookController) HandleKubeEvent(event kemtypes.KubeEvent, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleKubeEvent(event kemtypes.KubeEvent, handlerFunc func(BindingExecutionInfo)) {
+	if hc.KubernetesController != nil {
+		execInfo := hc.KubernetesController.HandleEvent(event)
+		if handlerFunc != nil {
+			handlerFunc(execInfo)
+		}
+	}
+}
+
+func (hc *HookController) HandleKubeEventWithFormTask(event kemtypes.KubeEvent, createTasksFn func(BindingExecutionInfo) task.Task) task.Task {
 	if hc.KubernetesController != nil {
 		execInfo := hc.KubernetesController.HandleEvent(event)
 		if createTasksFn != nil {
-			createTasksFn(execInfo)
+			return createTasksFn(execInfo)
 		}
 	}
+
+	return nil
 }
 
 func (hc *HookController) HandleAdmissionEvent(event admission.Event, createTasksFn func(BindingExecutionInfo)) {
@@ -190,17 +202,40 @@ func (hc *HookController) HandleConversionEvent(crdName string, request *v1.Conv
 	}
 }
 
-func (hc *HookController) HandleScheduleEvent(crontab string, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleScheduleEvent(crontab string, handlerFunc func(BindingExecutionInfo)) {
 	if hc.ScheduleController == nil {
 		return
 	}
+
 	infos := hc.ScheduleController.HandleEvent(crontab)
-	if createTasksFn == nil {
+	if handlerFunc == nil {
 		return
 	}
+
 	for _, info := range infos {
-		createTasksFn(info)
+		handlerFunc(info)
 	}
+}
+
+func (hc *HookController) HandleScheduleEventWithFormTasks(crontab string, createTasksFn func(BindingExecutionInfo) task.Task) []task.Task {
+	if hc.ScheduleController == nil {
+		return nil
+	}
+
+	infos := hc.ScheduleController.HandleEvent(crontab)
+	if createTasksFn == nil {
+		return nil
+	}
+
+	tasks := make([]task.Task, 0)
+	for _, info := range infos {
+		task := createTasksFn(info)
+		if task != nil {
+			tasks = append(tasks, task)
+		}
+	}
+
+	return tasks
 }
 
 func (hc *HookController) UnlockKubernetesEvents() {
