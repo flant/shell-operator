@@ -8,7 +8,7 @@ import (
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
-// A link between a hook and a kube monitor
+// ScheduleBindingToCrontabLink a link between a hook and a kube monitor
 type ScheduleBindingToCrontabLink struct {
 	BindingName string
 	Crontab     string
@@ -29,7 +29,7 @@ type ScheduleBindingsController interface {
 	HandleEvent(crontab string) []BindingExecutionInfo
 }
 
-// scheduleHooksController is a main implementation of KubernetesHooksController
+// scheduleBindingsController is a main implementation of KubernetesHooksController
 type scheduleBindingsController struct {
 	// dependencies
 	scheduleManager schedulemanager.ScheduleManager
@@ -43,7 +43,7 @@ type scheduleBindingsController struct {
 }
 
 // kubernetesHooksController should implement the KubernetesHooksController
-var _ ScheduleBindingsController = &scheduleBindingsController{}
+var _ ScheduleBindingsController = (*scheduleBindingsController)(nil)
 
 // NewScheduleBindingsController returns an implementation of ScheduleBindingsController
 var NewScheduleBindingsController = func() *scheduleBindingsController {

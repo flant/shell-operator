@@ -38,5 +38,6 @@ jobs:
           export GOOS=linux
 
           go test \
+            --race \
             -tags test \
             ./cmd/... ./pkg/... ./test/utils

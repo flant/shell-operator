@@ -33,7 +33,7 @@ type scheduleManager struct {
 	logger *log.Logger
 }
 
-var _ ScheduleManager = &scheduleManager{}
+var _ ScheduleManager = (*scheduleManager)(nil)
 
 func NewScheduleManager(ctx context.Context, logger *log.Logger) *scheduleManager {
 	cctx, cancel := context.WithCancel(ctx)

@@ -3,6 +3,7 @@ package kubeeventsmanager
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -38,6 +39,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 		},
 	}
 	objsFromEvents := make([]string, 0)
+	var objsMutex sync.Mutex
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
@@ -55,7 +57,9 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	metricStorage.GaugeSetMock.When("{PREFIX}kube_snapshot_objects", 3, map[string]string(nil)).Then()
 
 	mon := NewMonitor(context.Background(), fc.Client, metricStorage, monitorCfg, func(ev kemtypes.KubeEvent) {
+		objsMutex.Lock()
 		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
+		objsMutex.Unlock()
 	}, log.NewNop())
 
 	// Start monitor.
@@ -72,8 +76,11 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	createNsWithLabels(fc, "test-ns-1", map[string]string{"test-label": ""})
 
 	// Wait until informers appears.
-	g.Eventually(mon.VaryingInformers, "5s", "10ms").
-		Should(HaveKey("test-ns-1"), "Should create informer for new namespace")
+	g.Eventually(func() bool {
+		_, ok := mon.VaryingInformers.Load("test-ns-1")
+		return ok
+	}, "5s", "10ms").
+		Should(BeTrue(), "Should create informer for new namespace")
 
 	createCM(fc, "test-ns-1", testCM("cm-1"))
 
@@ -92,7 +99,11 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	mon.EnableKubeEventCb()
 
 	// Should catch 2 events for cm-2 and cm-3.
-	g.Eventually(func() []string { return objsFromEvents }, "6s", "10ms").
+	g.Eventually(func() []string {
+		objsMutex.Lock()
+		defer objsMutex.Unlock()
+		return objsFromEvents
+	}, "6s", "10ms").
 		Should(SatisfyAll(
 			ContainElement("test-ns-1/ConfigMap/cm-2"),
 			ContainElement("test-ns-1/ConfigMap/cm-3"),
@@ -110,8 +121,11 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	createNsWithLabels(fc, "test-ns-2", map[string]string{"test-label": ""})
 
 	// Monitor should create new configmap informer for new namespace.
-	g.Eventually(mon.VaryingInformers, "5s", "10ms").
-		Should(HaveKey("test-ns-2"), "Should create informer for ns/test-ns-2")
+	g.Eventually(func() bool {
+		_, ok := mon.VaryingInformers.Load("test-ns-2")
+		return ok
+	}, "5s", "10ms").
+		Should(BeTrue(), "Should create informer for ns/test-ns-2")
 
 	// Create new ConfigMap after Synchronization.
 	createCM(fc, "test-ns-2", testCM("cm-2-1"))
@@ -122,15 +136,22 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	}, "5s", "10ms").Should(ContainElement("test-ns-2/ConfigMap/cm-2-1"), "Should update snapshot on new ConfigMap after Synchronization")
 
 	// Should catch event for cm-2-1.
-	g.Eventually(func() []string { return objsFromEvents }, "5s", "10ms").
-		Should(ContainElement("test-ns-2/ConfigMap/cm-2-1"), "Should fire KubeEvent for new ConfigMap after Synchronization", objsFromEvents)
+	g.Eventually(func() []string {
+		objsMutex.Lock()
+		defer objsMutex.Unlock()
+		return objsFromEvents
+	}, "5s", "10ms").
+		Should(ContainElement("test-ns-2/ConfigMap/cm-2-1"), "Should fire KubeEvent for new ConfigMap after Synchronization")
 
 	// Add non-matched Namespace.
 	createNsWithLabels(fc, "test-ns-non-matched", map[string]string{"non-matched-label": ""})
 
 	// Monitor should create new configmap informer for new namespace.
-	g.Eventually(mon.VaryingInformers, "5s", "10ms").
-		ShouldNot(HaveKey("test-ns-non-matched"), "Should not create informer for non-mathed Namespace")
+	g.Eventually(func() bool {
+		_, ok := mon.VaryingInformers.Load("test-ns-non-matched")
+		return ok
+	}, "5s", "10ms").
+		ShouldNot(BeTrue(), "Should not create informer for non-matched Namespace")
 }
 
 func createNsWithLabels(fc *fake.Cluster, name string, labels map[string]string) {

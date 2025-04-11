@@ -56,7 +56,7 @@ type kubernetesBindingsController struct {
 }
 
 // kubernetesHooksController should implement the KubernetesHooksController
-var _ KubernetesBindingsController = &kubernetesBindingsController{}
+var _ KubernetesBindingsController = (*kubernetesBindingsController)(nil)
 
 // NewKubernetesBindingsController returns an implementation of KubernetesBindingsController
 var NewKubernetesBindingsController = func(logger *log.Logger) *kubernetesBindingsController {

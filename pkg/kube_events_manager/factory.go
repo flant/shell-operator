@@ -49,6 +49,12 @@ func NewFactoryStore() *FactoryStore {
 	}
 }
 
+func (c *FactoryStore) Reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data = make(map[FactoryIndex]Factory)
+}
+
 func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.data[index] = Factory{
