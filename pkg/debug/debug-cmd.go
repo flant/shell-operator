@@ -2,16 +2,21 @@ package debug
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"time"
 
+	"github.com/muesli/termenv"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
 )
 
 var (
-	outputFormat = "text"
-	showEmpty    = false
+	outputFormat  = "text"
+	showEmpty     = false
+	watch         = false
+	watchInterval = "1s"
 )
 
 func DefineDebugCommands(kpApp *kingpin.Application) {
@@ -20,16 +25,59 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	queueListCmd := queueCmd.Command("list", "Dump tasks in all queues.").
 		Action(func(_ *kingpin.ParseContext) error {
-			out, err := Queue(DefaultClient()).List(outputFormat, showEmpty)
-			if err != nil {
-				return err
+			var refreshInterval time.Duration
+			output := termenv.NewOutput(os.Stdout)
+
+			if watch {
+				c := make(chan os.Signal, 1)
+				signal.Notify(c, os.Interrupt)
+
+				go func() {
+					<-c
+					output.ExitAltScreen()
+					os.Exit(0)
+				}()
+
+				output.AltScreen()
+				output.ClearScreen()
+				output.MoveCursor(1, 1)
+				var err error
+				refreshInterval, err = time.ParseDuration(watchInterval)
+				if err != nil {
+					output.WriteString(fmt.Sprintf("could not parse watch refresh interval: %s, default 1s applied\n", err))
+					refreshInterval = time.Second
+				}
 			}
-			fmt.Println(string(out))
+
+			for {
+				out, err := Queue(DefaultClient()).List(outputFormat, showEmpty)
+				if err != nil {
+					return err
+				}
+
+				output.Write(out)
+				if !watch {
+					break
+				}
+
+				time.Sleep(refreshInterval)
+				output.ClearScreen()
+				output.MoveCursor(1, 1)
+				output.WriteString(time.Now().Format(time.RFC3339))
+				output.MoveCursor(3, 1)
+			}
+
 			return nil
 		})
 	queueListCmd.Flag("show-empty", "Show empty queues.").Short('e').
 		Default("false").
 		BoolVar(&showEmpty)
+	queueListCmd.Flag("watch", "Keep watching.").Short('w').
+		Default("false").
+		BoolVar(&watch)
+	queueListCmd.Flag("watchInterval", "Watch refresh interval.").Short('t').
+		Default(watchInterval).
+		StringVar(&watchInterval)
 	AddOutputJsonYamlTextFlag(queueListCmd)
 	app.DefineDebugUnixSocketFlag(queueListCmd)
 
