@@ -54,14 +54,14 @@ func (tqs *TaskQueueSet) Stop() {
 	tqs.m.RUnlock()
 }
 
-func (tqs *TaskQueueSet) StartMain() {
-	tqs.GetByName(tqs.MainName).Start()
+func (tqs *TaskQueueSet) StartMain(ctx context.Context) {
+	tqs.GetByName(tqs.MainName).Start(ctx)
 }
 
-func (tqs *TaskQueueSet) Start() {
+func (tqs *TaskQueueSet) Start(ctx context.Context) {
 	tqs.m.RLock()
 	for _, q := range tqs.Queues {
-		q.Start()
+		q.Start(ctx)
 	}
 
 	tqs.m.RUnlock()
@@ -73,7 +73,7 @@ func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
 	tqs.m.Unlock()
 }
 
-func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(task.Task) TaskResult) {
+func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult) {
 	q := NewTasksQueue()
 	q.WithName(name)
 	q.WithHandler(handler)

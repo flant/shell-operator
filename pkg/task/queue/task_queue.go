@@ -72,7 +72,7 @@ type TaskQueue struct {
 	debug bool
 
 	Name    string
-	Handler func(task.Task) TaskResult
+	Handler func(ctx context.Context, t task.Task) TaskResult
 	Status  string
 
 	measureActionFn     func()
@@ -113,7 +113,7 @@ func (q *TaskQueue) WithName(name string) *TaskQueue {
 	return q
 }
 
-func (q *TaskQueue) WithHandler(fn func(task.Task) TaskResult) *TaskQueue {
+func (q *TaskQueue) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueue {
 	q.Handler = fn
 	return q
 }
@@ -408,7 +408,7 @@ func (q *TaskQueue) Stop() {
 	}
 }
 
-func (q *TaskQueue) Start() {
+func (q *TaskQueue) Start(ctx context.Context) {
 	if q.started {
 		return
 	}
@@ -438,7 +438,7 @@ func (q *TaskQueue) Start() {
 			// Now the task can be handled!
 			var nextSleepDelay time.Duration
 			q.SetStatus("run first task")
-			taskRes := q.Handler(t)
+			taskRes := q.Handler(ctx, t)
 
 			// Check Done channel after long-running operation.
 			select {
