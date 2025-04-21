@@ -139,8 +139,7 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
 
-		var tasks []task.Task
-		op.HookManager.HandleKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
 				WithMetadata(task_metadata.HookMetadata{
 					HookName:       hook.Name,
@@ -152,13 +151,12 @@ func (op *ShellOperator) initHookManager() error {
 				}).
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
-			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
 
 			logEntry.With("queue", info.QueueName).
 				Info("queue task", slog.String("name", newTask.GetDescription()))
-		})
 
-		return tasks
+			return newTask.WithQueuedAt(time.Now())
+		})
 	})
 	op.ManagerEventsHandler.WithScheduleEventHandler(func(crontab string) []task.Task {
 		logLabels := map[string]string{
@@ -168,8 +166,7 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'schedule' event", slog.String("name", crontab))
 
-		var tasks []task.Task
-		op.HookManager.HandleScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+		return op.HookManager.HandleCreateTasksFromScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
 				WithMetadata(task_metadata.HookMetadata{
 					HookName:       hook.Name,
@@ -181,13 +178,12 @@ func (op *ShellOperator) initHookManager() error {
 				}).
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
-			tasks = append(tasks, newTask.WithQueuedAt(time.Now()))
 
 			logEntry.With("queue", info.QueueName).
 				Info("queue task", slog.String("name", newTask.GetDescription()))
-		})
 
-		return tasks
+			return newTask.WithQueuedAt(time.Now())
+		})
 	})
 
 	return nil
