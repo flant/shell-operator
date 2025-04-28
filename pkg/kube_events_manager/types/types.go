@@ -36,13 +36,13 @@ const (
 
 type ObjectAndFilterResult struct {
 	Metadata struct {
-		JqFilter     string
-		Checksum     string
-		ResourceId   string // Used for sorting
-		RemoveObject bool
-	}
-	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
-	FilterResult interface{}
+		JqFilter     string `json:"jqFilter" yaml:"jqFilter"`
+		Checksum     string `json:"checksum" yaml:"checksum"`
+		ResourceId   string `json:"resourceId" yaml:"resourceId"` // Used for sorting
+		RemoveObject bool   `json:"removeObject" yaml:"removeObject"`
+	} `json:"metadata" yaml:"metadata"`
+	Object       *unstructured.Unstructured `json:"object" yaml:"object"` // here is a pointer because of MarshalJSON receiver
+	FilterResult interface{}                `json:"filterResult" yaml:"filterResult"`
 }
 
 // Map constructs a map suitable for use in binding context.
