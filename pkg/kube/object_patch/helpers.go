@@ -65,14 +65,21 @@ func unmarshalFromYaml(yamlSpecs []byte) ([]OperationSpec, error) {
 }
 
 func applyJQPatch(jqFilter string, fl filter.Filter, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	filterResult, err := fl.ApplyFilter(jqFilter, obj.UnstructuredContent())
+	objBytes, err := obj.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	filterResult, err := fl.ApplyFilter(jqFilter, objBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply jqFilter:\n%sto Object:\n%s\n"+
 			"error: %s", jqFilter, obj, err)
 	}
 
-	retObj := &unstructured.Unstructured{
-		Object: filterResult,
+	retObj := &unstructured.Unstructured{}
+	_, _, err = unstructured.UnstructuredJSONScheme.Decode([]byte(filterResult), nil, retObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert filterResult:\n%s\nto Unstructured Object\nerror: %s", filterResult, err)
 	}
 
 	return retObj, nil

@@ -134,6 +134,7 @@ func DefineStartCommandFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause)
 	DefineKubeClientFlags(cmd)
 	DefineValidatingWebhookFlags(cmd)
 	DefineConversionWebhookFlags(cmd)
+	DefineJqFlags(cmd)
 	DefineLoggingFlags(cmd)
 	DefineDebugFlags(kpApp, cmd)
 }

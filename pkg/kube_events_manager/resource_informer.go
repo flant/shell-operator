@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -226,7 +227,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 			defer measure.Duration(func(d time.Duration) {
 				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 			})()
-			filter := jq.NewFilter()
+			filter := jq.NewFilter(app.JqLibraryPath)
 			objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, &obj)
 		}()
 
@@ -306,7 +307,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		defer measure.Duration(func(d time.Duration) {
 			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 		})()
-		filter := jq.NewFilter()
+		filter := jq.NewFilter(app.JqLibraryPath)
 		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, obj)
 	}()
 	if err != nil {

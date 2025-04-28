@@ -33,7 +33,7 @@ func main() {
 	// print version
 	kpApp.Command("version", "Show version.").Action(func(_ *kingpin.ParseContext) error {
 		fmt.Printf("%s %s\n", app.AppName, app.Version)
-		fl := jq.NewFilter()
+		fl := jq.NewFilter(app.JqLibraryPath)
 		fmt.Println(fl.FilterInfo())
 		return nil
 	})
