@@ -54,18 +54,14 @@ func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructu
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))
 	} else {
 		var err error
-		var filtered map[string]any
+		var filtered []byte
 		filtered, err = fl.ApplyFilter(jqFilter, obj.UnstructuredContent())
 		if err != nil {
 			return nil, fmt.Errorf("jqFilter: %v", err)
 		}
 
-		bytes, err := json.Marshal(filtered)
-		if err != nil {
-			return nil, fmt.Errorf("jqFilter: %v", err)
-		}
-		res.FilterResult = filtered
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(bytes))
+		res.FilterResult = string(filtered)
+		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filtered))
 	}
 
 	return res, nil

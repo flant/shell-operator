@@ -19,7 +19,7 @@ func NewFilter() *Filter {
 type Filter struct{}
 
 // ApplyFilter runs jq expression provided in jqFilter with jsonData as input.
-func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]any, error) {
+func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, error) {
 	query, err := gojq.Parse(jqFilter)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]a
 		}
 	}
 
-	return result, nil
+	return json.Marshal(result)
 }
 
 func (f *Filter) FilterInfo() string {

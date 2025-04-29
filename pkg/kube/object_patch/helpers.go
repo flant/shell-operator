@@ -71,8 +71,10 @@ func applyJQPatch(jqFilter string, fl filter.Filter, obj *unstructured.Unstructu
 			"error: %s", jqFilter, obj, err)
 	}
 
-	retObj := &unstructured.Unstructured{
-		Object: filterResult,
+	retObj := &unstructured.Unstructured{}
+	_, _, err = unstructured.UnstructuredJSONScheme.Decode(filterResult, nil, retObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert filterResult:\n%s\nto Unstructured Object\nerror: %s", filterResult, err)
 	}
 
 	return retObj, nil
