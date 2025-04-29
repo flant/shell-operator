@@ -27,7 +27,7 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, erro
 	// gojs will normalize numbers in the input data, we should create new map for prevent changes in input data
 	workData := deepCopy(data)
 	iter := query.Run(workData)
-	result := make([]map[string]any, 0)
+	result := make([]any, 0)
 	for {
 		v, ok := iter.Next()
 		if !ok {
@@ -40,9 +40,7 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, erro
 			}
 			return nil, err
 		}
-		if resultMap, ok := v.(map[string]any); ok {
-			result = append(result, resultMap)
-		}
+		result = append(result, v)
 	}
 
 	return json.Marshal(result)
