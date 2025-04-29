@@ -46,17 +46,17 @@ func Test_ApplyFilter_MultipleJsonDocumentsInArray(t *testing.T) {
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"users": []any{map[string]any{"name": "John", "status": "inactive"}, map[string]any{"name": "Jane", "status": "inactive"}}})
 	g.Expect(err).Should(BeNil())
 
-	var resultMap map[string]any
+	var resultMap []map[string]any
 	err = json.Unmarshal(result, &resultMap)
 	g.Expect(err).Should(BeNil())
+	g.Expect(resultMap).Should(HaveLen(2))
 
-	expected1 := map[string]any{"name": "John", "status": "active"}
-	expected2 := map[string]any{"name": "Jane", "status": "active"}
+	expected := []map[string]any{
+		{"name": "John", "status": "active"},
+		{"name": "Jane", "status": "active"},
+	}
 
-	g.Expect(resultMap).Should(SatisfyAny(
-		Equal(expected1),
-		Equal(expected2),
-	))
+	g.Expect(resultMap).Should(ConsistOf(expected))
 }
 
 func Test_ApplyFilter_InvalidFilter(t *testing.T) {
