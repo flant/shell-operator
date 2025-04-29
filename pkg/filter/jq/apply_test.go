@@ -16,11 +16,10 @@ func Test_ApplyFilter_SingleDocumentModification(t *testing.T) {
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"name": "John", "age": 30})
 	g.Expect(err).Should(BeNil())
 
-	var resultMap []any
+	var resultMap any
 	err = json.Unmarshal(result, &resultMap)
 	g.Expect(err).Should(BeNil())
-	g.Expect(resultMap).Should(HaveLen(1))
-	g.Expect(resultMap[0]).Should(Equal(map[string]any{"name": "John", "age": 30.0, "status": "active"}))
+	g.Expect(resultMap).Should(Equal(map[string]any{"name": "John", "age": 30.0, "status": "active"}))
 }
 
 func Test_ApplyFilter_ExtractValuesFromDocument(t *testing.T) {
@@ -32,11 +31,10 @@ func Test_ApplyFilter_ExtractValuesFromDocument(t *testing.T) {
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"user": map[string]any{"name": "John", "details": map[string]any{"location": "New York", "occupation": "Developer"}}})
 	g.Expect(err).Should(BeNil())
 
-	var resultMap []any
+	var resultMap any
 	err = json.Unmarshal(result, &resultMap)
 	g.Expect(err).Should(BeNil())
-	g.Expect(resultMap).Should(HaveLen(1))
-	g.Expect(resultMap[0]).Should(Equal(map[string]any{"location": "New York", "occupation": "Developer"}))
+	g.Expect(resultMap).Should(Equal(map[string]any{"location": "New York", "occupation": "Developer"}))
 }
 
 func Test_ApplyFilter_MultipleJsonDocumentsInArray(t *testing.T) {
@@ -82,7 +80,7 @@ func Test_ApplyFilter_InvalidJson(t *testing.T) {
 	g.Expect(err).Should(BeNil())
 	g.Expect(result).ShouldNot(BeNil())
 
-	var resultMap []any
+	var resultMap any
 	err = json.Unmarshal(result, &resultMap)
 	g.Expect(err).Should(BeNil())
 	g.Expect(resultMap).ShouldNot(BeNil())
@@ -152,10 +150,10 @@ func Test_ApplyFilter_EmptyResult(t *testing.T) {
 	g.Expect(err).Should(BeNil())
 	g.Expect(result).ShouldNot(BeNil())
 
-	var resultMap []any
+	var resultMap any
 	err = json.Unmarshal(result, &resultMap)
 	g.Expect(err).Should(BeNil())
-	g.Expect(resultMap).Should(HaveLen(1))
+	g.Expect(resultMap).Should(BeNil())
 }
 
 func Test_ApplyFilter_InvalidJqSyntax(t *testing.T) {

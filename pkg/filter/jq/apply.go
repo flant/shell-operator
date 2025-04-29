@@ -43,6 +43,10 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, erro
 		result = append(result, v)
 	}
 
+	if len(result) == 1 {
+		return json.Marshal(result[0])
+	}
+
 	return json.Marshal(result)
 }
 
