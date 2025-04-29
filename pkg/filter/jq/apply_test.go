@@ -1,6 +1,7 @@
 package jq
 
 import (
+	"encoding/json"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -13,9 +14,12 @@ func Test_ApplyFilter_SingleDocumentModification(t *testing.T) {
 	jqFilter := `. + {"status": "active"}`
 
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"name": "John", "age": 30})
-
 	g.Expect(err).Should(BeNil())
-	g.Expect(result).Should(Equal(map[string]any{"name": "John", "age": 30.0, "status": "active"}))
+
+	var resultMap map[string]any
+	err = json.Unmarshal(result, &resultMap)
+	g.Expect(err).Should(BeNil())
+	g.Expect(resultMap).Should(Equal(map[string]any{"name": "John", "age": 30.0, "status": "active"}))
 }
 
 func Test_ApplyFilter_ExtractValuesFromDocument(t *testing.T) {
@@ -25,9 +29,12 @@ func Test_ApplyFilter_ExtractValuesFromDocument(t *testing.T) {
 	jqFilter := `.user.details`
 
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"user": map[string]any{"name": "John", "details": map[string]any{"location": "New York", "occupation": "Developer"}}})
-
 	g.Expect(err).Should(BeNil())
-	g.Expect(result).Should(Equal(map[string]any{"location": "New York", "occupation": "Developer"}))
+
+	var resultMap map[string]any
+	err = json.Unmarshal(result, &resultMap)
+	g.Expect(err).Should(BeNil())
+	g.Expect(resultMap).Should(Equal(map[string]any{"location": "New York", "occupation": "Developer"}))
 }
 
 func Test_ApplyFilter_MultipleJsonDocumentsInArray(t *testing.T) {
@@ -37,13 +44,16 @@ func Test_ApplyFilter_MultipleJsonDocumentsInArray(t *testing.T) {
 	jqFilter := `.users[] | . + {"status": "active"}`
 
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"users": []any{map[string]any{"name": "John", "status": "inactive"}, map[string]any{"name": "Jane", "status": "inactive"}}})
+	g.Expect(err).Should(BeNil())
 
+	var resultMap map[string]any
+	err = json.Unmarshal(result, &resultMap)
 	g.Expect(err).Should(BeNil())
 
 	expected1 := map[string]any{"name": "John", "status": "active"}
 	expected2 := map[string]any{"name": "Jane", "status": "active"}
 
-	g.Expect(result).Should(SatisfyAny(
+	g.Expect(resultMap).Should(SatisfyAny(
 		Equal(expected1),
 		Equal(expected2),
 	))
@@ -56,7 +66,6 @@ func Test_ApplyFilter_InvalidFilter(t *testing.T) {
 	invalidFilter := `. | invalid_function`
 
 	result, err := filter.ApplyFilter(invalidFilter, map[string]any{"name": "John"})
-
 	g.Expect(err).ShouldNot(BeNil())
 	g.Expect(result).Should(BeNil())
 }
@@ -68,9 +77,13 @@ func Test_ApplyFilter_InvalidJson(t *testing.T) {
 	jqFilter := `.name`
 
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"name": "John"})
-
 	g.Expect(err).Should(BeNil())
 	g.Expect(result).ShouldNot(BeNil())
+
+	var resultMap map[string]any
+	err = json.Unmarshal(result, &resultMap)
+	g.Expect(err).Should(BeNil())
+	g.Expect(resultMap).ShouldNot(BeNil())
 }
 
 func Test_deepCopy(t *testing.T) {
