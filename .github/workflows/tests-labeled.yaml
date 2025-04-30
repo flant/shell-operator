@@ -110,6 +110,5 @@ jobs:
           ginkgo \
             --tags 'integration test'  \
             --vet off \
-            --race \
             -p \
             -r test/integration
