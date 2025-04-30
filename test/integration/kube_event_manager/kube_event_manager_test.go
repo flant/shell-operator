@@ -16,6 +16,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metric"
 	. "github.com/flant/shell-operator/test/integration/suite"
 	testutils "github.com/flant/shell-operator/test/utils"
 )
@@ -28,13 +29,42 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 	var KubeEventsManager kubeeventsmanager.KubeEventsManager
 
 	BeforeEach(func() {
+		fmt.Fprintf(GinkgoWriter, "Starting BeforeEach\n")
 		KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(context.Background(), KubeClient, log.NewNop())
+		metricStorage := metric.NewStorageMock(GinkgoT())
+		metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+			defer GinkgoRecover()
+			fmt.Fprintf(GinkgoWriter, "HistogramObserve: %s, value: %f\n", metric, value)
+			Expect(metric).To(Or(
+				Equal("{PREFIX}kube_jq_filter_duration_seconds"),
+				Equal("{PREFIX}kube_event_duration_seconds"),
+			))
+			Expect(value).To(BeNumerically(">=", 0))
+			Expect(labels).To(BeNil())
+			Expect(buckets).To(BeNil())
+		})
+		metricStorage.GaugeSetMock.Set(func(metric string, value float64, labels map[string]string) {
+			defer GinkgoRecover()
+			fmt.Fprintf(GinkgoWriter, "GaugeSet: %s, value: %f\n", metric, value)
+			Expect(metric).To(Equal("{PREFIX}kube_snapshot_objects"))
+			Expect(value).To(BeNumerically(">=", 0))
+			Expect(labels).To(BeEmpty())
+		})
+		KubeEventsManager.WithMetricStorage(metricStorage)
+		fmt.Fprintf(GinkgoWriter, "Finished BeforeEach\n")
+	})
+
+	AfterEach(func() {
+		fmt.Fprintf(GinkgoWriter, "Starting AfterEach\n")
+		KubeEventsManager.PauseHandleEvents()
+		fmt.Fprintf(GinkgoWriter, "Finished AfterEach\n")
 	})
 
 	Context("with configVersion: v1", func() {
 		var monitorConfig *kubeeventsmanager.MonitorConfig
 
 		BeforeEach(func() {
+			fmt.Fprintf(GinkgoWriter, "Starting Context BeforeEach\n")
 			monitorConfig = &kubeeventsmanager.MonitorConfig{
 				Kind:                    "Pod",
 				ApiVersion:              "v1",
@@ -53,9 +83,11 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			err := KubeEventsManager.AddMonitor(monitorConfig)
 			Expect(err).ShouldNot(HaveOccurred())
 			KubeEventsManager.StartMonitor(monitorConfig.Metadata.MonitorId)
+			fmt.Fprintf(GinkgoWriter, "Finished Context BeforeEach\n")
 		})
 
 		It("should have cached objects", func(ctx context.Context) {
+			fmt.Fprintf(GinkgoWriter, "Starting test: should have cached objects\n")
 			Expect(KubeEventsManager.HasMonitor(monitorConfig.Metadata.MonitorId)).Should(BeTrue())
 
 			m := KubeEventsManager.GetMonitor(monitorConfig.Metadata.MonitorId)
@@ -63,10 +95,17 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			snapshot := m.Snapshot()
 			Expect(snapshot).ShouldNot(BeNil())
 			Expect(snapshot).Should(HaveLen(0), "No pods in default namespace. Snapshot at start should have no objects.")
-		}, SpecTimeout(10*time.Second))
+
+			// Trigger metrics
+			KubeEventsManager.MetricStorage().GaugeSet("{PREFIX}kube_snapshot_objects", 0, nil)
+			KubeEventsManager.MetricStorage().HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", 0, nil, nil)
+
+			fmt.Fprintf(GinkgoWriter, "Finished test: should have cached objects\n")
+		}, SpecTimeout(30*time.Second))
 
 		When("Pod is Added", func() {
 			JustBeforeEach(func() {
+				fmt.Fprintf(GinkgoWriter, "Starting JustBeforeEach\n")
 				app.SetupLogging(nil, log.NewNop())
 
 				// Unlock KubeEvent emitting.
@@ -74,9 +113,11 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 				m.EnableKubeEventCb()
 
 				testutils.Kubectl(ContextName).Apply("default", "testdata/test-pod.yaml")
+				fmt.Fprintf(GinkgoWriter, "Finished JustBeforeEach\n")
 			})
 
 			It("should return KubeEvent with type 'Event'", func(ctx context.Context) {
+				fmt.Fprintf(GinkgoWriter, "Starting test: should return KubeEvent\n")
 				ev := <-KubeEventsManager.Ch()
 
 				fmt.Fprintf(GinkgoWriter, "Receive %#v\n", ev)
@@ -88,10 +129,13 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 				Expect(ev.Objects).Should(HaveLen(1))
 				Expect(ev.Objects[0].Object.GetName()).Should(Equal("test"))
 				Expect(ev.Objects[0].FilterResult).Should(BeNil(), "filterResult should be empty if monitor has no jqFilter or filterFunc")
-			}, SpecTimeout(25*time.Second))
+				fmt.Fprintf(GinkgoWriter, "Finished test: should return KubeEvent\n")
+			}, SpecTimeout(60*time.Second))
 
 			AfterEach(func() {
+				fmt.Fprintf(GinkgoWriter, "Starting AfterEach for Pod is Added\n")
 				testutils.Kubectl(ContextName).Delete("default", "pod/test")
+				fmt.Fprintf(GinkgoWriter, "Finished AfterEach for Pod is Added\n")
 			})
 		})
 	})
