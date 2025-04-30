@@ -19,13 +19,25 @@ type Filter struct{}
 
 // ApplyFilter runs jq expression provided in jqFilter with jsonData as input.
 func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, error) {
+	if jqFilter == "" {
+		return nil, errors.New("jqFilter is empty")
+	}
+
 	query, err := gojq.Parse(jqFilter)
 	if err != nil {
 		return nil, err
 	}
 
-	// gojs will normalize numbers in the input data, we should create new map for prevent changes in input data
-	workData := deepCopy(data)
+	var workData any
+	if data == nil {
+		workData = nil
+	} else {
+		workData, err = deepCopyAny(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	iter := query.Run(workData)
 	result := make([]any, 0)
 	for {
@@ -43,15 +55,32 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, erro
 		result = append(result, v)
 	}
 
+	if len(result) == 0 {
+		return []byte("null"), nil
+	}
 	if len(result) == 1 {
 		return json.Marshal(result[0])
 	}
-
 	return json.Marshal(result)
 }
 
 func (f *Filter) FilterInfo() string {
 	return "jqFilter implementation: using itchyny/gojq"
+}
+
+func deepCopyAny(input any) (any, error) {
+	if input == nil {
+		return nil, nil
+	}
+	data, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	var output any
+	if err := json.Unmarshal(data, &output); err != nil {
+		return nil, err
+	}
+	return output, nil
 }
 
 func deepCopy(input map[string]any) map[string]any {

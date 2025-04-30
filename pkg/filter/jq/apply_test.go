@@ -63,9 +63,15 @@ func Test_ApplyFilter_InvalidFilter(t *testing.T) {
 	g := NewWithT(t)
 	filter := NewFilter()
 
-	invalidFilter := `. | invalid_function`
+	// Test invalid jq syntax
+	invalidSyntax := `invalid syntax`
+	result, err := filter.ApplyFilter(invalidSyntax, map[string]any{"name": "John"})
+	g.Expect(err).ShouldNot(BeNil())
+	g.Expect(result).Should(BeNil())
 
-	result, err := filter.ApplyFilter(invalidFilter, map[string]any{"name": "John"})
+	// Test invalid jq function
+	invalidFunction := `. | invalid_function`
+	result, err = filter.ApplyFilter(invalidFunction, map[string]any{"name": "John"})
 	g.Expect(err).ShouldNot(BeNil())
 	g.Expect(result).Should(BeNil())
 }
@@ -137,8 +143,8 @@ func Test_ApplyFilter_InvalidJsonInDeepCopy(t *testing.T) {
 	}
 
 	result, err := filter.ApplyFilter(`.`, invalidData)
-	g.Expect(err).Should(BeNil())
-	g.Expect(result).ShouldNot(BeNil())
+	g.Expect(err).ShouldNot(BeNil()) // Expect an error due to invalid JSON
+	g.Expect(result).Should(BeNil())
 }
 
 func Test_ApplyFilter_EmptyResult(t *testing.T) {
@@ -153,7 +159,7 @@ func Test_ApplyFilter_EmptyResult(t *testing.T) {
 	var resultMap any
 	err = json.Unmarshal(result, &resultMap)
 	g.Expect(err).Should(BeNil())
-	g.Expect(resultMap).Should(BeNil())
+	g.Expect(resultMap).Should(BeNil()) // Expect result to be nil (empty)
 }
 
 func Test_ApplyFilter_InvalidJqSyntax(t *testing.T) {
@@ -172,4 +178,19 @@ func Test_ApplyFilter_InvalidJqFunction(t *testing.T) {
 	result, err := filter.ApplyFilter(`. | invalid_function`, map[string]any{"name": "John"})
 	g.Expect(err).ShouldNot(BeNil())
 	g.Expect(result).Should(BeNil())
+}
+
+func Test_ApplyFilter_PanicSafety(t *testing.T) {
+	g := NewWithT(t)
+	filter := NewFilter()
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("ApplyFilter panicked: %v", r)
+		}
+	}()
+
+	// Test with data that could potentially cause a panic
+	_, err := filter.ApplyFilter(`.`, map[string]any{"key": func() {}})
+	g.Expect(err).ShouldNot(BeNil())
 }
