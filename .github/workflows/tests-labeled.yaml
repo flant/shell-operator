@@ -89,7 +89,7 @@ jobs:
 
       - name: Install ginkgo
         run: |
-          go install github.com/onsi/ginkgo/ginkgo
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
           echo $PATH
           ls -la $GOPATH/bin
           ginkgo version
