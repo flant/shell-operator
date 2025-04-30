@@ -51,14 +51,14 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, erro
 		result = append(result, v)
 	}
 
-        switch len(result) {
-          case 0:
-            return []byte("null"), nil
-          case 1:
-            return json.Marshal(result[0])
-          default:
-            return json.Marshal(result)
-        }
+	switch len(result) {
+	case 0:
+		return []byte("null"), nil
+	case 1:
+		return json.Marshal(result[0])
+	default:
+		return json.Marshal(result)
+	}
 }
 
 func (f *Filter) FilterInfo() string {
