@@ -1,16 +1,11 @@
 # Publish flant/shell-operator image on hub.docker.com.
-# Build 'latest' tag if started manually on default branch.
-# Build 'latest' tag when PR is merged into the default branch.
-# Build 'v*.*.*' and 'latest' tags on push released tag.
+# Build 'latest' tag when release is published.
 name: Publish release image
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [closed]
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
 
 env:
   QEMU_PLATFORMS: arm64,arm

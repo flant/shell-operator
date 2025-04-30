@@ -5,7 +5,7 @@ FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl as libjq
 FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.23-alpine3.21 AS builder
 
 ARG appVersion=latest
-RUN apk --no-cache add git ca-certificates gcc musl-dev libc-dev
+RUN apk --no-cache add git ca-certificates gcc musl-dev libc-dev binutils-gold
 
 # Cache-friendly download of go dependencies.
 ADD go.mod go.sum /app/
@@ -25,7 +25,7 @@ ARG TARGETPLATFORM
 RUN apk --no-cache add ca-certificates bash sed tini && \
     kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
     echo "Download kubectl for ${kubectlArch}" && \
-    wget https://storage.googleapis.com/kubernetes-release/release/v1.27.13/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
+    wget https://dl.k8s.io/release/v1.30.12/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl && \
     mkdir /hooks
 ADD frameworks/shell /frameworks/shell
