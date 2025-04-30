@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -54,7 +55,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			KubeEventsManager.StartMonitor(monitorConfig.Metadata.MonitorId)
 		})
 
-		It("should have cached objects", func(done Done) {
+		It("should have cached objects", func(ctx context.Context) {
 			Expect(KubeEventsManager.HasMonitor(monitorConfig.Metadata.MonitorId)).Should(BeTrue())
 
 			m := KubeEventsManager.GetMonitor(monitorConfig.Metadata.MonitorId)
@@ -62,9 +63,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			snapshot := m.Snapshot()
 			Expect(snapshot).ShouldNot(BeNil())
 			Expect(snapshot).Should(HaveLen(0), "No pods in default namespace. Snapshot at start should have no objects.")
-
-			close(done)
-		}, 10)
+		}, SpecTimeout(10*time.Second))
 
 		When("Pod is Added", func() {
 			JustBeforeEach(func() {
@@ -77,7 +76,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 				testutils.Kubectl(ContextName).Apply("default", "testdata/test-pod.yaml")
 			})
 
-			It("should return KubeEvent with type 'Event'", func() {
+			It("should return KubeEvent with type 'Event'", func(ctx context.Context) {
 				ev := <-KubeEventsManager.Ch()
 
 				fmt.Fprintf(GinkgoWriter, "Receive %#v\n", ev)
@@ -89,7 +88,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 				Expect(ev.Objects).Should(HaveLen(1))
 				Expect(ev.Objects[0].Object.GetName()).Should(Equal("test"))
 				Expect(ev.Objects[0].FilterResult).Should(BeNil(), "filterResult should be empty if monitor has no jqFilter or filterFunc")
-			}, 25)
+			}, SpecTimeout(25*time.Second))
 
 			AfterEach(func() {
 				testutils.Kubectl(ContextName).Delete("default", "pod/test")
