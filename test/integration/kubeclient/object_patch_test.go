@@ -6,11 +6,12 @@ package kubeclient_test
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	. "github.com/flant/shell-operator/test/integration/suite"
 	uuid "github.com/gofrs/uuid/v5"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,12 +64,12 @@ var _ = Describe("Kubernetes API object patching", func() {
 			Expect(removeNamespace(testCM.Namespace))
 		})
 
-		It("should fail to Create() an object if it already exists", func() {
+		It("should fail to Create() an object if it already exists", func(ctx context.Context) {
 			err := ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOperation(unstructuredCM))
 			Expect(err).To(Not(Succeed()))
-		})
+		}, SpecTimeout(10*time.Second))
 
-		It("should should successfully CreateOrUpdate() an object even if it already exists", func() {
+		It("should should successfully CreateOrUpdate() an object even if it already exists", func(ctx context.Context) {
 			newTestCM := testCM.DeepCopy()
 			newTestCM.Data = map[string]string{
 				"firstField":  "test3",
@@ -81,12 +82,12 @@ var _ = Describe("Kubernetes API object patching", func() {
 			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredNewTestCM))
 			Expect(err).To(Succeed())
 
-			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), newTestCM.Name, metav1.GetOptions{})
+			cm, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(ctx, newTestCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(cm.Data).To(Equal(newTestCM.Data))
-		})
+		}, SpecTimeout(10*time.Second))
 
-		It("should successfully CreateOrUpdate() an object if id does not yet exist", func() {
+		It("should successfully CreateOrUpdate() an object if id does not yet exist", func(ctx context.Context) {
 			separateTestCM := testCM.DeepCopy()
 			separateTestCM.Name = "separate-test"
 
@@ -96,9 +97,9 @@ var _ = Describe("Kubernetes API object patching", func() {
 			err = ObjectPatcher.ExecuteOperation(objectpatch.NewCreateOrUpdateOperation(unstructuredSeparateTestCM))
 			Expect(err).To(Succeed())
 
-			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), separateTestCM.Name, metav1.GetOptions{})
+			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(ctx, separateTestCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
-		})
+		}, SpecTimeout(10*time.Second))
 	})
 
 	Context("deleting an object", func() {
@@ -116,19 +117,19 @@ var _ = Describe("Kubernetes API object patching", func() {
 			Expect(removeNamespace(testCM.Namespace))
 		})
 
-		It("should successfully delete an object", func() {
+		It("should successfully delete an object", func(ctx context.Context) {
 			err := ObjectPatcher.ExecuteOperation(objectpatch.NewDeleteInBackgroundOperation(
 				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
 			Expect(err).Should(Succeed())
 
-			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), testCM.Name, metav1.GetOptions{})
+			_, err = KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(ctx, testCM.Name, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
-		})
+		}, SpecTimeout(10*time.Second))
 
-		It("should successfully delete an object if it doesn't exist", func() {
+		It("should successfully delete an object if it doesn't exist", func(ctx context.Context) {
 			err := ObjectPatcher.ExecuteOperation(objectpatch.NewDeleteOperation(testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
 			Expect(err).Should(Succeed())
-		})
+		}, SpecTimeout(10*time.Second))
 	})
 
 	Context("patching an object", func() {
@@ -146,7 +147,7 @@ var _ = Describe("Kubernetes API object patching", func() {
 			Expect(removeNamespace(testCM.Namespace))
 		})
 
-		It("should successfully JQPatch an object", func() {
+		It("should successfully JQPatch an object", func(ctx context.Context) {
 			err := ObjectPatcher.ExecuteOperation(objectpatch.NewFromOperationSpec(objectpatch.OperationSpec{
 				Operation:  objectpatch.JQPatch,
 				ApiVersion: testCM.APIVersion,
@@ -157,12 +158,12 @@ var _ = Describe("Kubernetes API object patching", func() {
 			}))
 			Expect(err).Should(Succeed())
 
-			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), testCM.Name, metav1.GetOptions{})
+			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(ctx, testCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(existingCM.Data["firstField"]).To(Equal("JQPatched"))
-		})
+		}, SpecTimeout(10*time.Second))
 
-		It("should successfully MergePatch an object", func() {
+		It("should successfully MergePatch an object", func(ctx context.Context) {
 			mergePatchYaml := `---
 data:
   firstField: "mergePatched"
@@ -177,21 +178,21 @@ data:
 			err = ObjectPatcher.ExecuteOperation(objectpatch.NewMergePatchOperation(mergePatchJson, testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
 			Expect(err).To(Succeed())
 
-			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), testCM.Name, metav1.GetOptions{})
+			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(ctx, testCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(existingCM.Data["firstField"]).To(Equal("mergePatched"))
-		})
+		}, SpecTimeout(10*time.Second))
 
-		It("should successfully JSONPatch an object", func() {
+		It("should successfully JSONPatch an object", func(ctx context.Context) {
 			err := ObjectPatcher.ExecuteOperation(objectpatch.NewJSONPatchOperation(
 				[]byte(`[{ "op": "replace", "path": "/data/firstField", "value": "jsonPatched"}]`),
 				testCM.APIVersion, testCM.Kind, testCM.Namespace, testCM.Name))
 			Expect(err).To(Succeed())
 
-			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(context.TODO(), testCM.Name, metav1.GetOptions{})
+			existingCM, err := KubeClient.CoreV1().ConfigMaps(testCM.Namespace).Get(ctx, testCM.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 			Expect(existingCM.Data["firstField"]).To(Equal("jsonPatched"))
-		})
+		}, SpecTimeout(10*time.Second))
 	})
 })
 
