@@ -92,29 +92,6 @@ func Test_ApplyFilter_InvalidJson(t *testing.T) {
 	g.Expect(resultMap).ShouldNot(BeNil())
 }
 
-func Test_deepCopy(t *testing.T) {
-	g := NewWithT(t)
-
-	original := map[string]any{
-		"name": "John",
-		"age":  30.0,
-		"address": map[string]any{
-			"city":  "New York",
-			"state": "NY",
-		},
-	}
-
-	cp := deepCopy(original)
-
-	g.Expect(cp).Should(Equal(original))
-
-	cp["name"] = "Jane"
-	cp["address"].(map[string]any)["city"] = "Los Angeles"
-
-	g.Expect(original["name"]).Should(Equal("John"))
-	g.Expect(original["address"].(map[string]any)["city"]).Should(Equal("New York"))
-}
-
 func Test_ApplyFilter_NilInputData(t *testing.T) {
 	g := NewWithT(t)
 	filter := NewFilter()
@@ -193,4 +170,33 @@ func Test_ApplyFilter_PanicSafety(t *testing.T) {
 	// Test with data that could potentially cause a panic
 	_, err := filter.ApplyFilter(`.`, map[string]any{"key": func() {}})
 	g.Expect(err).ShouldNot(BeNil())
+}
+
+func Test_deepCopyAny(t *testing.T) {
+	g := NewWithT(t)
+
+	// Test copying a map
+	inputMap := map[string]any{"foo": "bar", "num": 42}
+	copyMap, err := deepCopyAny(inputMap)
+	g.Expect(err).Should(BeNil())
+	g.Expect(copyMap).Should(Equal(map[string]any{"foo": "bar", "num": float64(42)}))
+	g.Expect(copyMap).ShouldNot(BeIdenticalTo(inputMap))
+
+	// Test copying a slice
+	inputSlice := []any{"a", 1, true}
+	copySlice, err := deepCopyAny(inputSlice)
+	g.Expect(err).Should(BeNil())
+	g.Expect(copySlice).Should(Equal([]any{"a", float64(1), true}))
+	g.Expect(copySlice).ShouldNot(BeIdenticalTo(inputSlice))
+
+	// Test copying nil
+	copyNil, err := deepCopyAny(nil)
+	g.Expect(err).Should(BeNil())
+	g.Expect(copyNil).Should(BeNil())
+
+	// Test copying a value that cannot be marshaled to JSON
+	inputInvalid := map[string]any{"ch": make(chan int)}
+	copyInvalid, err := deepCopyAny(inputInvalid)
+	g.Expect(err).ShouldNot(BeNil())
+	g.Expect(copyInvalid).Should(BeNil())
 }

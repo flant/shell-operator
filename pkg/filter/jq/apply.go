@@ -19,10 +19,6 @@ type Filter struct{}
 
 // ApplyFilter runs jq expression provided in jqFilter with jsonData as input.
 func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, error) {
-	if jqFilter == "" {
-		return nil, errors.New("jqFilter is empty")
-	}
-
 	query, err := gojq.Parse(jqFilter)
 	if err != nil {
 		return nil, err
@@ -81,11 +77,4 @@ func deepCopyAny(input any) (any, error) {
 		return nil, err
 	}
 	return output, nil
-}
-
-func deepCopy(input map[string]any) map[string]any {
-	data, _ := json.Marshal(input)
-	var output map[string]any
-	_ = json.Unmarshal(data, &output)
-	return output
 }
