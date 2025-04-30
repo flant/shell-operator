@@ -16,6 +16,7 @@ import (
 
 type KubeEventsManager interface {
 	WithMetricStorage(mstor metric.Storage)
+	MetricStorage() metric.Storage
 	AddMonitor(monitorConfig *MonitorConfig) error
 	HasMonitor(monitorID string) bool
 	GetMonitor(monitorID string) Monitor
@@ -146,4 +147,8 @@ func (mgr *kubeEventsManager) PauseHandleEvents() {
 	for _, monitor := range mgr.Monitors {
 		monitor.PauseHandleEvents()
 	}
+}
+
+func (mgr *kubeEventsManager) MetricStorage() metric.Storage {
+	return mgr.metricStorage
 }

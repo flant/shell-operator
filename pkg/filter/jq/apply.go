@@ -3,7 +3,6 @@ package jq
 import (
 	"encoding/json"
 	"errors"
-	"maps"
 
 	"github.com/itchyny/gojq"
 
@@ -19,16 +18,24 @@ func NewFilter() *Filter {
 type Filter struct{}
 
 // ApplyFilter runs jq expression provided in jqFilter with jsonData as input.
-func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]any, error) {
+func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, error) {
 	query, err := gojq.Parse(jqFilter)
 	if err != nil {
 		return nil, err
 	}
 
-	// gojs will normalize numbers in the input data, we should create new map for prevent changes in input data
-	workData := deepCopy(data)
+	var workData any
+	if data == nil {
+		workData = nil
+	} else {
+		workData, err = deepCopyAny(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	iter := query.Run(workData)
-	result := make(map[string]any)
+	result := make([]any, 0)
 	for {
 		v, ok := iter.Next()
 		if !ok {
@@ -41,21 +48,34 @@ func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) (map[string]a
 			}
 			return nil, err
 		}
-		if resultMap, ok := v.(map[string]any); ok {
-			maps.Copy(result, resultMap)
-		}
+		result = append(result, v)
 	}
 
-	return result, nil
+	switch len(result) {
+	case 0:
+		return []byte("null"), nil
+	case 1:
+		return json.Marshal(result[0])
+	default:
+		return json.Marshal(result)
+	}
 }
 
 func (f *Filter) FilterInfo() string {
 	return "jqFilter implementation: using itchyny/gojq"
 }
 
-func deepCopy(input map[string]any) map[string]any {
-	data, _ := json.Marshal(input)
-	var output map[string]any
-	_ = json.Unmarshal(data, &output)
-	return output
+func deepCopyAny(input any) (any, error) {
+	if input == nil {
+		return nil, nil
+	}
+	data, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	var output any
+	if err := json.Unmarshal(data, &output); err != nil {
+		return nil, err
+	}
+	return output, nil
 }
