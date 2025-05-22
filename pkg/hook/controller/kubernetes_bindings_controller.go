@@ -220,7 +220,7 @@ func (c *kubernetesBindingsController) setBindingMonitorLinks(monitorId string, 
 
 // HandleEvent receives event from KubeEventManager and returns a BindingExecutionInfo
 // to help create a new task to run a hook.
-func (c *kubernetesBindingsController) HandleEvent(ctx context.Context, kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
+func (c *kubernetesBindingsController) HandleEvent(_ context.Context, kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
 	link, hasKey := c.getBindingMonitorLinksById(kubeEvent.MonitorId)
 	if !hasKey {
 		log.Error("Possible bug!!! Unknown kube event: no such monitor id registered", slog.String("monitorID", kubeEvent.MonitorId))

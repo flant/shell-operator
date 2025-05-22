@@ -82,7 +82,7 @@ func (c *ConversionBindingsController) CanHandleEvent(crdName string, _ *v1.Conv
 	return has
 }
 
-func (c *ConversionBindingsController) HandleEvent(ctx context.Context, crdName string, request *v1.ConversionRequest, rule conversion.Rule) BindingExecutionInfo {
+func (c *ConversionBindingsController) HandleEvent(_ context.Context, crdName string, request *v1.ConversionRequest, rule conversion.Rule) BindingExecutionInfo {
 	_, hasKey := c.Links[crdName]
 	if !hasKey {
 		log.Error("Possible bug!!! No binding for conversion event for crd", slog.String("crd", crdName))

@@ -74,7 +74,7 @@ func (c *scheduleBindingsController) CanHandleEvent(crontab string) bool {
 	return false
 }
 
-func (c *scheduleBindingsController) HandleEvent(ctx context.Context, crontab string) []BindingExecutionInfo {
+func (c *scheduleBindingsController) HandleEvent(_ context.Context, crontab string) []BindingExecutionInfo {
 	res := []BindingExecutionInfo{}
 
 	c.l.RLock()

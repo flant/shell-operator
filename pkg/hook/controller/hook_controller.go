@@ -148,7 +148,7 @@ func (hc *HookController) CanHandleConversionEvent(crdName string, event *v1.Con
 	return false
 }
 
-func (hc *HookController) HandleEnableKubernetesBindings(ctx context.Context, createTasksFn func(BindingExecutionInfo)) error {
+func (hc *HookController) HandleEnableKubernetesBindings(_ context.Context, createTasksFn func(BindingExecutionInfo)) error {
 	if hc.KubernetesController != nil {
 		execInfos, err := hc.KubernetesController.EnableKubernetesBindings()
 		if err != nil {
