@@ -92,7 +92,7 @@ func (h *Hook) WithHookController(hookController *controller.HookController) {
 	h.HookController = hookController
 }
 
-func (h *Hook) Run(_ htypes.BindingType, context []bctx.BindingContext, logLabels map[string]string) (*Result, error) {
+func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.BindingContext, logLabels map[string]string) (*Result, error) {
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
@@ -156,7 +156,7 @@ func (h *Hook) Run(_ htypes.BindingType, context []bctx.BindingContext, logLabel
 
 	result := &Result{}
 
-	result.Usage, err = hookCmd.RunAndLogLines(logLabels)
+	result.Usage, err = hookCmd.RunAndLogLines(ctx, logLabels)
 	if err != nil {
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}

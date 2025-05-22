@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"sync"
 
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -26,7 +27,7 @@ type ScheduleBindingsController interface {
 	EnableScheduleBindings()
 	DisableScheduleBindings()
 	CanHandleEvent(crontab string) bool
-	HandleEvent(crontab string) []BindingExecutionInfo
+	HandleEvent(ctx context.Context, crontab string) []BindingExecutionInfo
 }
 
 // scheduleBindingsController is a main implementation of KubernetesHooksController
@@ -73,7 +74,7 @@ func (c *scheduleBindingsController) CanHandleEvent(crontab string) bool {
 	return false
 }
 
-func (c *scheduleBindingsController) HandleEvent(crontab string) []BindingExecutionInfo {
+func (c *scheduleBindingsController) HandleEvent(ctx context.Context, crontab string) []BindingExecutionInfo {
 	res := []BindingExecutionInfo{}
 
 	c.l.RLock()

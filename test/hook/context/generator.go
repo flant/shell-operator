@@ -158,7 +158,7 @@ outer:
 			case "STOP_EVENTS":
 				break outer
 			default:
-				b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
+				b.HookCtrl.HandleKubeEvent(ctx, ev, func(info controller.BindingExecutionInfo) {
 					cc.AddBindingContext(types.OnKubernetesEvent, info)
 				})
 			}
@@ -169,12 +169,12 @@ outer:
 	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
-func (b *BindingContextController) RunSchedule(crontab string) (GeneratedBindingContexts, error) {
+func (b *BindingContextController) RunSchedule(ctx context.Context, crontab string) (GeneratedBindingContexts, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	cc := NewContextCombiner()
-	b.HookCtrl.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
+	b.HookCtrl.HandleScheduleEvent(ctx, crontab, func(info controller.BindingExecutionInfo) {
 		cc.AddBindingContext(types.Schedule, info)
 	})
 	return cc.CombinedAndUpdated(b.HookCtrl)

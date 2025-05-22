@@ -14,8 +14,13 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"go.opentelemetry.io/otel"
 
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
+)
+
+const (
+	serviceName = "executor"
 )
 
 func Run(cmd *exec.Cmd) error {
@@ -106,7 +111,10 @@ type CmdUsage struct {
 	MaxRss int64
 }
 
-func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error) {
+func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]string) (*CmdUsage, error) {
+	ctx, span := otel.Tracer(serviceName).Start(ctx, "RunAndLogLines")
+	defer span.End()
+
 	stdErr := bytes.NewBuffer(nil)
 	logEntry := utils.EnrichLoggerWithLabels(e.logger, logLabels)
 	stdoutLogEntry := logEntry.With("output", "stdout")
@@ -116,8 +124,22 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 		slog.String("command", strings.Join(e.cmd.Args, " ")),
 		slog.String("dir", e.cmd.Dir))
 
-	plo := &proxyLogger{e.logProxyHookJSON, e.proxyJsonKey, stdoutLogEntry, make([]byte, 0)}
-	ple := &proxyLogger{e.logProxyHookJSON, e.proxyJsonKey, stderrLogEntry, make([]byte, 0)}
+	plo := &proxyLogger{
+		ctx:              ctx,
+		logProxyHookJSON: e.logProxyHookJSON,
+		proxyJsonLogKey:  e.proxyJsonKey,
+		logger:           stdoutLogEntry,
+		buf:              make([]byte, 0),
+	}
+
+	ple := &proxyLogger{
+		ctx:              ctx,
+		logProxyHookJSON: e.logProxyHookJSON,
+		proxyJsonLogKey:  e.proxyJsonKey,
+		logger:           stderrLogEntry,
+		buf:              make([]byte, 0),
+	}
+
 	e.cmd.Stdout = plo
 	e.cmd.Stderr = io.MultiWriter(ple, stdErr)
 
@@ -149,12 +171,12 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 }
 
 type proxyLogger struct {
+	ctx context.Context
+
 	logProxyHookJSON bool
 	proxyJsonLogKey  string
-
-	logger *log.Logger
-
-	buf []byte
+	logger           *log.Logger
+	buf              []byte
 }
 
 func (pl *proxyLogger) Write(p []byte) (int, error) {
@@ -195,7 +217,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 	}
 
 	// logEntry.Log(log.FatalLevel, string(logLine))
-	pl.mergeAndLogInputLog(context.TODO(), logMap, "hook")
+	pl.mergeAndLogInputLog(pl.ctx, logMap, "hook")
 
 	return len(p), nil
 }
@@ -258,6 +280,7 @@ func (pl *proxyLogger) mergeAndLogInputLog(ctx context.Context, inputLog map[str
 	if !ok {
 		msg = "hook result"
 	}
+
 	delete(inputLog, slog.MessageKey)
 	delete(inputLog, slog.TimeKey)
 

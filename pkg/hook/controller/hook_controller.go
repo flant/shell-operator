@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"context"
+
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -162,18 +164,18 @@ func (hc *HookController) HandleEnableKubernetesBindings(createTasksFn func(Bind
 	return nil
 }
 
-func (hc *HookController) HandleKubeEvent(event kemtypes.KubeEvent, handlerFunc func(BindingExecutionInfo)) {
+func (hc *HookController) HandleKubeEvent(ctx context.Context, event kemtypes.KubeEvent, handlerFunc func(BindingExecutionInfo)) {
 	if hc.KubernetesController != nil {
-		execInfo := hc.KubernetesController.HandleEvent(event)
+		execInfo := hc.KubernetesController.HandleEvent(ctx, event)
 		if handlerFunc != nil {
 			handlerFunc(execInfo)
 		}
 	}
 }
 
-func (hc *HookController) HandleKubeEventWithFormTask(event kemtypes.KubeEvent, createTasksFn func(BindingExecutionInfo) task.Task) task.Task {
+func (hc *HookController) HandleKubeEventWithFormTask(ctx context.Context, event kemtypes.KubeEvent, createTasksFn func(BindingExecutionInfo) task.Task) task.Task {
 	if hc.KubernetesController != nil {
-		execInfo := hc.KubernetesController.HandleEvent(event)
+		execInfo := hc.KubernetesController.HandleEvent(ctx, event)
 		if createTasksFn != nil {
 			return createTasksFn(execInfo)
 		}
@@ -182,32 +184,32 @@ func (hc *HookController) HandleKubeEventWithFormTask(event kemtypes.KubeEvent, 
 	return nil
 }
 
-func (hc *HookController) HandleAdmissionEvent(event admission.Event, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleAdmissionEvent(ctx context.Context, event admission.Event, createTasksFn func(BindingExecutionInfo)) {
 	if hc.AdmissionController == nil {
 		return
 	}
-	execInfo := hc.AdmissionController.HandleEvent(event)
+	execInfo := hc.AdmissionController.HandleEvent(ctx, event)
 	if createTasksFn != nil {
 		createTasksFn(execInfo)
 	}
 }
 
-func (hc *HookController) HandleConversionEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTasksFn func(BindingExecutionInfo)) {
+func (hc *HookController) HandleConversionEvent(ctx context.Context, crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTasksFn func(BindingExecutionInfo)) {
 	if hc.ConversionController == nil {
 		return
 	}
-	execInfo := hc.ConversionController.HandleEvent(crdName, request, rule)
+	execInfo := hc.ConversionController.HandleEvent(ctx, crdName, request, rule)
 	if createTasksFn != nil {
 		createTasksFn(execInfo)
 	}
 }
 
-func (hc *HookController) HandleScheduleEvent(crontab string, handlerFunc func(BindingExecutionInfo)) {
+func (hc *HookController) HandleScheduleEvent(ctx context.Context, crontab string, handlerFunc func(BindingExecutionInfo)) {
 	if hc.ScheduleController == nil {
 		return
 	}
 
-	infos := hc.ScheduleController.HandleEvent(crontab)
+	infos := hc.ScheduleController.HandleEvent(ctx, crontab)
 	if handlerFunc == nil {
 		return
 	}
@@ -217,12 +219,12 @@ func (hc *HookController) HandleScheduleEvent(crontab string, handlerFunc func(B
 	}
 }
 
-func (hc *HookController) HandleScheduleEventWithFormTasks(crontab string, createTasksFn func(BindingExecutionInfo) task.Task) []task.Task {
+func (hc *HookController) HandleScheduleEventWithFormTasks(ctx context.Context, crontab string, createTasksFn func(BindingExecutionInfo) task.Task) []task.Task {
 	if hc.ScheduleController == nil {
 		return nil
 	}
 
-	infos := hc.ScheduleController.HandleEvent(crontab)
+	infos := hc.ScheduleController.HandleEvent(ctx, crontab)
 	if createTasksFn == nil {
 		return nil
 	}

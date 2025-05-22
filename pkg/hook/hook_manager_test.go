@@ -1,6 +1,7 @@
 package hook
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -107,7 +108,7 @@ func TestHookController_HandleValidatingEvent(t *testing.T) {
 	g.Expect(canHandle).To(BeTrue())
 
 	var infoList []controller.BindingExecutionInfo
-	h.HookController.HandleAdmissionEvent(ev, func(info controller.BindingExecutionInfo) {
+	h.HookController.HandleAdmissionEvent(context.Background(), ev, func(info controller.BindingExecutionInfo) {
 		infoList = append(infoList, info)
 	})
 
