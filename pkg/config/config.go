@@ -106,7 +106,7 @@ func (c *Config) List() []map[string]string {
 func (c *Config) String() string {
 	b := new(strings.Builder)
 	// Header
-	b.WriteString(fmt.Sprintf("%-30s %-20s %-20s %-40s\n", "NAME", "VALUE", "EXPIRE AT", "DESCRIPTION"))
+	fmt.Fprintf(b, "%-30s %-20s %-20s %-40s\n", "NAME", "VALUE", "EXPIRE AT", "DESCRIPTION")
 
 	params := c.List()
 	for _, param := range params {
@@ -114,7 +114,7 @@ func (c *Config) String() string {
 		if param["lastError"] != "" {
 			description = "Error: " + param["lastError"]
 		}
-		b.WriteString(fmt.Sprintf("%-30s %-20s %-20s %-40s\n", param["name"], param["value"], param["expireAt"], description))
+		fmt.Fprintf(b, "%-30s %-20s %-20s %-40s\n", param["name"], param["value"], param["expireAt"], description)
 	}
 
 	return b.String()

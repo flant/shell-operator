@@ -44,7 +44,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				var err error
 				refreshInterval, err = time.ParseDuration(watchInterval)
 				if err != nil {
-					output.WriteString(fmt.Sprintf("could not parse watch refresh interval: %s, default 1s applied\n", err))
+					fmt.Fprintf(output, "could not parse watch refresh interval: %s, default 1s applied\n", err)
 					refreshInterval = time.Second
 				}
 			}
