@@ -158,7 +158,7 @@ outer:
 			case "STOP_EVENTS":
 				break outer
 			default:
-				b.HookCtrl.HandleKubeEvent(ctx, ev, func(info controller.BindingExecutionInfo) {
+				b.HookCtrl.HandleKubeEvent(context.TODO(), ev, func(info controller.BindingExecutionInfo) {
 					cc.AddBindingContext(types.OnKubernetesEvent, info)
 				})
 			}
