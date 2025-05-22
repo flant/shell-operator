@@ -286,7 +286,7 @@ func (hm *Manager) GetHooksInOrder(bindingType htypes.BindingType) ([]string, er
 	return hooksNames, nil
 }
 
-func (hm *Manager) CreateTasksFromKubeEvent(ctx context.Context, kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
+func (hm *Manager) CreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	kubeHooks, _ := hm.GetHooksInOrder(htypes.OnKubernetesEvent)
 	tasks := make([]task.Task, 0)
 
@@ -294,7 +294,7 @@ func (hm *Manager) CreateTasksFromKubeEvent(ctx context.Context, kubeEvent kemty
 		h := hm.GetHook(hookName)
 
 		if h.HookController.CanHandleKubeEvent(kubeEvent) {
-			task := h.HookController.HandleKubeEventWithFormTask(ctx, kubeEvent, func(info controller.BindingExecutionInfo) task.Task {
+			task := h.HookController.HandleKubeEventWithFormTask(context.TODO(), kubeEvent, func(info controller.BindingExecutionInfo) task.Task {
 				if createTaskFn != nil {
 					return createTaskFn(h, info)
 				}
@@ -311,14 +311,14 @@ func (hm *Manager) CreateTasksFromKubeEvent(ctx context.Context, kubeEvent kemty
 	return tasks
 }
 
-func (hm *Manager) HandleCreateTasksFromScheduleEvent(ctx context.Context, crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
+func (hm *Manager) HandleCreateTasksFromScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	schHooks, _ := hm.GetHooksInOrder(htypes.Schedule)
 	tasks := make([]task.Task, 0)
 
 	for _, hookName := range schHooks {
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleScheduleEvent(crontab) {
-			newTasks := h.HookController.HandleScheduleEventWithFormTasks(ctx, crontab, func(info controller.BindingExecutionInfo) task.Task {
+			newTasks := h.HookController.HandleScheduleEventWithFormTasks(context.TODO(), crontab, func(info controller.BindingExecutionInfo) task.Task {
 				if createTaskFn != nil {
 					return createTaskFn(h, info)
 				}

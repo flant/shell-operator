@@ -136,7 +136,7 @@ func (op *ShellOperator) initHookManager() error {
 	}
 
 	// Define event handlers for schedule event and kubernetes event.
-	op.ManagerEventsHandler.WithKubeEventHandler(func(ctx context.Context, kubeEvent kemTypes.KubeEvent) []task.Task {
+	op.ManagerEventsHandler.WithKubeEventHandler(func(_ context.Context, kubeEvent kemTypes.KubeEvent) []task.Task {
 		logLabels := map[string]string{
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"binding":  string(types.OnKubernetesEvent),
@@ -144,7 +144,7 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
 
-		return op.HookManager.CreateTasksFromKubeEvent(ctx, kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
+		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
 				WithMetadata(task_metadata.HookMetadata{
 					HookName:       hook.Name,
@@ -163,7 +163,7 @@ func (op *ShellOperator) initHookManager() error {
 			return newTask.WithQueuedAt(time.Now())
 		})
 	})
-	op.ManagerEventsHandler.WithScheduleEventHandler(func(ctx context.Context, crontab string) []task.Task {
+	op.ManagerEventsHandler.WithScheduleEventHandler(func(_ context.Context, crontab string) []task.Task {
 		logLabels := map[string]string{
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"binding":  string(types.Schedule),
@@ -171,7 +171,7 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'schedule' event", slog.String("name", crontab))
 
-		return op.HookManager.HandleCreateTasksFromScheduleEvent(ctx, crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
+		return op.HookManager.HandleCreateTasksFromScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
 				WithMetadata(task_metadata.HookMetadata{
 					HookName:       hook.Name,
