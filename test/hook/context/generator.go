@@ -121,7 +121,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	b.Hook.WithHookController(b.HookCtrl)
 
 	cc := NewContextCombiner()
-	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+	err = b.HookCtrl.HandleEnableKubernetesBindings(context.Background(), func(info controller.BindingExecutionInfo) {
 		if info.KubernetesBinding.ExecuteHookOnSynchronization {
 			cc.AddBindingContext(types.OnKubernetesEvent, info)
 		}

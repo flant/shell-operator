@@ -424,7 +424,7 @@ func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.Tas
 		res = op.taskHandleHookRun(ctx, t)
 
 	case task_metadata.EnableKubernetesBindings:
-		res = op.taskHandleEnableKubernetesBindings(t)
+		res = op.taskHandleEnableKubernetesBindings(ctx, t)
 
 	case task_metadata.EnableScheduleBindings:
 		hookLogLabels := map[string]string{}
@@ -445,7 +445,7 @@ func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.Tas
 }
 
 // taskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
-func (op *ShellOperator) taskHandleEnableKubernetesBindings(t task.Task) queue.TaskResult {
+func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context, t task.Task) queue.TaskResult {
 	hookMeta := task_metadata.HookMetadataAccessor(t)
 
 	metricLabels := map[string]string{
@@ -471,7 +471,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(t task.Task) queue.T
 	hookRunTasks := make([]task.Task, 0)
 
 	// Run hook for each binding with Synchronization binding context. Ignore queue name here, execute in main queue.
-	err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+	err := taskHook.HookController.HandleEnableKubernetesBindings(ctx, func(info controller.BindingExecutionInfo) {
 		newTask := task.NewTask(task_metadata.HookRun).
 			WithMetadata(task_metadata.HookMetadata{
 				HookName:                 taskHook.Name,
