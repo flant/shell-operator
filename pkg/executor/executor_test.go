@@ -2,6 +2,7 @@ package executor
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"math/rand/v2"
 	"os"
@@ -36,7 +37,7 @@ func TestRunAndLogLines(t *testing.T) {
 			WithLogProxyHookJSON(true).
 			WithLogger(logger)
 
-		_, err := ex.RunAndLogLines(map[string]string{"a": "b"})
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"a": "b"})
 		assert.NoError(t, err)
 
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"hook result","a":"b","hook_foo":"baz","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
@@ -48,7 +49,7 @@ func TestRunAndLogLines(t *testing.T) {
 		ex := NewExecutor("", "echo", []string{"foobar"}, []string{}).
 			WithLogger(logger)
 
-		_, err := ex.RunAndLogLines(map[string]string{"a": "b"})
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"a": "b"})
 		assert.NoError(t, err)
 
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"foobar","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
@@ -68,7 +69,7 @@ func TestRunAndLogLines(t *testing.T) {
 			WithLogProxyHookJSON(true).
 			WithLogger(logger)
 
-		_, err = ex.RunAndLogLines(map[string]string{"a": "b"})
+		_, err = ex.RunAndLogLines(context.Background(), map[string]string{"a": "b"})
 		assert.NoError(t, err)
 
 		reg := regexp.MustCompile(`{"level":"info","msg":"hook result","a":"b","hook":{"truncated":".*:truncated"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"`)
@@ -88,7 +89,7 @@ func TestRunAndLogLines(t *testing.T) {
 		ex := NewExecutor("", "cat", []string{f.Name()}, []string{}).
 			WithLogger(logger)
 
-		_, err = ex.RunAndLogLines(map[string]string{"a": "b"})
+		_, err = ex.RunAndLogLines(context.Background(), map[string]string{"a": "b"})
 		assert.NoError(t, err)
 
 		reg := regexp.MustCompile(`{"level":"info","msg":"result .*:truncated","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"`)
@@ -104,11 +105,11 @@ func TestRunAndLogLines(t *testing.T) {
 			WithLogProxyHookJSON(true).
 			WithLogger(logger)
 
-		_, err := ex.RunAndLogLines(map[string]string{"a": "b"})
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"a": "b"})
 		assert.NoError(t, err)
 
-		assert.Equal(t, buf.String(), `{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:189","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:192","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
+		assert.Equal(t, buf.String(), `{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:211","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
+			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:214","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
 		buf.Reset()
 	})
 
@@ -122,7 +123,7 @@ func TestRunAndLogLines(t *testing.T) {
 			WithLogProxyHookJSON(true).
 			WithLogger(logger)
 
-		_, err := ex.RunAndLogLines(map[string]string{"foor": "baar"})
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"hook result","foor":"baar","hook_a":"b","hook_c":"d","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
 
@@ -137,7 +138,7 @@ c d
 		ex := NewExecutor("", "echo", []string{arg}, []string{}).
 			WithLogger(logger)
 
-		_, err := ex.RunAndLogLines(map[string]string{"foor": "baar"})
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"a b","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
 			`{"level":"info","msg":"c d","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
@@ -154,7 +155,7 @@ c d
 			WithLogProxyHookJSON(true).
 			WithLogger(logger)
 
-		_, err := ex.RunAndLogLines(map[string]string{"foor": "baar"})
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"a b","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
 			`{"level":"info","msg":"c d","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
@@ -171,7 +172,7 @@ c d
 			WithLogProxyHookJSON(true).
 			WithLogger(logger)
 
-		_, err := ex.RunAndLogLines(map[string]string{"foor": "baar"})
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"hook result","foor":"baar","hook_a":"b","hook_c":"d","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
 
@@ -184,7 +185,7 @@ c d
 			WithLogProxyHookJSON(true).
 			WithLogger(logger)
 
-		_, err := ex.RunAndLogLines(map[string]string{"foor": "baar"})
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"hook result","foor":"baar","hook_a":"b","hook_c":"d","hook_foor":"baar","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
 

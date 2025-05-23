@@ -11,6 +11,8 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	uuid "github.com/gofrs/uuid/v5"
 	"github.com/kennygrant/sanitize"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/time/rate"
 
 	"github.com/flant/shell-operator/pkg/app"
@@ -22,6 +24,10 @@ import (
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
+)
+
+const (
+	serviceName = "hook"
 )
 
 type CommonHook interface {
@@ -92,7 +98,15 @@ func (h *Hook) WithHookController(hookController *controller.HookController) {
 	h.HookController = hookController
 }
 
-func (h *Hook) Run(_ htypes.BindingType, context []bctx.BindingContext, logLabels map[string]string) (*Result, error) {
+func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.BindingContext, logLabels map[string]string) (*Result, error) {
+	ctx, span := otel.Tracer(serviceName).Start(ctx, "Run")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("name", h.Name),
+		attribute.String("path", h.Path),
+	)
+
 	// Refresh snapshots
 	freshBindingContext := h.HookController.UpdateSnapshots(context)
 
@@ -156,7 +170,7 @@ func (h *Hook) Run(_ htypes.BindingType, context []bctx.BindingContext, logLabel
 
 	result := &Result{}
 
-	result.Usage, err = hookCmd.RunAndLogLines(logLabels)
+	result.Usage, err = hookCmd.RunAndLogLines(ctx, logLabels)
 	if err != nil {
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}

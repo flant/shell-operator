@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -30,7 +31,7 @@ type KubernetesBindingsController interface {
 	UnlockEventsFor(monitorID string)
 	StopMonitors()
 	CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool
-	HandleEvent(kubeEvent kemtypes.KubeEvent) BindingExecutionInfo
+	HandleEvent(ctx context.Context, kubeEvent kemtypes.KubeEvent) BindingExecutionInfo
 	BindingNames() []string
 
 	SnapshotsFrom(bindingNames ...string) map[string][]kemtypes.ObjectAndFilterResult
@@ -92,7 +93,7 @@ func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExec
 		// Start monitor's informers to fill the cache.
 		c.kubeEventsManager.StartMonitor(config.Monitor.Metadata.MonitorId)
 
-		synchronizationInfo := c.HandleEvent(kemtypes.KubeEvent{
+		synchronizationInfo := c.HandleEvent(context.TODO(), kemtypes.KubeEvent{
 			MonitorId: config.Monitor.Metadata.MonitorId,
 			Type:      kemtypes.TypeSynchronization,
 		})
@@ -219,7 +220,7 @@ func (c *kubernetesBindingsController) setBindingMonitorLinks(monitorId string, 
 
 // HandleEvent receives event from KubeEventManager and returns a BindingExecutionInfo
 // to help create a new task to run a hook.
-func (c *kubernetesBindingsController) HandleEvent(kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
+func (c *kubernetesBindingsController) HandleEvent(_ context.Context, kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
 	link, hasKey := c.getBindingMonitorLinksById(kubeEvent.MonitorId)
 	if !hasKey {
 		log.Error("Possible bug!!! Unknown kube event: no such monitor id registered", slog.String("monitorID", kubeEvent.MonitorId))

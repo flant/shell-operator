@@ -8,6 +8,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/gofrs/uuid/v5"
+	"go.opentelemetry.io/otel"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	klient "github.com/flant/kube-client/client"
@@ -27,6 +28,10 @@ import (
 	"github.com/flant/shell-operator/pkg/utils/measure"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
+)
+
+const (
+	serviceName = "shell-operator"
 )
 
 var WaitQueuesTimeout = time.Second * 10
@@ -131,7 +136,7 @@ func (op *ShellOperator) initHookManager() error {
 	}
 
 	// Define event handlers for schedule event and kubernetes event.
-	op.ManagerEventsHandler.WithKubeEventHandler(func(kubeEvent kemTypes.KubeEvent) []task.Task {
+	op.ManagerEventsHandler.WithKubeEventHandler(func(_ context.Context, kubeEvent kemTypes.KubeEvent) []task.Task {
 		logLabels := map[string]string{
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"binding":  string(types.OnKubernetesEvent),
@@ -158,7 +163,7 @@ func (op *ShellOperator) initHookManager() error {
 			return newTask.WithQueuedAt(time.Now())
 		})
 	})
-	op.ManagerEventsHandler.WithScheduleEventHandler(func(crontab string) []task.Task {
+	op.ManagerEventsHandler.WithScheduleEventHandler(func(_ context.Context, crontab string) []task.Task {
 		logLabels := map[string]string{
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"binding":  string(types.Schedule),
@@ -219,7 +224,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 	}
 
 	// Define handler for AdmissionEvent
-	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(event admission.Event) (*admission.Response, error) {
+	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(ctx context.Context, event admission.Event) (*admission.Response, error) {
 		eventBindingType := op.HookManager.DetectAdmissionEventType(event)
 		logLabels := map[string]string{
 			"event.id": uuid.Must(uuid.NewV4()).String(),
@@ -232,7 +237,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			slog.String("webhookID", event.WebhookId))
 
 		var admissionTask task.Task
-		op.HookManager.HandleAdmissionEvent(event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+		op.HookManager.HandleAdmissionEvent(ctx, event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 			newTask := task.NewTask(task_metadata.HookRun).
 				WithMetadata(task_metadata.HookMetadata{
 					HookName:       hook.Name,
@@ -255,7 +260,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
 		}
 
-		res := op.taskHandler(op.ctx, admissionTask)
+		res := op.taskHandler(ctx, admissionTask)
 
 		if res.Status == "Fail" {
 			return &admission.Response{
@@ -314,7 +319,7 @@ func (op *ShellOperator) initConversionWebhookManager() error {
 }
 
 // conversionEventHandler is called when Kubernetes requests a conversion.
-func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.ConversionRequest) (*conversion.Response, error) {
+func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName string, request *v1.ConversionRequest) (*conversion.Response, error) {
 	logLabels := map[string]string{
 		"event.id": uuid.Must(uuid.NewV4()).String(),
 		"binding":  string(types.KubernetesConversion),
@@ -343,7 +348,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 
 		for _, convRule := range convPath {
 			var convTask task.Task
-			op.HookManager.HandleConversionEvent(crdName, request, convRule, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
+			op.HookManager.HandleConversionEvent(ctx, crdName, request, convRule, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
 				newTask := task.NewTask(task_metadata.HookRun).
 					WithMetadata(task_metadata.HookMetadata{
 						HookName:       hook.Name,
@@ -361,7 +366,7 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 				return nil, fmt.Errorf("no hook found for '%s' event for crd/%s", string(types.KubernetesConversion), crdName)
 			}
 
-			res := op.taskHandler(op.ctx, convTask)
+			res := op.taskHandler(ctx, convTask)
 
 			if res.Status == "Fail" {
 				return &conversion.Response{
@@ -409,17 +414,17 @@ func (op *ShellOperator) conversionEventHandler(crdName string, request *v1.Conv
 }
 
 // taskHandler
-func (op *ShellOperator) taskHandler(_ context.Context, t task.Task) queue.TaskResult {
+func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.TaskResult {
 	logEntry := op.logger.With("operator.component", "taskRunner")
 	hookMeta := task_metadata.HookMetadataAccessor(t)
 	var res queue.TaskResult
 
 	switch t.GetType() {
 	case task_metadata.HookRun:
-		res = op.taskHandleHookRun(t)
+		res = op.taskHandleHookRun(ctx, t)
 
 	case task_metadata.EnableKubernetesBindings:
-		res = op.taskHandleEnableKubernetesBindings(t)
+		res = op.taskHandleEnableKubernetesBindings(ctx, t)
 
 	case task_metadata.EnableScheduleBindings:
 		hookLogLabels := map[string]string{}
@@ -440,7 +445,10 @@ func (op *ShellOperator) taskHandler(_ context.Context, t task.Task) queue.TaskR
 }
 
 // taskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
-func (op *ShellOperator) taskHandleEnableKubernetesBindings(t task.Task) queue.TaskResult {
+func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context, t task.Task) queue.TaskResult {
+	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleEnableKubernetesBindings")
+	defer span.End()
+
 	hookMeta := task_metadata.HookMetadataAccessor(t)
 
 	metricLabels := map[string]string{
@@ -466,7 +474,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(t task.Task) queue.T
 	hookRunTasks := make([]task.Task, 0)
 
 	// Run hook for each binding with Synchronization binding context. Ignore queue name here, execute in main queue.
-	err := taskHook.HookController.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+	err := taskHook.HookController.HandleEnableKubernetesBindings(ctx, func(info controller.BindingExecutionInfo) {
 		newTask := task.NewTask(task_metadata.HookRun).
 			WithMetadata(task_metadata.HookMetadata{
 				HookName:                 taskHook.Name,
@@ -511,7 +519,10 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(t task.Task) queue.T
 }
 
 // TODO use Context to pass labels and a queue name
-func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
+func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) queue.TaskResult {
+	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleHookRun")
+	defer span.End()
+
 	hookMeta := task_metadata.HookMetadataAccessor(t)
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
@@ -589,7 +600,7 @@ func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
 		success := 0.0
 		errors := 0.0
 		allowed := 0.0
-		err = op.handleRunHook(t, taskHook, hookMeta, taskLogEntry, hookLogLabels, metricLabels)
+		err = op.handleRunHook(ctx, t, taskHook, hookMeta, taskLogEntry, hookLogLabels, metricLabels)
 		if err != nil {
 			if hookMeta.AllowFailure {
 				allowed = 1.0
@@ -625,12 +636,15 @@ func (op *ShellOperator) taskHandleHookRun(t task.Task) queue.TaskResult {
 	return res
 }
 
-func (op *ShellOperator) handleRunHook(t task.Task, taskHook *hook.Hook, hookMeta task_metadata.HookMetadata, taskLogEntry *log.Logger, hookLogLabels map[string]string, metricLabels map[string]string) error {
+func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHook *hook.Hook, hookMeta task_metadata.HookMetadata, taskLogEntry *log.Logger, hookLogLabels map[string]string, metricLabels map[string]string) error {
+	ctx, span := otel.Tracer(serviceName).Start(ctx, "handleRunHook")
+	defer span.End()
+
 	for _, info := range taskHook.HookController.SnapshotsInfo() {
 		taskLogEntry.Debug("snapshot info", slog.String("info", info))
 	}
 
-	result, err := taskHook.Run(hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
+	result, err := taskHook.Run(ctx, hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
 	if err != nil {
 		if result != nil && len(result.KubernetesPatchBytes) > 0 {
 			operations, patchStatusErr := objectpatch.ParseOperations(result.KubernetesPatchBytes)

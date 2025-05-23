@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -141,7 +142,7 @@ func (c *AdmissionBindingsController) CanHandleEvent(event admission.Event) bool
 	return has
 }
 
-func (c *AdmissionBindingsController) HandleEvent(event admission.Event) BindingExecutionInfo {
+func (c *AdmissionBindingsController) HandleEvent(_ context.Context, event admission.Event) BindingExecutionInfo {
 	if c.ConfigurationId != event.ConfigurationId {
 		log.Error("Possible bug!!! Unknown validating event: no binding for configurationId",
 			slog.String("configurationId", event.ConfigurationId),

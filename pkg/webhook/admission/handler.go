@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -16,7 +17,7 @@ import (
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
-type EventHandlerFn func(event Event) (*Response, error)
+type EventHandlerFn func(ctx context.Context, event Event) (*Response, error)
 
 type WebhookHandler struct {
 	Router  chi.Router
@@ -47,6 +48,7 @@ func NewWebhookHandler() *WebhookHandler {
 
 func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	ctx := r.Context()
 
 	var admissionReview v1.AdmissionReview
 	err := json.NewDecoder(r.Body).Decode(&admissionReview)
@@ -62,7 +64,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	admissionResponse, err := h.handleReviewRequest(r.URL.Path, admissionReview.Request)
+	admissionResponse, err := h.handleReviewRequest(ctx, r.URL.Path, admissionReview.Request)
 	if err != nil {
 		log.Error("validation failed", "request", admissionReview.Request.UID, log.Err(err))
 		admissionReview.Response = errored(err)
@@ -83,7 +85,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (h *WebhookHandler) handleReviewRequest(path string, request *v1.AdmissionRequest) (*v1.AdmissionResponse, error) {
+func (h *WebhookHandler) handleReviewRequest(ctx context.Context, path string, request *v1.AdmissionRequest) (*v1.AdmissionResponse, error) {
 	configurationID, webhookID := detectConfigurationAndWebhook(path)
 	log.Info("Got AdmissionReview request",
 		slog.String("configurationID", configurationID),
@@ -99,7 +101,7 @@ func (h *WebhookHandler) handleReviewRequest(path string, request *v1.AdmissionR
 		Request:         request,
 	}
 
-	admissionResponse, err := h.Handler(event)
+	admissionResponse, err := h.Handler(ctx, event)
 	if err != nil {
 		return nil, err
 	}
