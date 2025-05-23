@@ -260,7 +260,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
 		}
 
-		res := op.taskHandler(op.ctx, admissionTask)
+		res := op.taskHandler(ctx, admissionTask)
 
 		if res.Status == "Fail" {
 			return &admission.Response{
@@ -446,6 +446,9 @@ func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.Tas
 
 // taskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
 func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context, t task.Task) queue.TaskResult {
+	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleEnableKubernetesBindings")
+	defer span.End()
+
 	hookMeta := task_metadata.HookMetadataAccessor(t)
 
 	metricLabels := map[string]string{
