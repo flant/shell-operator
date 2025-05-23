@@ -11,12 +11,14 @@ linters:
     - depguard
     - dogsled
     - durationcheck
+    - errcheck
     - gochecknoinits
     - gocritic
     - goprintffuncname
     - govet
     - ineffassign
     - misspell
+    - musttag
     - nolintlint
     - nonamedreturns
     - prealloc
@@ -24,8 +26,10 @@ linters:
     - sloglint
     - staticcheck
     - unconvert
+    - unparam
     - unused
     - whitespace
+    - usestdlibvars
   settings:
     depguard:
       rules:

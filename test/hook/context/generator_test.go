@@ -13,6 +13,7 @@ import (
 
 func parseContexts(contexts string) []bctx.BindingContext {
 	var parsedBindingContexts []bctx.BindingContext
+	//nolint: musttag
 	_ = json.Unmarshal([]byte(contexts), &parsedBindingContexts)
 	return parsedBindingContexts
 }

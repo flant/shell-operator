@@ -55,7 +55,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 					return err
 				}
 
-				output.Write(out)
+				_, _ = output.Write(out)
 				if !watch {
 					break
 				}
@@ -63,7 +63,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				time.Sleep(refreshInterval)
 				output.ClearScreen()
 				output.MoveCursor(1, 1)
-				output.WriteString(time.Now().Format(time.RFC3339))
+				_, _ = output.WriteString(time.Now().Format(time.RFC3339))
 				output.MoveCursor(3, 1)
 			}
 
