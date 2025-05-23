@@ -23,7 +23,7 @@ type CombineResult struct {
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
+func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task) *CombineResult {
 	if q == nil {
 		return nil
 	}
@@ -42,26 +42,28 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 		if stopIterate {
 			return
 		}
+
 		// ignore current task
 		if tsk.GetId() == t.GetId() {
 			return
 		}
+
 		hm := tsk.GetMetadata()
+
 		// Stop on task without metadata
 		if hm == nil {
 			stopIterate = true
 			return
 		}
+
 		nextHookName := hm.(HookNameAccessor).GetHookName()
+
 		// Only tasks for the same hook and of the same type can be combined (HookRun cannot be combined with OnStartup).
 		// Using stopCombineFn function more stricter combine rules can be defined.
-		if nextHookName == hookName && t.GetType() == tsk.GetType() {
-			if stopCombineFn != nil {
-				stopIterate = stopCombineFn(tsk)
-			}
-		} else {
+		if nextHookName != hookName || t.GetType() != tsk.GetType() {
 			stopIterate = true
 		}
+
 		if !stopIterate {
 			otherTasks = append(otherTasks, tsk)
 		}

@@ -212,10 +212,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) error {
 			return fmt.Errorf("invalid kubernetesValidating config [%d]: %w", i, err)
 		}
 
-		validating, err := convertValidating(rawValidating)
-		if err != nil {
-			return err
-		}
+		validating := convertValidating(rawValidating)
 
 		c.KubernetesValidating = append(c.KubernetesValidating, validating)
 	}
@@ -237,10 +234,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) error {
 			return fmt.Errorf("invalid kubernetesMutating config [%d]: %w", i, err)
 		}
 
-		mutating, err := convertMutating(rawMutating)
-		if err != nil {
-			return err
-		}
+		mutating := convertMutating(rawMutating)
 
 		c.KubernetesMutating = append(c.KubernetesMutating, mutating)
 	}
@@ -421,7 +415,7 @@ func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []htypes.OnKubernetesEventCo
 	return allErr
 }
 
-func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (htypes.ValidatingConfig, error) {
+func convertValidating(cfgV1 KubernetesAdmissionConfigV1) htypes.ValidatingConfig {
 	cfg := htypes.ValidatingConfig{}
 
 	cfg.Group = cfgV1.Group
@@ -435,23 +429,28 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (htypes.ValidatingConf
 		Name:  cfgV1.Name,
 		Rules: cfgV1.Rules,
 	}
+
 	if cfgV1.Namespace != nil {
 		webhook.NamespaceSelector = cfgV1.Namespace.LabelSelector
 	}
+
 	if cfgV1.LabelSelector != nil {
 		webhook.ObjectSelector = cfgV1.LabelSelector
 	}
+
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
 		defaultFailurePolicy := v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
 		webhook.FailurePolicy = &defaultFailurePolicy
 	}
+
 	if cfgV1.SideEffects != nil {
 		webhook.SideEffects = cfgV1.SideEffects
 	} else {
 		webhook.SideEffects = &DefaultSideEffects
 	}
+
 	if cfgV1.TimeoutSeconds != nil {
 		webhook.TimeoutSeconds = cfgV1.TimeoutSeconds
 	} else {
@@ -463,13 +462,14 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (htypes.ValidatingConf
 	cfg.Webhook = &admission.ValidatingWebhookConfig{
 		ValidatingWebhook: webhook,
 	}
+
 	cfg.Webhook.Metadata.LogLabels = map[string]string{}
 	cfg.Webhook.Metadata.MetricLabels = map[string]string{}
 
-	return cfg, nil
+	return cfg
 }
 
-func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (htypes.MutatingConfig, error) {
+func convertMutating(cfgV1 KubernetesAdmissionConfigV1) htypes.MutatingConfig {
 	cfg := htypes.MutatingConfig{}
 
 	cfg.Group = cfgV1.Group
@@ -484,22 +484,27 @@ func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (htypes.MutatingConfig, 
 		Name:  cfgV1.Name,
 		Rules: cfgV1.Rules,
 	}
+
 	if cfgV1.Namespace != nil {
 		webhook.NamespaceSelector = cfgV1.Namespace.LabelSelector
 	}
+
 	if cfgV1.LabelSelector != nil {
 		webhook.ObjectSelector = cfgV1.LabelSelector
 	}
+
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
 		webhook.FailurePolicy = &DefaultFailurePolicy
 	}
+
 	if cfgV1.SideEffects != nil {
 		webhook.SideEffects = cfgV1.SideEffects
 	} else {
 		webhook.SideEffects = &DefaultSideEffects
 	}
+
 	if cfgV1.TimeoutSeconds != nil {
 		webhook.TimeoutSeconds = cfgV1.TimeoutSeconds
 	} else {
@@ -511,10 +516,11 @@ func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (htypes.MutatingConfig, 
 	cfg.Webhook = &admission.MutatingWebhookConfig{
 		MutatingWebhook: webhook,
 	}
+
 	cfg.Webhook.Metadata.LogLabels = map[string]string{}
 	cfg.Webhook.Metadata.MetricLabels = map[string]string{}
 
-	return cfg, nil
+	return cfg
 }
 
 func (cv1 *HookConfigV1) CheckConversion(kubeConfigs []htypes.OnKubernetesEventConfig, cfgV1 KubernetesConversionConfigV1) error {

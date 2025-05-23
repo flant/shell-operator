@@ -578,7 +578,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 			}
 		}
 		if shouldCombine {
-			combineResult := op.combineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t, nil)
+			combineResult := op.combineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t)
 			if combineResult != nil {
 				hookMeta.BindingContext = combineResult.BindingContexts
 				// Extra monitor IDs can be returned if several Synchronization for Group are combined.

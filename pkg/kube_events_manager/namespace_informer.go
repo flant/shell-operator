@@ -70,7 +70,7 @@ func (ni *namespaceInformer) createSharedInformer(addFn func(string), delFn func
 	ni.SharedInformer = corev1.NewFilteredNamespaceInformer(ni.KubeClient, resyncPeriod, indexers, tweakListOptions)
 	ni.addFn = addFn
 	ni.delFn = delFn
-	ni.SharedInformer.AddEventHandler(ni) // SharedNamespaceInformerEventHandler(ni, addFn, delFn))
+	_, _ = ni.SharedInformer.AddEventHandler(ni) // SharedNamespaceInformerEventHandler(ni, addFn, delFn))
 
 	listOptions := metav1.ListOptions{}
 	tweakListOptions(&listOptions)

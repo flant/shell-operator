@@ -49,9 +49,10 @@ func prepareTestDirTree() (string, error) {
 
 func createExecutableFile(file string) error {
 	if _, err := os.Create(file); err != nil {
-		return err
+		return fmt.Errorf("create: %w", err)
 	}
-	os.Chmod(file, 0o777)
+
+	_ = os.Chmod(file, 0o777)
 
 	return nil
 }
