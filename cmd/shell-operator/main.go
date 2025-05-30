@@ -13,15 +13,6 @@ import (
 	"github.com/flant/shell-operator/pkg/filter/jq"
 )
 
-var (
-	ShellOperatorVersion = "dev"
-)
-
-const (
-	AppName        = "shell-operator"
-	AppDescription = "shell-operator"
-)
-
 func main() {
 	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
 

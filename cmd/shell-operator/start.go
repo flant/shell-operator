@@ -18,6 +18,11 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
+const (
+	AppName        = "shell-operator"
+	AppDescription = "Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster"
+)
+
 func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 
 	app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
@@ -67,7 +72,6 @@ func registerTelemetry(ctx context.Context) func(ctx context.Context) error {
 	resource := sdkresource.NewWithAttributes(
 		semconv.SchemaURL,
 		semconv.ServiceNameKey.String(AppName),
-		semconv.ServiceVersionKey.String(ShellOperatorVersion),
 		semconv.TelemetrySDKLanguageKey.String("en"),
 		semconv.K8SDeploymentName(AppName),
 	)
