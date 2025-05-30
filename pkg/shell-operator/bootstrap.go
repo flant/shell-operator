@@ -21,7 +21,7 @@ import (
 
 // Init initialize logging, ensures directories and creates
 // a ShellOperator instance with all dependencies.
-func Init(logger *log.Logger) (*ShellOperator, error) {
+func Init(ctx context.Context, logger *log.Logger) (*ShellOperator, error) {
 	runtimeConfig := config.NewConfig(logger)
 	// Init logging subsystem.
 	app.SetupLogging(runtimeConfig, logger)
@@ -42,8 +42,10 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		logger.Log(context.TODO(), log.LevelFatal.Level(), "temp directory", log.Err(err))
 		return nil, err
 	}
-
-	op := NewShellOperator(context.Background(), WithLogger(logger))
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	op := NewShellOperator(ctx, WithLogger(logger))
 
 	// Debug server.
 	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
