@@ -22,17 +22,19 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 
 	app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
 	ctx := context.Background()
+	telemetryShutdown := registerTelemetry(ctx)
 	// Init logging and initialize a ShellOperator instance.
-	operator, err := shell_operator.Init(ctx, logger.Named("shell-operator"))
+	operator, err := shell_operator.Init(logger.Named("shell-operator"))
 	if err != nil {
 		os.Exit(1)
 	}
+
 	operator.Start()
-	telemetryShutdown := registerTelemetry(ctx)
+
 	// Block action by waiting signals from OS.
 	utils_signal.WaitForProcessInterruption(func() {
-		telemetryShutdown(ctx)
 		operator.Shutdown()
+		telemetryShutdown(ctx)
 		os.Exit(1)
 	})
 
