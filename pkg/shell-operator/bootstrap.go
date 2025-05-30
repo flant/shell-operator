@@ -43,7 +43,7 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		return nil, err
 	}
 
-	op := NewShellOperator(context.Background(), WithLogger(logger))
+	op := NewShellOperator(context.TODO(), WithLogger(logger))
 
 	// Debug server.
 	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
