@@ -24,7 +24,6 @@ const (
 	AppDescription = "Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster"
 )
 
-//nolint:unparam
 func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 	app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
 	ctx := context.Background()
@@ -32,7 +31,9 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 	// Init logging and initialize a ShellOperator instance.
 	operator, err := shell_operator.Init(logger.Named("shell-operator"))
 	if err != nil {
-		os.Exit(1)
+		return func(_ *kingpin.ParseContext) error {
+			return fmt.Errorf("init failed: %w", err)
+		}
 	}
 
 	operator.Start()
