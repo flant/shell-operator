@@ -74,7 +74,6 @@ func WithLogger(logger *log.Logger) Option {
 }
 
 func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
-
 	cctx, cancel := context.WithCancel(ctx)
 
 	so := &ShellOperator{

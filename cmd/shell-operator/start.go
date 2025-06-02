@@ -7,15 +7,16 @@ import (
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	"github.com/flant/shell-operator/pkg/app"
-	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
-	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	sdkresource "go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"gopkg.in/alecthomas/kingpin.v2"
+
+	"github.com/flant/shell-operator/pkg/app"
+	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
+	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
 
 const (
@@ -23,8 +24,8 @@ const (
 	AppDescription = "Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster"
 )
 
+//nolint:unparam
 func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
-
 	app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
 	ctx := context.Background()
 	telemetryShutdown := registerTelemetry(ctx)
@@ -39,6 +40,7 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 	// Block action by waiting signals from OS.
 	utils_signal.WaitForProcessInterruption(func() {
 		operator.Shutdown()
+		//nolint:errcheck
 		telemetryShutdown(ctx)
 		os.Exit(1)
 	})
