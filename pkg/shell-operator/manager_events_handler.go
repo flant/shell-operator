@@ -37,9 +37,6 @@ type ManagerEventsHandler struct {
 }
 
 func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfig) *ManagerEventsHandler {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &ManagerEventsHandler{
