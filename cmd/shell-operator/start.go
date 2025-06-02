@@ -40,8 +40,7 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 	// Block action by waiting signals from OS.
 	utils_signal.WaitForProcessInterruption(func() {
 		operator.Shutdown()
-		//nolint:errcheck
-		telemetryShutdown(ctx)
+		_ = telemetryShutdown(ctx)
 		os.Exit(1)
 	})
 
