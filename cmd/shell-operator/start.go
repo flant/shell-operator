@@ -32,10 +32,7 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 		// Init logging and initialize a ShellOperator instance.
 		operator, err := shell_operator.Init(logger.Named("shell-operator"))
 		if err != nil {
-			os.Exit(1)
-			// return func(_ *kingpin.ParseContext) error {
-			// 	return fmt.Errorf("init failed: %w", err)
-			// }
+			return fmt.Errorf("init failed: %w", err)
 		}
 
 		operator.Start()

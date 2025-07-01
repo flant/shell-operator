@@ -134,13 +134,16 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		return
 	}
 
-	format := FormatFromRequest(request)
-	if format == "" {
+	// Trying to get format from chi
+	format := chi.URLParam(request, "format")
+	if format == "" { // If failed, trying to parse uri with regexp
 		uri := request.RequestURI
 		uriFragments := strings.Split(uri, "/")
-		reResult := formatRe.FindStringSubmatch(uriFragments[len(uriFragments)-1])
-		format = reResult[1]
+		uriLastFragment := uriFragments[len(uriFragments)-1]     // string after last "/" to ignore garbage while regex
+		reResult := formatRe.FindStringSubmatch(uriLastFragment) // expression returns slice of: matched substring, matched group
+		format = reResult[1]                                     // matched group on index 1
 	}
+
 	structuredLogger.GetLogEntry(request).Debug("used format", slog.String("format", format))
 
 	switch format {
@@ -151,6 +154,7 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	case "yaml":
 		writer.Header().Set("Content-Type", "application/yaml")
 	default:
+		format = "text"
 		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	writer.WriteHeader(http.StatusOK)
@@ -195,6 +199,9 @@ func transformUsingFormat(w io.Writer, val interface{}, format string) error {
 
 func FormatFromRequest(request *http.Request) string {
 	format := chi.URLParam(request, "format")
+	if format == "" {
+		format = "text"
+	}
 	return format
 }
 

@@ -14,6 +14,8 @@ import (
 	"github.com/flant/shell-operator/pkg/task/dump"
 )
 
+var snapshotRe = regexp.MustCompile(`/hook/(.*)/snapshots(.*)`)
+
 // RunDefaultDebugServer initialized and run default debug server on unix and http sockets
 // This method is also used in addon-operator
 func RunDefaultDebugServer(unixSocket, httpServerAddress string, logger *log.Logger) (*debug.Server, error) {
@@ -47,22 +49,19 @@ func (op *ShellOperator) RegisterDebugQueueRoutes(dbgSrv *debug.Server) {
 	})
 }
 
-var snapshotRe = regexp.MustCompile(`/hook/(.*)/snapshots(.*)`)
-
 // RegisterDebugHookRoutes register routes for dumping queues
 func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 	dbgSrv.RegisterHandler(http.MethodGet, "/hook/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		return op.HookManager.GetHookNames(), nil
 	})
 
-	// dbgSrv.RegisterHandler(http.MethodGet, "/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
+	// handler for dump hook snapshots
+	// Example path: /hook/100-test.sh/snapshots.text
 	dbgSrv.RegisterHandler(http.MethodGet, "/hook/*", func(r *http.Request) (interface{}, error) {
-		uri := r.RequestURI
-		matched := snapshotRe.FindStringSubmatch(uri)
+		// Exctracting hook name from URI
+		matched := snapshotRe.FindStringSubmatch(r.RequestURI) // expression returns slice of: matched substring, matched group hookName, matched group format type
 		hookName := matched[1]
-		// format := strings.TrimPrefix(matched[2], ".")
-
-		// return fmt.Sprintf("uri: %s, hook: %s, match: %v", uri, hookName, matched), nil
+		// Return hook snapshot dump
 		h := op.HookManager.GetHook(hookName)
 		return h.HookController.SnapshotsDump(), nil
 	})
