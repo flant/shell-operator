@@ -5,10 +5,10 @@ if [[ $1 == "--config" ]] ; then
 configVersion: v1
 kubernetes:
 - apiVersion: v1
-  kind: Pod
+  kind: Namespace
   executeHookOnEvent: ["Added"]
 EOF
 else
   podName=$(jq -r .[0].object.metadata.name $BINDING_CONTEXT_PATH)
-  echo "Pod '${podName}' added"
+  echo "Namespace '${podName}' added"
 fi

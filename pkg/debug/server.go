@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"regexp"
+	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
@@ -114,6 +116,8 @@ func (s *Server) RegisterHandler(method, pattern string, handler func(request *h
 	}
 }
 
+var formatRe = regexp.MustCompile(`.*\.(.*)$`)
+
 func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
 	out, err := handler(request)
 	if err != nil {
@@ -131,6 +135,12 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	}
 
 	format := FormatFromRequest(request)
+	if format == "" {
+		uri := request.RequestURI
+		uriFragments := strings.Split(uri, "/")
+		reResult := formatRe.FindStringSubmatch(uriFragments[len(uriFragments)-1])
+		format = reResult[1]
+	}
 	structuredLogger.GetLogEntry(request).Debug("used format", slog.String("format", format))
 
 	switch format {
@@ -140,6 +150,8 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		writer.Header().Set("Content-Type", "application/json")
 	case "yaml":
 		writer.Header().Set("Content-Type", "application/yaml")
+	default:
+		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	writer.WriteHeader(http.StatusOK)
 
@@ -183,9 +195,6 @@ func transformUsingFormat(w io.Writer, val interface{}, format string) error {
 
 func FormatFromRequest(request *http.Request) string {
 	format := chi.URLParam(request, "format")
-	if format == "" {
-		format = "text"
-	}
 	return format
 }
 

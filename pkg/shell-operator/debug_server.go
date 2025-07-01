@@ -3,11 +3,11 @@ package shell_operator
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	"github.com/go-chi/chi/v5"
 
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
@@ -47,14 +47,22 @@ func (op *ShellOperator) RegisterDebugQueueRoutes(dbgSrv *debug.Server) {
 	})
 }
 
+var snapshotRe = regexp.MustCompile(`/hook/(.*)/snapshots(.*)`)
+
 // RegisterDebugHookRoutes register routes for dumping queues
 func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 	dbgSrv.RegisterHandler(http.MethodGet, "/hook/list.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		return op.HookManager.GetHookNames(), nil
 	})
 
-	dbgSrv.RegisterHandler(http.MethodGet, "/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
-		hookName := chi.URLParam(r, "name")
+	// dbgSrv.RegisterHandler(http.MethodGet, "/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
+	dbgSrv.RegisterHandler(http.MethodGet, "/hook/*", func(r *http.Request) (interface{}, error) {
+		uri := r.RequestURI
+		matched := snapshotRe.FindStringSubmatch(uri)
+		hookName := matched[1]
+		// format := strings.TrimPrefix(matched[2], ".")
+
+		// return fmt.Sprintf("uri: %s, hook: %s, match: %v", uri, hookName, matched), nil
 		h := op.HookManager.GetHook(hookName)
 		return h.HookController.SnapshotsDump(), nil
 	})

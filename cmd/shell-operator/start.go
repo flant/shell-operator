@@ -25,27 +25,30 @@ const (
 )
 
 func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
-	app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
-	ctx := context.Background()
-	telemetryShutdown := registerTelemetry(ctx)
-	// Init logging and initialize a ShellOperator instance.
-	operator, err := shell_operator.Init(logger.Named("shell-operator"))
-	if err != nil {
-		return func(_ *kingpin.ParseContext) error {
-			return fmt.Errorf("init failed: %w", err)
+	return func(_ *kingpin.ParseContext) error {
+		app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
+		ctx := context.Background()
+		telemetryShutdown := registerTelemetry(ctx)
+		// Init logging and initialize a ShellOperator instance.
+		operator, err := shell_operator.Init(logger.Named("shell-operator"))
+		if err != nil {
+			os.Exit(1)
+			// return func(_ *kingpin.ParseContext) error {
+			// 	return fmt.Errorf("init failed: %w", err)
+			// }
 		}
+
+		operator.Start()
+
+		// Block action by waiting signals from OS.
+		utils_signal.WaitForProcessInterruption(func() {
+			operator.Shutdown()
+			_ = telemetryShutdown(ctx)
+			os.Exit(1)
+		})
+
+		return nil
 	}
-
-	operator.Start()
-
-	// Block action by waiting signals from OS.
-	utils_signal.WaitForProcessInterruption(func() {
-		operator.Shutdown()
-		_ = telemetryShutdown(ctx)
-		os.Exit(1)
-	})
-
-	return nil
 }
 
 func registerTelemetry(ctx context.Context) func(ctx context.Context) error {
