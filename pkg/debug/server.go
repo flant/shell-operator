@@ -119,16 +119,17 @@ func (s *Server) RegisterHandler(method, pattern string, handler func(request *h
 func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
 	out, err := handler(request)
 	if err != nil {
-		if _, ok := err.(*BadRequestError); ok {
+		switch err.(type) {
+		case *BadRequestError:
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
-		}
-		if _, ok := err.(*NotFoundError); ok {
+		case *NotFoundError:
 			http.Error(writer, err.Error(), http.StatusNotFound)
 			return
+		default:
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
 
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if out == nil {
