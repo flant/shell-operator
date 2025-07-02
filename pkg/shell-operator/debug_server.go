@@ -62,7 +62,7 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 		// Exctracting hook name from URI
 		matched := snapshotRe.FindStringSubmatch(r.RequestURI) // expression returns slice of: matched substring, matched group hookName
 		var hookName string
-		if len(matched) >= 1 {
+		if len(matched) >= 2 { // expected presence of second element (hookName)
 			hookName = matched[1]
 		}
 		if hookName == "" {

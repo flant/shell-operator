@@ -142,8 +142,9 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	if format == "" { // If failed, trying to parse uri
 		uri := request.RequestURI
 		uriFragments := strings.Split(uri, "/")
-		uriLastFragment := uriFragments[len(uriFragments)-1] // string after last "/" to ignore garbage while regex
-		format = filepath.Ext(uriLastFragment)               // Extracts extention of path (like .yaml -> yaml), may return empty string
+		uriLastFragment := uriFragments[len(uriFragments)-1] // string after last "/" to ignore garbage
+		format = filepath.Ext(uriLastFragment)               // Extracts extension of path (like .yaml), may return empty string
+		format = strings.TrimPrefix(format, ".")
 	}
 
 	structuredLogger.GetLogEntry(request).Debug("used format", slog.String("format", format))
