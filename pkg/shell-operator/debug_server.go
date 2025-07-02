@@ -59,18 +59,27 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 	// handler for dump hook snapshots
 	// Example path: /hook/100-test.sh/snapshots.text
 	dbgSrv.RegisterHandler(http.MethodGet, "/hook/*", func(r *http.Request) (interface{}, error) {
-		// Exctracting hook name from URI
+		// check regex match
+		isMatched := snapshotRe.MatchString(r.RequestURI)
+		if !isMatched {
+			return nil, &debug.NotFoundError{Msg: "404 page not found"}
+		}
+
+		// Extracting hook name from URI
 		matched := snapshotRe.FindStringSubmatch(r.RequestURI) // expression returns slice of: matched substring, matched group hookName
 		var hookName string
 		if len(matched) >= 2 { // expected presence of second element (hookName)
 			hookName = matched[1]
 		}
 		if hookName == "" {
-			return nil, &debug.NotFoundError{Msg: "404 page not found"}
+			return nil, &debug.BadRequestError{Msg: "'hook' parameter is required"}
 		}
 
 		// Return hook snapshot dump
 		h := op.HookManager.GetHook(hookName)
+		if h == nil {
+			return nil, &debug.BadRequestError{Msg: fmt.Sprintf("hook '%s' is not exist", hookName)}
+		}
 		return h.HookController.SnapshotsDump(), nil
 	})
 }

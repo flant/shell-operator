@@ -122,10 +122,8 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		switch err.(type) {
 		case *BadRequestError:
 			http.Error(writer, err.Error(), http.StatusBadRequest)
-			return
 		case *NotFoundError:
 			http.Error(writer, err.Error(), http.StatusNotFound)
-			return
 		default:
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
@@ -140,7 +138,7 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	// Trying to get format from chi
 	format := chi.URLParam(request, "format")
 	if format == "" { // If failed, trying to parse uri
-		uri := request.RequestURI
+		uri := request.URL.Path
 		uriFragments := strings.Split(uri, "/")
 		uriLastFragment := uriFragments[len(uriFragments)-1] // string after last "/" to ignore garbage
 		format = filepath.Ext(uriLastFragment)               // Extracts extension of path (like .yaml), may return empty string
@@ -156,6 +154,7 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		writer.Header().Set("Content-Type", "application/json")
 	case "yaml":
 		writer.Header().Set("Content-Type", "application/yaml")
+	// support for old behavior. If the extension is not indicated, we use text by default
 	case "":
 		format = "text"
 		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
