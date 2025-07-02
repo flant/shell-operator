@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
@@ -117,12 +119,15 @@ func (s *Server) RegisterHandler(method, pattern string, handler func(request *h
 func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
 	out, err := handler(request)
 	if err != nil {
-		if _, ok := err.(*BadRequestError); ok {
+		switch err.(type) {
+		case *BadRequestError:
 			http.Error(writer, err.Error(), http.StatusBadRequest)
-			return
+		case *NotFoundError:
+			http.Error(writer, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
 
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if out == nil {
@@ -130,7 +135,16 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		return
 	}
 
-	format := FormatFromRequest(request)
+	// Trying to get format from chi
+	format := chi.URLParam(request, "format")
+	if format == "" { // If failed, trying to parse uri
+		uri := request.URL.Path
+		uriFragments := strings.Split(uri, "/")
+		uriLastFragment := uriFragments[len(uriFragments)-1] // string after last "/" to ignore garbage
+		format = filepath.Ext(uriLastFragment)               // Extracts extension of path (like .yaml), may return empty string
+		format = strings.TrimPrefix(format, ".")
+	}
+
 	structuredLogger.GetLogEntry(request).Debug("used format", slog.String("format", format))
 
 	switch format {
@@ -140,6 +154,10 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		writer.Header().Set("Content-Type", "application/json")
 	case "yaml":
 		writer.Header().Set("Content-Type", "application/yaml")
+	// support for old behavior. If the extension is not indicated, we use text by default
+	case "":
+		format = "text"
+		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	writer.WriteHeader(http.StatusOK)
 
@@ -195,4 +213,12 @@ type BadRequestError struct {
 
 func (be *BadRequestError) Error() string {
 	return be.Msg
+}
+
+type NotFoundError struct {
+	Msg string
+}
+
+func (nf *NotFoundError) Error() string {
+	return nf.Msg
 }

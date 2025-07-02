@@ -3,16 +3,19 @@ package shell_operator
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	"github.com/go-chi/chi/v5"
 
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/task/dump"
 )
+
+// hook path may be nested like: /hook/myfolder/myhook.sh/snapshots
+var snapshotRe = regexp.MustCompile(`/hook/(.*)/snapshots.*`)
 
 // RunDefaultDebugServer initialized and run default debug server on unix and http sockets
 // This method is also used in addon-operator
@@ -53,9 +56,30 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 		return op.HookManager.GetHookNames(), nil
 	})
 
-	dbgSrv.RegisterHandler(http.MethodGet, "/hook/{name}/snapshots.{format:(json|yaml|text)}", func(r *http.Request) (interface{}, error) {
-		hookName := chi.URLParam(r, "name")
+	// handler for dump hook snapshots
+	// Example path: /hook/100-test.sh/snapshots.text
+	dbgSrv.RegisterHandler(http.MethodGet, "/hook/*", func(r *http.Request) (interface{}, error) {
+		// check regex match
+		isMatched := snapshotRe.MatchString(r.RequestURI)
+		if !isMatched {
+			return nil, &debug.NotFoundError{Msg: "404 page not found"}
+		}
+
+		// Extracting hook name from URI
+		matched := snapshotRe.FindStringSubmatch(r.RequestURI) // expression returns slice of: matched substring, matched group hookName
+		var hookName string
+		if len(matched) >= 2 { // expected presence of second element (hookName)
+			hookName = matched[1]
+		}
+		if hookName == "" {
+			return nil, &debug.BadRequestError{Msg: "'hook' parameter is required"}
+		}
+
+		// Return hook snapshot dump
 		h := op.HookManager.GetHook(hookName)
+		if h == nil {
+			return nil, &debug.BadRequestError{Msg: fmt.Sprintf("hook '%s' is not exist", hookName)}
+		}
 		return h.HookController.SnapshotsDump(), nil
 	})
 }
