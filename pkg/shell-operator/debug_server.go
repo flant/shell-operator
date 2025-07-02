@@ -14,7 +14,7 @@ import (
 	"github.com/flant/shell-operator/pkg/task/dump"
 )
 
-var snapshotRe = regexp.MustCompile(`/hook/(.*)/snapshots(.*)`)
+var snapshotRe = regexp.MustCompile(`/hook/(.*)/snapshots.*`)
 
 // RunDefaultDebugServer initialized and run default debug server on unix and http sockets
 // This method is also used in addon-operator
@@ -61,6 +61,10 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 		// Exctracting hook name from URI
 		matched := snapshotRe.FindStringSubmatch(r.RequestURI) // expression returns slice of: matched substring, matched group hookName, matched group format type
 		hookName := matched[1]
+		if hookName == "" {
+			return nil, &debug.NotFoundError{Msg: "'hook' parameter is empty"}
+		}
+
 		// Return hook snapshot dump
 		h := op.HookManager.GetHook(hookName)
 		return h.HookController.SnapshotsDump(), nil

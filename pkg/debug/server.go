@@ -125,6 +125,10 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if _, ok := err.(*NotFoundError); ok {
+			http.Error(writer, err.Error(), http.StatusNotFound)
+			return
+		}
 
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
@@ -211,4 +215,12 @@ type BadRequestError struct {
 
 func (be *BadRequestError) Error() string {
 	return be.Msg
+}
+
+type NotFoundError struct {
+	Msg string
+}
+
+func (nf *NotFoundError) Error() string {
+	return nf.Msg
 }
