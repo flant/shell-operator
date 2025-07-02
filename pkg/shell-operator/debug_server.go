@@ -14,6 +14,7 @@ import (
 	"github.com/flant/shell-operator/pkg/task/dump"
 )
 
+// hook path may be nested like: /hook/myfolder/myhook.sh/snapshots
 var snapshotRe = regexp.MustCompile(`/hook/(.*)/snapshots.*`)
 
 // RunDefaultDebugServer initialized and run default debug server on unix and http sockets
@@ -59,10 +60,13 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 	// Example path: /hook/100-test.sh/snapshots.text
 	dbgSrv.RegisterHandler(http.MethodGet, "/hook/*", func(r *http.Request) (interface{}, error) {
 		// Exctracting hook name from URI
-		matched := snapshotRe.FindStringSubmatch(r.RequestURI) // expression returns slice of: matched substring, matched group hookName, matched group format type
-		hookName := matched[1]
+		matched := snapshotRe.FindStringSubmatch(r.RequestURI) // expression returns slice of: matched substring, matched group hookName
+		var hookName string
+		if len(matched) >= 1 {
+			hookName = matched[1]
+		}
 		if hookName == "" {
-			return nil, &debug.NotFoundError{Msg: "'hook' parameter is empty"}
+			return nil, &debug.NotFoundError{Msg: "404 page not found"}
 		}
 
 		// Return hook snapshot dump

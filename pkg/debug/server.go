@@ -154,7 +154,7 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		writer.Header().Set("Content-Type", "application/json")
 	case "yaml":
 		writer.Header().Set("Content-Type", "application/yaml")
-	default:
+	case "":
 		format = "text"
 		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
