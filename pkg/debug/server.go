@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"regexp"
+	"path/filepath"
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -116,8 +116,6 @@ func (s *Server) RegisterHandler(method, pattern string, handler func(request *h
 	}
 }
 
-var formatRe = regexp.MustCompile(`.*\.(.*)$`)
-
 func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
 	out, err := handler(request)
 	if err != nil {
@@ -140,12 +138,11 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 
 	// Trying to get format from chi
 	format := chi.URLParam(request, "format")
-	if format == "" { // If failed, trying to parse uri with regexp
+	if format == "" { // If failed, trying to parse uri
 		uri := request.RequestURI
 		uriFragments := strings.Split(uri, "/")
-		uriLastFragment := uriFragments[len(uriFragments)-1]     // string after last "/" to ignore garbage while regex
-		reResult := formatRe.FindStringSubmatch(uriLastFragment) // expression returns slice of: matched substring, matched group
-		format = reResult[1]                                     // matched group on index 1
+		uriLastFragment := uriFragments[len(uriFragments)-1] // string after last "/" to ignore garbage while regex
+		format = filepath.Ext(uriLastFragment)               // Extracts extention of path (like .yaml -> yaml), may return empty string
 	}
 
 	structuredLogger.GetLogEntry(request).Debug("used format", slog.String("format", format))
