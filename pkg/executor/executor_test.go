@@ -16,17 +16,15 @@ import (
 )
 
 func TestRunAndLogLines(t *testing.T) {
-	loggerOpts := log.Options{
-		TimeFunc: func(_ time.Time) time.Time {
-			parsedTime, err := time.Parse(time.DateTime, "2006-01-02 15:04:05")
-			if err != nil {
-				assert.NoError(t, err)
-			}
+	timeFunc := func(_ time.Time) time.Time {
+		parsedTime, err := time.Parse(time.DateTime, "2006-01-02 15:04:05")
+		if err != nil {
+			assert.NoError(t, err)
+		}
 
-			return parsedTime
-		},
+		return parsedTime
 	}
-	logger := log.NewLogger(loggerOpts)
+	logger := log.NewLogger(log.WithTimeFunc(timeFunc))
 	logger.SetLevel(log.LevelInfo)
 
 	var buf bytes.Buffer

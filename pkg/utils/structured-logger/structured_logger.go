@@ -27,7 +27,7 @@ type StructuredLogger struct {
 }
 
 func (l *StructuredLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
-	entry := &StructuredLoggerEntry{Logger: log.NewLogger(log.Options{})}
+	entry := &StructuredLoggerEntry{Logger: log.NewLogger()}
 
 	entry.Logger = entry.Logger.With(
 		// TODO: make snake_case

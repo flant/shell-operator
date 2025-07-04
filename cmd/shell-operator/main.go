@@ -16,7 +16,7 @@ import (
 func main() {
 	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
 
-	logger := log.NewLogger(log.Options{})
+	logger := log.NewLogger()
 	log.SetDefault(logger)
 
 	// override usage template to reveal additional commands with information about start command

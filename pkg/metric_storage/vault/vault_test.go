@@ -14,7 +14,7 @@ import (
 func Test_CounterAdd(t *testing.T) {
 	g := NewWithT(t)
 
-	logger := log.NewLogger(log.Options{})
+	logger := log.NewLogger()
 	log.SetDefault(logger)
 
 	buf := &bytes.Buffer{}
