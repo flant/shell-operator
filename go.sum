@@ -51,8 +51,8 @@ github.com/evanphx/json-patch/v5 v5.9.0 h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0
 github.com/evanphx/json-patch/v5 v5.9.0/go.mod h1:VNkHZ/282BpEyt/tObQO8s5CMPmYYq14uClGH4abBuQ=
 github.com/flant/go-openapi-validate v0.19.12-flant.0 h1:xk6kvc9fHKMgUdB6J7kbpbLR5vJOUzKAK8p3nrD7mDk=
 github.com/flant/go-openapi-validate v0.19.12-flant.0/go.mod h1:Rzou8hA/CBw8donlS6WNEUQupNvUZ0waH08tGe6kAQ4=
-github.com/flant/kube-client v0.0.0-20250704150444-b08cc051a445 h1:XuRacL6NoKEhlt5LeR5vD4763DJpJGhRn3+42IFyYVY=
-github.com/flant/kube-client v0.0.0-20250704150444-b08cc051a445/go.mod h1:A043nrL+OUgLCRCRZjkdk0uvUs6pX7DaFSkJx8xCh9Q=
+github.com/flant/kube-client v1.3.1-0.20250704150444-b08cc051a445 h1:7D1SbOU/4zHzXT93gilzxYoqvqYPgCpECBF9TkDkflM=
+github.com/flant/kube-client v1.3.1-0.20250704150444-b08cc051a445/go.mod h1:A043nrL+OUgLCRCRZjkdk0uvUs6pX7DaFSkJx8xCh9Q=
 github.com/globalsign/mgo v0.0.0-20180905125535-1ca0a4f7cbcb/go.mod h1:xkRDCp4j0OGD1HRkm4kmhM+pmpv3AKq5SU7GMg4oO/Q=
 github.com/go-chi/chi/v5 v5.2.1 h1:KOIHODQj58PmL80G2Eak4WdvUzjSJSm0vG72crDCqb8=
 github.com/go-chi/chi/v5 v5.2.1/go.mod h1:L2yAIGWB3H+phAw1NxKwWM+7eUH/lU8pOMm5hHcoops=
