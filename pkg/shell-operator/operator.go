@@ -86,7 +86,7 @@ func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 	}
 
 	if so.logger == nil {
-		so.logger = log.NewLogger(log.Options{}).Named("shell-operator")
+		so.logger = log.NewLogger().Named("shell-operator")
 	}
 
 	return so
