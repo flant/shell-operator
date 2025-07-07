@@ -2,167 +2,126 @@ package schedulemanager
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/stretchr/testify/assert"
 
-	"github.com/flant/shell-operator/pkg/schedule_manager/types"
+	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
-func Test_ScheduleManager_Add(t *testing.T) {
-	sm := NewScheduleManager(context.Background(), log.NewNop())
-
-	expectations := []struct {
-		testName string
-		crontab  string
-		id       string
-		err      string
-	}{
-		{
-			"crontab",
-			"* * * * *",
-			"* * * * *",
-			"",
-		},
-		{
-			"incorrect crontab format (value)",
-			"* * * 22 *",
-			"",
-			"End of range (22) above maximum (12): 22",
-		},
-		{
-			"incorrect crontab format (fields)",
-			"incorrect",
-			"",
-			"Expected 5 or 6 fields, found 1: incorrect",
-		},
-	}
-
-	for _, expectation := range expectations {
-		t.Run(expectation.testName, func(_ *testing.T) {
-			sm.Add(types.ScheduleEntry{Crontab: expectation.crontab, Id: expectation.id})
-
-			// if expectation.err != "" {
-			//	if err == nil {
-			//		t.Errorf("Expected specific error: %s", expectation.err)
-			//	} else {
-			//		assert.Equal(t, expectation.err, err.Error())
-			//	}
-			// } else if err != nil {
-			//	t.Error(err)
-			//}
-		})
-	}
-
-	// t.Run("1 crontab == 1 job", func(t *testing.T) {
-	//	id1, err := sm.Add("* */2 * * *")
-	//	if err != nil {
-	//		t.Fatal(err)
-	//	}
-	//
-	//	id2, err := sm.Add("* */2 * * *")
-	//	if err != nil {
-	//		t.Fatal(err)
-	//	}
-	//
-	//	assert.Equal(t, id1, id2)
-	// })
+func newTestManager() *scheduleManager {
+	return NewScheduleManager(context.Background(), log.NewNop())
 }
 
-// TODO rewrite with faked time
-// func Test_ScheduleManager_Run(t *testing.T) {
-//	sm := NewScheduleManager()
-//	sm.ScheduleCh = make(chan string)
-//
-//	expectations := []struct {
-//		crontab string
-//		counter int
-//	}{
-//		{
-//			"*/2 * * * * *",
-//			3,
-//		},
-//		{
-//			"* * * * * *",
-//			6,
-//		},
-//	}
-//
-//	for _, expectation := range expectations {
-//		_, err := sm.Add(expectation.crontab)
-//		if err != nil {
-//			t.Fatal(err)
-//		}
-//	}
-//
-//	timer := time.NewTimer(time.Second * 6)
-//	entryCounters := make(map[string]int)
-//	sm.Run()
-//
-//infinity:
-//	for {
-//		select {
-//		case crontab := <-ScheduleCh:
-//			entryCounters[crontab] += 1
-//		case <-timer.C:
-//			sm.stop()
-//			break infinity
-//		}
-//	}
-//
-//	for _, expectation := range expectations {
-//		assert.Equal(t, entryCounters[expectation.crontab], expectation.counter)
-//	}
-//}
+func TestAddAndRemoveEntry(t *testing.T) {
+	mgr := newTestManager()
+	entry := smtypes.ScheduleEntry{Crontab: "* * * * *", Id: "id1"}
 
-// TODO rewrite with faked time
-// func Test_ScheduleManager_Remove(t *testing.T) {
-//	t.Run("base", func(t *testing.T) {
-//		sm := NewScheduleManager()
-//
-//		ScheduleCh = make(chan string)
-//		expectation := struct {
-//			crontab string
-//			counter int
-//		}{
-//			"* * * * * *",
-//			1,
-//		}
-//
-//		_, err := sm.Add(expectation.crontab)
-//		if err != nil {
-//			t.Fatal(err)
-//		}
-//
-//		timer := time.NewTimer(time.Second * 5)
-//		entryCounters := make(map[string]int)
-//		sm.Run()
-//
-//	infinity:
-//		for {
-//			select {
-//			case crontab := <-ScheduleCh:
-//				entryCounters[crontab] += 1
-//				if err := sm.Remove(crontab); err != nil {
-//					t.Fatal(err)
-//				}
-//			case <-timer.C:
-//				sm.stop()
-//				break infinity
-//			}
-//		}
-//
-//		assert.Equal(t, entryCounters[expectation.crontab], expectation.counter)
-//	})
-//
-//	t.Run("not found", func(t *testing.T) {
-//		sm := NewScheduleManager()
-//		expectedError := "schedule manager entry '* * * * *' not found"
-//		err := sm.Remove("* * * * *")
-//		if err == nil {
-//			t.Errorf("Expected specific error: %s", expectedError)
-//		} else {
-//			assert.Equal(t, expectedError, err.Error())
-//		}
-//	})
-//}
+	mgr.Add(entry)
+	assert.Contains(t, mgr.Entries, entry.Crontab)
+	assert.Contains(t, mgr.Entries[entry.Crontab].Ids, entry.Id)
+
+	mgr.Remove(entry)
+	assert.NotContains(t, mgr.Entries, entry.Crontab)
+}
+
+func TestAddDuplicateId(t *testing.T) {
+	mgr := newTestManager()
+	entry := smtypes.ScheduleEntry{Crontab: "* * * * *", Id: "id1"}
+	mgr.Add(entry)
+	mgr.Add(entry) // duplicate
+	assert.Equal(t, 1, len(mgr.Entries[entry.Crontab].Ids))
+}
+
+func TestAddMultipleIdsSameCrontab(t *testing.T) {
+	mgr := newTestManager()
+	entry1 := smtypes.ScheduleEntry{Crontab: "* * * * *", Id: "id1"}
+	entry2 := smtypes.ScheduleEntry{Crontab: "* * * * *", Id: "id2"}
+	mgr.Add(entry1)
+	mgr.Add(entry2)
+	assert.Contains(t, mgr.Entries[entry1.Crontab].Ids, entry1.Id)
+	assert.Contains(t, mgr.Entries[entry2.Crontab].Ids, entry2.Id)
+	assert.Equal(t, 2, len(mgr.Entries[entry1.Crontab].Ids))
+
+	mgr.Remove(entry1)
+	assert.NotContains(t, mgr.Entries[entry1.Crontab].Ids, entry1.Id)
+	assert.Contains(t, mgr.Entries[entry1.Crontab].Ids, entry2.Id)
+	mgr.Remove(entry2)
+	assert.NotContains(t, mgr.Entries, entry1.Crontab)
+}
+
+func TestRemoveNonExistentEntry(_ *testing.T) {
+	mgr := newTestManager()
+	entry := smtypes.ScheduleEntry{Crontab: "* * * * *", Id: "id1"}
+	mgr.Remove(entry) // should not panic or error
+}
+
+func TestRemoveNonExistentId(t *testing.T) {
+	mgr := newTestManager()
+	entry1 := smtypes.ScheduleEntry{Crontab: "* * * * *", Id: "id1"}
+	entry2 := smtypes.ScheduleEntry{Crontab: "* * * * *", Id: "id2"}
+	mgr.Add(entry1)
+	mgr.Remove(entry2) // should not remove entry1
+	assert.Contains(t, mgr.Entries[entry1.Crontab].Ids, entry1.Id)
+}
+
+func TestAddEmptyCrontab(t *testing.T) {
+	mgr := newTestManager()
+	entry := smtypes.ScheduleEntry{Crontab: "", Id: "id1"}
+	mgr.Add(entry)
+	// Should not panic, and entry is not added
+	assert.NotContains(t, mgr.Entries, "")
+}
+
+func TestStartAndStop(_ *testing.T) {
+	mgr := newTestManager()
+	mgr.Start()
+	mgr.Stop()
+}
+
+func TestChReturnsChannel(t *testing.T) {
+	mgr := newTestManager()
+	ch := mgr.Ch()
+	assert.NotNil(t, ch)
+}
+
+func TestScheduleFires(t *testing.T) {
+	mgr := newTestManager()
+	entry := smtypes.ScheduleEntry{Crontab: "@every 0.1s", Id: "id1"}
+	mgr.Add(entry)
+	mgr.Start()
+	defer mgr.Stop()
+
+	select {
+	case v := <-mgr.Ch():
+		assert.Equal(t, entry.Crontab, v)
+	case <-time.After(2 * time.Second):
+		t.Fatal("schedule did not fire in time")
+	}
+}
+
+func TestConcurrentAddRemove(_ *testing.T) {
+	mgr := newTestManager()
+	mgr.Start()
+	defer mgr.Stop()
+	entry := smtypes.ScheduleEntry{Crontab: "@every 0.2s", Id: "id1"}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		for i := 0; i < 10; i++ {
+			mgr.Add(smtypes.ScheduleEntry{Crontab: entry.Crontab, Id: "id" + string(rune(i))})
+		}
+		wg.Done()
+	}()
+	go func() {
+		for i := 0; i < 10; i++ {
+			mgr.Remove(smtypes.ScheduleEntry{Crontab: entry.Crontab, Id: "id" + string(rune(i))})
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}
