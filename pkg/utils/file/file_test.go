@@ -123,17 +123,17 @@ func TestRecursiveCheckLibDirectory(t *testing.T) {
 	for _, tt := range tests {
 		var buf bytes.Buffer
 
-		logger := log.NewLogger(log.Options{
-			Output: &buf,
-			TimeFunc: func(_ time.Time) time.Time {
+		logger := log.NewLogger(
+			log.WithOutput(&buf),
+			log.WithTimeFunc(func(_ time.Time) time.Time {
 				parsedTime, err := time.Parse(time.DateTime, "2006-01-02 15:04:05")
 				if err != nil {
 					assert.NoError(t, err)
 				}
 
 				return parsedTime
-			},
-		})
+			}),
+		)
 
 		log.SetDefault(logger)
 
