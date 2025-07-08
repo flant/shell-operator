@@ -79,7 +79,7 @@ The following tools for debugging and fine-tuning of Shell-operator and hooks ar
 - The environment variable can be set to `LOG_LEVEL=debug` to include the detailed debugging information into logs,
 - You can view the contents of the working queues with cli command from inside a Pod:
    ```sh
-   kubectl exec -ti po/shell-operator /bin/bash
+   kubectl exec -ti po/shell-operator -- /bin/bash
    shell-operator queue list
    ```
 
