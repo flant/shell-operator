@@ -3,6 +3,7 @@ package schedulemanager
 import (
 	"context"
 	"log/slog"
+	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
@@ -31,6 +32,7 @@ type scheduleManager struct {
 	Entries    map[string]CronEntry
 
 	logger *log.Logger
+	mu     sync.Mutex
 }
 
 var _ ScheduleManager = (*scheduleManager)(nil)
@@ -60,19 +62,27 @@ func (sm *scheduleManager) Stop() {
 // function before pass to Add.
 func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	logEntry := sm.logger.With("operator.component", "scheduleManager")
+	if newEntry.Crontab == "" {
+		logEntry.Error("crontab is empty")
+		return
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
 
 	cronEntry, hasCronEntry := sm.Entries[newEntry.Crontab]
 
 	// If no entry, then add new scheduled function and save CronEntry.
 	if !hasCronEntry {
-		// The error can occur in case of bad format of crontab string.
-		// All crontab strings should be validated before add.
-		entryId, _ := sm.cron.AddFunc(newEntry.Crontab, func() {
-			logEntry.Debug("fire schedule event for entry", slog.String("name", newEntry.Crontab))
+		entryId, err := sm.cron.AddFunc(newEntry.Crontab, func() {
+			logEntry.Debug("fire schedule event for entry", slog.String("crontab", newEntry.Crontab))
 			sm.ScheduleCh <- newEntry.Crontab
 		})
+		if err != nil {
+			logEntry.Error("invalid crontab", slog.String("crontab", newEntry.Crontab), slog.Any("error", err))
+			return
+		}
 
-		logEntry.Debug("entry added", slog.String("name", newEntry.Crontab))
+		logEntry.Debug("entry added", slog.String("crontab", newEntry.Crontab))
 
 		sm.Entries[newEntry.Crontab] = CronEntry{
 			EntryID: entryId,
@@ -84,12 +94,14 @@ func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 
 	// Just add id into CronEntry.Ids
 	_, hasId := cronEntry.Ids[newEntry.Id]
-	if !hasId {
+	if !hasId && hasCronEntry {
 		sm.Entries[newEntry.Crontab].Ids[newEntry.Id] = true
 	}
 }
 
 func (sm *scheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
 	cronEntry, hasCronEntry := sm.Entries[delEntry.Crontab]
 
 	// Nothing to Remove
