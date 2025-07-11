@@ -39,7 +39,7 @@ func Test_ValidateMetricOperations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			ops, err := MetricOperationsFromBytes([]byte(tt.op))
+			ops, err := MetricOperationsFromBytes([]byte(tt.op), "")
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			err = ValidateOperations(ops)

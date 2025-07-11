@@ -56,7 +56,7 @@ func (m MetricOperation) String() string {
 	return "[" + strings.Join(parts, ", ") + "]"
 }
 
-func MetricOperationsFromReader(r io.Reader) ([]MetricOperation, error) {
+func MetricOperationsFromReader(r io.Reader, defaultGroup string) ([]MetricOperation, error) {
 	operations := make([]MetricOperation, 0)
 
 	dec := json.NewDecoder(r)
@@ -73,9 +73,14 @@ func MetricOperationsFromReader(r io.Reader) ([]MetricOperation, error) {
 			metricOperation.Action = "set"
 			metricOperation.Value = metricOperation.Set
 		}
+
 		if metricOperation.Add != nil && metricOperation.Set == nil {
 			metricOperation.Action = "add"
 			metricOperation.Value = metricOperation.Add
+		}
+
+		if metricOperation.Group == "" {
+			metricOperation.Group = defaultGroup
 		}
 
 		operations = append(operations, metricOperation)
@@ -84,11 +89,11 @@ func MetricOperationsFromReader(r io.Reader) ([]MetricOperation, error) {
 	return operations, nil
 }
 
-func MetricOperationsFromBytes(data []byte) ([]MetricOperation, error) {
-	return MetricOperationsFromReader(bytes.NewReader(data))
+func MetricOperationsFromBytes(data []byte, defaultGroup string) ([]MetricOperation, error) {
+	return MetricOperationsFromReader(bytes.NewReader(data), defaultGroup)
 }
 
-func MetricOperationsFromFile(filePath string) ([]MetricOperation, error) {
+func MetricOperationsFromFile(filePath, defaultGroup string) ([]MetricOperation, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
@@ -97,7 +102,7 @@ func MetricOperationsFromFile(filePath string) ([]MetricOperation, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
-	return MetricOperationsFromBytes(data)
+	return MetricOperationsFromBytes(data, defaultGroup)
 }
 
 func ValidateOperations(ops []MetricOperation) error {

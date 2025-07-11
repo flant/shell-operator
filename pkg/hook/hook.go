@@ -175,7 +175,7 @@ func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.Bin
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
 
-	result.Metrics, err = operation.MetricOperationsFromFile(metricsPath)
+	result.Metrics, err = operation.MetricOperationsFromFile(metricsPath, h.Name)
 	if err != nil {
 		return result, fmt.Errorf("got bad metrics: %s", err)
 	}
