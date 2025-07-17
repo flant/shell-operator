@@ -3,10 +3,13 @@ package executor
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"math/rand/v2"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,7 +72,6 @@ func TestRunAndLogLines(t *testing.T) {
 
 		_, err = ex.RunAndLogLines(context.Background(), map[string]string{"a": "b"})
 		assert.NoError(t, err)
-
 		reg := regexp.MustCompile(`{"level":"info","msg":"hook result","a":"b","hook":{"truncated":".*:truncated"},"output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"`)
 		assert.Regexp(t, reg, buf.String())
 
@@ -105,9 +107,26 @@ func TestRunAndLogLines(t *testing.T) {
 
 		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"a": "b"})
 		assert.NoError(t, err)
+		lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 
-		assert.Equal(t, buf.String(), `{"level":"debug","msg":"json log line not map[string]interface{}","source":"executor/executor.go:211","a":"b","line":["a","b","c"],"output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n"+
-			`{"level":"info","msg":"[\"a\",\"b\",\"c\"]\n","source":"executor/executor.go:214","a":"b","output":"stdout","time":"2006-01-02T15:04:05Z"}`+"\n")
+		var debugLine map[string]interface{}
+		err = json.Unmarshal([]byte(lines[0]), &debugLine)
+		assert.NoError(t, err)
+		assert.Equal(t, "debug", debugLine["level"])
+		assert.Equal(t, "json log line not map[string]interface{}", debugLine["msg"])
+		assert.Equal(t, []interface{}{"a", "b", "c"}, debugLine["line"])
+		assert.Equal(t, "b", debugLine["a"])
+		assert.Equal(t, "stdout", debugLine["output"])
+		assert.Equal(t, "2006-01-02T15:04:05Z", debugLine["time"])
+
+		var infoLine map[string]interface{}
+		err = json.Unmarshal([]byte(lines[1]), &infoLine)
+		assert.NoError(t, err)
+		assert.Equal(t, "info", infoLine["level"])
+		assert.Equal(t, "[\"a\",\"b\",\"c\"]\n", infoLine["msg"])
+		assert.Equal(t, "b", infoLine["a"])
+		assert.Equal(t, "stdout", infoLine["output"])
+		assert.Equal(t, "2006-01-02T15:04:05Z", infoLine["time"])
 		buf.Reset()
 	})
 
@@ -186,6 +205,37 @@ c d
 		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"foor": "baar"})
 		assert.NoError(t, err)
 		assert.Equal(t, buf.String(), `{"level":"info","msg":"hook result","foor":"baar","hook_a":"b","hook_c":"d","hook_foor":"baar","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}`+"\n")
+
+		buf.Reset()
+	})
+
+	t.Run("multiline json several logs", func(t *testing.T) {
+		logger.SetLevel(log.LevelInfo)
+		arg := `
+{"a":"b","c":"d"}
+{"b":"c","d":"a"}
+{"c":"d","a":"b"}
+{"d":"a","b":"c"}
+plain text
+{
+"a":"b",
+"c":"d"
+}`
+		ex := NewExecutor("", "echo", []string{arg}, []string{}).
+			WithLogProxyHookJSON(true).
+			WithLogger(logger)
+
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{"foor": "baar"})
+		assert.NoError(t, err)
+		fmt.Println("actual", buf.String())
+		expected := ""
+		expected += `{"level":"info","msg":"hook result","foor":"baar","hook_a":"b","hook_c":"d","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}` + "\n"
+		expected += `{"level":"info","msg":"hook result","foor":"baar","hook_b":"c","hook_d":"a","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}` + "\n"
+		expected += `{"level":"info","msg":"hook result","foor":"baar","hook_a":"b","hook_c":"d","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}` + "\n"
+		expected += `{"level":"info","msg":"hook result","foor":"baar","hook_b":"c","hook_d":"a","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}` + "\n"
+		expected += `{"level":"info","msg":"plain text","foor":"baar","output":"stdout","time":"2006-01-02T15:04:05Z"}` + "\n"
+		expected += `{"level":"info","msg":"hook result","foor":"baar","hook_a":"b","hook_c":"d","output":"stdout","proxyJsonLog":true,"time":"2006-01-02T15:04:05Z"}` + "\n"
+		assert.Equal(t, expected, buf.String())
 
 		buf.Reset()
 	})
