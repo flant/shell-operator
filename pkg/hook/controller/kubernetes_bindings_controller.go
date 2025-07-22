@@ -316,21 +316,27 @@ func (c *kubernetesBindingsController) SnapshotsInfo() []string {
 }
 
 func (c *kubernetesBindingsController) SnapshotsDump() map[string]interface{} {
+	fmt.Println("[SNAPSHOT] kubernetesBindingsController.SnapshotsDump: called")
 	dumps := make(map[string]interface{})
+	bindingCount := 0
 	for _, binding := range c.KubernetesBindings {
 		monitorID := binding.Monitor.Metadata.MonitorId
 		if c.kubeEventsManager.HasMonitor(monitorID) {
 			total, last := c.kubeEventsManager.GetMonitor(monitorID).SnapshotOperations()
+			snapshot := c.kubeEventsManager.GetMonitor(monitorID).Snapshot()
+			fmt.Println("[SNAPSHOT] SnapshotsDump: binding=", binding.BindingName, "snapshot size=", len(snapshot))
+			fmt.Println("[SNAPSHOT] SnapshotsDump: binding=", binding.BindingName, "operations since start:", total, "since last:", last)
 			dumps[binding.BindingName] = map[string]interface{}{
-				"snapshot": c.kubeEventsManager.GetMonitor(monitorID).Snapshot(),
+				"snapshot": snapshot,
 				"operations": map[string]interface{}{
 					"sinceStart":         total,
 					"sinceLastExecution": last,
 				},
 			}
+			bindingCount++
 		}
 	}
-
+	fmt.Println("[SNAPSHOT] kubernetesBindingsController.SnapshotsDump: total bindings in dump:", bindingCount)
 	return dumps
 }
 

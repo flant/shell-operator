@@ -154,8 +154,10 @@ func (ei *resourceInformer) createSharedInformer() error {
 // Snapshot returns all cached objects for this informer
 func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
 	ei.cacheLock.RLock()
+	fmt.Println("[CACHE] getCachedObjects: reading all cached objects, count:", len(ei.cachedObjects))
 	res := make([]kemtypes.ObjectAndFilterResult, 0)
-	for _, obj := range ei.cachedObjects {
+	for k, obj := range ei.cachedObjects {
+		fmt.Println("[CACHE] getCachedObjects: key=", k, "object=", obj)
 		res = append(res, *obj)
 	}
 	ei.cacheLock.RUnlock()
@@ -163,6 +165,7 @@ func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult 
 	// Reset eventBuf if needed.
 	ei.eventBufLock.Lock()
 	if !ei.eventCbEnabled {
+		fmt.Println("[CACHE] getCachedObjects: eventCb not enabled, resetting eventBuf")
 		ei.eventBuf = nil
 	}
 	ei.eventBufLock.Unlock()
@@ -239,19 +242,17 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		}
 
 		filteredObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
-
-		log.Debug("initial list: cached with checksum",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("resourceId", objFilterRes.Metadata.ResourceId),
-			slog.String("checksum", objFilterRes.Metadata.Checksum))
+		fmt.Println("[CACHE] loadExistedObjects: will add object to cache, key=", objFilterRes.Metadata.ResourceId, "object=", objFilterRes)
 	}
 
 	// Save objects to the cache.
 	ei.cacheLock.Lock()
-	defer ei.cacheLock.Unlock()
 	for k, v := range filteredObjects {
+		fmt.Println("[CACHE] loadExistedObjects: writing to cache, key=", k, "object=", v)
 		ei.cachedObjects[k] = v
 	}
+	fmt.Println("[CACHE] loadExistedObjects: cache now has", len(ei.cachedObjects), "objects")
+	ei.cacheLock.Unlock()
 
 	ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
 	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
@@ -327,31 +328,20 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	case kemtypes.WatchEventAdded:
 		fallthrough
 	case kemtypes.WatchEventModified:
-		// Update object in cache
 		ei.cacheLock.Lock()
 		cachedObject, objectInCache := ei.cachedObjects[resourceId]
 		skipEvent := false
 		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
-			// update object in cache and do not send event
-			log.Debug("skip KubeEvent",
-				slog.String("debugName", ei.Monitor.Metadata.DebugName),
-				slog.String("eventType", string(eventType)),
-				slog.String("resourceId", resourceId),
-			)
+			fmt.Println("[CACHE] handleWatchEvent:", eventType, "skipping event for object with same checksum, key=", resourceId)
 			skipEvent = true
 		}
-		ei.cachedObjects[resourceId] = objFilterRes
-		// Update cached objects info.
-		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
-		if eventType == kemtypes.WatchEventAdded {
-			ei.cachedObjectsInfo.Added++
-			ei.cachedObjectsIncrement.Added++
+		if objectInCache {
+			fmt.Println("[CACHE] handleWatchEvent:", eventType, "update existing object in cache, key=", resourceId, "old=", cachedObject, "new=", objFilterRes)
 		} else {
-			ei.cachedObjectsInfo.Modified++
-			ei.cachedObjectsIncrement.Modified++
+			fmt.Println("[CACHE] handleWatchEvent:", eventType, "add new object to cache, key=", resourceId, "object=", objFilterRes)
 		}
-		// Update metrics.
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.cachedObjects[resourceId] = objFilterRes
+		fmt.Println("[CACHE] handleWatchEvent:", eventType, "cache now has", len(ei.cachedObjects), "objects")
 		ei.cacheLock.Unlock()
 		if skipEvent {
 			return
@@ -359,17 +349,14 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 
 	case kemtypes.WatchEventDeleted:
 		ei.cacheLock.Lock()
-		delete(ei.cachedObjects, resourceId)
-		// Update cached objects info.
-		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
-		if ei.cachedObjectsInfo.Count == 0 {
-			ei.cachedObjectsInfo.Cleaned++
-			ei.cachedObjectsIncrement.Cleaned++
+		_, existed := ei.cachedObjects[resourceId]
+		if existed {
+			fmt.Println("[CACHE] handleWatchEvent: Deleted, removing object from cache, key=", resourceId)
+			delete(ei.cachedObjects, resourceId)
+			fmt.Println("[CACHE] handleWatchEvent: Deleted, cache now has", len(ei.cachedObjects), "objects")
+		} else {
+			fmt.Println("[CACHE] handleWatchEvent: Deleted, object not found in cache, key=", resourceId)
 		}
-		ei.cachedObjectsInfo.Deleted++
-		ei.cachedObjectsIncrement.Deleted++
-		// Update metrics.
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 	}
 
@@ -458,6 +445,19 @@ func (ei *resourceInformer) start() {
 		}
 	}()
 
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ei.ctx.Done():
+				return
+			case <-ticker.C:
+				ei.LogDanglingObjects()
+			}
+		}
+	}()
+
 	// TODO: separate handler and informer
 	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage, ei.logger.Named("watch-error-handler"))
 	err := DefaultFactoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
@@ -488,4 +488,27 @@ func (ei *resourceInformer) getCachedObjectsInfoIncrement() CachedObjectsInfo {
 	info := *ei.cachedObjectsIncrement
 	ei.cachedObjectsIncrement = &CachedObjectsInfo{}
 	return info
+}
+
+func (ei *resourceInformer) LogDanglingObjects() {
+	// Получить актуальный список объектов из Kubernetes
+	objList, err := ei.KubeClient.Dynamic().
+		Resource(ei.GroupVersionResource).
+		Namespace(ei.Namespace).
+		List(context.TODO(), ei.ListOptions)
+	if err != nil {
+		fmt.Println("[DANGLING] Error listing objects from API:", err)
+		return
+	}
+	actual := make(map[string]bool)
+	for _, item := range objList.Items {
+		actual[resourceId(&item)] = true
+	}
+	ei.cacheLock.RLock()
+	for k := range ei.cachedObjects {
+		if !actual[k] {
+			fmt.Println("[DANGLING] Object in cache but not in API:", k)
+		}
+	}
+	ei.cacheLock.RUnlock()
 }
