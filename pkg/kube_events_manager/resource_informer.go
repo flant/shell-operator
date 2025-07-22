@@ -446,14 +446,22 @@ func (ei *resourceInformer) start() {
 	}()
 
 	go func() {
+		fmt.Println("[DANGLING] LogDanglingObjects ticker goroutine started for informer:", ei.Monitor.Metadata.DebugName)
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ei.ctx.Done():
+				fmt.Println("[DANGLING] LogDanglingObjects ticker goroutine stopped for informer:", ei.Monitor.Metadata.DebugName)
 				return
 			case <-ticker.C:
-				ei.LogDanglingObjects()
+				fmt.Println("[DANGLING] LogDanglingObjects ticker tick for informer:", ei.Monitor.Metadata.DebugName)
+				dangling := ei.LogDanglingObjects()
+				if len(dangling) == 0 {
+					fmt.Println("[DANGLING] LogDanglingObjects ticker: SUCCESS — no dangling objects for informer:", ei.Monitor.Metadata.DebugName)
+				} else {
+					fmt.Println("[DANGLING] LogDanglingObjects ticker: found", len(dangling), "dangling objects for informer:", ei.Monitor.Metadata.DebugName, dangling)
+				}
 			}
 		}
 	}()
@@ -490,25 +498,33 @@ func (ei *resourceInformer) getCachedObjectsInfoIncrement() CachedObjectsInfo {
 	return info
 }
 
-func (ei *resourceInformer) LogDanglingObjects() {
-	// Получить актуальный список объектов из Kubernetes
+func (ei *resourceInformer) LogDanglingObjects() []string {
+	fmt.Println("[DANGLING] LogDanglingObjects: start for informer:", ei.Monitor.Metadata.DebugName)
 	objList, err := ei.KubeClient.Dynamic().
 		Resource(ei.GroupVersionResource).
 		Namespace(ei.Namespace).
 		List(context.TODO(), ei.ListOptions)
 	if err != nil {
-		fmt.Println("[DANGLING] Error listing objects from API:", err)
-		return
+		fmt.Println("[DANGLING] LogDanglingObjects: error listing objects from API:", err)
+		return nil
 	}
 	actual := make(map[string]bool)
 	for _, item := range objList.Items {
 		actual[resourceId(&item)] = true
 	}
 	ei.cacheLock.RLock()
+	dangling := []string{}
 	for k := range ei.cachedObjects {
 		if !actual[k] {
-			fmt.Println("[DANGLING] Object in cache but not in API:", k)
+			dangling = append(dangling, k)
 		}
 	}
+	fmt.Println("[DANGLING] LogDanglingObjects: informer:", ei.Monitor.Metadata.DebugName, "cache size:", len(ei.cachedObjects), "actual in API:", len(actual))
+	if len(dangling) > 0 {
+		fmt.Println("[DANGLING] LogDanglingObjects: found", len(dangling), "dangling objects:", dangling)
+	} else {
+		fmt.Println("[DANGLING] LogDanglingObjects: SUCCESS — no dangling objects found!")
+	}
 	ei.cacheLock.RUnlock()
+	return dangling
 }

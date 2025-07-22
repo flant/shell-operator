@@ -6,6 +6,6 @@ metadata:
 spec:
   containers:
   - name: shell-operator
-    image: monitor-pods:v2
+    image: monitor-pods:v3
     imagePullPolicy: Never
   serviceAccountName: monitor-pods-acc
