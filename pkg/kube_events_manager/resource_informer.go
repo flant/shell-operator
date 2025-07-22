@@ -336,9 +336,9 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			skipEvent = true
 		}
 		if objectInCache {
-			fmt.Println("[CACHE] handleWatchEvent:", eventType, "update existing object in cache, key=", resourceId, "old=", cachedObject, "new=", objFilterRes)
+			fmt.Println("[CACHE] handleWatchEvent:", eventType, "update existing object in cache, key=", resourceId)
 		} else {
-			fmt.Println("[CACHE] handleWatchEvent:", eventType, "add new object to cache, key=", resourceId, "object=", objFilterRes)
+			fmt.Println("[CACHE] handleWatchEvent:", eventType, "add new object to cache, key=", resourceId)
 		}
 		ei.cachedObjects[resourceId] = objFilterRes
 		fmt.Println("[CACHE] handleWatchEvent:", eventType, "cache now has", len(ei.cachedObjects), "objects")
