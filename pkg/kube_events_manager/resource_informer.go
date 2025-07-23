@@ -229,7 +229,9 @@ func (ei *resourceInformer) loadExistedObjects() error {
 			defer measure.Duration(func(d time.Duration) {
 				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 			})()
+
 			filter := jq.NewFilter()
+
 			objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, &obj)
 		}()
 

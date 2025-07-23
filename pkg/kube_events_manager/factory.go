@@ -117,7 +117,6 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 
 	if !informer.HasSynced() {
 		go informer.Run(factory.ctx.Done())
-
 		if err := wait.PollUntilContextCancel(ctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 			return informer.HasSynced(), nil
 		}); err != nil {
