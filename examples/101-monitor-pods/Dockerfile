@@ -1,2 +1,2 @@
-FROM ghcr.io/flant/shell-operator:latest
+FROM shell:v2
 ADD hooks /hooks

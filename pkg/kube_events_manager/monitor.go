@@ -274,21 +274,33 @@ func (m *monitor) CreateInformers() error {
 
 // Snapshot returns all existed objects from all created informers
 func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
+	fmt.Println("[SNAPSHOT] monitor.Snapshot: called for monitor:", m.Name)
 	objects := make([]kemtypes.ObjectAndFilterResult, 0)
-
-	for _, informer := range m.ResourceInformers {
-		objects = append(objects, informer.getCachedObjects()...)
-	}
-
-	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
-		for _, informer := range value {
-			objects = append(objects, informer.getCachedObjects()...)
+	fmt.Println("[SNAPSHOT] monitor.Snapshot: ResourceInformers count:", len(m.ResourceInformers))
+	for idx, informer := range m.ResourceInformers {
+		objs := informer.getCachedObjects()
+		fmt.Println("[SNAPSHOT] monitor.Snapshot: ResourceInformer #", idx, "returned", len(objs), "objects")
+		for _, obj := range objs {
+			fmt.Println("[SNAPSHOT] monitor.Snapshot: ResourceInformer #", idx, "object:", obj.Metadata.ResourceId)
 		}
+		objects = append(objects, objs...)
+	}
+	countVarying := 0
+	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
+		fmt.Println("[SNAPSHOT] monitor.Snapshot: VaryingInformers group #", countVarying, "count:", len(value))
+		for idx, informer := range value {
+			objs := informer.getCachedObjects()
+			fmt.Println("[SNAPSHOT] monitor.Snapshot: VaryingInformer #", countVarying, "/", idx, "returned", len(objs), "objects")
+			for _, obj := range objs {
+				fmt.Println("[SNAPSHOT] monitor.Snapshot: VaryingInformer #", countVarying, "/", idx, "object:", obj.Metadata.ResourceId)
+			}
+			objects = append(objects, objs...)
+		}
+		countVarying++
 	})
-
+	fmt.Println("[SNAPSHOT] monitor.Snapshot: total objects in snapshot:", len(objects))
 	// Sort objects by namespace and name
 	sort.Sort(kemtypes.ByNamespaceAndName(objects))
-
 	return objects
 }
 
