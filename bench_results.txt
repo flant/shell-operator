@@ -1,0 +1,18 @@
+1000 подов легковесных до - 61.17МБ
+
+--- Замена md5 на xxhash ---
+val1 chksum: 6553245509327505009
+val2 chksum: 6553245509327505009
+goos: darwin
+goarch: arm64
+pkg: github.com/flant/shell-operator/pkg/utils/checksum
+cpu: Apple M3
+BenchmarkCalculateChecksum_MD5-8         3094308               374.1 ns/op           304 B/op          4 allocs/op
+BenchmarkCalculateChecksum_xxHash-8     27565690                42.79 ns/op          224 B/op          1 allocs/op
+PASS
+ok      github.com/flant/shell-operator/pkg/utils/checksum      2.940s
+
+Прирост производительности в 8.7 раз,
+
+---
+

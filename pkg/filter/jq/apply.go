@@ -3,13 +3,17 @@ package jq
 import (
 	"encoding/json"
 	"errors"
+	"sync"
 
 	"github.com/itchyny/gojq"
 
 	"github.com/flant/shell-operator/pkg/filter"
 )
 
-var _ filter.Filter = (*Filter)(nil)
+var (
+	_       filter.Filter = (*Filter)(nil)
+	jqCache               = &sync.Map{} // map[string]*gojq.Query
+)
 
 func NewFilter() *Filter {
 	return &Filter{}
@@ -19,9 +23,18 @@ type Filter struct{}
 
 // ApplyFilter runs jq expression provided in jqFilter with jsonData as input.
 func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, error) {
-	query, err := gojq.Parse(jqFilter)
-	if err != nil {
-		return nil, err
+	var query *gojq.Query
+	var err error
+
+	cached, ok := jqCache.Load(jqFilter)
+	if ok {
+		query = cached.(*gojq.Query)
+	} else {
+		query, err = gojq.Parse(jqFilter)
+		if err != nil {
+			return nil, err
+		}
+		jqCache.Store(jqFilter, query)
 	}
 
 	var workData any

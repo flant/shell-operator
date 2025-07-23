@@ -37,7 +37,7 @@ const (
 type ObjectAndFilterResult struct {
 	Metadata struct {
 		JqFilter     string
-		Checksum     string
+		Checksum     uint64
 		ResourceId   string // Used for sorting
 		RemoveObject bool
 	}

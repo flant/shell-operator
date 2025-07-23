@@ -8,6 +8,8 @@ kubernetes:
   kind: Pod
   executeHookOnEvent:
   - Added
+  - Deleted
+  - Modified
 EOF
 else
   type=$(jq -r '.[0].type' $BINDING_CONTEXT_PATH)

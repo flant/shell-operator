@@ -1,32 +1,41 @@
 package checksum
 
 import (
-	"crypto/md5"
-	"encoding/hex"
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/cespare/xxhash/v2"
 )
 
-func CalculateChecksum(stringArr ...string) string {
-	hasher := md5.New()
+// CalculateChecksum вычисляет 64-битную контрольную сумму для массива строк.
+func CalculateChecksum(stringArr ...string) uint64 {
+	digest := xxhash.New()
 	sort.Strings(stringArr)
 	for _, value := range stringArr {
-		_, _ = hasher.Write([]byte(value))
+		_, _ = digest.Write([]byte(value))
 	}
-	return hex.EncodeToString(hasher.Sum(nil))
+	return digest.Sum64()
 }
 
-func CalculateChecksumOfFile(path string) (string, error) {
+func CalculateChecksumOfFile(path string) (uint64, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	return CalculateChecksum(string(content)), nil
 }
 
-func CalculateChecksumOfDirectory(path string) (string, error) {
-	res := ""
+func combineHashes(h1, h2 uint64) uint64 {
+	buf := make([]byte, 16)
+	binary.BigEndian.PutUint64(buf[:8], h1)
+	binary.BigEndian.PutUint64(buf[8:], h2)
+	return xxhash.Sum64(buf)
+}
+
+func CalculateChecksumOfDirectory(path string) (uint64, error) {
+	var res uint64
 
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -40,27 +49,27 @@ func CalculateChecksumOfDirectory(path string) (string, error) {
 		if err != nil {
 			return err
 		}
-		res = CalculateChecksum(res, checksum)
+		res = combineHashes(res, checksum)
 
 		return nil
 	})
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
 	return res, nil
 }
 
-func CalculateChecksumOfPaths(pathArr ...string) (string, error) {
-	res := ""
+func CalculateChecksumOfPaths(pathArr ...string) (uint64, error) {
+	var res uint64
 
 	for _, path := range pathArr {
 		fileInfo, err := os.Stat(path)
 		if err != nil {
-			return "", err
+			return 0, err
 		}
 
-		var checksum string
+		var checksum uint64
 		if fileInfo.IsDir() {
 			checksum, err = CalculateChecksumOfDirectory(path)
 		} else {
@@ -68,9 +77,9 @@ func CalculateChecksumOfPaths(pathArr ...string) (string, error) {
 		}
 
 		if err != nil {
-			return "", err
+			return 0, err
 		}
-		res = CalculateChecksum(res, checksum)
+		res = combineHashes(res, checksum)
 	}
 
 	return res, nil

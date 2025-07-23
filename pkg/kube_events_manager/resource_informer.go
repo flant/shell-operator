@@ -36,8 +36,8 @@ type resourceInformer struct {
 	GroupVersionResource schema.GroupVersionResource
 	ListOptions          metav1.ListOptions
 
-	// A cache of objects and filterResults. It is a part of the Monitor's snapshot.
-	cachedObjects map[string]*kemtypes.ObjectAndFilterResult
+	// A cache for checksums to deduplicate events.
+	checksumCache map[string]uint64
 	cacheLock     sync.RWMutex
 
 	// Cached objects operations since start
@@ -84,7 +84,7 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		Name:                   name,
 		eventCb:                cfg.eventCb,
 		Monitor:                cfg.monitor,
-		cachedObjects:          make(map[string]*kemtypes.ObjectAndFilterResult),
+		checksumCache:          make(map[string]uint64),
 		cacheLock:              sync.RWMutex{},
 		eventBufLock:           sync.Mutex{},
 		cachedObjectsInfo:      &CachedObjectsInfo{},
@@ -144,21 +144,54 @@ func (ei *resourceInformer) createSharedInformer() error {
 		LabelSelector: ei.ListOptions.LabelSelector,
 	}
 
-	if err = ei.loadExistedObjects(); err != nil {
-		return fmt.Errorf("load existing objects: %w", err)
-	}
-
 	return nil
 }
 
-// Snapshot returns all cached objects for this informer
-func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
-	ei.cacheLock.RLock()
-	res := make([]kemtypes.ObjectAndFilterResult, 0)
-	for _, obj := range ei.cachedObjects {
-		res = append(res, *obj)
+// populateChecksumCacheFromInformerStore fills the checksum cache from the informer's store.
+func (ei *resourceInformer) populateChecksumCacheFromInformerStore() error {
+	informer := DefaultFactoryStore.get(ei.KubeClient.Dynamic(), ei.FactoryIndex).
+		shared.ForResource(ei.GroupVersionResource).Informer()
+
+	items := informer.GetStore().List()
+
+	ei.cacheLock.Lock()
+	defer ei.cacheLock.Unlock()
+	ei.checksumCache = make(map[string]uint64, len(items))
+
+	for i := range items {
+		// don't store copy of the object in heap, just use pointer
+		obj := items[i].(*unstructured.Unstructured)
+		// It's not a watch event, so we don't need to handle it.
+		// We just need to fill the checksum cache.
+		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, jq.NewFilter(), ei.Monitor.FilterFunc, obj)
+		if err != nil {
+			// Log error and continue
+			log.Errorf("cannot apply filter to initial object %s: %v", resourceId(obj), err)
+			continue
+		}
+		ei.checksumCache[resourceId(obj)] = objFilterRes.Metadata.Checksum
 	}
-	ei.cacheLock.RUnlock()
+	log.Debugf("informer %s: checksum cache populated with %d items", ei.Monitor.Metadata.DebugName, len(ei.checksumCache))
+	return nil
+}
+
+// getCachedObjects returns a snapshot of objects from the informer's store.
+func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
+	informer := DefaultFactoryStore.get(ei.KubeClient.Dynamic(), ei.FactoryIndex).
+		shared.ForResource(ei.GroupVersionResource).Informer()
+
+	items := informer.GetStore().List()
+	res := make([]kemtypes.ObjectAndFilterResult, 0, len(items))
+
+	for _, item := range items {
+		obj := item.(*unstructured.Unstructured)
+		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, jq.NewFilter(), ei.Monitor.FilterFunc, obj)
+		if err != nil {
+			log.Errorf("cannot apply filter to snapshot object %s: %v", resourceId(obj), err)
+			continue
+		}
+		res = append(res, *objFilterRes)
+	}
 
 	// Reset eventBuf if needed.
 	ei.eventBufLock.Lock()
@@ -181,82 +214,6 @@ func (ei *resourceInformer) enableKubeEventCb() {
 		ei.putEvent(kubeEvent)
 	}
 	ei.eventBuf = nil
-}
-
-// loadExistedObjects get a list of existed objects in namespace that match selectors and
-// fills Checksum map with checksums of existing objects.
-func (ei *resourceInformer) loadExistedObjects() error {
-	defer trace.StartRegion(context.Background(), "loadExistedObjects").End()
-
-	objList, err := ei.KubeClient.Dynamic().
-		Resource(ei.GroupVersionResource).
-		Namespace(ei.Namespace).
-		List(context.TODO(), ei.ListOptions)
-	if err != nil {
-		log.Error("initial list resources of kind",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("kind", ei.Monitor.Kind),
-			log.Err(err))
-		return err
-	}
-
-	if objList == nil || len(objList.Items) == 0 {
-		log.Debug("Got no existing resources",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("kind", ei.Monitor.Kind))
-		return nil
-	}
-
-	// FIXME objList.Items has too much information for log
-	// log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
-	log.Debug("initial list: Got existing resources",
-		slog.String("debugName", ei.Monitor.Metadata.DebugName),
-		slog.String("kind", ei.Monitor.Kind),
-		slog.Int("count", len(objList.Items)))
-
-	filteredObjects := make(map[string]*kemtypes.ObjectAndFilterResult)
-
-	for _, item := range objList.Items {
-		// copy loop var to avoid duplication of pointer in filteredObjects
-		obj := item
-
-		var objFilterRes *kemtypes.ObjectAndFilterResult
-		var err error
-		func() {
-			defer measure.Duration(func(d time.Duration) {
-				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
-			})()
-			filter := jq.NewFilter()
-			objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, &obj)
-		}()
-
-		if err != nil {
-			return err
-		}
-
-		if !ei.Monitor.KeepFullObjectsInMemory {
-			objFilterRes.RemoveFullObject()
-		}
-
-		filteredObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
-
-		log.Debug("initial list: cached with checksum",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("resourceId", objFilterRes.Metadata.ResourceId),
-			slog.String("checksum", objFilterRes.Metadata.Checksum))
-	}
-
-	// Save objects to the cache.
-	ei.cacheLock.Lock()
-	defer ei.cacheLock.Unlock()
-	for k, v := range filteredObjects {
-		ei.cachedObjects[k] = v
-	}
-
-	ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
-	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
-
-	return nil
 }
 
 func (ei *resourceInformer) OnAdd(obj interface{}, _ bool) {
@@ -298,7 +255,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 
 	resourceId := resourceId(obj)
 
-	// Always calculate checksum and update cache, because we need an actual state in ei.cachedObjects.
+	// Always calculate checksum and update cache, because we need an actual state in ei.checksumCache.
 
 	var objFilterRes *kemtypes.ObjectAndFilterResult
 	var err error
@@ -327,31 +284,14 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	case kemtypes.WatchEventAdded:
 		fallthrough
 	case kemtypes.WatchEventModified:
-		// Update object in cache
 		ei.cacheLock.Lock()
-		cachedObject, objectInCache := ei.cachedObjects[resourceId]
+		oldChecksum, objectInCache := ei.checksumCache[resourceId]
+		newChecksum := objFilterRes.Metadata.Checksum
 		skipEvent := false
-		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
-			// update object in cache and do not send event
-			log.Debug("skip KubeEvent",
-				slog.String("debugName", ei.Monitor.Metadata.DebugName),
-				slog.String("eventType", string(eventType)),
-				slog.String("resourceId", resourceId),
-			)
+		if objectInCache && oldChecksum == newChecksum {
 			skipEvent = true
 		}
-		ei.cachedObjects[resourceId] = objFilterRes
-		// Update cached objects info.
-		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
-		if eventType == kemtypes.WatchEventAdded {
-			ei.cachedObjectsInfo.Added++
-			ei.cachedObjectsIncrement.Added++
-		} else {
-			ei.cachedObjectsInfo.Modified++
-			ei.cachedObjectsIncrement.Modified++
-		}
-		// Update metrics.
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.checksumCache[resourceId] = newChecksum
 		ei.cacheLock.Unlock()
 		if skipEvent {
 			return
@@ -359,17 +299,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 
 	case kemtypes.WatchEventDeleted:
 		ei.cacheLock.Lock()
-		delete(ei.cachedObjects, resourceId)
-		// Update cached objects info.
-		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
-		if ei.cachedObjectsInfo.Count == 0 {
-			ei.cachedObjectsInfo.Cleaned++
-			ei.cachedObjectsIncrement.Cleaned++
-		}
-		ei.cachedObjectsInfo.Deleted++
-		ei.cachedObjectsIncrement.Deleted++
-		// Update metrics.
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		delete(ei.checksumCache, resourceId)
 		ei.cacheLock.Unlock()
 	}
 
@@ -464,6 +394,12 @@ func (ei *resourceInformer) start() {
 	if err != nil {
 		ei.Monitor.Logger.Error("cache is not synced for informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 		return
+	}
+
+	// Populate the checksum cache for the first time.
+	err = ei.populateChecksumCacheFromInformerStore()
+	if err != nil {
+		ei.Monitor.Logger.Error("cannot populate checksum cache", log.Err(err))
 	}
 
 	log.Debug("informer is ready", slog.String("debugName", ei.Monitor.Metadata.DebugName))
