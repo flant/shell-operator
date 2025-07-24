@@ -2,7 +2,6 @@ package kubeeventsmanager
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -12,20 +11,21 @@ import (
 
 	"github.com/flant/shell-operator/pkg/filter"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
+	checksum "github.com/flant/shell-operator/pkg/utils/checksum"
+	"github.com/itchyny/gojq"
 )
 
 // applyFilter filters object json representation with jq expression, calculate checksum
 // over result and return ObjectAndFilterResult. If jqFilter is empty, no filter
 // is required and checksum is calculated over full json representation of the object.
-func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+func applyFilter(jqFilter *gojq.Code, fl filter.Filter, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
 	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
 
 	res := &kemtypes.ObjectAndFilterResult{
 		Object: obj,
 	}
 	res.Metadata.JqFilter = jqFilter
-	res.Metadata.ResourceId = resourceId(obj)
+	res.Metadata.ResourceId = resourceIDStore.GetResourceID(obj).String()
 
 	// If filterFn is passed, run it and return result.
 	if filterFn != nil {
@@ -34,24 +34,21 @@ func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructu
 			return nil, fmt.Errorf("filterFn (%s) contains an error: %v", runtime.FuncForPC(reflect.ValueOf(filterFn).Pointer()).Name(), err)
 		}
 
-		filteredBytes, err := json.Marshal(filteredObj)
+		res.FilterResult = filteredObj
+		res.Metadata.Checksum, err = checksum.CalculateChecksum(filteredObj)
 		if err != nil {
 			return nil, err
 		}
-
-		res.FilterResult = filteredObj
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filteredBytes))
 
 		return res, nil
 	}
 
-	// Render obj to JSON text to apply jq filter.
-	if jqFilter == "" {
-		data, err := json.Marshal(obj)
+	if jqFilter == nil {
+		var err error
+		res.Metadata.Checksum, err = checksum.CalculateChecksum(obj)
 		if err != nil {
 			return nil, err
 		}
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))
 	} else {
 		var err error
 		var filtered []byte
@@ -61,7 +58,10 @@ func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructu
 		}
 
 		res.FilterResult = string(filtered)
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filtered))
+		res.Metadata.Checksum, err = checksum.CalculateChecksum(filtered)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return res, nil

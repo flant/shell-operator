@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/itchyny/gojq"
 	v1 "k8s.io/api/admission/v1"
 	apixv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -16,7 +17,7 @@ type BindingContext struct {
 	Metadata struct {
 		Version             string
 		BindingType         htypes.BindingType
-		JqFilter            string
+		JqFilter            *gojq.Code
 		IncludeSnapshots    []string
 		IncludeAllSnapshots bool
 		Group               string
@@ -126,7 +127,7 @@ func (bc BindingContext) MapV1() map[string]interface{} {
 	case kemtypes.TypeEvent:
 		if len(bc.Objects) == 0 {
 			res["object"] = nil
-			if bc.Metadata.JqFilter != "" {
+			if bc.Metadata.JqFilter != nil {
 				res["filterResult"] = ""
 			}
 		} else {

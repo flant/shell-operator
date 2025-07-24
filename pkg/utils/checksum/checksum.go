@@ -4,16 +4,53 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 
 	"github.com/cespare/xxhash/v2"
 )
 
-// CalculateChecksum вычисляет 64-битную контрольную сумму для массива строк.
-func CalculateChecksum(stringArr ...string) uint64 {
+// CalculateChecksum calculates a fast and stable checksum for any data structure.
+// optimized with pools for both encoders and hashers.
+func CalculateChecksum(v interface{}) (uint64, error) {
+	switch v := v.(type) {
+	case nil:
+		return 0, nil
+	case string:
+		hasher := getHasher()
+		_, _ = hasher.WriteString(v)
+		return hasher.Sum64(), nil
+	case []byte:
+		hasher := getHasher()
+		_, _ = hasher.Write(v)
+		return hasher.Sum64(), nil
+	}
+
+	mainHasher := getHasher()
+	defer putHasher(mainHasher)
+	// hasher's state must be reset after retrieving it from the pool
+	mainHasher.Reset()
+
+	encoder := getEncoder(mainHasher)
+	defer putEncoder(encoder)
+
+	if err := encoder.encode(reflect.ValueOf(v)); err != nil {
+		return 0, err
+	}
+
+	return mainHasher.Sum64(), nil
+}
+
+// encoder is the state of our recursive "hashing serializer".
+
+// CalculateChecksum_v1 calculates a 64-bit checksum for an array of strings. Renamed to avoid conflicts.
+func CalculateChecksum_v1(stringArr ...string) uint64 {
 	digest := xxhash.New()
-	sort.Strings(stringArr)
-	for _, value := range stringArr {
+	// Strings are sorted to ensure the checksum is stable.
+	sortedStrings := make([]string, len(stringArr))
+	copy(sortedStrings, stringArr)
+	sort.Strings(sortedStrings)
+	for _, value := range sortedStrings {
 		_, _ = digest.Write([]byte(value))
 	}
 	return digest.Sum64()
@@ -24,7 +61,7 @@ func CalculateChecksumOfFile(path string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return CalculateChecksum(string(content)), nil
+	return CalculateChecksum_v1(string(content)), nil
 }
 
 func combineHashes(h1, h2 uint64) uint64 {

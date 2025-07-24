@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/flant/shell-operator/pkg/filter/jq"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -27,7 +28,9 @@ func newObj(kind, ns, name, filterResult string) *ObjectAndFilterResult {
 
 func Test_ObjectAndFilterResult_ToJson(t *testing.T) {
 	obj := newObj("Pod", "default", "pod-qwe", `{"spec":"asd"}`)
-	obj.Metadata.JqFilter = ".spec"
+	var err error
+	obj.Metadata.JqFilter, err = jq.CompileJQ(".spec")
+	assert.NoError(t, err)
 
 	data, err := json.Marshal(obj)
 	assert.NoError(t, err)
@@ -38,7 +41,9 @@ func Test_ObjectAndFilterResult_ToJson(t *testing.T) {
 
 func Test_ObjectAndFilterResult_ToJson_EmptyFilterResult(t *testing.T) {
 	obj := newObj("Pod", "default", "pod-qwe", ``)
-	obj.Metadata.JqFilter = ".spec"
+	var err error
+	obj.Metadata.JqFilter, err = jq.CompileJQ(".spec")
+	assert.NoError(t, err)
 
 	data, err := json.Marshal(obj)
 	assert.NoError(t, err)
@@ -49,7 +54,9 @@ func Test_ObjectAndFilterResult_ToJson_EmptyFilterResult(t *testing.T) {
 
 func Test_ObjectAndFilterResult_ToJson_NullFilterResult(t *testing.T) {
 	obj := newObj("Pod", "default", "pod-qwe", `null`)
-	obj.Metadata.JqFilter = ".spec"
+	var err error
+	obj.Metadata.JqFilter, err = jq.CompileJQ(".spec")
+	assert.NoError(t, err)
 
 	data, err := json.Marshal(obj)
 	assert.NoError(t, err)
@@ -60,7 +67,7 @@ func Test_ObjectAndFilterResult_ToJson_NullFilterResult(t *testing.T) {
 
 func Test_ObjectAndFilterResult_ToJson_Empty_JQFilter_Has_FilterResult(t *testing.T) {
 	obj := newObj("Pod", "default", "pod-qwe", `{"spec":"asd"}`)
-	obj.Metadata.JqFilter = ""
+	obj.Metadata.JqFilter = nil
 
 	data, err := json.Marshal(obj)
 	assert.NoError(t, err)

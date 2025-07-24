@@ -3,17 +3,13 @@ package jq
 import (
 	"encoding/json"
 	"errors"
-	"sync"
 
 	"github.com/itchyny/gojq"
 
 	"github.com/flant/shell-operator/pkg/filter"
 )
 
-var (
-	_       filter.Filter = (*Filter)(nil)
-	jqCache               = &sync.Map{} // map[string]*gojq.Query
-)
+var _ filter.Filter = (*Filter)(nil)
 
 func NewFilter() *Filter {
 	return &Filter{}
@@ -22,32 +18,11 @@ func NewFilter() *Filter {
 type Filter struct{}
 
 // ApplyFilter runs jq expression provided in jqFilter with jsonData as input.
-func (f *Filter) ApplyFilter(jqFilter string, data map[string]any) ([]byte, error) {
-	var query *gojq.Query
-	var err error
-
-	cached, ok := jqCache.Load(jqFilter)
-	if ok {
-		query = cached.(*gojq.Query)
-	} else {
-		query, err = gojq.Parse(jqFilter)
-		if err != nil {
-			return nil, err
-		}
-		jqCache.Store(jqFilter, query)
+func (f *Filter) ApplyFilter(jqFilter *gojq.Code, data map[string]any) ([]byte, error) {
+	if jqFilter == nil {
+		return nil, errors.New("jqFilter is nil")
 	}
-
-	var workData any
-	if data == nil {
-		workData = nil
-	} else {
-		workData, err = deepCopyAny(data)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	iter := query.Run(workData)
+	iter := jqFilter.Run(data)
 	result := make([]any, 0)
 	for {
 		v, ok := iter.Next()
@@ -78,17 +53,10 @@ func (f *Filter) FilterInfo() string {
 	return "jqFilter implementation: using itchyny/gojq"
 }
 
-func deepCopyAny(input any) (any, error) {
-	if input == nil {
-		return nil, nil
-	}
-	data, err := json.Marshal(input)
+func CompileJQ(jqFilter string) (*gojq.Code, error) {
+	query, err := gojq.Parse(jqFilter)
 	if err != nil {
 		return nil, err
 	}
-	var output any
-	if err := json.Unmarshal(data, &output); err != nil {
-		return nil, err
-	}
-	return output, nil
+	return gojq.Compile(query)
 }

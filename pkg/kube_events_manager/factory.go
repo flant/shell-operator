@@ -2,6 +2,7 @@ package kubeeventsmanager
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
@@ -115,14 +115,9 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 		slog.Int("value", len(factory.handlerRegistrations)),
 		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 
-	if !informer.HasSynced() {
-		go informer.Run(factory.ctx.Done())
-
-		if err := wait.PollUntilContextCancel(ctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
-			return informer.HasSynced(), nil
-		}); err != nil {
-			return err
-		}
+	go informer.Run(factory.ctx.Done())
+	if !cache.WaitForCacheSync(factory.ctx.Done(), informer.HasSynced) {
+		return fmt.Errorf("failed to sync cache for gvr %s", index.GVR.String())
 	}
 	log.Debug("Factory store: started informer",
 		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))

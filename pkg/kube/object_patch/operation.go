@@ -289,7 +289,11 @@ func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, n
 func NewPatchWithJQOperation(jqQuery string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newFilterOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		filter := jq.NewFilter()
-		return applyJQPatch(jqQuery, filter, u)
+		jqFilter, err := jq.CompileJQ(jqQuery)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile jqFilter: %w", err)
+		}
+		return applyJQPatch(jqFilter, filter, u)
 	}, apiVersion, kind, namespace, name, opts...)
 }
 

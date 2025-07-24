@@ -2,6 +2,7 @@ package kubeeventsmanager
 
 import (
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/itchyny/gojq"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -24,7 +25,7 @@ type MonitorConfig struct {
 	NamespaceSelector       *kemtypes.NamespaceSelector
 	LabelSelector           *metav1.LabelSelector
 	FieldSelector           *kemtypes.FieldSelector
-	JqFilter                string
+	JqFilter                *gojq.Code
 	Logger                  *log.Logger
 	Mode                    kemtypes.KubeEventMode
 	KeepFullObjectsInMemory bool

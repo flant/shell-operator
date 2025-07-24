@@ -1,2 +1,2 @@
-FROM shell:v2
+FROM shell-operator:local
 ADD hooks /hooks

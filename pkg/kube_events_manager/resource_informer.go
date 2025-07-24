@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"runtime/trace"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -16,11 +17,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg/filter"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
+
+var resourceIDStore = NewResourceIDStore()
 
 type resourceInformer struct {
 	id         string
@@ -30,14 +34,13 @@ type resourceInformer struct {
 	Namespace string
 	// Filter by object name
 	Name string
-
 	// Kubernetes informer and its settings.
 	FactoryIndex         FactoryIndex
 	GroupVersionResource schema.GroupVersionResource
 	ListOptions          metav1.ListOptions
 
 	// A cache for checksums to deduplicate events.
-	checksumCache map[string]uint64
+	checksumCache map[ResourceID]uint64
 	cacheLock     sync.RWMutex
 
 	// Cached objects operations since start
@@ -52,6 +55,8 @@ type resourceInformer struct {
 	eventCb        func(kemtypes.KubeEvent)
 	eventCbEnabled bool
 	eventBufLock   sync.Mutex
+	// preallocate filter
+	filter filter.Filter
 
 	// TODO resourceInformer should be stoppable (think of deleted namespaces and disabled modules in addon-operator)
 	ctx    context.Context
@@ -60,7 +65,7 @@ type resourceInformer struct {
 	metricStorage metric.Storage
 
 	// a flag to stop handle events after Stop()
-	stopped bool
+	stopped atomic.Bool
 
 	logger *log.Logger
 }
@@ -84,12 +89,13 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		Name:                   name,
 		eventCb:                cfg.eventCb,
 		Monitor:                cfg.monitor,
-		checksumCache:          make(map[string]uint64),
+		checksumCache:          make(map[ResourceID]uint64),
 		cacheLock:              sync.RWMutex{},
 		eventBufLock:           sync.Mutex{},
 		cachedObjectsInfo:      &CachedObjectsInfo{},
 		cachedObjectsIncrement: &CachedObjectsInfo{},
 		logger:                 cfg.logger,
+		filter:                 jq.NewFilter(),
 	}
 	return informer
 }
@@ -156,20 +162,20 @@ func (ei *resourceInformer) populateChecksumCacheFromInformerStore() error {
 
 	ei.cacheLock.Lock()
 	defer ei.cacheLock.Unlock()
-	ei.checksumCache = make(map[string]uint64, len(items))
-
+	ei.checksumCache = make(map[ResourceID]uint64, len(items))
 	for i := range items {
 		// don't store copy of the object in heap, just use pointer
 		obj := items[i].(*unstructured.Unstructured)
+		resourceID := resourceIDStore.GetResourceID(obj)
 		// It's not a watch event, so we don't need to handle it.
 		// We just need to fill the checksum cache.
-		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, jq.NewFilter(), ei.Monitor.FilterFunc, obj)
+		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, ei.filter, ei.Monitor.FilterFunc, obj)
 		if err != nil {
 			// Log error and continue
-			log.Errorf("cannot apply filter to initial object %s: %v", resourceId(obj), err)
+			log.Errorf("cannot apply filter to initial object %s: %v", resourceID, err)
 			continue
 		}
-		ei.checksumCache[resourceId(obj)] = objFilterRes.Metadata.Checksum
+		ei.checksumCache[resourceIDStore.GetResourceID(obj)] = objFilterRes.Metadata.Checksum
 	}
 	log.Debugf("informer %s: checksum cache populated with %d items", ei.Monitor.Metadata.DebugName, len(ei.checksumCache))
 	return nil
@@ -183,11 +189,12 @@ func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult 
 	items := informer.GetStore().List()
 	res := make([]kemtypes.ObjectAndFilterResult, 0, len(items))
 
-	for _, item := range items {
-		obj := item.(*unstructured.Unstructured)
-		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, jq.NewFilter(), ei.Monitor.FilterFunc, obj)
+	for i := range items {
+		obj := items[i].(*unstructured.Unstructured)
+		resourceID := resourceIDStore.GetResourceID(obj)
+		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, ei.filter, ei.Monitor.FilterFunc, obj)
 		if err != nil {
-			log.Errorf("cannot apply filter to snapshot object %s: %v", resourceId(obj), err)
+			log.Errorf("cannot apply filter to snapshot object %s: %v", resourceID, err)
 			continue
 		}
 		res = append(res, *objFilterRes)
@@ -234,7 +241,7 @@ func (ei *resourceInformer) OnDelete(obj interface{}) {
 // func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemtypes.WatchEventType) {
 	// check if stop
-	if ei.stopped {
+	if ei.stopped.Load() {
 		log.Debug("received WATCH for stopped informer",
 			slog.String("debugName", ei.Monitor.Metadata.DebugName),
 			slog.String("namespace", ei.Namespace),
@@ -253,7 +260,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	}
 	obj := object.(*unstructured.Unstructured)
 
-	resourceId := resourceId(obj)
+	resourceID := resourceIDStore.GetResourceID(obj)
 
 	// Always calculate checksum and update cache, because we need an actual state in ei.checksumCache.
 
@@ -263,8 +270,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		defer measure.Duration(func(d time.Duration) {
 			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 		})()
-		filter := jq.NewFilter()
-		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, obj)
+		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, ei.filter, ei.Monitor.FilterFunc, obj)
 	}()
 	if err != nil {
 		log.Error("handleWatchEvent: applyFilter error",
@@ -285,13 +291,13 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		fallthrough
 	case kemtypes.WatchEventModified:
 		ei.cacheLock.Lock()
-		oldChecksum, objectInCache := ei.checksumCache[resourceId]
+		oldChecksum, objectInCache := ei.checksumCache[resourceID]
 		newChecksum := objFilterRes.Metadata.Checksum
 		skipEvent := false
 		if objectInCache && oldChecksum == newChecksum {
 			skipEvent = true
 		}
-		ei.checksumCache[resourceId] = newChecksum
+		ei.checksumCache[resourceID] = newChecksum
 		ei.cacheLock.Unlock()
 		if skipEvent {
 			return
@@ -299,7 +305,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 
 	case kemtypes.WatchEventDeleted:
 		ei.cacheLock.Lock()
-		delete(ei.checksumCache, resourceId)
+		delete(ei.checksumCache, resourceID)
 		ei.cacheLock.Unlock()
 	}
 
@@ -308,7 +314,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		log.Debug("send KubeEvent",
 			slog.String("debugName", ei.Monitor.Metadata.DebugName),
 			slog.String("eventType", string(eventType)),
-			slog.String("resourceId", resourceId))
+			slog.String("resourceId", resourceID.String()))
 		// TODO: should be disabled by default and enabled by a debug feature switch
 		// log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
@@ -337,6 +343,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			ei.eventBuf = append(ei.eventBuf, kubeEvent)
 			ei.eventBufLock.Unlock()
 		}
+	} else {
 	}
 }
 
@@ -407,7 +414,7 @@ func (ei *resourceInformer) start() {
 
 func (ei *resourceInformer) pauseHandleEvents() {
 	log.Debug("PAUSE resource informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
-	ei.stopped = true
+	ei.stopped.Store(true)
 }
 
 // CachedObjectsInfo returns info accumulated from start.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/flant/kube-client/manifest"
 	"github.com/flant/shell-operator/pkg/filter"
+	"github.com/itchyny/gojq"
 )
 
 func unmarshalFromJSONOrYAML(specs []byte) ([]OperationSpec, error) {
@@ -64,7 +65,7 @@ func unmarshalFromYaml(yamlSpecs []byte) ([]OperationSpec, error) {
 	return specSlice, nil
 }
 
-func applyJQPatch(jqFilter string, fl filter.Filter, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func applyJQPatch(jqFilter *gojq.Code, fl filter.Filter, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	filterResult, err := fl.ApplyFilter(jqFilter, obj.UnstructuredContent())
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply jqFilter:\n%sto Object:\n%s\n"+

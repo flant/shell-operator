@@ -5,13 +5,15 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_ApplyFilter_SingleDocumentModification(t *testing.T) {
 	g := NewWithT(t)
 	filter := NewFilter()
 
-	jqFilter := `. + {"status": "active"}`
+	jqFilter, err := CompileJQ(`. + {"status": "active"}`)
+	g.Expect(err).Should(BeNil())
 
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"name": "John", "age": 30})
 	g.Expect(err).Should(BeNil())
@@ -26,7 +28,8 @@ func Test_ApplyFilter_ExtractValuesFromDocument(t *testing.T) {
 	g := NewWithT(t)
 	filter := NewFilter()
 
-	jqFilter := `.user.details`
+	jqFilter, err := CompileJQ(`.user.details`)
+	g.Expect(err).Should(BeNil())
 
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"user": map[string]any{"name": "John", "details": map[string]any{"location": "New York", "occupation": "Developer"}}})
 	g.Expect(err).Should(BeNil())
@@ -41,7 +44,8 @@ func Test_ApplyFilter_MultipleJsonDocumentsInArray(t *testing.T) {
 	g := NewWithT(t)
 	filter := NewFilter()
 
-	jqFilter := `.users[] | . + {"status": "active"}`
+	jqFilter, err := CompileJQ(`.users[] | . + {"status": "active"}`)
+	g.Expect(err).Should(BeNil())
 
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"users": []any{map[string]any{"name": "John", "status": "inactive"}, map[string]any{"name": "Jane", "status": "inactive"}}})
 	g.Expect(err).Should(BeNil())
@@ -59,28 +63,56 @@ func Test_ApplyFilter_MultipleJsonDocumentsInArray(t *testing.T) {
 	g.Expect(resultMap).Should(ConsistOf(expected))
 }
 
-func Test_ApplyFilter_InvalidFilter(t *testing.T) {
+func Test_CompileJQ_InvalidFilter(t *testing.T) {
+	g := NewWithT(t)
+
+	// Test invalid jq syntax
+	_, err := CompileJQ(`invalid syntax`)
+	g.Expect(err).ShouldNot(BeNil())
+
+	// Test invalid jq function, note: gojq does not fail on compilation for this
+	// _, err = CompileJQ(`. | invalid_function`)
+	// g.Expect(err).ShouldNot(BeNil())
+}
+
+func Test_ApplyFilter_InvalidFunction(t *testing.T) {
 	g := NewWithT(t)
 	filter := NewFilter()
 
-	// Test invalid jq syntax
-	invalidSyntax := `invalid syntax`
-	result, err := filter.ApplyFilter(invalidSyntax, map[string]any{"name": "John"})
+	jqFilter, err := CompileJQ(`. | invalid_function`)
 	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(result).Should(BeNil())
 
-	// Test invalid jq function
-	invalidFunction := `. | invalid_function`
-	result, err = filter.ApplyFilter(invalidFunction, map[string]any{"name": "John"})
+	result, err := filter.ApplyFilter(jqFilter, map[string]any{"name": "John"})
 	g.Expect(err).ShouldNot(BeNil())
 	g.Expect(result).Should(BeNil())
 }
 
-func Test_ApplyFilter_InvalidJson(t *testing.T) {
+func Test_ApplyFilter_NilInputData(t *testing.T) {
 	g := NewWithT(t)
 	filter := NewFilter()
 
-	jqFilter := `.name`
+	jqFilter, err := CompileJQ(`.`)
+	g.Expect(err).Should(BeNil())
+
+	result, err := filter.ApplyFilter(jqFilter, nil)
+	g.Expect(err).Should(BeNil())
+	g.Expect(result).ShouldNot(BeNil())
+}
+
+func Test_ApplyFilter_EmptyFilter(t *testing.T) {
+	g := NewWithT(t)
+
+	_, err := CompileJQ(``)
+	g.Expect(err).ShouldNot(BeNil())
+}
+
+func Test_ApplyFilter_EmptyResult(t *testing.T) {
+	g := NewWithT(t)
+	filter := NewFilter()
+
+	// Filter that returns no results
+	jqFilter, err := CompileJQ(`.nonexistent`)
+	g.Expect(err).Should(BeNil())
 
 	result, err := filter.ApplyFilter(jqFilter, map[string]any{"name": "John"})
 	g.Expect(err).Should(BeNil())
@@ -89,72 +121,7 @@ func Test_ApplyFilter_InvalidJson(t *testing.T) {
 	var resultMap any
 	err = json.Unmarshal(result, &resultMap)
 	g.Expect(err).Should(BeNil())
-	g.Expect(resultMap).ShouldNot(BeNil())
-}
-
-func Test_ApplyFilter_NilInputData(t *testing.T) {
-	g := NewWithT(t)
-	filter := NewFilter()
-
-	result, err := filter.ApplyFilter(`.`, nil)
-	g.Expect(err).Should(BeNil())
-	g.Expect(result).ShouldNot(BeNil())
-}
-
-func Test_ApplyFilter_EmptyFilter(t *testing.T) {
-	g := NewWithT(t)
-	filter := NewFilter()
-
-	result, err := filter.ApplyFilter("", map[string]any{"name": "John"})
-	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(result).Should(BeNil())
-}
-
-func Test_ApplyFilter_InvalidJsonInDeepCopy(t *testing.T) {
-	g := NewWithT(t)
-	filter := NewFilter()
-
-	// Create invalid JSON data that cannot be marshaled
-	invalidData := map[string]any{
-		"channel": make(chan int), // channel cannot be marshaled to JSON
-	}
-
-	result, err := filter.ApplyFilter(`.`, invalidData)
-	g.Expect(err).ShouldNot(BeNil()) // Expect an error due to invalid JSON
-	g.Expect(result).Should(BeNil())
-}
-
-func Test_ApplyFilter_EmptyResult(t *testing.T) {
-	g := NewWithT(t)
-	filter := NewFilter()
-
-	// Filter that returns no results
-	result, err := filter.ApplyFilter(`.nonexistent`, map[string]any{"name": "John"})
-	g.Expect(err).Should(BeNil())
-	g.Expect(result).ShouldNot(BeNil())
-
-	var resultMap any
-	err = json.Unmarshal(result, &resultMap)
-	g.Expect(err).Should(BeNil())
 	g.Expect(resultMap).Should(BeNil()) // Expect result to be nil (empty)
-}
-
-func Test_ApplyFilter_InvalidJqSyntax(t *testing.T) {
-	g := NewWithT(t)
-	filter := NewFilter()
-
-	result, err := filter.ApplyFilter(`invalid syntax`, map[string]any{"name": "John"})
-	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(result).Should(BeNil())
-}
-
-func Test_ApplyFilter_InvalidJqFunction(t *testing.T) {
-	g := NewWithT(t)
-	filter := NewFilter()
-
-	result, err := filter.ApplyFilter(`. | invalid_function`, map[string]any{"name": "John"})
-	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(result).Should(BeNil())
 }
 
 func Test_ApplyFilter_PanicSafety(t *testing.T) {
@@ -167,36 +134,35 @@ func Test_ApplyFilter_PanicSafety(t *testing.T) {
 		}
 	}()
 
+	jqFilter, err := CompileJQ(`.`)
+	g.Expect(err).Should(BeNil())
+
 	// Test with data that could potentially cause a panic
-	_, err := filter.ApplyFilter(`.`, map[string]any{"key": func() {}})
+	_, err = filter.ApplyFilter(jqFilter, map[string]any{"key": func() {}})
 	g.Expect(err).ShouldNot(BeNil())
 }
 
-func Test_deepCopyAny(t *testing.T) {
+func Test_ShouldNotMutateInputData(t *testing.T) {
 	g := NewWithT(t)
 
-	// Test copying a map
-	inputMap := map[string]any{"foo": "bar", "num": 42}
-	copyMap, err := deepCopyAny(inputMap)
-	g.Expect(err).Should(BeNil())
-	g.Expect(copyMap).Should(Equal(map[string]any{"foo": "bar", "num": float64(42)}))
-	g.Expect(copyMap).ShouldNot(BeIdenticalTo(inputMap))
+	jqFilter, err := CompileJQ(`.a`)
+	require.NoError(t, err)
+	filter := NewFilter()
+	input := map[string]interface{}{
+		"a": "b",
+		"c": "d",
+	}
 
-	// Test copying a slice
-	inputSlice := []any{"a", 1, true}
-	copySlice, err := deepCopyAny(inputSlice)
-	g.Expect(err).Should(BeNil())
-	g.Expect(copySlice).Should(Equal([]any{"a", float64(1), true}))
-	g.Expect(copySlice).ShouldNot(BeIdenticalTo(inputSlice))
+	// Create a deep copy of the input for comparison later
+	inputBytes, err := json.Marshal(input)
+	require.NoError(t, err)
+	var originalInput map[string]interface{}
+	err = json.Unmarshal(inputBytes, &originalInput)
+	require.NoError(t, err)
 
-	// Test copying nil
-	copyNil, err := deepCopyAny(nil)
-	g.Expect(err).Should(BeNil())
-	g.Expect(copyNil).Should(BeNil())
+	_, err = filter.ApplyFilter(jqFilter, input)
+	require.NoError(t, err)
 
-	// Test copying a value that cannot be marshaled to JSON
-	inputInvalid := map[string]any{"ch": make(chan int)}
-	copyInvalid, err := deepCopyAny(inputInvalid)
-	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(copyInvalid).Should(BeNil())
+	g.Expect(originalInput).Should(Equal(input))
+
 }

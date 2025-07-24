@@ -3,10 +3,10 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/itchyny/gojq"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -36,7 +36,7 @@ const (
 
 type ObjectAndFilterResult struct {
 	Metadata struct {
-		JqFilter     string
+		JqFilter     *gojq.Code
 		Checksum     uint64
 		ResourceId   string // Used for sorting
 		RemoveObject bool
@@ -53,13 +53,13 @@ func (o ObjectAndFilterResult) Map() map[string]interface{} {
 		m["object"] = o.Object
 	}
 
-	if o.Metadata.JqFilter == "" && o.FilterResult == nil {
+	if o.Metadata.JqFilter == nil && o.FilterResult == nil {
 		// No jqFilter, no filterResult -> filterResult field should not be in a map.
 		return m
 	}
 
 	var filterResultValue interface{}
-	if o.Metadata.JqFilter != "" {
+	if o.Metadata.JqFilter != nil {
 		// jqFilter is set, so filterResult field should be in a map.
 		// FilterResult is a jq output and should be a string.
 		filterResString, ok := o.FilterResult.(string)
@@ -72,7 +72,6 @@ func (o ObjectAndFilterResult) Map() map[string]interface{} {
 		err := json.Unmarshal([]byte(filterResString), &filterResultValue)
 		if err != nil {
 			log.Error("Possible bug!!! Cannot unmarshal jq filter result",
-				slog.String("jqFilter", o.Metadata.JqFilter),
 				log.Err(err))
 			m["filterResult"] = nil
 			return m
