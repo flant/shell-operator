@@ -1,7 +1,9 @@
 package checksum
 
 import (
+	"crypto/md5"
 	"encoding/binary"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,6 +44,15 @@ func CalculateChecksum(v interface{}) (uint64, error) {
 }
 
 // encoder is the state of our recursive "hashing serializer".
+// for backward compatibility
+func CalculateChecksum_old(stringArr ...string) string {
+	hasher := md5.New()
+	sort.Strings(stringArr)
+	for _, value := range stringArr {
+		_, _ = hasher.Write([]byte(value))
+	}
+	return hex.EncodeToString(hasher.Sum(nil))
+}
 
 // CalculateChecksum_v1 calculates a 64-bit checksum for an array of strings. Renamed to avoid conflicts.
 func CalculateChecksum_v1(stringArr ...string) uint64 {

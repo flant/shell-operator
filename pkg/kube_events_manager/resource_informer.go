@@ -21,6 +21,7 @@ import (
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
+	checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
@@ -175,7 +176,12 @@ func (ei *resourceInformer) populateChecksumCacheFromInformerStore() error {
 			log.Errorf("cannot apply filter to initial object %s: %v", resourceID, err)
 			continue
 		}
-		ei.checksumCache[resourceIDStore.GetResourceID(obj)] = objFilterRes.Metadata.Checksum
+		checksum, err := checksum.CalculateChecksum(objFilterRes.FilterResult)
+		if err != nil {
+			log.Errorf("cannot calculate checksum for initial object %s: %v", resourceID, err)
+			continue
+		}
+		ei.checksumCache[resourceID] = checksum
 	}
 	log.Debugf("informer %s: checksum cache populated with %d items", ei.Monitor.Metadata.DebugName, len(ei.checksumCache))
 	return nil
@@ -189,14 +195,35 @@ func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult 
 	items := informer.GetStore().List()
 	res := make([]kemtypes.ObjectAndFilterResult, 0, len(items))
 
+	ei.cacheLock.RLock()
+	defer ei.cacheLock.RUnlock()
+
 	for i := range items {
 		obj := items[i].(*unstructured.Unstructured)
 		resourceID := resourceIDStore.GetResourceID(obj)
+
+		// Apply jqFilter to get the current state of the object for the hook context.
 		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, ei.filter, ei.Monitor.FilterFunc, obj)
 		if err != nil {
 			log.Errorf("cannot apply filter to snapshot object %s: %v", resourceID, err)
 			continue
 		}
+
+		// Use the already calculated and cached checksum.
+		// This is the core optimization to prevent CPU spikes.
+		if cachedChecksum, ok := ei.checksumCache[resourceID]; ok {
+			objFilterRes.Metadata.Checksum = cachedChecksum
+		} else {
+			// This case should ideally not happen if populateInitialCaches ran correctly.
+			// As a fallback, calculate it on the fly from the filtered result.
+			fallbackChecksum, errCalc := checksum.CalculateChecksum(objFilterRes.FilterResult)
+			if errCalc != nil {
+				log.Errorf("cannot calculate checksum for snapshot object %s: %v", resourceID, errCalc)
+				continue
+			}
+			objFilterRes.Metadata.Checksum = fallbackChecksum
+		}
+
 		res = append(res, *objFilterRes)
 	}
 
@@ -280,6 +307,16 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		return
 	}
 
+	newChecksum, err := checksum.CalculateChecksum(objFilterRes.FilterResult)
+	if err != nil {
+		log.Error("handleWatchEvent: calculate checksum error",
+			slog.String("debugName", ei.Monitor.Metadata.DebugName),
+			slog.String("eventType", string(eventType)),
+			log.Err(err))
+		return
+	}
+	objFilterRes.Metadata.Checksum = newChecksum
+
 	if !ei.Monitor.KeepFullObjectsInMemory {
 		objFilterRes.RemoveFullObject()
 	}
@@ -292,14 +329,11 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	case kemtypes.WatchEventModified:
 		ei.cacheLock.Lock()
 		oldChecksum, objectInCache := ei.checksumCache[resourceID]
-		newChecksum := objFilterRes.Metadata.Checksum
-		skipEvent := false
-		if objectInCache && oldChecksum == newChecksum {
-			skipEvent = true
-		}
 		ei.checksumCache[resourceID] = newChecksum
 		ei.cacheLock.Unlock()
-		if skipEvent {
+
+		fmt.Printf("Checksums: old=%d, new=%d. In cache: %v\n", oldChecksum, newChecksum, objectInCache)
+		if oldChecksum == newChecksum {
 			return
 		}
 
