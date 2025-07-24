@@ -67,7 +67,14 @@ func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedIn
 		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 }
 
-func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory {
+func (c *FactoryStore) Get(client dynamic.Interface, index FactoryIndex) Factory {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.getUnlocked(client, index)
+}
+
+// getUnlocked is not thread-safe, it must be called under the lock.
+func (c *FactoryStore) getUnlocked(client dynamic.Interface, index FactoryIndex) Factory {
 	f, ok := c.data[index]
 	if ok {
 		log.Debug("Factory store: the factory with index found",
@@ -99,7 +106,7 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	factory := c.get(client, index)
+	factory := c.getUnlocked(client, index)
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
 	// Add error handler, ignore "already started" error.

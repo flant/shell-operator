@@ -156,7 +156,7 @@ func (ei *resourceInformer) createSharedInformer() error {
 
 // populateChecksumCacheFromInformerStore fills the checksum cache from the informer's store.
 func (ei *resourceInformer) populateChecksumCacheFromInformerStore() error {
-	informer := DefaultFactoryStore.get(ei.KubeClient.Dynamic(), ei.FactoryIndex).
+	informer := DefaultFactoryStore.Get(ei.KubeClient.Dynamic(), ei.FactoryIndex).
 		shared.ForResource(ei.GroupVersionResource).Informer()
 
 	items := informer.GetStore().List()
@@ -189,7 +189,7 @@ func (ei *resourceInformer) populateChecksumCacheFromInformerStore() error {
 
 // getCachedObjects returns a snapshot of objects from the informer's store.
 func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
-	informer := DefaultFactoryStore.get(ei.KubeClient.Dynamic(), ei.FactoryIndex).
+	informer := DefaultFactoryStore.Get(ei.KubeClient.Dynamic(), ei.FactoryIndex).
 		shared.ForResource(ei.GroupVersionResource).Informer()
 
 	items := informer.GetStore().List()
@@ -328,11 +328,10 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		fallthrough
 	case kemtypes.WatchEventModified:
 		ei.cacheLock.Lock()
-		oldChecksum, objectInCache := ei.checksumCache[resourceID]
+		oldChecksum := ei.checksumCache[resourceID]
 		ei.checksumCache[resourceID] = newChecksum
 		ei.cacheLock.Unlock()
 
-		fmt.Printf("Checksums: old=%d, new=%d. In cache: %v\n", oldChecksum, newChecksum, objectInCache)
 		if oldChecksum == newChecksum {
 			return
 		}
