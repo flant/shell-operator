@@ -2,6 +2,7 @@ package kubeeventsmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime/trace"
@@ -69,6 +70,13 @@ type resourceInformer struct {
 	stopped atomic.Bool
 
 	logger *log.Logger
+
+	// objectPool is an "Object Transporter".
+	// It's a pool of reusable unstructured.Unstructured objects that we use
+	// to "teleport" data from the live cache into a safe, isolated container
+	// before passing it to the JQ filter. This prevents race conditions
+	// without the high memory/GC overhead of a simple DeepCopy on every call.
+	objectPool *sync.Pool
 }
 
 // resourceInformer should implement ResourceInformer
@@ -97,6 +105,13 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		cachedObjectsIncrement: &CachedObjectsInfo{},
 		logger:                 cfg.logger,
 		filter:                 jq.NewFilter(),
+		// Preallocate a pool of unstructured.Unstructured objects
+		// to avoid allocations during the filter
+		objectPool: &sync.Pool{
+			New: func() interface{} {
+				return &unstructured.Unstructured{}
+			},
+		},
 	}
 	return informer
 }
@@ -164,27 +179,110 @@ func (ei *resourceInformer) populateChecksumCacheFromInformerStore() error {
 	ei.cacheLock.Lock()
 	defer ei.cacheLock.Unlock()
 	ei.checksumCache = make(map[ResourceID]uint64, len(items))
+
+	var allErrors error
+
 	for i := range items {
 		// don't store copy of the object in heap, just use pointer
 		obj := items[i].(*unstructured.Unstructured)
 		resourceID := resourceIDStore.GetResourceID(obj)
-		// It's not a watch event, so we don't need to handle it.
-		// We just need to fill the checksum cache.
-		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, ei.filter, ei.Monitor.FilterFunc, obj)
-		if err != nil {
-			// Log error and continue
-			log.Errorf("cannot apply filter to initial object %s: %v", resourceID, err)
-			continue
-		}
-		checksum, err := checksum.CalculateChecksum(objFilterRes.FilterResult)
-		if err != nil {
-			log.Errorf("cannot calculate checksum for initial object %s: %v", resourceID, err)
-			continue
-		}
-		ei.checksumCache[resourceID] = checksum
+
+		// Using a closure to correctly manage the lifecycle of the pooled object with defer.
+		func() {
+			// Step 1: Get a safe, reusable object from the "Transporter" pool.
+			pooledObj := ei.objectPool.Get().(*unstructured.Unstructured)
+			defer ei.objectPool.Put(pooledObj)
+
+			// Step 2: "Teleport" the data from the live object into our safe container.
+			obj.DeepCopyInto(pooledObj)
+
+			// Step 3: Use the safe object for filtering.
+			// It's not a watch event, so we don't need to handle it.
+			// We just need to fill the checksum cache.
+			objFilterRes, err := ei.filterObject(obj)
+			if err != nil {
+				err = fmt.Errorf("cannot apply filter to initial object %s: %w", resourceID, err)
+				allErrors = errors.Join(allErrors, err)
+				log.Error("cannot apply filter to initial object",
+					slog.String("debugName", ei.Monitor.Metadata.DebugName),
+					slog.String("resourceId", resourceID.String()),
+					log.Err(err))
+				return
+			}
+			// calculate checksum for filtered data
+			checksum, err := checksum.CalculateChecksum(objFilterRes.FilterResult)
+			if err != nil {
+				err = fmt.Errorf("cannot calculate checksum for initial object %s: %w", resourceID, err)
+				allErrors = errors.Join(allErrors, err)
+				log.Error("cannot calculate checksum for initial object",
+					slog.String("debugName", ei.Monitor.Metadata.DebugName),
+					slog.String("resourceId", resourceID.String()),
+					log.Err(err))
+				return
+			}
+			ei.checksumCache[resourceID] = checksum
+		}()
 	}
-	log.Debugf("informer %s: checksum cache populated with %d items", ei.Monitor.Metadata.DebugName, len(ei.checksumCache))
-	return nil
+	log.Debug("informer: checksum cache populated", slog.String("informer", ei.Monitor.Metadata.DebugName), slog.Int("items", len(ei.checksumCache)))
+	return allErrors
+}
+
+// filterObject is a central method to safely apply JQ filters to an object.
+// It uses a sync.Pool to avoid memory allocations, prevent race conditions, and measures execution time.
+func (ei *resourceInformer) filterObject(obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+	var objFilterRes *kemtypes.ObjectAndFilterResult
+	var err error
+
+	// Using a closure to correctly manage the lifecycle of the pooled object with defer
+	// and to measure the duration of the filtering process.
+	func() {
+		defer measure.Duration(func(d time.Duration) {
+			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
+		})()
+
+		pooledObj := ei.objectPool.Get().(*unstructured.Unstructured)
+		defer ei.objectPool.Put(pooledObj)
+
+		obj.DeepCopyInto(pooledObj)
+
+		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, ei.filter, ei.Monitor.FilterFunc, pooledObj)
+	}()
+	if err != nil {
+		return nil, err
+	}
+	objFilterRes.Object = obj
+	return objFilterRes, nil
+}
+
+func (ei *resourceInformer) processSnapshotObject(obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+	resourceID := resourceIDStore.GetResourceID(obj)
+
+	// All the pooling and filtering logic is now in filterObject.
+	objFilterRes, err := ei.filterObject(obj)
+	if err != nil {
+		return nil, fmt.Errorf("filter snapshot object: %w", err)
+	}
+
+	// If a filter is specified and it returns an empty result,
+	// this object should not be included in the snapshot for the hook.
+	if (ei.Monitor.JqFilter != nil || ei.Monitor.FilterFunc != nil) && (objFilterRes.FilterResult == nil || objFilterRes.FilterResult == "") {
+		return nil, nil // Not an error, just skip this object.
+	}
+
+	// Use the already calculated and cached checksum.
+	// This is the core optimization to prevent CPU spikes.
+	if cachedChecksum, ok := ei.checksumCache[resourceID]; ok {
+		objFilterRes.Metadata.Checksum = cachedChecksum
+	} else {
+		// As a fallback, calculate it on the fly from the original object.
+		fallbackChecksum, errCalc := checksum.CalculateChecksum(obj)
+		if errCalc != nil {
+			return nil, fmt.Errorf("calculate checksum for snapshot object: %w", errCalc)
+		}
+		objFilterRes.Metadata.Checksum = fallbackChecksum
+	}
+
+	return objFilterRes, nil
 }
 
 // getCachedObjects returns a snapshot of objects from the informer's store.
@@ -200,31 +298,19 @@ func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult 
 
 	for i := range items {
 		obj := items[i].(*unstructured.Unstructured)
-		resourceID := resourceIDStore.GetResourceID(obj)
 
-		// Apply jqFilter to get the current state of the object for the hook context.
-		objFilterRes, err := applyFilter(ei.Monitor.JqFilter, ei.filter, ei.Monitor.FilterFunc, obj)
+		objFilterRes, err := ei.processSnapshotObject(obj)
 		if err != nil {
-			log.Errorf("cannot apply filter to snapshot object %s: %v", resourceID, err)
+			log.Error("cannot process snapshot object",
+				slog.String("debugName", ei.Monitor.Metadata.DebugName),
+				slog.String("resourceId", resourceIDStore.GetResourceID(obj).String()),
+				log.Err(err))
 			continue
 		}
 
-		// Use the already calculated and cached checksum.
-		// This is the core optimization to prevent CPU spikes.
-		if cachedChecksum, ok := ei.checksumCache[resourceID]; ok {
-			objFilterRes.Metadata.Checksum = cachedChecksum
-		} else {
-			// This case should ideally not happen if populateInitialCaches ran correctly.
-			// As a fallback, calculate it on the fly from the filtered result.
-			fallbackChecksum, errCalc := checksum.CalculateChecksum(objFilterRes.FilterResult)
-			if errCalc != nil {
-				log.Errorf("cannot calculate checksum for snapshot object %s: %v", resourceID, errCalc)
-				continue
-			}
-			objFilterRes.Metadata.Checksum = fallbackChecksum
+		if objFilterRes != nil {
+			res = append(res, *objFilterRes)
 		}
-
-		res = append(res, *objFilterRes)
 	}
 
 	// Reset eventBuf if needed.
@@ -287,20 +373,10 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	}
 	obj := object.(*unstructured.Unstructured)
 
-	resourceID := resourceIDStore.GetResourceID(obj)
-
-	// Always calculate checksum and update cache, because we need an actual state in ei.checksumCache.
-
-	var objFilterRes *kemtypes.ObjectAndFilterResult
-	var err error
-	func() {
-		defer measure.Duration(func(d time.Duration) {
-			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
-		})()
-		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, ei.filter, ei.Monitor.FilterFunc, obj)
-	}()
+	// The filterObject method now handles pooling, copying, filtering and metrics.
+	objFilterRes, err := ei.filterObject(obj)
 	if err != nil {
-		log.Error("handleWatchEvent: applyFilter error",
+		log.Error("cannot apply filter to watch object",
 			slog.String("debugName", ei.Monitor.Metadata.DebugName),
 			slog.String("eventType", string(eventType)),
 			log.Err(err))
@@ -328,8 +404,8 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		fallthrough
 	case kemtypes.WatchEventModified:
 		ei.cacheLock.Lock()
-		oldChecksum := ei.checksumCache[resourceID]
-		ei.checksumCache[resourceID] = newChecksum
+		oldChecksum := ei.checksumCache[resourceIDStore.GetResourceID(obj)]
+		ei.checksumCache[resourceIDStore.GetResourceID(obj)] = newChecksum
 		ei.cacheLock.Unlock()
 
 		if oldChecksum == newChecksum {
@@ -338,7 +414,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 
 	case kemtypes.WatchEventDeleted:
 		ei.cacheLock.Lock()
-		delete(ei.checksumCache, resourceID)
+		delete(ei.checksumCache, resourceIDStore.GetResourceID(obj))
 		ei.cacheLock.Unlock()
 	}
 
@@ -347,7 +423,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		log.Debug("send KubeEvent",
 			slog.String("debugName", ei.Monitor.Metadata.DebugName),
 			slog.String("eventType", string(eventType)),
-			slog.String("resourceId", resourceID.String()))
+			slog.String("resourceId", objFilterRes.Metadata.ResourceId))
 		// TODO: should be disabled by default and enabled by a debug feature switch
 		// log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
@@ -376,7 +452,6 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			ei.eventBuf = append(ei.eventBuf, kubeEvent)
 			ei.eventBufLock.Unlock()
 		}
-	} else {
 	}
 }
 

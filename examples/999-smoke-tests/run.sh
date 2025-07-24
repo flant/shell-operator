@@ -1,0 +1,1 @@
+docker build -t smoke-tests:local . && (kubectl delete -f pod.yaml || true) && kubectl apply -f pod.yaml

@@ -17,35 +17,25 @@ import (
 // applyFilter runs jq expression and returns an object.
 func applyFilter(jqFilter *gojq.Code, fl filter.Filter, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
 	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
-
-	res := &kemtypes.ObjectAndFilterResult{
-		Object: obj,
-	}
+	// we will add Object to the result later, because here we use objects from sync.Pool
+	res := &kemtypes.ObjectAndFilterResult{}
 	res.Metadata.JqFilter = jqFilter
 	res.Metadata.ResourceId = resourceIDStore.GetResourceID(obj).String()
 
-	var objectForFilter interface{}
-
-	if filterFn != nil {
+	switch {
+	case filterFn != nil:
 		filteredObj, err := filterFn(obj)
 		if err != nil {
 			return nil, fmt.Errorf("filterFn (%s) contains an error: %v", runtime.FuncForPC(reflect.ValueOf(filterFn).Pointer()).Name(), err)
 		}
 		res.FilterResult = filteredObj
-		objectForFilter = filteredObj
-	} else if jqFilter != nil {
+	case jqFilter != nil:
 		filteredBytes, err := fl.ApplyFilter(jqFilter, obj.UnstructuredContent())
 		if err != nil {
 			return nil, fmt.Errorf("jqFilter: %v", err)
 		}
 		res.FilterResult = string(filteredBytes)
-		objectForFilter = filteredBytes
-	} else {
-		// No filters, use the original object.
-		objectForFilter = obj
 	}
-
-	res.FilterResult = objectForFilter
 
 	return res, nil
 }

@@ -3,8 +3,6 @@ package kubeeventsmanager
 import (
 	"fmt"
 	"math/rand/v2"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +13,8 @@ import (
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
+// ResourceID is a compact representation of a Kubernetes object's identity.
+// It uses numeric indices for Kind and Namespace to save memory.
 type ResourceID struct {
 	NamespaceIDX uint16
 	KindIDX      uint16
@@ -25,43 +25,31 @@ type ResourceID struct {
 
 func (rid ResourceID) String() string {
 	if rid.store == nil {
-		// This is a rare/debug path, but let's optimize it too.
-		// Using strings.Builder is significantly faster than fmt.Sprintf.
-		var sb strings.Builder
-		sb.WriteString("uninitialized_resource_id:ns_idx=")
-		sb.WriteString(strconv.FormatUint(uint64(rid.NamespaceIDX), 10))
-		sb.WriteString("/kind_idx=")
-		sb.WriteString(strconv.FormatUint(uint64(rid.KindIDX), 10))
-		sb.WriteByte('/')
-		sb.WriteString(rid.Name)
-		return sb.String()
+		return fmt.Sprintf("Kind(idx:%d)/NS(idx:%d)/%s", rid.KindIDX, rid.NamespaceIDX, rid.Name)
 	}
+	return fmt.Sprintf("%s/%s/%s", rid.store.GetKindByID(rid.KindIDX), rid.store.GetNSByID(rid.NamespaceIDX), rid.Name)
+}
 
-	ns := rid.store.GetNSByID(rid.NamespaceIDX)
-	kind := rid.store.GetKindByID(rid.KindIDX)
-
-	// Pre-allocating the buffer for the string builder is a key performance optimization.
-	// It avoids intermediate allocations while building the string.
-	size := len(kind) + len(rid.Name) + 1 // kind + "/" + name
-	if ns != "" {
-		size += len(ns) + 1 // ns + "/"
+func (rid ResourceID) GetKind() string {
+	if rid.store == nil {
+		return ""
 	}
+	return rid.store.GetKindByID(rid.KindIDX)
+}
 
-	var sb strings.Builder
-	sb.Grow(size)
-
-	if ns != "" {
-		sb.WriteString(ns)
-		sb.WriteByte('/')
+func (rid ResourceID) GetNamespace() string {
+	if rid.store == nil {
+		return ""
 	}
-	sb.WriteString(kind)
-	sb.WriteByte('/')
-	sb.WriteString(rid.Name)
+	return rid.store.GetNSByID(rid.NamespaceIDX)
+}
 
-	return sb.String()
+func (rid ResourceID) GetName() string {
+	return rid.Name
 }
 
 // ResourceIDStore is a thread-safe storage for "interning" Kind and Namespace strings
+// to save memory by representing them as numeric indices.
 type ResourceIDStore struct {
 	mu        sync.RWMutex
 	kindStore map[string]uint16
@@ -80,8 +68,8 @@ func NewResourceIDStore() *ResourceIDStore {
 	}
 }
 
-// GetKindIDX gets the numeric index for a Kind string
-// If the Kind has not been seen before, it will be added
+// GetKindIDX gets the numeric index for a Kind string.
+// If the Kind has not been seen before, it will be added.
 func (r *ResourceIDStore) GetKindIDX(kind string) uint16 {
 	// 1. Fast path: check for existence with a read lock.
 	r.mu.RLock()
@@ -90,20 +78,24 @@ func (r *ResourceIDStore) GetKindIDX(kind string) uint16 {
 	if ok {
 		return idx
 	}
+
+	// 2. Slow path: acquire a write lock to add the new kind.
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Double-check to prevent a race condition in case another goroutine added the kind while we were waiting for the lock.
-	idx, ok = r.kindStore[kind]
-	if !ok {
-		idx = uint16(len(r.kindStore))
-		r.kindStore[kind] = idx
-		r.kindRev = append(r.kindRev, kind)
+	// 3. Double-check to prevent a race condition where another goroutine
+	//    added the kind while we were waiting for the write lock.
+	if idx, ok = r.kindStore[kind]; ok {
+		return idx
 	}
+
+	idx = uint16(len(r.kindStore))
+	r.kindStore[kind] = idx
+	r.kindRev = append(r.kindRev, kind)
 	return idx
 }
 
-// GetKindByID returns the Kind string for its index
+// GetKindByID returns the Kind string for its index.
 func (r *ResourceIDStore) GetKindByID(idx uint16) string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -113,7 +105,7 @@ func (r *ResourceIDStore) GetKindByID(idx uint16) string {
 	return ""
 }
 
-// GetNSIDX gets the numeric index for a Namespace string
+// GetNSIDX gets the numeric index for a Namespace string.
 func (r *ResourceIDStore) GetNSIDX(ns string) uint16 {
 	r.mu.RLock()
 	idx, ok := r.nsStore[ns]
@@ -125,16 +117,17 @@ func (r *ResourceIDStore) GetNSIDX(ns string) uint16 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	idx, ok = r.nsStore[ns]
-	if !ok {
-		idx = uint16(len(r.nsStore))
-		r.nsStore[ns] = idx
-		r.nsRev = append(r.nsRev, ns)
+	if idx, ok = r.nsStore[ns]; ok {
+		return idx
 	}
+
+	idx = uint16(len(r.nsStore))
+	r.nsStore[ns] = idx
+	r.nsRev = append(r.nsRev, ns)
 	return idx
 }
 
-// GetNSByID returns the Namespace string for its index
+// GetNSByID returns the Namespace string for its index.
 func (r *ResourceIDStore) GetNSByID(idx uint16) string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
