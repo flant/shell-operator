@@ -55,19 +55,7 @@ func (c *FactoryStore) Reset() {
 	c.data = make(map[FactoryIndex]Factory)
 }
 
-func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
-	ctx, cancel := context.WithCancel(context.Background())
-	c.data[index] = Factory{
-		shared:               f,
-		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
-		ctx:                  ctx,
-		cancel:               cancel,
-	}
-	log.Debug("Factory store: added a new factory for index",
-		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
-}
-
-func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory {
+func (c *FactoryStore) getnolock(client dynamic.Interface, index FactoryIndex) Factory {
 	f, ok := c.data[index]
 	if ok {
 		log.Debug("Factory store: the factory with index found",
@@ -87,19 +75,35 @@ func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory
 		}
 	}
 
-	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
+	dynFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
 		client, resyncPeriod, index.Namespace, tweakListOptions)
-	factory.ForResource(index.GVR)
+	dynFactory.ForResource(index.GVR)
 
-	c.add(index, factory)
-	return c.data[index]
+	ctx, cancel := context.WithCancel(context.Background())
+	newFactory := Factory{
+		shared:               dynFactory,
+		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
+		ctx:                  ctx,
+		cancel:               cancel,
+	}
+	c.data[index] = newFactory
+	log.Debug("Factory store: added a new factory for index",
+		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+
+	return newFactory
+}
+
+func (c *FactoryStore) Get(client dynamic.Interface, index FactoryIndex) Factory {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.getnolock(client, index)
 }
 
 func (c *FactoryStore) Start(ctx context.Context, informerId string, client dynamic.Interface, index FactoryIndex, handler cache.ResourceEventHandler, errorHandler *WatchErrorHandler) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	factory := c.get(client, index)
+	factory := c.getnolock(client, index)
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
 	// Add error handler, ignore "already started" error.

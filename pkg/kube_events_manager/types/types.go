@@ -34,13 +34,15 @@ const (
 	ModeIncremental KubeEventMode = "Incremental" // Send Synchronization with existed object and Event for each followed event.
 )
 
+type ObjectAndFilterResultMetadata struct {
+	JqFilter     string
+	Checksum     string
+	ResourceId   string // Used for sorting
+	RemoveObject bool
+}
+
 type ObjectAndFilterResult struct {
-	Metadata struct {
-		JqFilter     string
-		Checksum     string
-		ResourceId   string // Used for sorting
-		RemoveObject bool
-	}
+	Metadata     ObjectAndFilterResultMetadata
 	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
 	FilterResult interface{}
 }
