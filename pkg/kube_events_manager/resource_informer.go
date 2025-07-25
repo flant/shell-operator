@@ -209,8 +209,8 @@ func (ei *resourceInformer) populateChecksumCacheFromInformerStore() error {
 					log.Err(err))
 				return
 			}
-			// calculate checksum for filtered data
-			checksum, err := checksum.CalculateChecksum(objFilterRes.FilterResult)
+
+			checksum, err := ei.checksum(objFilterRes)
 			if err != nil {
 				err = fmt.Errorf("cannot calculate checksum for initial object %s: %w", resourceID, err)
 				allErrors = errors.Join(allErrors, err)
@@ -263,24 +263,8 @@ func (ei *resourceInformer) processSnapshotObject(obj *unstructured.Unstructured
 		return nil, fmt.Errorf("filter snapshot object: %w", err)
 	}
 
-	// If a filter is specified and it returns an empty result,
-	// this object should not be included in the snapshot for the hook.
-	if (ei.Monitor.JqFilter != nil || ei.Monitor.FilterFunc != nil) && (objFilterRes.FilterResult == nil || objFilterRes.FilterResult == "") {
-		return nil, nil // Not an error, just skip this object.
-	}
-
-	// Use the already calculated and cached checksum.
-	// This is the core optimization to prevent CPU spikes.
-	if cachedChecksum, ok := ei.checksumCache[resourceID]; ok {
-		objFilterRes.Metadata.Checksum = cachedChecksum
-	} else {
-		// As a fallback, calculate it on the fly from the original object.
-		fallbackChecksum, errCalc := checksum.CalculateChecksum(obj)
-		if errCalc != nil {
-			return nil, fmt.Errorf("calculate checksum for snapshot object: %w", errCalc)
-		}
-		objFilterRes.Metadata.Checksum = fallbackChecksum
-	}
+	// Use the already calculated and cached checksum to prevent CPU spikes
+	objFilterRes.Metadata.Checksum = ei.checksumCache[resourceID]
 
 	return objFilterRes, nil
 }
@@ -373,7 +357,6 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	}
 	obj := object.(*unstructured.Unstructured)
 
-	// The filterObject method now handles pooling, copying, filtering and metrics.
 	objFilterRes, err := ei.filterObject(obj)
 	if err != nil {
 		log.Error("cannot apply filter to watch object",
@@ -383,7 +366,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		return
 	}
 
-	newChecksum, err := checksum.CalculateChecksum(objFilterRes.FilterResult)
+	newChecksum, err := ei.checksum(objFilterRes)
 	if err != nil {
 		log.Error("handleWatchEvent: calculate checksum error",
 			slog.String("debugName", ei.Monitor.Metadata.DebugName),
@@ -539,4 +522,11 @@ func (ei *resourceInformer) getCachedObjectsInfoIncrement() CachedObjectsInfo {
 	info := *ei.cachedObjectsIncrement
 	ei.cachedObjectsIncrement = &CachedObjectsInfo{}
 	return info
+}
+
+func (ei *resourceInformer) checksum(obj *kemtypes.ObjectAndFilterResult) (uint64, error) {
+	if obj.FilterResult != nil || obj.FilterResult != "" {
+		return checksum.CalculateChecksum(obj.FilterResult)
+	}
+	return checksum.CalculateChecksum(obj.Object)
 }
