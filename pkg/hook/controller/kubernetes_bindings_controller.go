@@ -337,6 +337,11 @@ func (c *kubernetesBindingsController) SnapshotsDump() map[string]interface{} {
 func ConvertKubeEventToBindingContext(kubeEvent kemtypes.KubeEvent, link *KubernetesBindingToMonitorLink) []bctx.BindingContext {
 	bindingContexts := make([]bctx.BindingContext, 0)
 
+	fmt.Printf("[TRACE] ConvertKubeEventToBindingContext: processing KubeEvent with %d objects for monitor '%s'.\n", len(kubeEvent.Objects), kubeEvent.MonitorId)
+	for i, obj := range kubeEvent.Objects {
+		fmt.Printf("[TRACE] ConvertKubeEventToBindingContext: object[%d] = %s\n", i, obj.Metadata.ResourceId)
+	}
+
 	switch kubeEvent.Type {
 	case kemtypes.TypeSynchronization:
 		bc := bctx.BindingContext{
@@ -352,12 +357,13 @@ func ConvertKubeEventToBindingContext(kubeEvent kemtypes.KubeEvent, link *Kubern
 		bindingContexts = append(bindingContexts, bc)
 
 	case kemtypes.TypeEvent:
-		for _, kEvent := range kubeEvent.WatchEvents {
+		for i, obj := range kubeEvent.Objects {
+			watchEvent := kubeEvent.WatchEvents[i]
 			bc := bctx.BindingContext{
 				Binding:    link.BindingConfig.BindingName,
 				Type:       kubeEvent.Type,
-				WatchEvent: kEvent,
-				Objects:    kubeEvent.Objects,
+				WatchEvent: watchEvent,
+				Objects:    []kemtypes.ObjectAndFilterResult{obj},
 			}
 			bc.Metadata.JqFilter = link.BindingConfig.Monitor.JqFilter
 			bc.Metadata.BindingType = htypes.OnKubernetesEvent

@@ -4,15 +4,113 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"runtime/trace"
 	"sync"
+	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg/app"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
 )
+
+// --- Debouncer structs ---
+type pendingEvent struct {
+	Object    kemtypes.ObjectAndFilterResult
+	EventType kemtypes.WatchEventType
+}
+type pendingState map[string]pendingEvent
+
+type debouncer struct {
+	outputChan    chan<- kemtypes.KubeEvent
+	debounce      time.Duration
+	pendingStates map[string]pendingState // monitorId -> state
+	timers        map[string]*time.Timer  // monitorId -> timer
+	mu            sync.Mutex
+	logger        *log.Logger
+}
+
+func newDebouncer(outputChan chan<- kemtypes.KubeEvent, debounce time.Duration, logger *log.Logger) *debouncer {
+	return &debouncer{
+		outputChan:    outputChan,
+		debounce:      debounce,
+		pendingStates: make(map[string]pendingState),
+		timers:        make(map[string]*time.Timer),
+		logger:        logger.Named("debouncer"),
+	}
+}
+
+func (d *debouncer) handleEvent(event kemtypes.KubeEvent) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	monitorID := event.MonitorId
+	fmt.Printf("[TRACE] Debouncer: received event for monitor '%s' with %d objects.\n", monitorID, len(event.Objects))
+
+	if _, ok := d.pendingStates[monitorID]; !ok {
+		d.pendingStates[monitorID] = make(pendingState)
+	}
+	state := d.pendingStates[monitorID]
+
+	for i := range event.Objects {
+		eventType := event.WatchEvents[i]
+		resourceID := event.Objects[i].Metadata.ResourceId
+
+		d.logger.Debug("debouncing event", "monitor.id", monitorID, "resource.id", resourceID, "event.type", eventType)
+		state[resourceID] = pendingEvent{
+			Object:    event.Objects[i],
+			EventType: eventType,
+		}
+
+	}
+
+	if timer, ok := d.timers[monitorID]; ok {
+		fmt.Printf("[TRACE] Debouncer: resetting timer for monitor '%s'.\n", monitorID)
+		timer.Stop()
+	}
+
+	d.timers[monitorID] = time.AfterFunc(d.debounce, func() {
+		fmt.Printf("[TRACE] Debouncer: timer fired for monitor '%s'. Firing aggregated event.\n", monitorID)
+		d.fire(monitorID)
+	})
+}
+
+func (d *debouncer) fire(monitorID string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	state, ok := d.pendingStates[monitorID]
+	if !ok || len(state) == 0 {
+		return
+	}
+
+	d.logger.Info("debounce timer fired", "monitor.id", monitorID, "events.count", len(state))
+	fmt.Printf("[TRACE] Debouncer: sending %d aggregated events for monitor '%s'.\n", len(state), monitorID)
+
+	// Создаем один агрегированный KubeEvent со всеми объектами
+	finalEvent := kemtypes.KubeEvent{
+		MonitorId:   monitorID,
+		Type:        kemtypes.TypeEvent,
+		WatchEvents: make([]kemtypes.WatchEventType, 0, len(state)),
+		Objects:     make([]kemtypes.ObjectAndFilterResult, 0, len(state)),
+	}
+
+	for _, pEvent := range state {
+		event := pEvent
+
+		finalEvent.Objects = append(finalEvent.Objects, event.Object)
+		finalEvent.WatchEvents = append(finalEvent.WatchEvents, event.EventType)
+	}
+
+	fmt.Printf("[TRACE] Debouncer: sending aggregated event with %d objects.\n", len(finalEvent.Objects))
+	d.outputChan <- finalEvent
+
+	delete(d.pendingStates, monitorID)
+	delete(d.timers, monitorID)
+}
+
+// --- end Debouncer structs ---
 
 type KubeEventsManager interface {
 	WithMetricStorage(mstor metric.Storage)
@@ -37,6 +135,7 @@ type kubeEventsManager struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	metricStorage metric.Storage
+	debouncer     *debouncer
 
 	m        sync.RWMutex
 	Monitors map[string]Monitor
@@ -48,18 +147,27 @@ type kubeEventsManager struct {
 var _ KubeEventsManager = (*kubeEventsManager)(nil)
 
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
-func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) *kubeEventsManager {
+func NewKubeEventsManager(ctx context.Context, kubeClient *klient.Client, logger *log.Logger) KubeEventsManager {
 	cctx, cancel := context.WithCancel(ctx)
-	em := &kubeEventsManager{
+
+	mgr := &kubeEventsManager{
+		KubeEventCh: make(chan kemtypes.KubeEvent, 1000),
+		KubeClient:  kubeClient,
 		ctx:         cctx,
 		cancel:      cancel,
-		KubeClient:  client,
-		m:           sync.RWMutex{},
 		Monitors:    make(map[string]Monitor),
-		KubeEventCh: make(chan kemtypes.KubeEvent, 1),
-		logger:      logger,
+		logger:      logger.Named("kube-events-manager"),
 	}
-	return em
+
+	// Initialize debouncer only if feature flag is enabled
+	if app.IsEventDebouncerEnabled() {
+		mgr.debouncer = newDebouncer(mgr.KubeEventCh, 2*time.Second, logger)
+		logger.Info("Event debouncer enabled with 2-second delay")
+	} else {
+		logger.Info("Event debouncer disabled")
+	}
+
+	return mgr
 }
 
 func (mgr *kubeEventsManager) WithMetricStorage(mstor metric.Storage) {
@@ -72,15 +180,25 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor metric.Storage) {
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	log.Debug("Add MONITOR",
 		slog.String("config", fmt.Sprintf("%+v", monitorConfig)))
+
+	// Create event callback based on whether debouncer is enabled
+	var eventCb func(ev kemtypes.KubeEvent)
+	if app.IsEventDebouncerEnabled() && mgr.debouncer != nil {
+		eventCb = func(ev kemtypes.KubeEvent) {
+			mgr.debouncer.handleEvent(ev)
+		}
+	} else {
+		eventCb = func(ev kemtypes.KubeEvent) {
+			mgr.KubeEventCh <- ev
+		}
+	}
+
 	monitor := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,
 		mgr.metricStorage,
 		monitorConfig,
-		func(ev kemtypes.KubeEvent) {
-			defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
-			mgr.KubeEventCh <- ev
-		},
+		eventCb,
 		mgr.logger.Named("monitor"),
 	)
 

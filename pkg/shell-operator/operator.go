@@ -138,7 +138,7 @@ func (op *ShellOperator) initHookManager() error {
 			"binding":  string(types.OnKubernetesEvent),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
+		logEntry.Debug("Create tasks for 'kubernetes' event", slog.Any("name", kubeEvent))
 
 		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).

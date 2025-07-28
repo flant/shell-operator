@@ -2,9 +2,7 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +41,20 @@ type ObjectAndFilterResult struct {
 	}
 	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
 	FilterResult interface{}
+}
+
+func (o *ObjectAndFilterResult) DeepCopy() *ObjectAndFilterResult {
+	if o == nil {
+		return nil
+	}
+	res := &ObjectAndFilterResult{
+		Metadata:     o.Metadata,
+		FilterResult: o.FilterResult,
+	}
+	if o.Object != nil {
+		res.Object = o.Object.DeepCopy()
+	}
+	return res
 }
 
 // Map constructs a map suitable for use in binding context.
@@ -128,44 +140,44 @@ type KubeEvent struct {
 	Objects     []ObjectAndFilterResult
 }
 
-func (k KubeEvent) String() string {
-	msgs := make([]string, 0)
-	switch k.Type {
-	case TypeSynchronization:
-		if len(k.Objects) > 0 {
-			kind := k.Objects[0].Object.GetKind()
-			msgs = append(msgs, fmt.Sprintf("Synchronization with %d objects of kind '%s'", len(k.Objects), kind))
-		} else {
-			msgs = append(msgs, "Synchronization with 0 objects")
-		}
-	case TypeEvent:
-		if len(k.Objects) == 1 {
-			obj := k.Objects[0].Object
-			if len(k.WatchEvents) > 0 {
-				if obj != nil {
-					msgs = append(msgs, fmt.Sprintf("Event '%s' for %s/%s/%s", k.WatchEvents[0], obj.GetNamespace(), obj.GetKind(), obj.GetName()))
-				} else {
-					msgs = append(msgs, fmt.Sprintf("Event '%s' without object", k.WatchEvents[0]))
-				}
-			} else {
-				if obj != nil {
-					msgs = append(msgs, fmt.Sprintf("Event with no kubernetes event type for %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName()))
-				} else {
-					msgs = append(msgs, "Event with no kubernetes event type")
-				}
-			}
-		} else {
-			if len(k.WatchEvents) > 0 {
-				msgs = append(msgs, fmt.Sprintf("Event '%s' without objects", k.WatchEvents[0]))
-			} else {
-				msgs = append(msgs, "Event without objects and kubernetes event type")
-			}
-		}
-	default:
-		msgs = append(msgs, fmt.Sprintf("unknown type: '%s' from monitor '%s'", k.Type, k.MonitorId))
-	}
-	return strings.Join(msgs, " ")
-}
+// func (k KubeEvent) String() string {
+// 	msgs := make([]string, 0)
+// 	switch k.Type {
+// 	case TypeSynchronization:
+// 		if len(k.Objects) > 0 {
+// 			kind := k.Objects[0].Object.GetKind()
+// 			msgs = append(msgs, fmt.Sprintf("Synchronization with %d objects of kind '%s'", len(k.Objects), kind))
+// 		} else {
+// 			msgs = append(msgs, "Synchronization with 0 objects")
+// 		}
+// 	case TypeEvent:
+// 		if len(k.Objects) == 1 {
+// 			obj := k.Objects[0].Object
+// 			if len(k.WatchEvents) > 0 {
+// 				if obj != nil {
+// 					msgs = append(msgs, fmt.Sprintf("Event '%s' for %s/%s/%s", k.WatchEvents[0], obj.GetNamespace(), obj.GetKind(), obj.GetName()))
+// 				} else {
+// 					msgs = append(msgs, fmt.Sprintf("Event '%s' without object", k.WatchEvents[0]))
+// 				}
+// 			} else {
+// 				if obj != nil {
+// 					msgs = append(msgs, fmt.Sprintf("Event with no kubernetes event type for %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName()))
+// 				} else {
+// 					msgs = append(msgs, "Event with no kubernetes event type")
+// 				}
+// 			}
+// 		} else {
+// 			if len(k.WatchEvents) > 0 {
+// 				msgs = append(msgs, fmt.Sprintf("Event '%s' without objects", k.WatchEvents[0]))
+// 			} else {
+// 				msgs = append(msgs, "Event without objects and kubernetes event type")
+// 			}
+// 		}
+// 	default:
+// 		msgs = append(msgs, fmt.Sprintf("unknown type: '%s' from monitor '%s'", k.Type, k.MonitorId))
+// 	}
+// 	return strings.Join(msgs, " ")
+// }
 
 // Monitor configuration
 

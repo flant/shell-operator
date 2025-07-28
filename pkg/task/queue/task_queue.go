@@ -219,9 +219,10 @@ func (q *TaskQueue) AddLast(t task.Task) {
 	})
 }
 
-// addFirst adds new tail element.
 func (q *TaskQueue) addLast(t task.Task) {
+	fmt.Printf("[TRACE] TaskQueue: adding task to queue '%s', current length: %d\n", q.Name, len(q.items))
 	q.items = append(q.items, t)
+	fmt.Printf("[TRACE] TaskQueue: task added to queue '%s', new length: %d\n", q.Name, len(q.items))
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
@@ -621,6 +622,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 	defer q.MeasureActionTime("Filter")()
 
 	q.withLock(func() {
+		originalLength := len(q.items)
 		newItems := make([]task.Task, 0)
 		for _, t := range q.items {
 			if filterFn(t) {
@@ -628,6 +630,10 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 			}
 		}
 		q.items = newItems
+		removedCount := originalLength - len(q.items)
+		if removedCount > 0 {
+			fmt.Printf("[TRACE] TaskQueue: filtered queue '%s', removed %d tasks, new length: %d\n", q.Name, removedCount, len(q.items))
+		}
 	})
 }
 

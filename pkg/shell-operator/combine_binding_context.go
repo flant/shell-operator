@@ -121,6 +121,10 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 	} else {
 		compactMsg = fmt.Sprintf("are combined to %d contexts", len(combinedContext))
 	}
+
+	fmt.Printf("[TRACE] CombineBindingContext: combining %d tasks for hook '%s', dropping %d tasks from queue '%s'\n",
+		len(otherTasks)+1, hookName, len(tasksFilter)-1, t.GetQueueName())
+
 	op.logger.Info("Binding contexts from are dropped from queue",
 		slog.Int("count", len(otherTasks)+1),
 		slog.String("message", compactMsg),

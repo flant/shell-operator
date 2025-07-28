@@ -2,6 +2,7 @@ package shell_operator
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -77,6 +78,7 @@ func (m *ManagerEventsHandler) Start() {
 				}
 
 			case kubeEvent := <-m.kubeEventsManager.Ch():
+				fmt.Printf("[TRACE] ManagerEventsHandler: received KubeEvent from channel with %d objects for monitor '%s'.\n", len(kubeEvent.Objects), kubeEvent.MonitorId)
 				if m.kubeEventCb != nil {
 					tailTasks = m.kubeEventCb(ctx, kubeEvent)
 				}
@@ -87,6 +89,7 @@ func (m *ManagerEventsHandler) Start() {
 			}
 
 			m.taskQueues.DoWithLock(func(tqs *queue.TaskQueueSet) {
+				fmt.Printf("[TRACE] ManagerEventsHandler: adding %d tasks to queues.\n", len(tailTasks))
 				for _, resTask := range tailTasks {
 					if q := tqs.Queues[resTask.GetQueueName()]; q == nil {
 						log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
@@ -94,6 +97,7 @@ func (m *ManagerEventsHandler) Start() {
 							slog.String("description", resTask.GetDescription()))
 					} else {
 						q.AddLast(resTask)
+						fmt.Printf("[TRACE] ManagerEventsHandler: added task to queue '%s', queue length now: %d\n", resTask.GetQueueName(), q.Length())
 					}
 				}
 			})

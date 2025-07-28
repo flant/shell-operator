@@ -27,6 +27,11 @@ var (
 
 var PrometheusMetricsPrefix = "shell_operator_"
 
+// Feature flags
+var (
+	EnableEventDebouncer = "false"
+)
+
 type FlagInfo struct {
 	Name   string
 	Help   string
@@ -67,7 +72,7 @@ var CommonFlagsInfo = map[string]FlagInfo{
 	},
 	"hook-metrics-listen-port": {
 		"hook-metrics-listen-port",
-		"Port to use to serve hooks’ custom metrics to Prometheus. Can be set with $SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT. Equal to listen-port if empty.",
+		"Port to use to serve hooks' custom metrics to Prometheus. Can be set with $SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT. Equal to listen-port if empty.",
 		"SHELL_OPERATOR_HOOK_METRICS_LISTEN_PORT",
 		true,
 	},
@@ -75,6 +80,12 @@ var CommonFlagsInfo = map[string]FlagInfo{
 		"namespace",
 		"A namespace of a shell-operator. Used to setup validating webhooks. Can be set with $SHELL_OPERATOR_NAMESPACE.",
 		"SHELL_OPERATOR_NAMESPACE",
+		true,
+	},
+	"enable-event-debouncer": {
+		"enable-event-debouncer",
+		"Enable event debouncer to aggregate multiple events and reduce queue load. Can be set with $SHELL_OPERATOR_ENABLE_EVENT_DEBOUNCER.",
+		"SHELL_OPERATOR_ENABLE_EVENT_DEBOUNCER",
 		true,
 	},
 }
@@ -131,6 +142,14 @@ func DefineStartCommandFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause)
 			StringVar(&Namespace)
 	}
 
+	flag = CommonFlagsInfo["enable-event-debouncer"]
+	if flag.Define {
+		cmd.Flag(flag.Name, flag.Help).
+			Envar(flag.Envar).
+			Default(EnableEventDebouncer).
+			StringVar(&EnableEventDebouncer)
+	}
+
 	DefineKubeClientFlags(cmd)
 	DefineValidatingWebhookFlags(cmd)
 	DefineConversionWebhookFlags(cmd)
@@ -151,4 +170,9 @@ func CommandWithDefaultUsageTemplate(kpApp *kingpin.Application, name, help stri
 		kpApp.UsageTemplate(kingpin.DefaultUsageTemplate)
 		return nil
 	})
+}
+
+// IsEventDebouncerEnabled returns true if the event debouncer feature is enabled
+func IsEventDebouncerEnabled() bool {
+	return EnableEventDebouncer == "true"
 }

@@ -6,6 +6,6 @@ metadata:
 spec:
   containers:
   - name: shell-operator
-    image: registry.mycompany.com/shell-operator:monitor-pods
-    imagePullPolicy: Always
+    image: pods:v1
+    imagePullPolicy: Never
   serviceAccountName: monitor-pods-acc
