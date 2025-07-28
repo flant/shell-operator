@@ -181,6 +181,13 @@ func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult 
 			continue
 		}
 
+		jqFilter := jq.NewFilter()
+		filterResult, err := applyFilter(ei.Monitor.JqFilter, jqFilter, ei.Monitor.FilterFunc, obj)
+		if err != nil {
+			log.Error("applyFilter error", slog.String("resourceId", resourceId), log.Err(err))
+			continue
+		}
+
 		objFilterRes := &kemtypes.ObjectAndFilterResult{
 			Metadata: kemtypes.ObjectAndFilterResultMetadata{
 				JqFilter:     ei.Monitor.JqFilter,
@@ -188,7 +195,7 @@ func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult 
 				ResourceId:   resourceId,
 				RemoveObject: ei.Monitor.KeepFullObjectsInMemory,
 			},
-			FilterResult: cache.FilterResult,
+			FilterResult: filterResult,
 			Object:       obj,
 		}
 
@@ -386,7 +393,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		}
 		ei.cachedObjects[resourceId] = &cachedObject{
 			Checksum:        objFilterRes.Metadata.Checksum,
-			FilterResult:    objFilterRes.FilterResult,
+			FilterResult:    nil,
 			ResourceVersion: rv,
 		}
 		// Update cached objects info.
@@ -682,7 +689,7 @@ func (ei *resourceInformer) populateCacheFromInformerStore() error {
 		}
 		ei.cachedObjects[resourceId] = &cachedObject{
 			Checksum:        objFilterRes.Metadata.Checksum,
-			FilterResult:    objFilterRes.FilterResult,
+			FilterResult:    nil,
 			ResourceVersion: resourceVersion,
 		}
 	}

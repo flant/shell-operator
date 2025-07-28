@@ -6,8 +6,11 @@ configVersion: v1
 kubernetes:
 - apiVersion: v1
   kind: Pod
+  jqFilter: .metadata.labels
   executeHookOnEvent:
   - Added
+  - Deleted
+  - Modified
 EOF
 else
   type=$(jq -r '.[0].type' $BINDING_CONTEXT_PATH)

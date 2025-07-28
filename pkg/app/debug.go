@@ -11,7 +11,7 @@ var DebugUnixSocket = "/var/run/shell-operator/debug.socket"
 var DebugHttpServerAddr = ""
 
 var (
-	DebugKeepTmpFilesVar = "no"
+	DebugKeepTmpFilesVar = "yes"
 	DebugKeepTmpFiles    = false
 )
 
