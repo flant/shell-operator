@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
-	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
+	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -33,16 +33,20 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
-	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ context.Context, _ task.Task) queue.TaskResult {
-		return queue.TaskResult{
-			Status: "Success",
-		}
+	TaskQueues.NewNamedQueue("test_multiple_hooks", queue.QueueOpts{
+		Handler: func(_ context.Context, _ task.Task) queue.TaskResult {
+			return queue.TaskResult{
+				Status: "Success",
+			}
+		},
+		CompactableTypes:   []task.TaskType{task_metadata.HookRun},
+		CompactionCallback: nil,
 	})
 
 	tasks := []task.Task{
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -51,9 +55,9 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -62,9 +66,9 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -72,9 +76,9 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -83,9 +87,9 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook2.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -94,9 +98,9 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -138,16 +142,20 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
-	TaskQueues.NewNamedQueue("test_no_combine", func(_ context.Context, _ task.Task) queue.TaskResult {
-		return queue.TaskResult{
-			Status: "Success",
-		}
+	TaskQueues.NewNamedQueue("test_no_combine", queue.QueueOpts{
+		Handler: func(_ context.Context, _ task.Task) queue.TaskResult {
+			return queue.TaskResult{
+				Status: "Success",
+			}
+		},
+		CompactableTypes:   []task.TaskType{task_metadata.HookRun},
+		CompactionCallback: nil,
 	})
 
 	tasks := []task.Task{
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_no_combine").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -156,9 +164,9 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_no_combine").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook2.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -167,9 +175,9 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_no_combine").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook3.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -208,10 +216,14 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
-	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ context.Context, _ task.Task) queue.TaskResult {
-		return queue.TaskResult{
-			Status: "Success",
-		}
+	TaskQueues.NewNamedQueue("test_multiple_hooks", queue.QueueOpts{
+		Handler: func(_ context.Context, _ task.Task) queue.TaskResult {
+			return queue.TaskResult{
+				Status: "Success",
+			}
+		},
+		CompactableTypes:   []task.TaskType{task_metadata.HookRun},
+		CompactionCallback: nil,
 	})
 
 	bcMeta := bindingcontext.BindingContext{}.Metadata
@@ -219,9 +231,9 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 
 	tasks := []task.Task{
 		// 3 tasks with Group should be compacted
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -231,9 +243,9 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -243,9 +255,9 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -254,9 +266,9 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -266,9 +278,9 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 				},
 			}),
 		// Should not combine with next tasks (different hook name)
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook2.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -277,9 +289,9 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -321,10 +333,14 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
-	TaskQueues.NewNamedQueue("test_multiple_hooks", func(_ context.Context, _ task.Task) queue.TaskResult {
-		return queue.TaskResult{
-			Status: "Success",
-		}
+	TaskQueues.NewNamedQueue("test_multiple_hooks", queue.QueueOpts{
+		Handler: func(_ context.Context, _ task.Task) queue.TaskResult {
+			return queue.TaskResult{
+				Status: "Success",
+			}
+		},
+		CompactableTypes:   []task.TaskType{task_metadata.HookRun},
+		CompactionCallback: nil,
 	})
 
 	bcMeta := bindingcontext.BindingContext{}.Metadata
@@ -336,9 +352,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	schMeta.BindingType = types.Schedule
 
 	tasks := []task.Task{
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -348,9 +364,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -360,9 +376,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -374,9 +390,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 		// stop compaction for group
 
 		// bcList[1] type == kemtypes.TypeEvent
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -386,9 +402,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 				},
 			}),
 		// bcList[2] type == Group
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -398,9 +414,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 				},
 			}),
 		// bcList[3] type == Schedule
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -414,9 +430,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 				},
 			}),
 		// bcList[4] type == Group
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -427,9 +443,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 				},
 			}),
 		// Should not combine with task that has different type
-		task.NewTask(EnableScheduleBindings).
+		task.NewTask(task_metadata.EnableScheduleBindings).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
@@ -438,9 +454,9 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 					},
 				},
 			}),
-		task.NewTask(HookRun).
+		task.NewTask(task_metadata.HookRun).
 			WithQueueName("test_multiple_hooks").
-			WithMetadata(HookMetadata{
+			WithMetadata(task_metadata.HookMetadata{
 				HookName: "hook1.sh",
 				BindingContext: []bindingcontext.BindingContext{
 					{
