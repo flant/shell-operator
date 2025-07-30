@@ -595,6 +595,16 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	res.Status = "Success"
 
 	if shouldRunHook {
+		currentQueue := op.TaskQueues.GetByName(t.GetQueueName())
+		if currentQueue != nil {
+			queueLen := currentQueue.Length()
+			taskIDs := make([]string, 0, queueLen)
+			currentQueue.Iterate(func(queuedTask task.Task) {
+				taskIDs = append(taskIDs, queuedTask.GetId())
+			})
+			fmt.Printf("[TRACE-QUEUE] Before hook execution for task %s: queue '%s' has %d tasks with IDs: %v\n", t.GetId(), t.GetQueueName(), queueLen, taskIDs)
+		}
+
 		taskLogEntry.Info("Execute hook")
 
 		success := 0.0

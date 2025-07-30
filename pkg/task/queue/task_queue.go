@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
@@ -219,8 +221,33 @@ func (q *TaskQueue) AddLast(t task.Task) {
 	})
 }
 
-// addFirst adds new tail element.
+// addLast adds a new tail element.
+// It implements the merging logic for HookRun tasks.
 func (q *TaskQueue) addLast(t task.Task) {
+	hm := task_metadata.HookMetadataAccessor(t)
+	fmt.Printf("[TRACE-QUEUE] Adding task %s to queue '%s'\n", t.GetId(), q.Name)
+	// Try to merge with the last task. This works only for HookRun tasks.
+	if !isNil(hm) && t.GetType() == task_metadata.HookRun {
+		if len(q.items) > 0 {
+			lastTask := q.items[len(q.items)-1]
+			if lastHm := task_metadata.HookMetadataAccessor(lastTask); !isNil(lastHm) && lastTask.GetType() == task_metadata.HookRun && lastHm.HookName == hm.HookName {
+				// Last task is a match, merge into it.
+				fmt.Printf("[TRACE-QUEUE] Merged task %s into LAST task %s for hook '%s' in queue '%s'\n", t.GetId(), lastTask.GetId(), hm.HookName, q.Name)
+				lastHm.BindingContext = append(lastHm.BindingContext, hm.BindingContext...)
+				lastHm.MonitorIDs = append(lastHm.MonitorIDs, hm.MonitorIDs...)
+				lastTask.UpdateMetadata(lastHm)
+				// Task merged, no need to add a new one.
+				return
+			}
+		}
+	}
+
+	// No task to merge with, or not a HookRun task. Add to the end.
+	if !isNil(hm) {
+		fmt.Printf("[TRACE-QUEUE] Added new task %s for hook '%s' to queue '%s' (no merge occurred)\n", t.GetId(), hm.HookName, q.Name)
+	} else {
+		fmt.Printf("[TRACE-QUEUE] Added new task %s of type '%s' to queue '%s'\n", t.GetId(), t.GetType(), q.Name)
+	}
 	q.items = append(q.items, t)
 }
 
@@ -660,4 +687,16 @@ func (q *TaskQueue) withRLock(fn func()) {
 	q.m.RLock()
 	fn()
 	q.m.RUnlock()
+}
+
+// isNil checks if an interface value is nil.
+func isNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Chan, reflect.Slice, reflect.Func:
+		return reflect.ValueOf(i).IsNil()
+	}
+	return false
 }
