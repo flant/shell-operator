@@ -139,6 +139,7 @@ func (op *ShellOperator) initHookManager() error {
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
+		fmt.Printf("[TRACE] Received KubeEvent: monitorId=%s\n", kubeEvent.MonitorId)
 
 		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
@@ -153,6 +154,7 @@ func (op *ShellOperator) initHookManager() error {
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
 
+			fmt.Printf("[TRACE] Creating HookRun task: hook=%s, binding=%s, queue=%s\n", hook.Name, info.Binding, info.QueueName)
 			logEntry.With("queue", info.QueueName).
 				Info("queue task", slog.String("name", newTask.GetDescription()))
 
@@ -574,6 +576,8 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 			}
 		}
 		if shouldCombine {
+
+			fmt.Printf("[TRACE] Combining binding contexts for hook: hook=%s, bindingContexts=%+v\n", hookMeta.HookName, hookMeta.BindingContext)
 			combineResult := op.combineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t)
 			if combineResult != nil {
 				hookMeta.BindingContext = combineResult.BindingContexts
