@@ -212,7 +212,8 @@ func (q *TaskQueue) addLast(t task.Task) {
 	// When any task is added, perform a full queue compaction for ALL hooks.
 	// This ensures the queue is always in the most compact state possible.
 
-	if t.GetType() != task_metadata.HookRun {
+	hm := task_metadata.HookMetadataAccessor(t)
+	if isNil(hm) {
 		fmt.Printf("[TRACE-QUEUE] Added non-mergeable task %s of type %s to queue '%s'\n", t.GetId(), t.GetType(), q.Name)
 		element := q.items.PushBack(t)
 		q.idIndex[t.GetId()] = element
@@ -224,7 +225,7 @@ func (q *TaskQueue) addLast(t task.Task) {
 	q.idIndex[t.GetId()] = element
 
 	// Perform global compaction
-	// q.performGlobalCompaction()
+	q.performGlobalCompaction()
 }
 
 // performGlobalCompaction merges HookRun tasks for the same hook.

@@ -237,33 +237,31 @@ func (q *TaskQueueOLD) AddLast(t task.Task) {
 // addLast adds a new tail element.
 // It implements the merging logic for HookRun tasks by scanning the whole queue.
 func (q *TaskQueueOLD) addLast(t task.Task) {
-	q.items = append(q.items, t)
-
-	if t.GetType() != task_metadata.HookRun {
-		return // Do nothing for non-hook tasks.
+	hm := task_metadata.HookMetadataAccessor(t)
+	// The task is not a hook task if it has no HookMetadata.
+	if isNil(hm) {
+		q.items = append(q.items, t)
+		return
 	}
 
+	// For hook tasks, always add and then trigger debounced compaction.
+	q.items = append(q.items, t)
+
 	// Debounce compaction.
-	// Stop the previous timer if it exists.
 	if q.compactionTimer != nil {
 		q.compactionTimer.Stop()
 	}
 
-	// Start a new timer that will trigger compaction after a short delay.
 	q.compactionTimer = time.AfterFunc(DefaultDebounceDuration, func() {
-		// This function runs in a separate goroutine, so it needs its own lock.
 		q.m.Lock()
 		defer q.m.Unlock()
-
-		// A log message to confirm that debounced compaction is working.
-		fmt.Println("[TRACE-QUEUE] Debounced compaction triggered.")
 		q.performGlobalCompaction()
 	})
 }
 
-// performGlobalCompaction - blazing fast версия с O(N) сложностью
+// performGlobalCompaction merges hook tasks.
 func (q *TaskQueueOLD) performGlobalCompaction() {
-	if len(q.items) == 0 {
+	if len(q.items) < 2 {
 		return
 	}
 
@@ -276,14 +274,15 @@ func (q *TaskQueueOLD) performGlobalCompaction() {
 
 	// Один проход: собираем индексы задач по хукам - O(N)
 	for i, task := range q.items {
-		if task.GetType() != task_metadata.HookRun {
-			result = append(result, task) // Non-hook задачи сразу в результат
+		hm := task_metadata.HookMetadataAccessor(task)
+		if isNil(hm) {
+			// This is not a hook task, add it to the result as is.
+			result = append(result, task)
 			continue
 		}
 
-		hm := task_metadata.HookMetadataAccessor(task)
-		if isNil(hm) || task.IsProcessing() {
-			result = append(result, task) // Nil metadata и processing задачи сразу в результат
+		if task.IsProcessing() {
+			result = append(result, task) // Do not compact tasks that are being processed.
 			continue
 		}
 
