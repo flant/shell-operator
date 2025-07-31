@@ -344,7 +344,7 @@ func compactBindingContexts(combinedContext []bindingcontext.BindingContext) []b
 	for i := 0; i < len(combinedContext); i++ {
 		keep := true
 		current := combinedContext[i]
-
+		fmt.Printf("[GROUP] %s\n", current.Metadata.Group)
 		// Binding context is ignored if the next binding context has a similar group.
 		if groupName := current.Metadata.Group; groupName != "" {
 			if i+1 < len(combinedContext) {
