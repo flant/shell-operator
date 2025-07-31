@@ -274,8 +274,9 @@ func (q *TaskQueueOLD) performGlobalCompaction() {
 
 	// Один проход: собираем индексы задач по хукам - O(N)
 	for i, task := range q.items {
-		hm := task_metadata.HookMetadataAccessor(task)
-		if isNil(hm) {
+		metadata := task.GetMetadata()
+
+		if isNil(metadata) {
 			// This is not a hook task, add it to the result as is.
 			result = append(result, task)
 			continue
@@ -286,7 +287,7 @@ func (q *TaskQueueOLD) performGlobalCompaction() {
 			continue
 		}
 
-		hookName := hm.HookName
+		hookName := metadata.(task_metadata.HookNameAccessor).GetHookName()
 		if _, exists := hookGroups[hookName]; !exists {
 			hookOrder = append(hookOrder, hookName)
 		}
