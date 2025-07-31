@@ -261,6 +261,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 		taskType := t.GetType()
 
 		if isNil(metadata) || t.IsProcessing() {
+			fmt.Printf("[TRACE-QUEUE] Skipping task %s of type %s because it is nil or processing\n", t.GetId(), t.GetType())
 			continue
 		}
 
