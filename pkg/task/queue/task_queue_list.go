@@ -264,7 +264,8 @@ func (q *TaskQueue) performGlobalCompaction() {
 		}
 
 		// skip service tasks
-		if taskType != task_metadata.HookRun {
+		if _, ok := q.taskTypesToMerge[taskType]; !ok {
+			fmt.Printf("[TRACE-QUEUE] Skipping task %s of type %s because it is not in the list of task types to merge\n", t.GetId(), t.GetType())
 			continue
 		}
 
