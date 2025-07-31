@@ -646,7 +646,7 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 }
 
 // CancelTaskDelay breaks wait loop. Useful to break the possible long sleep delay.
-func (q *TaskQueueList) CancelTaskDelay() {
+func (q *TaskQueue) CancelTaskDelay() {
 	q.waitMu.Lock()
 	if q.waitInProgress {
 		q.cancelDelay = true
@@ -655,7 +655,7 @@ func (q *TaskQueueList) CancelTaskDelay() {
 }
 
 // Iterate run doFn for every task.
-func (q *TaskQueueList) Iterate(doFn func(task.Task)) {
+func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 	if doFn == nil {
 		return
 	}
@@ -670,7 +670,7 @@ func (q *TaskQueueList) Iterate(doFn func(task.Task)) {
 }
 
 // Filter run filterFn on every task and remove each with false result.
-func (q *TaskQueueList) Filter(filterFn func(task.Task) bool) {
+func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 	if filterFn == nil {
 		return
 	}
@@ -693,7 +693,7 @@ func (q *TaskQueueList) Filter(filterFn func(task.Task) bool) {
 // TODO define mapping method with QueueAction to insert, modify and delete tasks.
 
 // Dump tasks in queue to one line
-func (q *TaskQueueList) String() string {
+func (q *TaskQueue) String() string {
 	var buf strings.Builder
 	var index int
 	qLen := q.Length()
@@ -709,13 +709,13 @@ func (q *TaskQueueList) String() string {
 	return buf.String()
 }
 
-func (q *TaskQueueList) withLock(fn func()) {
+func (q *TaskQueue) withLock(fn func()) {
 	q.m.Lock()
 	fn()
 	q.m.Unlock()
 }
 
-func (q *TaskQueueList) withRLock(fn func()) {
+func (q *TaskQueue) withRLock(fn func()) {
 	q.m.RLock()
 	fn()
 	q.m.RUnlock()
