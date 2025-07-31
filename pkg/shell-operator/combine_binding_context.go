@@ -23,7 +23,7 @@ type CombineResult struct {
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task) *CombineResult {
+func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueueList, t task.Task) *CombineResult {
 	if q == nil {
 		return nil
 	}
@@ -34,7 +34,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 	}
 	hookName := taskMeta.(HookNameAccessor).GetHookName()
 
-	fmt.Printf("[TRACE] combineBindingContextForHook called: hook=%s, task=%s\n", hookName, t.GetId())
+	// fmt.Printf("[TRACE] combineBindingContextForHook called: hook=%s, task=%s\n", hookName, t.GetId())
 
 	res := new(CombineResult)
 
@@ -45,7 +45,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 			return
 		}
 
-		fmt.Printf("[TRACE] Iterating task in queue: taskId=%s, hookName=%s\n", tsk.GetId(), hookName)
+		// fmt.Printf("[TRACE] Iterating task in queue: taskId=%s, hookName=%s\n", tsk.GetId(), hookName)
 
 		// ignore current task
 		if tsk.GetId() == t.GetId() {
@@ -78,7 +78,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 		return nil
 	}
 
-	fmt.Printf("[TRACE] Found tasks to combine: count=%d\n", len(otherTasks))
+	// fmt.Printf("[TRACE] Found tasks to combine: count=%d\n", len(otherTasks))
 
 	// Combine binding context and make a map to delete excess tasks
 	combinedContext := make([]bctx.BindingContext, 0)
@@ -96,7 +96,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 		tasksFilter[tsk.GetId()] = false
 	}
 
-	fmt.Printf("[TRACE] Combined binding contexts before compaction: contexts=%+v\n", combinedContext)
+	// fmt.Printf("[TRACE] Combined binding contexts before compaction: contexts=%+v\n", combinedContext)
 
 	// Delete tasks with false in tasksFilter map
 	tqs.GetByName(t.GetQueueName()).Filter(func(tsk task.Task) bool {
@@ -116,7 +116,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 		if groupName != "" && (i+1 <= len(combinedContext)-1) && combinedContext[i+1].Metadata.Group == groupName {
 			keep = false
 		}
-		fmt.Printf("[TRACE] Compacting binding context: group=%s, keep=%t\n", groupName, keep)
+		// fmt.Printf("[TRACE] Compacting binding context: group=%s, keep=%t\n", groupName, keep)
 
 		if keep {
 			compactedContext = append(compactedContext, combinedContext[i])

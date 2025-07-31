@@ -78,7 +78,7 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 	tasksCount := 0
 	mainTasksCount := 0
 
-	tqs.Iterate(func(queue *queue.TaskQueue) {
+	tqs.Iterate(func(queue *queue.TaskQueueList) {
 		if queue == nil {
 			return
 		}
@@ -156,7 +156,7 @@ func pluralize(n int, zero, one, many string) string {
 	return fmt.Sprintf("%d %s", n, description)
 }
 
-func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
+func getTasksForQueue(q *queue.TaskQueueList) []dumpTask {
 	tasks := make([]dumpTask, 0, q.Length())
 
 	index := 1

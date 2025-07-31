@@ -389,7 +389,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			Objects:     []kemtypes.ObjectAndFilterResult{*objFilterRes},
 		}
 
-		fmt.Printf("[TRACE] KubeEvent created: monitorId=%s, eventType=%s\n", kubeEvent.MonitorId, string(eventType))
+		// fmt.Printf("[TRACE] KubeEvent created: monitorId=%s, eventType=%s\n", kubeEvent.MonitorId, string(eventType))
 
 		// fix race with enableKubeEventCb.
 		eventCbEnabled := false

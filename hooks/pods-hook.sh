@@ -12,7 +12,7 @@ kubernetes:
   - Deleted
 EOF
 else
-  for event in $(jq -c '.[]' $BINDING_CONTEXT_PATH); do
+  jq -c '.[]' $BINDING_CONTEXT_PATH | while read -r event; do
     type=$(echo "$event" | jq -r '.type')
     if [[ $type == "Event" ]] ; then
       podName=$(echo "$event" | jq -r '.object.metadata.name')

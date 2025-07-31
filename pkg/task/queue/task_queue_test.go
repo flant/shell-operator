@@ -89,6 +89,70 @@ func Test_TasksQueue_Remove(t *testing.T) {
 	))
 }
 
+func Test_TasksQueue_RemoveFirst(t *testing.T) {
+	g := NewWithT(t)
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddFirst",
+			"queue_name":   "",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+
+	q := NewTasksQueue().WithMetricStorage(metricStorage)
+
+	// Remove just one element
+	Task := &task.BaseTask{Id: "First one"}
+	q.AddFirst(Task)
+	g.Expect(q.Length()).To(Equal(1))
+	q.RemoveFirst()
+	g.Expect(q.Length()).To(Equal(0))
+
+	// Remove element in the middle
+	for i := 0; i < 5; i++ {
+		Task := &task.BaseTask{Id: fmt.Sprintf("task_%02d", i)}
+		q.AddFirst(Task)
+	}
+	g.Expect(q.Length()).To(Equal(5))
+	q.RemoveFirst()
+	g.Expect(q.Length()).To(Equal(4))
+
+	idsDump := DumpTaskIds(q)
+
+	g.Expect(idsDump).To(And(
+		ContainSubstring("task_00"),
+		ContainSubstring("task_01"),
+		ContainSubstring("task_02"),
+	))
+
+	// Remove last element
+	q.RemoveFirst()
+	g.Expect(q.Length()).To(Equal(3))
+
+	idsDump = DumpTaskIds(q)
+
+	g.Expect(idsDump).To(And(
+		ContainSubstring("task_00"),
+		ContainSubstring("task_01"),
+		ContainSubstring("task_02"),
+	))
+
+	// Remove first element by id
+	q.RemoveFirst()
+	g.Expect(q.Length()).To(Equal(2))
+
+	idsDump = DumpTaskIds(q)
+
+	g.Expect(idsDump).To(And(
+		ContainSubstring("task_01"),
+		ContainSubstring("task_00"),
+	))
+}
+
 func Test_ExponentialBackoff(t *testing.T) {
 	g := NewWithT(t)
 

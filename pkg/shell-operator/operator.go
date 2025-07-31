@@ -139,7 +139,7 @@ func (op *ShellOperator) initHookManager() error {
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
-		fmt.Printf("[TRACE] Received KubeEvent: monitorId=%s\n", kubeEvent.MonitorId)
+		// fmt.Printf("[TRACE] Received KubeEvent: monitorId=%s\n", kubeEvent.MonitorId)
 
 		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
@@ -154,7 +154,7 @@ func (op *ShellOperator) initHookManager() error {
 				WithLogLabels(logLabels).
 				WithQueueName(info.QueueName)
 
-			fmt.Printf("[TRACE] Creating HookRun task: hook=%s, binding=%s, queue=%s\n", hook.Name, info.Binding, info.QueueName)
+			// fmt.Printf("[TRACE] Creating HookRun task: hook=%s, binding=%s, queue=%s\n", hook.Name, info.Binding, info.QueueName)
 			logEntry.With("queue", info.QueueName).
 				Info("queue task", slog.String("name", newTask.GetDescription()))
 
@@ -577,7 +577,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 		}
 		if shouldCombine {
 
-			fmt.Printf("[TRACE] Combining binding contexts for hook: hook=%s, bindingContexts=%+v\n", hookMeta.HookName, hookMeta.BindingContext)
+			// fmt.Printf("[TRACE] Combining binding contexts for hook: hook=%s, bindingContexts=%+v\n", hookMeta.HookName, hookMeta.BindingContext)
 			combineResult := op.combineBindingContextForHook(op.TaskQueues, op.TaskQueues.GetByName(t.GetQueueName()), t)
 			if combineResult != nil {
 				hookMeta.BindingContext = combineResult.BindingContexts
@@ -602,7 +602,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 			currentQueue.Iterate(func(queuedTask task.Task) {
 				taskIDs = append(taskIDs, queuedTask.GetId())
 			})
-			fmt.Printf("[TRACE-QUEUE] Before hook execution for task %s: queue '%s' has %d tasks with IDs: %v\n", t.GetId(), t.GetQueueName(), queueLen, taskIDs)
+			// fmt.Printf("[TRACE-QUEUE] Before hook execution for task %s: queue '%s' has %d tasks with IDs: %v\n", t.GetId(), t.GetQueueName(), queueLen, taskIDs)
 		}
 
 		taskLogEntry.Info("Execute hook")
@@ -722,7 +722,7 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
+func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueueList, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
 	if q == nil {
 		return nil
 	}
@@ -939,7 +939,7 @@ func (op *ShellOperator) runMetrics() {
 	// task queue length
 	go func() {
 		for {
-			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
+			op.TaskQueues.Iterate(func(queue *queue.TaskQueueList) {
 				queueLen := float64(queue.Length())
 				op.MetricStorage.GaugeSet("{PREFIX}tasks_queue_length", queueLen, map[string]string{"queue": queue.Name})
 			})

@@ -21,12 +21,12 @@ type TaskQueueSet struct {
 	cancel context.CancelFunc
 
 	m      sync.RWMutex
-	Queues map[string]*TaskQueue
+	Queues map[string]*TaskQueueList
 }
 
 func NewTaskQueueSet() *TaskQueueSet {
 	return &TaskQueueSet{
-		Queues:   make(map[string]*TaskQueue),
+		Queues:   make(map[string]*TaskQueueList),
 		MainName: MainQueueName,
 	}
 }
@@ -67,14 +67,14 @@ func (tqs *TaskQueueSet) Start(ctx context.Context) {
 	tqs.m.RUnlock()
 }
 
-func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
+func (tqs *TaskQueueSet) Add(queue *TaskQueueList) {
 	tqs.m.Lock()
 	tqs.Queues[queue.Name] = queue
 	tqs.m.Unlock()
 }
 
 func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult) {
-	q := NewTasksQueue()
+	q := NewTasksQueueList()
 	q.WithName(name)
 	q.WithHandler(handler)
 	q.WithContext(tqs.ctx)
@@ -84,7 +84,7 @@ func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Con
 	tqs.m.Unlock()
 }
 
-func (tqs *TaskQueueSet) GetByName(name string) *TaskQueue {
+func (tqs *TaskQueueSet) GetByName(name string) *TaskQueueList {
 	tqs.m.RLock()
 	defer tqs.m.RUnlock()
 	ts, exists := tqs.Queues[name]
@@ -94,7 +94,7 @@ func (tqs *TaskQueueSet) GetByName(name string) *TaskQueue {
 	return nil
 }
 
-func (tqs *TaskQueueSet) GetMain() *TaskQueue {
+func (tqs *TaskQueueSet) GetMain() *TaskQueueList {
 	return tqs.GetByName(tqs.MainName)
 }
 
@@ -112,7 +112,7 @@ func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
 }
 
 // Iterate run doFn for every task.
-func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
+func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueueList)) {
 	if doFn == nil {
 		return
 	}

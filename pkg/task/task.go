@@ -3,6 +3,7 @@ package task
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -28,6 +29,8 @@ type Task interface {
 	GetDescription() string
 	GetProp(key string) interface{}
 	SetProp(key string, value interface{})
+	IsProcessing() bool
+	SetProcessing(bool)
 }
 
 type BaseTask struct {
@@ -43,6 +46,8 @@ type BaseTask struct {
 
 	lock     sync.RWMutex
 	Metadata interface{}
+
+	processing atomic.Bool
 }
 
 func NewTask(taskType TaskType) *BaseTask {
@@ -154,4 +159,12 @@ func (t *BaseTask) GetDescription() string {
 	}
 
 	return fmt.Sprintf("%s:%s%s%s", t.GetType(), t.GetQueueName(), metaDescription, failDescription)
+}
+
+func (t *BaseTask) SetProcessing(val bool) {
+	t.processing.Store(val)
+}
+
+func (t *BaseTask) IsProcessing() bool {
+	return t.processing.Load()
 }
