@@ -322,15 +322,50 @@ func (q *TaskQueue) performGlobalCompaction() {
 		}
 
 		// Update target task with new, perfectly sized slices
-		withContexts := targethookmetadata.(task_metadata.BindingContextSetter).SetBindingContext(newContexts)
-		withContexts = withContexts.(task_metadata.MonitorIDSetter).SetMonitorIDs(newMonitorIDs)
-
-		targetTask.UpdateMetadata(withContexts)
+		compactedContexts := compactBindingContexts(newContexts)
+		withContext := targethookmetadata.(task_metadata.BindingContextSetter).SetBindingContext(compactedContexts)
+		withContext = withContext.(task_metadata.MonitorIDSetter).SetMonitorIDs(newMonitorIDs)
+		targetTask.UpdateMetadata(withContext)
 	}
 
 	if compactedCount > 0 {
 		fmt.Printf("[TRACE-QUEUE] Global compaction complete: merged %d tasks\n", compactedCount)
 	}
+}
+
+// compactBindingContexts mimics the logic from shell-operator's CombineBindingContextForHook.
+// It removes intermediate states for the same group, keeping only the most recent one.
+func compactBindingContexts(combinedContext []bindingcontext.BindingContext) []bindingcontext.BindingContext {
+	if len(combinedContext) < 2 {
+		return combinedContext
+	}
+
+	compactedContext := make([]bindingcontext.BindingContext, 0, len(combinedContext))
+	for i := 0; i < len(combinedContext); i++ {
+		keep := true
+		current := combinedContext[i]
+
+		// Binding context is ignored if the next binding context has a similar group.
+		if groupName := current.Metadata.Group; groupName != "" {
+			if i+1 < len(combinedContext) {
+				next := combinedContext[i+1]
+				if next.Metadata.Group == groupName {
+					keep = false
+				}
+			}
+		}
+
+		if keep {
+			compactedContext = append(compactedContext, current)
+		}
+	}
+
+	// Describe what was done.
+	if len(compactedContext) < len(combinedContext) {
+		fmt.Printf("[TRACE-QUEUE] Compacted binding contexts from %d to %d\n", len(combinedContext), len(compactedContext))
+	}
+
+	return compactedContext
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
@@ -480,11 +515,6 @@ func (q *TaskQueue) Start(ctx context.Context) {
 		q.SetStatus("no handler set")
 		return
 	}
-	// initial compaction
-	// if q.isDirty {
-	// 	q.performGlobalCompaction()
-	// 	q.isDirty = false
-	// }
 
 	go func() {
 		q.SetStatus("")
@@ -497,12 +527,16 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				log.Info("queue stopped", slog.String("name", q.Name))
 				return
 			}
-			// q.m.Lock()
-			// if q.isDirty {
-			// 	q.performGlobalCompaction()
-			// 	q.isDirty = false
-			// }
-			// q.m.Unlock()
+
+			func() {
+				q.m.Lock()
+				defer q.m.Unlock()
+
+				if q.isDirty {
+					q.performGlobalCompaction()
+					q.isDirty = false
+				}
+			}()
 
 			fmt.Printf("[TRACE-QUEUE] Starting task %s of type %s, queue length %d, queue name %s\n", t.GetId(), t.GetType(), q.Length(), q.Name)
 
