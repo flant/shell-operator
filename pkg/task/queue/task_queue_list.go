@@ -481,10 +481,10 @@ func (q *TaskQueue) Start(ctx context.Context) {
 		return
 	}
 	// initial compaction
-	if q.isDirty {
-		q.performGlobalCompaction()
-		q.isDirty = false
-	}
+	// if q.isDirty {
+	// 	q.performGlobalCompaction()
+	// 	q.isDirty = false
+	// }
 
 	go func() {
 		q.SetStatus("")
@@ -497,12 +497,12 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				log.Info("queue stopped", slog.String("name", q.Name))
 				return
 			}
-			q.m.Lock()
-			if q.isDirty {
-				q.performGlobalCompaction()
-				q.isDirty = false
-			}
-			q.m.Unlock()
+			// q.m.Lock()
+			// if q.isDirty {
+			// 	q.performGlobalCompaction()
+			// 	q.isDirty = false
+			// }
+			// q.m.Unlock()
 
 			fmt.Printf("[TRACE-QUEUE] Starting task %s of type %s, queue length %d, queue name %s\n", t.GetId(), t.GetType(), q.Length(), q.Name)
 
