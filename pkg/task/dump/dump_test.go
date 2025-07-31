@@ -107,7 +107,7 @@ func Test_Dump(t *testing.T) {
 
 	// Create and fill main queue.
 	t.Run("single main queue", func(t *testing.T) {
-		tqs.NewNamedQueue("main", nil)
+		tqs.NewNamedQueue("main", nil, []task.TaskType{task_metadata.HookRun})
 
 		// Single empty main should be reported only as summary.
 		dump := testDumpQueuesWrapper(tqs, "text", true)
@@ -131,7 +131,7 @@ func Test_Dump(t *testing.T) {
 
 	// Create and fill active queue.
 	t.Run("fill active queue", func(_ *testing.T) {
-		tqs.NewNamedQueue("active-queue", nil)
+		tqs.NewNamedQueue("active-queue", nil, []task.TaskType{task_metadata.HookRun})
 		fillQueue(tqs.GetByName("active-queue"), activeTasks)
 
 		dump := testDumpQueuesWrapper(tqs, "text", true)
@@ -142,7 +142,7 @@ func Test_Dump(t *testing.T) {
 
 	// Create empty queue.
 	t.Run("create empty queue", func(t *testing.T) {
-		tqs.NewNamedQueue("empty", nil)
+		tqs.NewNamedQueue("empty", nil, []task.TaskType{task_metadata.HookRun})
 
 		dump := testDumpQueuesWrapper(tqs, "text", true)
 		t.Log(dump)

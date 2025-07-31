@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
+	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -37,7 +38,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 		return queue.TaskResult{
 			Status: "Success",
 		}
-	})
+	}, []task.TaskType{task_metadata.HookRun})
 
 	tasks := []task.Task{
 		task.NewTask(HookRun).
@@ -142,7 +143,7 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 		return queue.TaskResult{
 			Status: "Success",
 		}
-	})
+	}, []task.TaskType{task_metadata.HookRun})
 
 	tasks := []task.Task{
 		task.NewTask(HookRun).
@@ -212,7 +213,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 		return queue.TaskResult{
 			Status: "Success",
 		}
-	})
+	}, []task.TaskType{task_metadata.HookRun})
 
 	bcMeta := bindingcontext.BindingContext{}.Metadata
 	bcMeta.Group = "pods"
@@ -325,7 +326,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 		return queue.TaskResult{
 			Status: "Success",
 		}
-	})
+	}, []task.TaskType{task_metadata.HookRun})
 
 	bcMeta := bindingcontext.BindingContext{}.Metadata
 	bcMeta.Group = "pods"

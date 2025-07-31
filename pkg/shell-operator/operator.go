@@ -836,7 +836,7 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 
 	// Prepopulate main queue with 'onStartup' tasks and 'enable kubernetes bindings' tasks.
 	tqs.WithMainName("main")
-	tqs.NewNamedQueue("main", op.taskHandler)
+	tqs.NewNamedQueue("main", op.taskHandler, []task.TaskType{task_metadata.HookRun})
 
 	mainQueue := tqs.GetMain()
 
@@ -905,7 +905,7 @@ func (op *ShellOperator) initAndStartHookQueues() {
 		h := op.HookManager.GetHook(hookName)
 		for _, hookBinding := range h.Config.Schedules {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
-				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler)
+				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler, []task.TaskType{task_metadata.HookRun})
 				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
 		}
@@ -916,7 +916,7 @@ func (op *ShellOperator) initAndStartHookQueues() {
 		h := op.HookManager.GetHook(hookName)
 		for _, hookBinding := range h.Config.OnKubernetesEvents {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
-				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler)
+				op.TaskQueues.NewNamedQueue(hookBinding.Queue, op.taskHandler, []task.TaskType{task_metadata.HookRun})
 				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
 		}

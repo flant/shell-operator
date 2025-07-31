@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
@@ -73,12 +74,13 @@ func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
 	tqs.m.Unlock()
 }
 
-func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult) {
+func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, taskTypesToMerge []task.TaskType) {
 	q := NewTasksQueue()
 	q.WithName(name)
 	q.WithHandler(handler)
 	q.WithContext(tqs.ctx)
 	q.WithMetricStorage(tqs.metricStorage)
+	q.WithTaskTypesToMerge([]task.TaskType{task_metadata.HookRun})
 	tqs.m.Lock()
 	tqs.Queues[name] = q
 	tqs.m.Unlock()

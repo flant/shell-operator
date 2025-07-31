@@ -41,6 +41,8 @@ type TaskQueue struct {
 	waitInProgress bool
 	cancelDelay    bool
 
+	taskTypesToMerge map[task.TaskType]struct{}
+
 	items   *list.List
 	idIndex map[string]*list.Element
 
@@ -94,6 +96,14 @@ func (q *TaskQueue) WithName(name string) *TaskQueue {
 
 func (q *TaskQueue) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueue {
 	q.Handler = fn
+	return q
+}
+
+func (q *TaskQueue) WithTaskTypesToMerge(taskTypes []task.TaskType) *TaskQueue {
+	q.taskTypesToMerge = make(map[task.TaskType]struct{}, len(taskTypes))
+	for _, taskType := range taskTypes {
+		q.taskTypesToMerge[taskType] = struct{}{}
+	}
 	return q
 }
 
@@ -212,20 +222,15 @@ func (q *TaskQueue) addLast(t task.Task) {
 	// When any task is added, perform a full queue compaction for ALL hooks.
 	// This ensures the queue is always in the most compact state possible.
 
-	hm := task_metadata.HookMetadataAccessor(t)
-	if isNil(hm) {
-		fmt.Printf("[TRACE-QUEUE] Added non-mergeable task %s of type %s to queue '%s'\n", t.GetId(), t.GetType(), q.Name)
-		element := q.items.PushBack(t)
-		q.idIndex[t.GetId()] = element
-		return
-	}
+	// DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
+	q.pushBack(t)
 
-	// Add the new task temporarily to perform global compaction
+	q.performGlobalCompaction()
+}
+
+func (q *TaskQueue) pushBack(t task.Task) {
 	element := q.items.PushBack(t)
 	q.idIndex[t.GetId()] = element
-
-	// Perform global compaction
-	q.performGlobalCompaction()
 }
 
 // performGlobalCompaction merges HookRun tasks for the same hook.
@@ -251,25 +256,34 @@ func (q *TaskQueue) performGlobalCompaction() {
 		if t.GetType() != task_metadata.HookRun {
 			continue
 		}
+		metadata := t.GetMetadata()
+		taskType := t.GetType()
 
-		hm := task_metadata.HookMetadataAccessor(t)
-		if isNil(hm) || t.IsProcessing() {
+		if isNil(metadata) || t.IsProcessing() {
 			continue
 		}
-		hookName := hm.HookName
+
+		// skip service tasks
+		if taskType != task_metadata.HookRun {
+			continue
+		}
+
+		hookName := metadata.(task_metadata.HookNameAccessor).GetHookName()
+		bindingContext := metadata.(task_metadata.BindingContextAccessor).GetBindingContext()
+		monitorIDs := metadata.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
 
 		if group, exists := hookGroups[hookName]; exists {
 			// Add to existing group
 			group.elementsToMerge = append(group.elementsToMerge, e)
-			group.totalContexts += len(hm.BindingContext)
-			group.totalMonitorIDs += len(hm.MonitorIDs)
+			group.totalContexts += len(bindingContext)
+			group.totalMonitorIDs += len(monitorIDs)
 		} else {
 			// Create a new group
 			hookGroups[hookName] = &compactionGroup{
 				targetElement:   e,
 				elementsToMerge: []*list.Element{},
-				totalContexts:   len(hm.BindingContext),
-				totalMonitorIDs: len(hm.MonitorIDs),
+				totalContexts:   len(bindingContext),
+				totalMonitorIDs: len(monitorIDs),
 			}
 		}
 	}
