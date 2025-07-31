@@ -41,6 +41,8 @@ type TaskQueue struct {
 	waitInProgress bool
 	cancelDelay    bool
 
+	isDirty bool
+
 	taskTypesToMerge map[task.TaskType]struct{}
 
 	items   *list.List
@@ -223,14 +225,13 @@ func (q *TaskQueue) addLast(t task.Task) {
 	// This ensures the queue is always in the most compact state possible.
 
 	// DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-	q.pushBack(t)
-
-	q.performGlobalCompaction()
-}
-
-func (q *TaskQueue) pushBack(t task.Task) {
 	element := q.items.PushBack(t)
 	q.idIndex[t.GetId()] = element
+
+	if _, ok := q.taskTypesToMerge[t.GetType()]; ok {
+		q.isDirty = true
+	}
+
 }
 
 // performGlobalCompaction merges HookRun tasks for the same hook.
@@ -479,6 +480,11 @@ func (q *TaskQueue) Start(ctx context.Context) {
 		q.SetStatus("no handler set")
 		return
 	}
+	// initial compaction
+	if q.isDirty {
+		q.performGlobalCompaction()
+		q.isDirty = false
+	}
 
 	go func() {
 		q.SetStatus("")
@@ -491,6 +497,12 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				log.Info("queue stopped", slog.String("name", q.Name))
 				return
 			}
+			q.m.Lock()
+			if q.isDirty {
+				q.performGlobalCompaction()
+				q.isDirty = false
+			}
+			q.m.Unlock()
 
 			fmt.Printf("[TRACE-QUEUE] Starting task %s of type %s, queue length %d, queue name %s\n", t.GetId(), t.GetType(), q.Length(), q.Name)
 
