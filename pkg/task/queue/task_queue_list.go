@@ -239,6 +239,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 	if q.items.Len() < 2 {
 		return
 	}
+	fmt.Printf("[TRACE-QUEUE] Performing global compaction for queue '%s'\n", q.Name)
 
 	type compactionGroup struct {
 		targetElement   *list.Element
@@ -268,6 +269,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 			fmt.Printf("[TRACE-QUEUE] Skipping task %s of type %s because it is not in the list of task types to merge\n", t.GetId(), t.GetType())
 			continue
 		}
+		fmt.Printf("[TRACE-QUEUE] Adding task %s of type %s to compaction group\n", t.GetId(), t.GetType())
 
 		hookName := metadata.(task_metadata.HookNameAccessor).GetHookName()
 		bindingContext := metadata.(task_metadata.BindingContextAccessor).GetBindingContext()
@@ -296,23 +298,27 @@ func (q *TaskQueue) performGlobalCompaction() {
 		}
 
 		targetTask := group.targetElement.Value.(task.Task)
-		targetHm := task_metadata.HookMetadataAccessor(targetTask)
+		targetMetadata := targetTask.GetMetadata()
+		bindingContext := targetMetadata.(task_metadata.BindingContextAccessor).GetBindingContext()
+		monitorIDs := targetMetadata.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
 
 		// Pre-allocate new slices with the final calculated size
 		newContexts := make([]bindingcontext.BindingContext, 0, group.totalContexts)
 		newMonitorIDs := make([]string, 0, group.totalMonitorIDs)
 
 		// Add target's contexts first
-		newContexts = append(newContexts, targetHm.BindingContext...)
-		newMonitorIDs = append(newMonitorIDs, targetHm.MonitorIDs...)
+		newContexts = append(newContexts, bindingContext...)
+		newMonitorIDs = append(newMonitorIDs, monitorIDs...)
 
 		// Append contexts from other tasks and remove them
 		for _, elementToMerge := range group.elementsToMerge {
 			taskToMerge := elementToMerge.Value.(task.Task)
-			hmToMerge := task_metadata.HookMetadataAccessor(taskToMerge)
+			metadataToMerge := taskToMerge.GetMetadata()
+			bindingContextToMerge := metadataToMerge.(task_metadata.BindingContextAccessor).GetBindingContext()
+			monitorIDsToMerge := metadataToMerge.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
 
-			newContexts = append(newContexts, hmToMerge.BindingContext...)
-			newMonitorIDs = append(newMonitorIDs, hmToMerge.MonitorIDs...)
+			newContexts = append(newContexts, bindingContextToMerge...)
+			newMonitorIDs = append(newMonitorIDs, monitorIDsToMerge...)
 
 			fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
 				taskToMerge.GetId(), hookName, targetTask.GetId())
@@ -323,9 +329,9 @@ func (q *TaskQueue) performGlobalCompaction() {
 		}
 
 		// Update target task with new, perfectly sized slices
-		targetHm.BindingContext = newContexts
-		targetHm.MonitorIDs = newMonitorIDs
-		targetTask.UpdateMetadata(targetHm)
+		targetMetadata.(task_metadata.BindingContextSetter).SetBindingContext(newContexts)
+		targetMetadata.(task_metadata.MonitorIDSetter).SetMonitorIDs(newMonitorIDs)
+		targetTask.UpdateMetadata(targetMetadata)
 	}
 
 	if compactedCount > 0 {

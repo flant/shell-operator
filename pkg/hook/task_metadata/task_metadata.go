@@ -26,6 +26,14 @@ type BindingContextAccessor interface {
 	GetBindingContext() []bindingcontext.BindingContext
 }
 
+type BindingContextSetter interface {
+	SetBindingContext([]bindingcontext.BindingContext)
+}
+
+type MonitorIDSetter interface {
+	SetMonitorIDs([]string)
+}
+
 type MonitorIDAccessor interface {
 	GetMonitorIDs() []string
 }
@@ -74,12 +82,20 @@ func (m HookMetadata) GetBindingContext() []bindingcontext.BindingContext {
 	return m.BindingContext
 }
 
+func (m *HookMetadata) SetBindingContext(context []bindingcontext.BindingContext) {
+	m.BindingContext = context
+}
+
 func (m HookMetadata) GetAllowFailure() bool {
 	return m.AllowFailure
 }
 
 func (m HookMetadata) GetMonitorIDs() []string {
 	return m.MonitorIDs
+}
+
+func (m *HookMetadata) SetMonitorIDs(monitorIDs []string) {
+	m.MonitorIDs = monitorIDs
 }
 
 func (m *HookMetadata) WithHookName(name string) *HookMetadata {
