@@ -722,7 +722,7 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueueList, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
+func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
 	if q == nil {
 		return nil
 	}
@@ -939,7 +939,7 @@ func (op *ShellOperator) runMetrics() {
 	// task queue length
 	go func() {
 		for {
-			op.TaskQueues.Iterate(func(queue *queue.TaskQueueList) {
+			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
 				queueLen := float64(queue.Length())
 				op.MetricStorage.GaugeSet("{PREFIX}tasks_queue_length", queueLen, map[string]string{"queue": queue.Name})
 			})

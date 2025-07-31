@@ -230,7 +230,7 @@ func TestTaskQueue_AddLast_GreedyMerge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := &TaskQueue{
+			q := &TaskQueueOLD{
 				Name:  "test_queue",
 				m:     sync.RWMutex{},
 				items: tt.initialQueue,
@@ -368,7 +368,7 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := NewTasksQueueList()
+			q := NewTasksQueue()
 			q.WithName("test_queue")
 			for _, task := range tt.initialQueue {
 				q.addLast(task)

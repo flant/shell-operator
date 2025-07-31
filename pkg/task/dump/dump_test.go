@@ -54,7 +54,7 @@ func Test_Sort_ByNamespaceAndName(t *testing.T) {
 	}
 }
 
-func fillQueue(q *queue.TaskQueueList, n int) {
+func fillQueue(q *queue.TaskQueue, n int) {
 	for i := 0; i < n; i++ {
 		t := &task.BaseTask{Id: fmt.Sprintf("test_task_%s_%04d", q.Name, i)}
 		t.WithMetadata(task_metadata.HookMetadata{
