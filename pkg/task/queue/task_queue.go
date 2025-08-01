@@ -330,13 +330,15 @@ func (q *TaskQueue) performGlobalCompaction() {
 			if idx == minIndex {
 				continue
 			}
-			existingHm := task_metadata.HookMetadataAccessor(q.items[idx])
+			existingHm := q.items[idx].GetMetadata()
+			existingContexts := existingHm.(task_metadata.BindingContextAccessor).GetBindingContext()
+			existingMonitorIDs := existingHm.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
 
-			copy(newContexts[contextIndex:], existingHm.BindingContext)
-			contextIndex += len(existingHm.BindingContext)
+			copy(newContexts[contextIndex:], existingContexts)
+			contextIndex += len(existingContexts)
 
-			copy(newMonitorIDs[monitorIndex:], existingHm.MonitorIDs)
-			monitorIndex += len(existingHm.MonitorIDs)
+			copy(newMonitorIDs[monitorIndex:], existingMonitorIDs)
+			monitorIndex += len(existingMonitorIDs)
 
 			fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
 				q.items[idx].GetId(), hookName, targetTask.GetId())

@@ -127,52 +127,52 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 		expectedIDs  []string
 		expectedBCs  map[string]int // map[taskID] -> expected number of binding contexts
 	}{
-		// {
-		// 	name:         "Simple merge into last task",
-		// 	initialQueue: []task.Task{newHookTask("h1_A", "hook-1")},
-		// 	taskToAdd:    newHookTask("h1_B", "hook-1"),
-		// 	expectedIDs:  []string{"h1_A"},
-		// 	expectedBCs:  map[string]int{"h1_A": 2},
-		// },
-		// {
-		// 	name:         "No merge for different hook",
-		// 	initialQueue: []task.Task{newHookTask("h1_A", "hook-1")},
-		// 	taskToAdd:    newHookTask("h2_B", "hook-2"),
-		// 	expectedIDs:  []string{"h1_A", "h2_B"},
-		// 	expectedBCs:  map[string]int{"h1_A": 1, "h2_B": 1},
-		// },
-		// {
-		// 	name:         "Greedy merge over a different hook task",
-		// 	initialQueue: []task.Task{newHookTask("h1_A", "hook-1"), newHookTask("h2_B", "hook-2")},
-		// 	taskToAdd:    newHookTask("h1_C", "hook-1"),
-		// 	expectedIDs:  []string{"h1_A", "h2_B"},
-		// 	expectedBCs:  map[string]int{"h1_A": 2, "h2_B": 1},
-		// },
-		// {
-		// 	name: "Do not merge into a processing task, add new",
-		// 	initialQueue: []task.Task{func() task.Task {
-		// 		t := newHookTask("h1_A", "hook-1")
-		// 		t.SetProcessing(true)
-		// 		return t
-		// 	}()},
-		// 	taskToAdd:   newHookTask("h1_B", "hook-1"),
-		// 	expectedIDs: []string{"h1_A", "h1_B"},
-		// 	expectedBCs: map[string]int{"h1_A": 1, "h1_B": 1},
-		// },
-		// {
-		// 	name: "Merge into the second pile, not the processing one",
-		// 	initialQueue: []task.Task{
-		// 		func() task.Task {
-		// 			t := newHookTask("h1_A", "hook-1")
-		// 			t.SetProcessing(true)
-		// 			return t
-		// 		}(),
-		// 		newHookTask("h1_B", "hook-1"),
-		// 	},
-		// 	taskToAdd:   newHookTask("h1_C", "hook-1"),
-		// 	expectedIDs: []string{"h1_A", "h1_B"},
-		// 	expectedBCs: map[string]int{"h1_A": 1, "h1_B": 2},
-		// },
+		{
+			name:         "Simple merge into last task",
+			initialQueue: []task.Task{newHookTask("h1_A", "hook-1")},
+			taskToAdd:    newHookTask("h1_B", "hook-1"),
+			expectedIDs:  []string{"h1_A"},
+			expectedBCs:  map[string]int{"h1_A": 2},
+		},
+		{
+			name:         "No merge for different hook",
+			initialQueue: []task.Task{newHookTask("h1_A", "hook-1")},
+			taskToAdd:    newHookTask("h2_B", "hook-2"),
+			expectedIDs:  []string{"h1_A", "h2_B"},
+			expectedBCs:  map[string]int{"h1_A": 1, "h2_B": 1},
+		},
+		{
+			name:         "Greedy merge over a different hook task",
+			initialQueue: []task.Task{newHookTask("h1_A", "hook-1"), newHookTask("h2_B", "hook-2")},
+			taskToAdd:    newHookTask("h1_C", "hook-1"),
+			expectedIDs:  []string{"h1_A", "h2_B"},
+			expectedBCs:  map[string]int{"h1_A": 2, "h2_B": 1},
+		},
+		{
+			name: "Do not merge into a processing task, add new",
+			initialQueue: []task.Task{func() task.Task {
+				t := newHookTask("h1_A", "hook-1")
+				t.SetProcessing(true)
+				return t
+			}()},
+			taskToAdd:   newHookTask("h1_B", "hook-1"),
+			expectedIDs: []string{"h1_A", "h1_B"},
+			expectedBCs: map[string]int{"h1_A": 1, "h1_B": 1},
+		},
+		{
+			name: "Merge into the second pile, not the processing one",
+			initialQueue: []task.Task{
+				func() task.Task {
+					t := newHookTask("h1_A", "hook-1")
+					t.SetProcessing(true)
+					return t
+				}(),
+				newHookTask("h1_B", "hook-1"),
+			},
+			taskToAdd:   newHookTask("h1_C", "hook-1"),
+			expectedIDs: []string{"h1_A", "h1_B"},
+			expectedBCs: map[string]int{"h1_A": 1, "h1_B": 2},
+		},
 		{
 			name: "Greedy merge over a processing task of the same kind",
 			initialQueue: []task.Task{
