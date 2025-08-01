@@ -5,22 +5,17 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"reflect"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
-	"github.com/flant/shell-operator/pkg/hook/task_metadata"
+
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
-
-const DefaultDebounceDuration = 50 * time.Millisecond
 
 /*
 A working queue (a pipeline) for sequential execution of tasks.
@@ -60,7 +55,7 @@ type TaskResult struct {
 	AfterHandle func()
 }
 
-type TaskQueueOLD struct {
+type TaskQueue struct {
 	m             sync.RWMutex
 	metricStorage metric.Storage
 	ctx           context.Context
@@ -70,12 +65,7 @@ type TaskQueueOLD struct {
 	waitInProgress bool
 	cancelDelay    bool
 
-	items           []task.Task
-	compactionTimer *time.Timer // Timer to debounce compaction.
-	head            int
-	size            int
-	idIndex         map[string]int
-
+	items   []task.Task
 	started bool // a flag to ignore multiple starts
 
 	// Log debug messages if true.
@@ -95,10 +85,9 @@ type TaskQueueOLD struct {
 	ExponentialBackoffFn  func(failureCount int) time.Duration
 }
 
-func NewTasksQueueOLD() *TaskQueueOLD {
-	return &TaskQueueOLD{
-		items:   make([]task.Task, 0),
-		idIndex: make(map[string]int),
+func NewTasksQueue() *TaskQueue {
+	return &TaskQueue{
+		items: make([]task.Task, 0),
 		// Default timings
 		WaitLoopCheckInterval: DefaultWaitLoopCheckInterval,
 		DelayOnQueueIsEmpty:   DefaultDelayOnQueueIsEmpty,
@@ -109,32 +98,33 @@ func NewTasksQueueOLD() *TaskQueueOLD {
 	}
 }
 
-func (q *TaskQueueOLD) WithContext(ctx context.Context) {
+func (q *TaskQueue) WithContext(ctx context.Context) {
 	q.ctx, q.cancel = context.WithCancel(ctx)
 }
 
-func (q *TaskQueueOLD) WithMetricStorage(mstor metric.Storage) *TaskQueueOLD {
+func (q *TaskQueue) WithMetricStorage(mstor metric.Storage) *TaskQueue {
 	q.metricStorage = mstor
 
 	return q
 }
 
-func (q *TaskQueueOLD) WithName(name string) *TaskQueueOLD {
+// заглушка для тестов
+func (q *TaskQueue) WithTaskTypesToMerge(taskTypesToMerge []task.TaskType) *TaskQueue {
+	return q
+}
+
+func (q *TaskQueue) WithName(name string) *TaskQueue {
 	q.Name = name
 	return q
 }
 
-func (q *TaskQueueOLD) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueueOLD {
+func (q *TaskQueue) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueue {
 	q.Handler = fn
 	return q
 }
 
 // MeasureActionTime is a helper to measure execution time of queue's actions
-func (q *TaskQueueOLD) MeasureActionTime(action string) func() {
-	if q.metricStorage == nil {
-		return func() {}
-	}
-
+func (q *TaskQueue) MeasureActionTime(action string) func() {
 	q.measureActionFnOnce.Do(func() {
 		if os.Getenv("QUEUE_ACTIONS_METRICS") == "no" {
 			q.measureActionFn = func() {}
@@ -147,31 +137,31 @@ func (q *TaskQueueOLD) MeasureActionTime(action string) func() {
 	return q.measureActionFn
 }
 
-func (q *TaskQueueOLD) GetStatus() string {
+func (q *TaskQueue) GetStatus() string {
 	defer q.MeasureActionTime("GetStatus")()
 	q.m.RLock()
 	defer q.m.RUnlock()
 	return q.Status
 }
 
-func (q *TaskQueueOLD) SetStatus(status string) {
+func (q *TaskQueue) SetStatus(status string) {
 	q.m.Lock()
 	q.Status = status
 	q.m.Unlock()
 }
 
-func (q *TaskQueueOLD) IsEmpty() bool {
+func (q *TaskQueue) IsEmpty() bool {
 	defer q.MeasureActionTime("IsEmpty")()
 	q.m.RLock()
 	defer q.m.RUnlock()
 	return q.isEmpty()
 }
 
-func (q *TaskQueueOLD) isEmpty() bool {
+func (q *TaskQueue) isEmpty() bool {
 	return len(q.items) == 0
 }
 
-func (q *TaskQueueOLD) Length() int {
+func (q *TaskQueue) Length() int {
 	defer q.MeasureActionTime("Length")()
 	q.m.RLock()
 	defer q.m.RUnlock()
@@ -179,7 +169,7 @@ func (q *TaskQueueOLD) Length() int {
 }
 
 // AddFirst adds new head element.
-func (q *TaskQueueOLD) AddFirst(t task.Task) {
+func (q *TaskQueue) AddFirst(t task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
 	q.withLock(func() {
 		q.addFirst(t)
@@ -187,12 +177,12 @@ func (q *TaskQueueOLD) AddFirst(t task.Task) {
 }
 
 // addFirst adds new head element.
-func (q *TaskQueueOLD) addFirst(t task.Task) {
+func (q *TaskQueue) addFirst(t task.Task) {
 	q.items = append([]task.Task{t}, q.items...)
 }
 
 // RemoveFirst deletes a head element, so head is moved.
-func (q *TaskQueueOLD) RemoveFirst() task.Task {
+func (q *TaskQueue) RemoveFirst() task.Task {
 	defer q.MeasureActionTime("RemoveFirst")()
 	var t task.Task
 
@@ -204,7 +194,7 @@ func (q *TaskQueueOLD) RemoveFirst() task.Task {
 }
 
 // removeFirst deletes a head element, so head is moved.
-func (q *TaskQueueOLD) removeFirst() task.Task {
+func (q *TaskQueue) removeFirst() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
@@ -216,7 +206,7 @@ func (q *TaskQueueOLD) removeFirst() task.Task {
 }
 
 // GetFirst returns a head element.
-func (q *TaskQueueOLD) GetFirst() task.Task {
+func (q *TaskQueue) GetFirst() task.Task {
 	defer q.MeasureActionTime("GetFirst")()
 	q.m.RLock()
 	defer q.m.RUnlock()
@@ -227,171 +217,20 @@ func (q *TaskQueueOLD) GetFirst() task.Task {
 }
 
 // AddLast adds new tail element.
-func (q *TaskQueueOLD) AddLast(t task.Task) {
+func (q *TaskQueue) AddLast(t task.Task) {
 	defer q.MeasureActionTime("AddLast")()
 	q.withLock(func() {
 		q.addLast(t)
 	})
 }
 
-// addLast adds a new tail element.
-// It implements the merging logic for HookRun tasks by scanning the whole queue.
-func (q *TaskQueueOLD) addLast(t task.Task) {
-	hm := task_metadata.HookMetadataAccessor(t)
-	// The task is not a hook task if it has no HookMetadata.
-	if isNil(hm) {
-		q.items = append(q.items, t)
-		return
-	}
-
-	// For hook tasks, always add and then trigger debounced compaction.
+// addFirst adds new tail element.
+func (q *TaskQueue) addLast(t task.Task) {
 	q.items = append(q.items, t)
-
-	// Debounce compaction.
-	if q.compactionTimer != nil {
-		q.compactionTimer.Stop()
-	}
-
-	q.compactionTimer = time.AfterFunc(DefaultDebounceDuration, func() {
-		q.m.Lock()
-		defer q.m.Unlock()
-		q.performGlobalCompaction()
-	})
-}
-
-// performGlobalCompaction merges hook tasks.
-func (q *TaskQueueOLD) performGlobalCompaction() {
-	if len(q.items) < 2 {
-		return
-	}
-
-	// Предварительно выделяем память для результата
-	result := make([]task.Task, 0, len(q.items))
-
-	// Map для быстрого поиска групп хуков
-	hookGroups := make(map[string][]int, 10) // hookName -> []indices
-	var hookOrder []string
-
-	// Один проход: собираем индексы задач по хукам - O(N)
-	for i, task := range q.items {
-		metadata := task.GetMetadata()
-
-		if isNil(metadata) {
-			// This is not a hook task, add it to the result as is.
-			result = append(result, task)
-			continue
-		}
-
-		if task.IsProcessing() {
-			result = append(result, task) // Do not compact tasks that are being processed.
-			continue
-		}
-
-		hookName := metadata.(task_metadata.HookNameAccessor).GetHookName()
-		if _, exists := hookGroups[hookName]; !exists {
-			hookOrder = append(hookOrder, hookName)
-		}
-		hookGroups[hookName] = append(hookGroups[hookName], i)
-	}
-
-	// Обрабатываем группы хуков - O(N) в худшем случае
-	for _, hookName := range hookOrder {
-		indices := hookGroups[hookName]
-
-		if len(indices) == 1 {
-			// Только одна задача - добавляем как есть
-			result = append(result, q.items[indices[0]])
-			continue
-		}
-
-		// Находим задачу с минимальным индексом как целевую
-		minIndex := indices[0]
-		for _, idx := range indices {
-			if idx < minIndex {
-				minIndex = idx
-			}
-		}
-
-		targetTask := q.items[minIndex]
-		targetHm := task_metadata.HookMetadataAccessor(targetTask)
-
-		// Предварительно вычисляем общий размер
-		totalContexts := len(targetHm.BindingContext)
-		totalMonitorIDs := len(targetHm.MonitorIDs)
-
-		for _, idx := range indices {
-			if idx == minIndex {
-				continue // Пропускаем целевую задачу
-			}
-			existingHm := task_metadata.HookMetadataAccessor(q.items[idx])
-			totalContexts += len(existingHm.BindingContext)
-			totalMonitorIDs += len(existingHm.MonitorIDs)
-		}
-
-		// Создаем новые слайсы с правильным размером
-		newContexts := make([]bindingcontext.BindingContext, totalContexts)
-		newMonitorIDs := make([]string, totalMonitorIDs)
-
-		// Копируем контексты целевой задачи
-		copy(newContexts, targetHm.BindingContext)
-		copy(newMonitorIDs, targetHm.MonitorIDs)
-
-		// Копируем контексты от остальных задач
-		contextIndex := len(targetHm.BindingContext)
-		monitorIndex := len(targetHm.MonitorIDs)
-
-		for _, idx := range indices {
-			if idx == minIndex {
-				continue
-			}
-			existingHm := task_metadata.HookMetadataAccessor(q.items[idx])
-
-			copy(newContexts[contextIndex:], existingHm.BindingContext)
-			contextIndex += len(existingHm.BindingContext)
-
-			copy(newMonitorIDs[monitorIndex:], existingHm.MonitorIDs)
-			monitorIndex += len(existingHm.MonitorIDs)
-
-			// fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
-			// 	q.items[idx].GetId(), hookName, targetTask.GetId())
-		}
-
-		// Обновляем метаданные
-		targetHm.BindingContext = newContexts
-		targetHm.MonitorIDs = newMonitorIDs
-		targetTask.UpdateMetadata(targetHm)
-
-		// Просто добавляем в конец, потом отсортируем
-		result = append(result, targetTask)
-
-		// fmt.Printf("[TRACE-QUEUE] Global compaction: merged %d tasks for hook '%s' into task %s\n",
-		// 	len(indices), hookName, targetTask.GetId())
-	}
-
-	// Сортируем результат по исходным позициям для сохранения порядка
-	// Создаем map для быстрого поиска позиций
-	positionMap := make(map[task.Task]int, len(q.items))
-	for i, task := range q.items {
-		positionMap[task] = i
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		posI := positionMap[result[i]]
-		posJ := positionMap[result[j]]
-		return posI < posJ
-	})
-
-	// Заменяем очередь
-	// originalSize := len(q.items)
-	q.items = result
-	// compactedSize := len(q.items)
-
-	// fmt.Printf("[TRACE-QUEUE] Global compaction complete: %d tasks -> %d tasks (compressed %d tasks)\n",
-	// 	originalSize, compactedSize, originalSize-compactedSize)
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
-func (q *TaskQueueOLD) RemoveLast() task.Task {
+func (q *TaskQueue) RemoveLast() task.Task {
 	defer q.MeasureActionTime("RemoveLast")()
 	var t task.Task
 
@@ -403,7 +242,7 @@ func (q *TaskQueueOLD) RemoveLast() task.Task {
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
-func (q *TaskQueueOLD) removeLast() task.Task {
+func (q *TaskQueue) removeLast() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
@@ -419,7 +258,7 @@ func (q *TaskQueueOLD) removeLast() task.Task {
 }
 
 // GetLast returns a tail element.
-func (q *TaskQueueOLD) GetLast() task.Task {
+func (q *TaskQueue) GetLast() task.Task {
 	defer q.MeasureActionTime("GetLast")()
 	var t task.Task
 
@@ -431,7 +270,7 @@ func (q *TaskQueueOLD) GetLast() task.Task {
 }
 
 // GetLast returns a tail element.
-func (q *TaskQueueOLD) getLast() task.Task {
+func (q *TaskQueue) getLast() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
@@ -440,7 +279,7 @@ func (q *TaskQueueOLD) getLast() task.Task {
 }
 
 // Get returns a task by id.
-func (q *TaskQueueOLD) Get(id string) task.Task {
+func (q *TaskQueue) Get(id string) task.Task {
 	defer q.MeasureActionTime("Get")()
 	var t task.Task
 
@@ -452,7 +291,7 @@ func (q *TaskQueueOLD) Get(id string) task.Task {
 }
 
 // Get returns a task by id.
-func (q *TaskQueueOLD) get(id string) task.Task {
+func (q *TaskQueue) get(id string) task.Task {
 	for _, t := range q.items {
 		if t.GetId() == id {
 			return t
@@ -463,7 +302,7 @@ func (q *TaskQueueOLD) get(id string) task.Task {
 }
 
 // AddAfter inserts a task after the task with specified id.
-func (q *TaskQueueOLD) AddAfter(id string, newTask task.Task) {
+func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
 	q.withLock(func() {
 		q.addAfter(id, newTask)
@@ -471,7 +310,7 @@ func (q *TaskQueueOLD) AddAfter(id string, newTask task.Task) {
 }
 
 // addAfter inserts a task after the task with specified id.
-func (q *TaskQueueOLD) addAfter(id string, newTask task.Task) {
+func (q *TaskQueue) addAfter(id string, newTask task.Task) {
 	newItems := make([]task.Task, len(q.items)+1)
 
 	idFound := false
@@ -494,7 +333,7 @@ func (q *TaskQueueOLD) addAfter(id string, newTask task.Task) {
 }
 
 // AddBefore inserts a task before the task with specified id.
-func (q *TaskQueueOLD) AddBefore(id string, newTask task.Task) {
+func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddBefore")()
 	q.withLock(func() {
 		q.addBefore(id, newTask)
@@ -502,7 +341,7 @@ func (q *TaskQueueOLD) AddBefore(id string, newTask task.Task) {
 }
 
 // addBefore inserts a task before the task with specified id.
-func (q *TaskQueueOLD) addBefore(id string, newTask task.Task) {
+func (q *TaskQueue) addBefore(id string, newTask task.Task) {
 	newItems := make([]task.Task, len(q.items)+1)
 
 	idFound := false
@@ -528,7 +367,7 @@ func (q *TaskQueueOLD) addBefore(id string, newTask task.Task) {
 }
 
 // Remove finds element by id and deletes it.
-func (q *TaskQueueOLD) Remove(id string) task.Task {
+func (q *TaskQueue) Remove(id string) task.Task {
 	defer q.MeasureActionTime("Remove")()
 	var t task.Task
 
@@ -539,7 +378,7 @@ func (q *TaskQueueOLD) Remove(id string) task.Task {
 	return t
 }
 
-func (q *TaskQueueOLD) remove(id string) task.Task {
+func (q *TaskQueue) remove(id string) task.Task {
 	delId := -1
 	for i, item := range q.items {
 		if item.GetId() == id {
@@ -557,24 +396,24 @@ func (q *TaskQueueOLD) remove(id string) task.Task {
 	return t
 }
 
-func (q *TaskQueueOLD) SetDebug(debug bool) {
+func (q *TaskQueue) SetDebug(debug bool) {
 	q.debug = debug
 }
 
-func (q *TaskQueueOLD) debugf(format string, args ...interface{}) {
+func (q *TaskQueue) debugf(format string, args ...interface{}) {
 	if !q.debug {
 		return
 	}
 	log.Debug("DEBUG", fmt.Sprintf(format, args...))
 }
 
-func (q *TaskQueueOLD) Stop() {
+func (q *TaskQueue) Stop() {
 	if q.cancel != nil {
 		q.cancel()
 	}
 }
 
-func (q *TaskQueueOLD) Start(ctx context.Context) {
+func (q *TaskQueue) Start(ctx context.Context) {
 	if q.started {
 		return
 	}
@@ -590,7 +429,6 @@ func (q *TaskQueueOLD) Start(ctx context.Context) {
 		var sleepDelay time.Duration
 		for {
 			q.debugf("queue %s: wait for task, delay %d", q.Name, sleepDelay)
-
 			t := q.waitForTask(sleepDelay)
 			if t == nil {
 				q.SetStatus("stop")
@@ -598,20 +436,11 @@ func (q *TaskQueueOLD) Start(ctx context.Context) {
 				return
 			}
 
-			log.Info(
-				"Starting task",
-				slog.String("task", t.GetDescription()),
-				slog.Int("queue_length", q.Length()),
-				slog.String("queue_name", q.Name),
-			)
-
-			// set that current task is being processed, so we don't merge it with other tasks
-			t.SetProcessing(true)
-
 			// dump task and a whole queue
 			q.debugf("queue %s: tasks after wait %s", q.Name, q.String())
 			q.debugf("queue %s: task to handle '%s'", q.Name, t.GetType())
 
+			// Now the task can be handled!
 			var nextSleepDelay time.Duration
 			q.SetStatus("run first task")
 			taskRes := q.Handler(ctx, t)
@@ -627,7 +456,6 @@ func (q *TaskQueueOLD) Start(ctx context.Context) {
 
 			switch taskRes.Status {
 			case Fail:
-				t.SetProcessing(false)
 				// Exponential backoff delay before retry.
 				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
 				t.IncrementFailureCount()
@@ -642,8 +470,6 @@ func (q *TaskQueueOLD) Start(ctx context.Context) {
 					if taskRes.Status == Success {
 						q.remove(t.GetId())
 					}
-
-					t.SetProcessing(false)
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
 					// become the new first task in the queue.
@@ -659,7 +485,6 @@ func (q *TaskQueueOLD) Start(ctx context.Context) {
 			case Repeat:
 				// repeat a current task after a small delay
 				nextSleepDelay = q.DelayOnRepeat
-				t.SetProcessing(false)
 				q.SetStatus("repeat head task")
 			}
 
@@ -683,7 +508,7 @@ func (q *TaskQueueOLD) Start(ctx context.Context) {
 // waitForTask returns a task that can be processed or a nil if context is canceled.
 // sleepDelay is used to sleep before check a task, e.g. in case of failed previous task.
 // If queue is empty, then it will be checked every DelayOnQueueIsEmpty.
-func (q *TaskQueueOLD) waitForTask(sleepDelay time.Duration) task.Task {
+func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	// Check Done channel.
 	select {
 	case <-q.ctx.Done():
@@ -769,7 +594,7 @@ func (q *TaskQueueOLD) waitForTask(sleepDelay time.Duration) task.Task {
 }
 
 // CancelTaskDelay breaks wait loop. Useful to break the possible long sleep delay.
-func (q *TaskQueueOLD) CancelTaskDelay() {
+func (q *TaskQueue) CancelTaskDelay() {
 	q.waitMu.Lock()
 	if q.waitInProgress {
 		q.cancelDelay = true
@@ -778,7 +603,7 @@ func (q *TaskQueueOLD) CancelTaskDelay() {
 }
 
 // Iterate run doFn for every task.
-func (q *TaskQueueOLD) Iterate(doFn func(task.Task)) {
+func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 	if doFn == nil {
 		return
 	}
@@ -793,7 +618,7 @@ func (q *TaskQueueOLD) Iterate(doFn func(task.Task)) {
 }
 
 // Filter run filterFn on every task and remove each with false result.
-func (q *TaskQueueOLD) Filter(filterFn func(task.Task) bool) {
+func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 	if filterFn == nil {
 		return
 	}
@@ -814,7 +639,7 @@ func (q *TaskQueueOLD) Filter(filterFn func(task.Task) bool) {
 // TODO define mapping method with QueueAction to insert, modify and delete tasks.
 
 // Dump tasks in queue to one line
-func (q *TaskQueueOLD) String() string {
+func (q *TaskQueue) String() string {
 	var buf strings.Builder
 	var index int
 	qLen := q.Length()
@@ -830,25 +655,14 @@ func (q *TaskQueueOLD) String() string {
 	return buf.String()
 }
 
-func (q *TaskQueueOLD) withLock(fn func()) {
+func (q *TaskQueue) withLock(fn func()) {
 	q.m.Lock()
 	fn()
 	q.m.Unlock()
 }
 
-func (q *TaskQueueOLD) withRLock(fn func()) {
+func (q *TaskQueue) withRLock(fn func()) {
 	q.m.RLock()
 	fn()
 	q.m.RUnlock()
-}
-
-func isNil(i interface{}) bool {
-	if i == nil {
-		return true
-	}
-	switch reflect.TypeOf(i).Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Array, reflect.Chan, reflect.Slice:
-		return reflect.ValueOf(i).IsNil()
-	}
-	return false
 }
