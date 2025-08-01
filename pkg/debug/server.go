@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"gopkg.in/yaml.v3"
 
+	utils "github.com/flant/shell-operator/pkg/utils/file"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
@@ -44,37 +47,37 @@ func NewServer(prefix, socketPath, httpAddr string, logger *log.Logger) *Server 
 }
 
 func (s *Server) Init() error {
-	// address := s.SocketPath
+	address := s.SocketPath
 
-	// if err := os.MkdirAll(path.Dir(address), 0o700); err != nil {
-	// 	return fmt.Errorf("Debug HTTP server fail to create socket '%s': %w", address, err)
-	// }
+	if err := os.MkdirAll(path.Dir(address), 0o700); err != nil {
+		return fmt.Errorf("Debug HTTP server fail to create socket '%s': %w", address, err)
+	}
 
-	// exists, err := utils.FileExists(address)
-	// if err != nil {
-	// 	return fmt.Errorf("Debug HTTP server fail to check socket '%s': %w", address, err)
-	// }
+	exists, err := utils.FileExists(address)
+	if err != nil {
+		return fmt.Errorf("Debug HTTP server fail to check socket '%s': %w", address, err)
+	}
 
-	// if exists {
-	// 	if err := os.Remove(address); err != nil {
-	// 		return fmt.Errorf("Debug HTTP server fail to check socket '%s': %w", address, err)
-	// 	}
-	// }
+	if exists {
+		if err := os.Remove(address); err != nil {
+			return fmt.Errorf("Debug HTTP server fail to check socket '%s': %w", address, err)
+		}
+	}
 
-	// // Check if socket is available
-	// listener, err := net.Listen("unix", address)
-	// if err != nil {
-	// 	return fmt.Errorf("Debug HTTP server fail to listen on '%s': %w", address, err)
-	// }
+	// Check if socket is available
+	listener, err := net.Listen("unix", address)
+	if err != nil {
+		return fmt.Errorf("Debug HTTP server fail to listen on '%s': %w", address, err)
+	}
 
-	// s.logger.Info("Debug endpoint listen on address", slog.String("address", address))
+	s.logger.Info("Debug endpoint listen on address", slog.String("address", address))
 
-	// go func() {
-	// 	if err := http.Serve(listener, s.Router); err != nil {
-	// 		s.logger.Error("Error starting Debug socket server", log.Err(err))
-	// 		os.Exit(1)
-	// 	}
-	// }()
+	go func() {
+		if err := http.Serve(listener, s.Router); err != nil {
+			s.logger.Error("Error starting Debug socket server", log.Err(err))
+			os.Exit(1)
+		}
+	}()
 
 	if s.HttpAddr != "" {
 		go func() {
