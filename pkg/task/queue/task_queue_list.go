@@ -320,14 +320,14 @@ func (q *TaskQueue) addLast(t task.Task) {
 	element := q.items.PushBack(t)
 	q.idIndex[t.GetId()] = element
 
-	taskType := t.GetType()
-	if _, ok := q.taskTypesToMerge[taskType]; ok {
-		q.isDirty = true
-		// Only trigger compaction if queue is getting long and we have mergeable tasks
-		if q.items.Len() > 100 && q.isDirty {
-			q.performGlobalCompaction()
-		}
-	}
+	// taskType := t.GetType()
+	// if _, ok := q.taskTypesToMerge[taskType]; ok {
+	// 	q.isDirty = true
+	// 	// Only trigger compaction if queue is getting long and we have mergeable tasks
+	// 	if q.items.Len() > 100 && q.isDirty {
+	// 		q.performGlobalCompaction()
+	// 	}
+	// }
 }
 
 // performGlobalCompaction merges HookRun tasks for the same hook.
@@ -630,20 +630,21 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				return
 			}
 
-			func() {
-				q.m.Lock()
-				defer q.m.Unlock()
+			// func() {
+			// 	q.m.Lock()
+			// 	defer q.m.Unlock()
 
-				if q.isDirty {
-					q.performGlobalCompaction()
-					q.isDirty = false
-				}
-			}()
+			// 	// Temporarily disable compaction to match old implementation behavior
+			// 	// if q.isDirty {
+			// 	// 	q.performGlobalCompaction()
+			// 	// 	q.isDirty = false
+			// 	// }
+			// }()
 
 			fmt.Printf("[TRACE-QUEUE] Starting task %s of type %s, queue length %d, queue name %s\n", t.GetId(), t.GetType(), q.Length(), q.Name)
 
 			// set that current task is being processed, so we don't merge it with other tasks
-			t.SetProcessing(true)
+			// t.SetProcessing(true)
 
 			// dump task and a whole queue
 			q.debugf("queue %s: tasks after wait %s", q.Name, q.String())
@@ -668,7 +669,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			switch taskRes.Status {
 			case Fail:
 				fmt.Printf("[TRACE-QUEUE] Task %s of type %s failed, setting processing=false, failure count: %d\n", t.GetId(), t.GetType(), t.GetFailureCount())
-				t.SetProcessing(false)
+				// t.SetProcessing(false)
 				// Exponential backoff delay before retry.
 				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
 				t.IncrementFailureCount()
@@ -690,7 +691,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					} else {
 						fmt.Printf("[TRACE-QUEUE] Keeping task %s of type %s in queue (Keep)\n", t.GetId(), t.GetType())
 					}
-					t.SetProcessing(false) // release processing flag
+					// t.SetProcessing(false) // release processing flag
 
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
@@ -710,8 +711,8 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			case Repeat:
 				fmt.Printf("[TRACE-QUEUE] Task %s of type %s will repeat after delay\n", t.GetId(), t.GetType())
 				// repeat a current task after a small delay
+				// t.SetProcessing(false)
 				nextSleepDelay = q.DelayOnRepeat
-				t.SetProcessing(false)
 				q.SetStatus("repeat head task")
 			}
 
