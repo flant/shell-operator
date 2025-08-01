@@ -749,7 +749,6 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 
 	// Shortcut: return the first task if the queue is not empty and delay is not required.
 	if !q.IsEmpty() && sleepDelay == 0 {
-		fmt.Printf("[TRACE-QUEUE] waitForTask: shortcut - returning first task immediately (sleepDelay=0)\n")
 		return q.GetFirst()
 	}
 
@@ -759,7 +758,6 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	if sleepDelay != 0 {
 		waitUntil = sleepDelay
 	}
-	fmt.Printf("[TRACE-QUEUE] waitForTask: starting wait, sleepDelay=%s, waitUntil=%s\n", sleepDelay.String(), waitUntil.String())
 
 	checkTicker := time.NewTicker(q.WaitLoopCheckInterval)
 	q.waitMu.Lock()
@@ -786,7 +784,6 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 		select {
 		case <-q.ctx.Done():
 			// Queue is stopped.
-			fmt.Printf("[TRACE-QUEUE] waitForTask: context done, returning nil\n")
 			return nil
 		case <-checkTicker.C:
 			// Check and update waitUntil.
@@ -796,7 +793,6 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			if q.cancelDelay {
 				// Reset waitUntil to check task immediately.
 				waitUntil = elapsed
-				fmt.Printf("[TRACE-QUEUE] waitForTask: delay canceled, resetting waitUntil to %s\n", waitUntil.String())
 			}
 			q.waitMu.Unlock()
 
@@ -804,7 +800,6 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			if elapsed >= waitUntil {
 				// Increase waitUntil to wait on the next iteration and go check for the head task.
 				checkTask = true
-				fmt.Printf("[TRACE-QUEUE] waitForTask: elapsed (%s) >= waitUntil (%s), checking for task\n", elapsed.String(), waitUntil.String())
 			}
 		}
 
@@ -813,9 +808,7 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			if q.IsEmpty() {
 				// No task to return: increase wait time.
 				waitUntil += q.DelayOnQueueIsEmpty
-				fmt.Printf("[TRACE-QUEUE] waitForTask: queue empty, increasing waitUntil to %s\n", waitUntil.String())
 			} else {
-				fmt.Printf("[TRACE-QUEUE] waitForTask: returning first task after delay\n")
 				return q.GetFirst()
 			}
 		}
