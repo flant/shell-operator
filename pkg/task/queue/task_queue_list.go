@@ -31,6 +31,50 @@ config parameter.
 This implementation uses container/list for O(1) queue operations and a map for O(1) task lookup by ID.
 */
 
+// Global object pools for reducing allocations
+var (
+	compactionGroupPool = sync.Pool{
+		New: func() interface{} {
+			return &compactionGroup{
+				elementsToMerge: make([]*list.Element, 0, 8),
+			}
+		},
+	}
+
+	contextSlicePool = sync.Pool{
+		New: func() interface{} {
+			return make([]bindingcontext.BindingContext, 0, 64)
+		},
+	}
+
+	monitorIDSlicePool = sync.Pool{
+		New: func() interface{} {
+			return make([]string, 0, 64)
+		},
+	}
+
+	hookGroupsMapPool = sync.Pool{
+		New: func() interface{} {
+			return make(map[string]*compactionGroup, 32)
+		},
+	}
+)
+
+type compactionGroup struct {
+	targetElement   *list.Element
+	elementsToMerge []*list.Element
+	totalContexts   int
+	totalMonitorIDs int
+}
+
+// reset resets the compaction group for reuse
+func (cg *compactionGroup) reset() {
+	cg.targetElement = nil
+	cg.elementsToMerge = cg.elementsToMerge[:0] // Reuse slice
+	cg.totalContexts = 0
+	cg.totalMonitorIDs = 0
+}
+
 type TaskQueue struct {
 	m             sync.RWMutex
 	metricStorage metric.Storage
@@ -65,6 +109,11 @@ type TaskQueue struct {
 	DelayOnQueueIsEmpty   time.Duration
 	DelayOnRepeat         time.Duration
 	ExponentialBackoffFn  func(failureCount int) time.Duration
+
+	// Pre-allocated buffers for compaction
+	contextBuffer   []bindingcontext.BindingContext
+	monitorIDBuffer []string
+	groupBuffer     map[string]*compactionGroup
 }
 
 func NewTasksQueue() *TaskQueue {
@@ -78,7 +127,51 @@ func NewTasksQueue() *TaskQueue {
 		ExponentialBackoffFn: func(failureCount int) time.Duration {
 			return exponential_backoff.CalculateDelay(DefaultInitialDelayOnFailedTask, failureCount)
 		},
+		// Pre-allocate buffers
+		contextBuffer:   make([]bindingcontext.BindingContext, 0, 128),
+		monitorIDBuffer: make([]string, 0, 128),
+		groupBuffer:     make(map[string]*compactionGroup, 32),
 	}
+}
+
+// Pool management methods
+func (q *TaskQueue) getCompactionGroup() *compactionGroup {
+	return compactionGroupPool.Get().(*compactionGroup)
+}
+
+func (q *TaskQueue) putCompactionGroup(cg *compactionGroup) {
+	cg.reset()
+	compactionGroupPool.Put(cg)
+}
+
+func (q *TaskQueue) getContextSlice() []bindingcontext.BindingContext {
+	return contextSlicePool.Get().([]bindingcontext.BindingContext)
+}
+
+func (q *TaskQueue) putContextSlice(slice []bindingcontext.BindingContext) {
+	slice = slice[:0] // Reset slice
+	contextSlicePool.Put(slice)
+}
+
+func (q *TaskQueue) getMonitorIDSlice() []string {
+	return monitorIDSlicePool.Get().([]string)
+}
+
+func (q *TaskQueue) putMonitorIDSlice(slice []string) {
+	slice = slice[:0] // Reset slice
+	monitorIDSlicePool.Put(slice)
+}
+
+func (q *TaskQueue) getHookGroupsMap() map[string]*compactionGroup {
+	return hookGroupsMapPool.Get().(map[string]*compactionGroup)
+}
+
+func (q *TaskQueue) putHookGroupsMap(m map[string]*compactionGroup) {
+	// Clear the map
+	for k := range m {
+		delete(m, k)
+	}
+	hookGroupsMapPool.Put(m)
 }
 
 func (q *TaskQueue) WithContext(ctx context.Context) {
@@ -160,7 +253,7 @@ func (q *TaskQueue) Length() int {
 
 // AddFirst adds new head element.
 func (q *TaskQueue) AddFirst(t task.Task) {
-	fmt.Printf("[TRACE-QUEUE] ADDING FIRST: Adding task %s of type %s to queue '%s'\n", t.GetId(), t.GetType(), q.Name)
+	// fmt.Printf("[TRACE-QUEUE] ADDING FIRST: Adding task %s of type %s to queue '%s'\n", t.GetId(), t.GetType(), q.Name)
 	defer q.MeasureActionTime("AddFirst")()
 	q.withLock(func() {
 		q.addFirst(t)
@@ -210,7 +303,7 @@ func (q *TaskQueue) GetFirst() task.Task {
 
 // AddLast adds new tail element.
 func (q *TaskQueue) AddLast(t task.Task) {
-	fmt.Printf("[TRACE-QUEUE] ADDING LAST: Adding task %s of type %s to queue '%s'\n", t.GetId(), t.GetType(), q.Name)
+	// fmt.Printf("[TRACE-QUEUE] ADDING LAST: Adding task %s of type %s to queue '%s'\n", t.GetId(), t.GetType(), q.Name)
 	defer q.MeasureActionTime("AddLast")()
 	q.withLock(func() {
 		q.addLast(t)
@@ -224,33 +317,39 @@ func (q *TaskQueue) addLast(t task.Task) {
 	// When any task is added, perform a full queue compaction for ALL hooks.
 	// This ensures the queue is always in the most compact state possible.
 
-	// DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
 	element := q.items.PushBack(t)
 	q.idIndex[t.GetId()] = element
 
-	if _, ok := q.taskTypesToMerge[t.GetType()]; ok {
+	taskType := t.GetType()
+	if _, ok := q.taskTypesToMerge[taskType]; ok {
 		q.isDirty = true
+		// Only trigger compaction if queue is getting long and we have mergeable tasks
+		if q.items.Len() > 100 && q.isDirty {
+			q.performGlobalCompaction()
+		}
 	}
-
 }
 
 // performGlobalCompaction merges HookRun tasks for the same hook.
 // It iterates through the list once, making it an O(N) operation.
+// DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
 func (q *TaskQueue) performGlobalCompaction() {
+	fmt.Printf("[TRACE-QUEUE] Performing global compaction for queue '%s'\n", q.Name)
 	if q.items.Len() < 2 {
 		return
 	}
-	fmt.Printf("[TRACE-QUEUE] Performing global compaction for queue '%s'\n", q.Name)
-
-	type compactionGroup struct {
-		targetElement   *list.Element
-		elementsToMerge []*list.Element
-		totalContexts   int
-		totalMonitorIDs int
-	}
-
-	hookGroups := make(map[string]*compactionGroup)
+	before := q.items.Len()
 	var compactedCount int
+
+	// Get objects from pools
+	hookGroups := q.getHookGroupsMap()
+	defer func() {
+		// Return all compaction groups to pool
+		for _, group := range hookGroups {
+			q.putCompactionGroup(group)
+		}
+		q.putHookGroupsMap(hookGroups)
+	}()
 
 	// First pass: identify groups and calculate sizes
 	for e := q.items.Front(); e != nil; e = e.Next() {
@@ -258,7 +357,6 @@ func (q *TaskQueue) performGlobalCompaction() {
 		taskType := t.GetType()
 
 		if _, ok := q.taskTypesToMerge[taskType]; !ok {
-			fmt.Printf("[TRACE-QUEUE] Skipping task %s of type %s because it is not in the list of task types to merge\n", t.GetId(), t.GetType())
 			continue
 		}
 
@@ -267,7 +365,6 @@ func (q *TaskQueue) performGlobalCompaction() {
 			continue
 		}
 
-		fmt.Printf("[TRACE-QUEUE] Adding task %s of type %s to compaction group\n", t.GetId(), t.GetType())
 		hookName := metadata.(task_metadata.HookNameAccessor).GetHookName()
 		bindingContext := metadata.(task_metadata.BindingContextAccessor).GetBindingContext()
 		monitorIDs := metadata.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
@@ -278,94 +375,99 @@ func (q *TaskQueue) performGlobalCompaction() {
 			group.totalContexts += len(bindingContext)
 			group.totalMonitorIDs += len(monitorIDs)
 		} else {
-			// Create a new group
-			hookGroups[hookName] = &compactionGroup{
-				targetElement:   e,
-				elementsToMerge: []*list.Element{},
-				totalContexts:   len(bindingContext),
-				totalMonitorIDs: len(monitorIDs),
-			}
+			// Get new group from pool
+			group := q.getCompactionGroup()
+			group.targetElement = e
+			group.totalContexts = len(bindingContext)
+			group.totalMonitorIDs = len(monitorIDs)
+			hookGroups[hookName] = group
 		}
 	}
 
-	// Second pass: merge with pre-allocated slices
-	for hookName, group := range hookGroups {
+	// Second pass: merge with pooled slices
+	for _, group := range hookGroups {
 		if len(group.elementsToMerge) == 0 {
 			continue
 		}
 
 		targetTask := group.targetElement.Value.(task.Task)
-		targethookmetadata := targetTask.GetMetadata()
+		targetMetadata := targetTask.GetMetadata()
 
-		// Pre-allocate new slices with the final calculated size
-		newContexts := make([]bindingcontext.BindingContext, 0, group.totalContexts)
-		newMonitorIDs := make([]string, 0, group.totalMonitorIDs)
+		// Get slices from pools
+		newContexts := q.getContextSlice()
+		newMonitorIDs := q.getMonitorIDSlice()
+
+		// Ensure capacity
+		if cap(newContexts) < group.totalContexts {
+			newContexts = make([]bindingcontext.BindingContext, 0, group.totalContexts)
+		}
+		if cap(newMonitorIDs) < group.totalMonitorIDs {
+			newMonitorIDs = make([]string, 0, group.totalMonitorIDs)
+		}
 
 		// Add target's contexts first
-		newContexts = append(newContexts, targethookmetadata.(task_metadata.BindingContextAccessor).GetBindingContext()...)
-		newMonitorIDs = append(newMonitorIDs, targethookmetadata.(task_metadata.MonitorIDAccessor).GetMonitorIDs()...)
+		newContexts = append(newContexts, targetMetadata.(task_metadata.BindingContextAccessor).GetBindingContext()...)
+		newMonitorIDs = append(newMonitorIDs, targetMetadata.(task_metadata.MonitorIDAccessor).GetMonitorIDs()...)
 
 		// Append contexts from other tasks and remove them
 		for _, elementToMerge := range group.elementsToMerge {
 			taskToMerge := elementToMerge.Value.(task.Task)
-			hookmetadatatomerge := taskToMerge.GetMetadata()
+			mergeMetadata := taskToMerge.GetMetadata()
 
-			newContexts = append(newContexts, hookmetadatatomerge.(task_metadata.BindingContextAccessor).GetBindingContext()...)
-			newMonitorIDs = append(newMonitorIDs, hookmetadatatomerge.(task_metadata.MonitorIDAccessor).GetMonitorIDs()...)
-
-			fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
-				taskToMerge.GetId(), hookName, targetTask.GetId())
+			newContexts = append(newContexts, mergeMetadata.(task_metadata.BindingContextAccessor).GetBindingContext()...)
+			newMonitorIDs = append(newMonitorIDs, mergeMetadata.(task_metadata.MonitorIDAccessor).GetMonitorIDs()...)
 
 			q.items.Remove(elementToMerge)
 			delete(q.idIndex, taskToMerge.GetId())
 			compactedCount++
 		}
 
-		// Update target task with new, perfectly sized slices
-		compactedContexts := compactBindingContexts(newContexts)
-		withContext := targethookmetadata.(task_metadata.BindingContextSetter).SetBindingContext(compactedContexts)
+		// Update target task with compacted slices
+		compactedContexts := compactBindingContextsOptimized(newContexts)
+		withContext := targetMetadata.(task_metadata.BindingContextSetter).SetBindingContext(compactedContexts)
 		withContext = withContext.(task_metadata.MonitorIDSetter).SetMonitorIDs(newMonitorIDs)
 		targetTask.UpdateMetadata(withContext)
-	}
 
-	if compactedCount > 0 {
-		fmt.Printf("[TRACE-QUEUE] Global compaction complete: merged %d tasks\n", compactedCount)
+		// Return slices to pools
+		q.putContextSlice(newContexts)
+		q.putMonitorIDSlice(newMonitorIDs)
 	}
+	fmt.Printf("[TRACE-QUEUE] Global compaction for queue '%s' completed, compacted %d tasks, before: %d, after: %d\n", q.Name, compactedCount, before, q.items.Len())
 }
 
 // compactBindingContexts mimics the logic from shell-operator's CombineBindingContextForHook.
 // It removes intermediate states for the same group, keeping only the most recent one.
-func compactBindingContexts(combinedContext []bindingcontext.BindingContext) []bindingcontext.BindingContext {
+func compactBindingContextsOptimized(combinedContext []bindingcontext.BindingContext) []bindingcontext.BindingContext {
 	if len(combinedContext) < 2 {
 		return combinedContext
 	}
 
-	compactedContext := make([]bindingcontext.BindingContext, 0, len(combinedContext))
+	// Use the same slice to avoid allocation
+	writeIndex := 0
+	prevGroup := ""
+
 	for i := 0; i < len(combinedContext); i++ {
-		keep := true
 		current := combinedContext[i]
-		fmt.Printf("[GROUP] %s\n", current.Metadata.Group)
-		// Binding context is ignored if the next binding context has a similar group.
-		if groupName := current.Metadata.Group; groupName != "" {
-			if i+1 < len(combinedContext) {
-				next := combinedContext[i+1]
-				if next.Metadata.Group == groupName {
-					keep = false
-				}
-			}
+		currentGroup := current.Metadata.Group
+
+		// Fast path: empty group always kept
+		if currentGroup == "" {
+			combinedContext[writeIndex] = current
+			writeIndex++
+			prevGroup = ""
+			continue
 		}
 
-		if keep {
-			compactedContext = append(compactedContext, current)
+		// Fast path: different group always kept
+		if currentGroup != prevGroup {
+			combinedContext[writeIndex] = current
+			writeIndex++
+			prevGroup = currentGroup
 		}
+		// Same group as previous - skip (keep = false)
 	}
 
-	// Describe what was done.
-	if len(compactedContext) < len(combinedContext) {
-		fmt.Printf("[TRACE-QUEUE] Compacted binding contexts from %d to %d\n", len(combinedContext), len(compactedContext))
-	}
-
-	return compactedContext
+	return combinedContext[:writeIndex]
 }
 
 // RemoveLast deletes a tail element, so tail is moved.

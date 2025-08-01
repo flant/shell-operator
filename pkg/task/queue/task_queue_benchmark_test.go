@@ -60,10 +60,9 @@ func (t *mockTaskBench) SetProp(key string, value interface{})     {}
 func (t *mockTaskBench) GetQueuedAt() time.Time                    { return time.Now() }
 func (t *mockTaskBench) WithQueuedAt(queuedAt time.Time) task.Task { return t }
 
-// --- Benchmarks for TaskQueue (slice-based) ---
-
 func benchmarkTaskQueueAddLast(b *testing.B, size int) {
-	q := NewTasksQueueOLD()
+	q := NewTasksQueue()
+	q.WithTaskTypesToMerge([]task.TaskType{task_metadata.HookRun})
 	for i := 0; i < size; i++ {
 		q.AddLast(newBenchmarkTask(i, true))
 	}
@@ -74,7 +73,8 @@ func benchmarkTaskQueueAddLast(b *testing.B, size int) {
 }
 
 func benchmarkTaskQueueAddFirst(b *testing.B, size int) {
-	q := NewTasksQueueOLD()
+	q := NewTasksQueue()
+	q.WithTaskTypesToMerge([]task.TaskType{task_metadata.HookRun})
 	for i := 0; i < size; i++ {
 		q.AddLast(newBenchmarkTask(i, true))
 	}
@@ -86,7 +86,8 @@ func benchmarkTaskQueueAddFirst(b *testing.B, size int) {
 
 func benchmarkTaskQueueRemoveFirst(b *testing.B, size int) {
 	b.StopTimer()
-	q := NewTasksQueueOLD()
+	q := NewTasksQueue()
+	q.WithTaskTypesToMerge([]task.TaskType{task_metadata.HookRun})
 	for i := 0; i < size; i++ {
 		q.AddLast(newBenchmarkTask(i, false))
 	}
@@ -103,64 +104,12 @@ func benchmarkTaskQueueRemoveFirst(b *testing.B, size int) {
 	}
 }
 
-func BenchmarkTaskQueue_AddLast_100(b *testing.B)      { benchmarkTaskQueueAddLast(b, 100) }
-func BenchmarkTaskQueue_AddLast_1000(b *testing.B)     { benchmarkTaskQueueAddLast(b, 1000) }
-func BenchmarkTaskQueue_AddFirst_100(b *testing.B)     { benchmarkTaskQueueAddFirst(b, 100) }
-func BenchmarkTaskQueue_AddFirst_1000(b *testing.B)    { benchmarkTaskQueueAddFirst(b, 1000) }
-func BenchmarkTaskQueue_RemoveFirst_100(b *testing.B)  { benchmarkTaskQueueRemoveFirst(b, 100) }
-func BenchmarkTaskQueue_RemoveFirst_1000(b *testing.B) { benchmarkTaskQueueRemoveFirst(b, 1000) }
-
-// --- Benchmarks for TaskQueueList (list-based) ---
-
-func benchmarkTaskQueueListAddLast(b *testing.B, size int) {
-	q := NewTasksQueue()
-	for i := 0; i < size; i++ {
-		q.AddLast(newBenchmarkTask(i, true))
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		q.AddLast(newBenchmarkTask(size+i, true))
-	}
-}
-
-func benchmarkTaskQueueListAddFirst(b *testing.B, size int) {
-	q := NewTasksQueue()
-	for i := 0; i < size; i++ {
-		q.AddLast(newBenchmarkTask(i, true))
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		q.AddFirst(newBenchmarkTask(size+i, true))
-	}
-}
-
-func benchmarkTaskQueueListRemoveFirst(b *testing.B, size int) {
-	b.StopTimer()
-	q := NewTasksQueue()
-	for i := 0; i < size; i++ {
-		q.AddLast(newBenchmarkTask(i, false))
-	}
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		if q.Length() == 0 {
-			b.StopTimer()
-			for j := 0; j < size; j++ {
-				q.AddLast(newBenchmarkTask(j, false))
-			}
-			b.StartTimer()
-		}
-		q.RemoveFirst()
-	}
-}
-
-func BenchmarkTaskQueueList_AddLast_100(b *testing.B)     { benchmarkTaskQueueListAddLast(b, 100) }
-func BenchmarkTaskQueueList_AddLast_1000(b *testing.B)    { benchmarkTaskQueueListAddLast(b, 1000) }
-func BenchmarkTaskQueueList_AddFirst_100(b *testing.B)    { benchmarkTaskQueueListAddFirst(b, 100) }
-func BenchmarkTaskQueueList_AddFirst_1000(b *testing.B)   { benchmarkTaskQueueListAddFirst(b, 1000) }
-func BenchmarkTaskQueueList_RemoveFirst_100(b *testing.B) { benchmarkTaskQueueListRemoveFirst(b, 100) }
-func BenchmarkTaskQueueList_RemoveFirst_1000(b *testing.B) {
-	benchmarkTaskQueueListRemoveFirst(b, 1000)
-}
+// func BenchmarkTaskQueue_AddLast_100(b *testing.B)  { benchmarkTaskQueueAddLast(b, 100) }
+// func BenchmarkTaskQueue_AddLast_1000(b *testing.B) { benchmarkTaskQueueAddLast(b, 1000) }
+// func BenchmarkTaskQueue_AddFirst_100(b *testing.B) { benchmarkTaskQueueAddFirst(b, 100) }
+// func BenchmarkTaskQueue_AddFirst_1000(b *testing.B) {
+// 	benchmarkTaskQueueAddFirst(b, 1000)
+// }
 
 // --- Compaction Benchmarks ---
 
@@ -202,40 +151,32 @@ func createCompactionBenchmarkData(b *testing.B, size int) []task.Task {
 	return tasks
 }
 
-// Benchmark for original TaskQueue (slice-based) compaction
 func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		q := NewTasksQueueOLD()
-		tasks := createCompactionBenchmarkData(b, size)
-		q.items = tasks // Directly set items to avoid compaction during setup
-		triggerTask := newCompactionHookTask(size, "hook-a")
-		b.StartTimer()
-		q.addLast(triggerTask) // This triggers performGlobalCompaction
-	}
-}
-
-func BenchmarkTaskQueue_Compaction_100(b *testing.B)  { benchmarkTaskQueueCompaction(b, 100) }
-func BenchmarkTaskQueue_Compaction_500(b *testing.B)  { benchmarkTaskQueueCompaction(b, 500) }
-func BenchmarkTaskQueue_Compaction_1000(b *testing.B) { benchmarkTaskQueueCompaction(b, 1000) }
-
-// Benchmark for new TaskQueueList (list-based) compaction
-func benchmarkTaskQueueListCompaction(b *testing.B, size int) {
-	for i := 0; i < b.N; i++ {
-		b.StopTimer()
 		q := NewTasksQueue()
+		q.WithTaskTypesToMerge([]task.TaskType{task_metadata.HookRun})
 		tasks := createCompactionBenchmarkData(b, size)
 		// Setup queue without triggering compaction
 		for _, t := range tasks {
-			element := q.items.PushBack(t)
-			q.idIndex[t.GetId()] = element
+			q.items.PushBack(t)
 		}
-		triggerTask := newCompactionHookTask(size, "hook-a")
+		// triggerTask := newCompactionHookTask(size, "hook-a")
 		b.StartTimer()
-		q.addLast(triggerTask) // This triggers performGlobalCompaction
+		q.performGlobalCompaction() // This triggers performGlobalCompaction
 	}
 }
 
-func BenchmarkTaskQueueList_Compaction_100(b *testing.B)  { benchmarkTaskQueueListCompaction(b, 100) }
-func BenchmarkTaskQueueList_Compaction_500(b *testing.B)  { benchmarkTaskQueueListCompaction(b, 500) }
-func BenchmarkTaskQueueList_Compaction_1000(b *testing.B) { benchmarkTaskQueueListCompaction(b, 1000) }
+func BenchmarkTaskQueue_Compaction_10(b *testing.B) {
+	benchmarkTaskQueueCompaction(b, 10)
+}
+
+func BenchmarkTaskQueue_Compaction_100(b *testing.B) {
+	benchmarkTaskQueueCompaction(b, 100)
+}
+func BenchmarkTaskQueue_Compaction_500(b *testing.B) {
+	benchmarkTaskQueueCompaction(b, 500)
+}
+func BenchmarkTaskQueue_Compaction_1000(b *testing.B) {
+	benchmarkTaskQueueCompaction(b, 1000)
+}
