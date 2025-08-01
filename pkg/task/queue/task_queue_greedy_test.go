@@ -253,10 +253,6 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 					expectedCount, found := tt.expectedBCs[mt.GetId()]
 					require.True(t, found, "Task ID %s should be in expectedBCs map", mt.GetId())
 					hm := task_metadata.HookMetadataAccessor(mt)
-					fmt.Println(hm.HookName)
-					for _, bc := range hm.BindingContext {
-						fmt.Println(bc.Binding)
-					}
 					require.NotNil(t, hm, "HookMetadataAccessor should not return nil for hook task")
 					assert.Len(t, hm.BindingContext, expectedCount, "BindingContext count for task %s should match", mt.GetId())
 				}

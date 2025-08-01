@@ -272,7 +272,13 @@ func (q *TaskQueue) performGlobalCompaction() {
 			continue
 		}
 
-		hookName := hm.(task_metadata.HookNameAccessor).GetHookName()
+		// Safety check to ensure we can access hook name
+		hookNameAccessor, ok := hm.(task_metadata.HookNameAccessor)
+		if !ok {
+			result = append(result, task) // Cannot access hook name, skip compaction
+			continue
+		}
+		hookName := hookNameAccessor.GetHookName()
 		if _, exists := hookGroups[hookName]; !exists {
 			hookOrder = append(hookOrder, hookName)
 		}
@@ -297,10 +303,29 @@ func (q *TaskQueue) performGlobalCompaction() {
 			}
 		}
 
+		// Safety check to ensure minIndex is valid
+		if minIndex < 0 || minIndex >= len(q.items) {
+			continue
+		}
+
 		targetTask := q.items[minIndex]
 		targetHm := targetTask.GetMetadata()
-		contexts := targetHm.(task_metadata.BindingContextAccessor).GetBindingContext()
-		monitorIDs := targetHm.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
+		if targetHm == nil {
+			continue
+		}
+
+		// Safety checks for type assertions
+		bindingContextAccessor, ok := targetHm.(task_metadata.BindingContextAccessor)
+		if !ok {
+			continue
+		}
+		monitorIDAccessor, ok := targetHm.(task_metadata.MonitorIDAccessor)
+		if !ok {
+			continue
+		}
+
+		contexts := bindingContextAccessor.GetBindingContext()
+		monitorIDs := monitorIDAccessor.GetMonitorIDs()
 		// Предварительно вычисляем общий размер
 		totalContexts := len(contexts)
 		totalMonitorIDs := len(monitorIDs)
@@ -309,18 +334,43 @@ func (q *TaskQueue) performGlobalCompaction() {
 			if idx == minIndex {
 				continue // Пропускаем целевую задачу
 			}
-			existingHm := task_metadata.HookMetadataAccessor(q.items[idx])
-			totalContexts += len(existingHm.BindingContext)
-			totalMonitorIDs += len(existingHm.MonitorIDs)
+			existingHm := q.items[idx].GetMetadata()
+			if existingHm != nil {
+				if bindingContextAccessor, ok := existingHm.(task_metadata.BindingContextAccessor); ok {
+					totalContexts += len(bindingContextAccessor.GetBindingContext())
+				}
+				if monitorIDAccessor, ok := existingHm.(task_metadata.MonitorIDAccessor); ok {
+					totalMonitorIDs += len(monitorIDAccessor.GetMonitorIDs())
+				}
+			}
 		}
 
 		// Создаем новые слайсы с правильным размером
+		// Safety check to ensure we don't create negative-sized slices
+		if totalContexts < 0 {
+			totalContexts = 0
+		}
+		if totalMonitorIDs < 0 {
+			totalMonitorIDs = 0
+		}
 		newContexts := make([]bindingcontext.BindingContext, totalContexts)
 		newMonitorIDs := make([]string, totalMonitorIDs)
 
 		// Копируем контексты целевой задачи
-		copy(newContexts, contexts)
-		copy(newMonitorIDs, monitorIDs)
+		if len(contexts) > 0 && len(newContexts) > 0 {
+			copySize := len(contexts)
+			if copySize > len(newContexts) {
+				copySize = len(newContexts)
+			}
+			copy(newContexts[:copySize], contexts[:copySize])
+		}
+		if len(monitorIDs) > 0 && len(newMonitorIDs) > 0 {
+			copySize := len(monitorIDs)
+			if copySize > len(newMonitorIDs) {
+				copySize = len(newMonitorIDs)
+			}
+			copy(newMonitorIDs[:copySize], monitorIDs[:copySize])
+		}
 
 		// Копируем контексты от остальных задач
 		contextIndex := len(contexts)
@@ -330,23 +380,70 @@ func (q *TaskQueue) performGlobalCompaction() {
 			if idx == minIndex {
 				continue
 			}
+			// Safety check to ensure idx is valid
+			if idx < 0 || idx >= len(q.items) {
+				continue
+			}
 			existingHm := q.items[idx].GetMetadata()
-			existingContexts := existingHm.(task_metadata.BindingContextAccessor).GetBindingContext()
-			existingMonitorIDs := existingHm.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
+			if existingHm == nil {
+				continue
+			}
 
-			copy(newContexts[contextIndex:], existingContexts)
+			// Safety checks for type assertions
+			bindingContextAccessor, ok := existingHm.(task_metadata.BindingContextAccessor)
+			if !ok {
+				continue
+			}
+			monitorIDAccessor, ok := existingHm.(task_metadata.MonitorIDAccessor)
+			if !ok {
+				continue
+			}
+
+			existingContexts := bindingContextAccessor.GetBindingContext()
+			existingMonitorIDs := monitorIDAccessor.GetMonitorIDs()
+
+			if len(existingContexts) > 0 && contextIndex < len(newContexts) {
+				// Safety check to ensure we don't exceed slice bounds
+				remainingSpace := len(newContexts) - contextIndex
+				if remainingSpace > 0 {
+					copySize := len(existingContexts)
+					if copySize > remainingSpace {
+						copySize = remainingSpace
+					}
+					copy(newContexts[contextIndex:contextIndex+copySize], existingContexts[:copySize])
+				}
+			}
 			contextIndex += len(existingContexts)
 
-			copy(newMonitorIDs[monitorIndex:], existingMonitorIDs)
+			if len(existingMonitorIDs) > 0 && monitorIndex < len(newMonitorIDs) {
+				// Safety check to ensure we don't exceed slice bounds
+				remainingSpace := len(newMonitorIDs) - monitorIndex
+				if remainingSpace > 0 {
+					copySize := len(existingMonitorIDs)
+					if copySize > remainingSpace {
+						copySize = remainingSpace
+					}
+					copy(newMonitorIDs[monitorIndex:monitorIndex+copySize], existingMonitorIDs[:copySize])
+				}
+			}
 			monitorIndex += len(existingMonitorIDs)
 
-			fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
-				q.items[idx].GetId(), hookName, targetTask.GetId())
+			// fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
+			// 	q.items[idx].GetId(), hookName, targetTask.GetId())
 		}
 
 		// Обновляем метаданные
-		withContext := targetHm.(task_metadata.BindingContextSetter).SetBindingContext(compactBindingContextsOptimized(newContexts))
-		withContext = withContext.(task_metadata.MonitorIDSetter).SetMonitorIDs(newMonitorIDs)
+		bindingContextSetter, ok := targetHm.(task_metadata.BindingContextSetter)
+		if !ok {
+			continue
+		}
+		withContext := bindingContextSetter.SetBindingContext(compactBindingContextsOptimized(newContexts))
+
+		monitorIDSetter, ok := withContext.(task_metadata.MonitorIDSetter)
+		if !ok {
+			continue
+		}
+		withContext = monitorIDSetter.SetMonitorIDs(newMonitorIDs)
 		targetTask.UpdateMetadata(withContext)
 
 		// Просто добавляем в конец, потом отсортируем
@@ -400,6 +497,14 @@ func compactBindingContextsOptimized(combinedContext []bindingcontext.BindingCon
 			prevGroup = currentGroup
 		}
 		// Same group as previous - skip (keep = false)
+	}
+
+	// Safety check to prevent slice bounds panic
+	if writeIndex <= 0 {
+		return []bindingcontext.BindingContext{}
+	}
+	if writeIndex > len(combinedContext) {
+		writeIndex = len(combinedContext)
 	}
 
 	return combinedContext[:writeIndex]
