@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
+	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
@@ -65,6 +69,9 @@ type TaskQueue struct {
 	waitInProgress bool
 	cancelDelay    bool
 
+	isDirty          bool
+	taskTypesToMerge map[task.TaskType]struct{}
+
 	items   []task.Task
 	started bool // a flag to ignore multiple starts
 
@@ -108,8 +115,11 @@ func (q *TaskQueue) WithMetricStorage(mstor metric.Storage) *TaskQueue {
 	return q
 }
 
-// заглушка для тестов
-func (q *TaskQueue) WithTaskTypesToMerge(taskTypesToMerge []task.TaskType) *TaskQueue {
+func (q *TaskQueue) WithTaskTypesToMerge(taskTypes []task.TaskType) *TaskQueue {
+	q.taskTypesToMerge = make(map[task.TaskType]struct{}, len(taskTypes))
+	for _, taskType := range taskTypes {
+		q.taskTypesToMerge[taskType] = struct{}{}
+	}
 	return q
 }
 
@@ -227,6 +237,178 @@ func (q *TaskQueue) AddLast(t task.Task) {
 // addFirst adds new tail element.
 func (q *TaskQueue) addLast(t task.Task) {
 	q.items = append(q.items, t)
+
+	taskType := t.GetType()
+	if _, ok := q.taskTypesToMerge[taskType]; ok {
+		q.isDirty = true
+		// Only trigger compaction if queue is getting long and we have mergeable tasks
+		if len(q.items) > 100 && q.isDirty {
+			q.performGlobalCompaction()
+		}
+	}
+}
+
+// performGlobalCompaction merges HookRun tasks for the same hook.
+// DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
+func (q *TaskQueue) performGlobalCompaction() {
+	if len(q.items) == 0 {
+		return
+	}
+
+	// Предварительно выделяем память для результата
+	result := make([]task.Task, 0, len(q.items))
+
+	hookGroups := make(map[string][]int, 10) // hookName -> []indices
+	var hookOrder []string
+
+	for i, task := range q.items {
+		if _, ok := q.taskTypesToMerge[task.GetType()]; !ok {
+			result = append(result, task)
+			continue
+		}
+		hm := task.GetMetadata()
+		if isNil(hm) || task.IsProcessing() {
+			result = append(result, task) // Nil metadata и processing задачи сразу в результат
+			continue
+		}
+
+		hookName := hm.(task_metadata.HookNameAccessor).GetHookName()
+		if _, exists := hookGroups[hookName]; !exists {
+			hookOrder = append(hookOrder, hookName)
+		}
+		hookGroups[hookName] = append(hookGroups[hookName], i)
+	}
+
+	// Обрабатываем группы хуков - O(N) в худшем случае
+	for _, hookName := range hookOrder {
+		indices := hookGroups[hookName]
+
+		if len(indices) == 1 {
+			// Только одна задача - добавляем как есть
+			result = append(result, q.items[indices[0]])
+			continue
+		}
+
+		// Находим задачу с минимальным индексом как целевую
+		minIndex := indices[0]
+		for _, idx := range indices {
+			if idx < minIndex {
+				minIndex = idx
+			}
+		}
+
+		targetTask := q.items[minIndex]
+		targetHm := targetTask.GetMetadata()
+		contexts := targetHm.(task_metadata.BindingContextAccessor).GetBindingContext()
+		monitorIDs := targetHm.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
+		// Предварительно вычисляем общий размер
+		totalContexts := len(contexts)
+		totalMonitorIDs := len(monitorIDs)
+
+		for _, idx := range indices {
+			if idx == minIndex {
+				continue // Пропускаем целевую задачу
+			}
+			existingHm := task_metadata.HookMetadataAccessor(q.items[idx])
+			totalContexts += len(existingHm.BindingContext)
+			totalMonitorIDs += len(existingHm.MonitorIDs)
+		}
+
+		// Создаем новые слайсы с правильным размером
+		newContexts := make([]bindingcontext.BindingContext, totalContexts)
+		newMonitorIDs := make([]string, totalMonitorIDs)
+
+		// Копируем контексты целевой задачи
+		copy(newContexts, contexts)
+		copy(newMonitorIDs, monitorIDs)
+
+		// Копируем контексты от остальных задач
+		contextIndex := len(contexts)
+		monitorIndex := len(monitorIDs)
+
+		for _, idx := range indices {
+			if idx == minIndex {
+				continue
+			}
+			existingHm := task_metadata.HookMetadataAccessor(q.items[idx])
+
+			copy(newContexts[contextIndex:], existingHm.BindingContext)
+			contextIndex += len(existingHm.BindingContext)
+
+			copy(newMonitorIDs[monitorIndex:], existingHm.MonitorIDs)
+			monitorIndex += len(existingHm.MonitorIDs)
+
+			fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
+				q.items[idx].GetId(), hookName, targetTask.GetId())
+		}
+
+		// Обновляем метаданные
+		withContext := targetHm.(task_metadata.BindingContextSetter).SetBindingContext(compactBindingContextsOptimized(newContexts))
+		withContext = withContext.(task_metadata.MonitorIDSetter).SetMonitorIDs(newMonitorIDs)
+		targetTask.UpdateMetadata(withContext)
+
+		// Просто добавляем в конец, потом отсортируем
+		result = append(result, targetTask)
+
+		// fmt.Printf("[TRACE-QUEUE] Global compaction: merged %d tasks for hook '%s' into task %s\n",
+		// 	len(indices), hookName, targetTask.GetId())
+	}
+
+	positionMap := make(map[task.Task]int, len(q.items))
+	for i, task := range q.items {
+		positionMap[task] = i
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		posI := positionMap[result[i]]
+		posJ := positionMap[result[j]]
+		return posI < posJ
+	})
+
+	q.items = result
+}
+
+// compactBindingContexts mimics the logic from shell-operator's CombineBindingContextForHook.
+// It removes intermediate states for the same group, keeping only the most recent one.
+func compactBindingContextsOptimized(combinedContext []bindingcontext.BindingContext) []bindingcontext.BindingContext {
+	if len(combinedContext) < 2 {
+		return combinedContext
+	}
+
+	// Use the same slice to avoid allocation
+	writeIndex := 0
+	prevGroup := ""
+
+	for i := 0; i < len(combinedContext); i++ {
+		current := combinedContext[i]
+		currentGroup := current.Metadata.Group
+
+		// Fast path: empty group always kept
+		if currentGroup == "" {
+			combinedContext[writeIndex] = current
+			writeIndex++
+			prevGroup = ""
+			continue
+		}
+
+		// Fast path: different group always kept
+		if currentGroup != prevGroup {
+			combinedContext[writeIndex] = current
+			writeIndex++
+			prevGroup = currentGroup
+		}
+		// Same group as previous - skip (keep = false)
+	}
+
+	return combinedContext[:writeIndex]
+}
+
+// compactionGroup represents a group of tasks that can be merged
+type compactionGroup struct {
+	targetIndex     int
+	indicesToMerge  []int
+	totalContexts   int
+	totalMonitorIDs int
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
@@ -436,9 +618,18 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				return
 			}
 
+			q.withLock(func() {
+				if q.isDirty {
+					q.performGlobalCompaction()
+				}
+			})
+
 			// dump task and a whole queue
 			q.debugf("queue %s: tasks after wait %s", q.Name, q.String())
 			q.debugf("queue %s: task to handle '%s'", q.Name, t.GetType())
+
+			// set that current task is being processed, so we don't merge it with other tasks
+			t.SetProcessing(true)
 
 			// Now the task can be handled!
 			var nextSleepDelay time.Duration
@@ -456,6 +647,8 @@ func (q *TaskQueue) Start(ctx context.Context) {
 
 			switch taskRes.Status {
 			case Fail:
+				// Reset processing flag for failed task
+				t.SetProcessing(false)
 				// Exponential backoff delay before retry.
 				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
 				t.IncrementFailureCount()
@@ -469,6 +662,9 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					// Remove current task on success.
 					if taskRes.Status == Success {
 						q.remove(t.GetId())
+					} else {
+						// Reset processing flag for kept task
+						t.SetProcessing(false)
 					}
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
@@ -483,6 +679,8 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				})
 				q.SetStatus("")
 			case Repeat:
+				// Reset processing flag for repeated task
+				t.SetProcessing(false)
 				// repeat a current task after a small delay
 				nextSleepDelay = q.DelayOnRepeat
 				q.SetStatus("repeat head task")
@@ -665,4 +863,19 @@ func (q *TaskQueue) withRLock(fn func()) {
 	q.m.RLock()
 	fn()
 	q.m.RUnlock()
+}
+
+func isNil(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+
+	// Use reflection to check if the interface contains a nil concrete value
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return rv.IsNil()
+	default:
+		return false
+	}
 }
