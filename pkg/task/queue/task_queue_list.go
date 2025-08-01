@@ -672,17 +672,15 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
-					if taskRes.Status == Success {
-						// Remove current task on success.
-						// Note: it is safe to use t.GetId() because we have a lock.
-						// The task t is the one we just processed.
-						q.remove(t.GetId())
-					}
-					t.SetProcessing(false) // release processing flag
-
 					for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
 						q.addAfter(t.GetId(), taskRes.AfterTasks[i])
 					}
+
+					if taskRes.Status == Success {
+						q.remove(t.GetId())
+					}
+
+					t.SetProcessing(false) // release processing flag
 
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
