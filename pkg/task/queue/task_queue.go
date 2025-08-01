@@ -428,8 +428,8 @@ func (q *TaskQueue) performGlobalCompaction() {
 			}
 			monitorIndex += len(existingMonitorIDs)
 
-			// fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
-			// 	q.items[idx].GetId(), hookName, targetTask.GetId())
+			fmt.Printf("[TRACE-QUEUE] Compacting task %s for hook '%s' into task %s\n",
+				q.items[idx].GetId(), hookName, targetTask.GetId())
 		}
 
 		// Обновляем метаданные
@@ -449,8 +449,8 @@ func (q *TaskQueue) performGlobalCompaction() {
 		// Просто добавляем в конец, потом отсортируем
 		result = append(result, targetTask)
 
-		// fmt.Printf("[TRACE-QUEUE] Global compaction: merged %d tasks for hook '%s' into task %s\n",
-		// 	len(indices), hookName, targetTask.GetId())
+		fmt.Printf("[TRACE-QUEUE] Global compaction: merged %d tasks for hook '%s' into task %s\n",
+			len(indices), hookName, targetTask.GetId())
 	}
 
 	positionMap := make(map[task.Task]int, len(q.items))
