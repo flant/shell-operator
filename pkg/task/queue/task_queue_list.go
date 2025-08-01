@@ -651,7 +651,9 @@ func (q *TaskQueue) Start(ctx context.Context) {
 
 			var nextSleepDelay time.Duration
 			q.SetStatus("run first task")
+			fmt.Printf("[TRACE-QUEUE] Calling handler for task %s of type %s\n", t.GetId(), t.GetType())
 			taskRes := q.Handler(ctx, t)
+			fmt.Printf("[TRACE-QUEUE] Handler returned status: %s for task %s of type %s\n", taskRes.Status, t.GetId(), t.GetType())
 
 			// Check Done channel after long-running operation.
 			select {
@@ -662,39 +664,51 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			default:
 			}
 
+			fmt.Printf("[TRACE-QUEUE] Processing task result status: %s for task %s of type %s\n", taskRes.Status, t.GetId(), t.GetType())
 			switch taskRes.Status {
 			case Fail:
+				fmt.Printf("[TRACE-QUEUE] Task %s of type %s failed, setting processing=false, failure count: %d\n", t.GetId(), t.GetType(), t.GetFailureCount())
 				t.SetProcessing(false)
 				// Exponential backoff delay before retry.
 				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
 				t.IncrementFailureCount()
 				q.SetStatus(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
+				fmt.Printf("[TRACE-QUEUE] Task %s of type %s will retry after %s delay\n", t.GetId(), t.GetType(), nextSleepDelay.String())
 			case Success, Keep:
+				fmt.Printf("[TRACE-QUEUE] Task %s of type %s status: %s, processing AfterTasks: %d, HeadTasks: %d, TailTasks: %d\n",
+					t.GetId(), t.GetType(), taskRes.Status, len(taskRes.AfterTasks), len(taskRes.HeadTasks), len(taskRes.TailTasks))
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
 					for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
+						fmt.Printf("[TRACE-QUEUE] Adding AfterTask %s of type %s after task %s\n", taskRes.AfterTasks[i].GetId(), taskRes.AfterTasks[i].GetType(), t.GetId())
 						q.addAfter(t.GetId(), taskRes.AfterTasks[i])
 					}
 
 					if taskRes.Status == Success {
+						fmt.Printf("[TRACE-QUEUE] Removing task %s of type %s from queue (Success)\n", t.GetId(), t.GetType())
 						q.remove(t.GetId())
+					} else {
+						fmt.Printf("[TRACE-QUEUE] Keeping task %s of type %s in queue (Keep)\n", t.GetId(), t.GetType())
 					}
-
 					t.SetProcessing(false) // release processing flag
 
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
 					// become the new first task in the queue.
 					for i := len(taskRes.HeadTasks) - 1; i >= 0; i-- {
+						fmt.Printf("[TRACE-QUEUE] Adding HeadTask %s of type %s to front of queue\n", taskRes.HeadTasks[i].GetId(), taskRes.HeadTasks[i].GetType())
 						q.addFirst(taskRes.HeadTasks[i])
 					}
 					// Add tasks to the end of the queue
 					for _, newTask := range taskRes.TailTasks {
+						fmt.Printf("[TRACE-QUEUE] Adding TailTask %s of type %s to end of queue\n", newTask.GetId(), newTask.GetType())
 						q.addLast(newTask)
 					}
 				})
 				q.SetStatus("")
+				fmt.Printf("[TRACE-QUEUE] Task %s of type %s processing completed, queue length now: %d\n", t.GetId(), t.GetType(), q.Length())
 			case Repeat:
+				fmt.Printf("[TRACE-QUEUE] Task %s of type %s will repeat after delay\n", t.GetId(), t.GetType())
 				// repeat a current task after a small delay
 				nextSleepDelay = q.DelayOnRepeat
 				t.SetProcessing(false)
@@ -704,11 +718,14 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			if taskRes.DelayBeforeNextTask != 0 {
 				nextSleepDelay = taskRes.DelayBeforeNextTask
 				q.SetStatus(fmt.Sprintf("sleep for %s", nextSleepDelay.String()))
+				fmt.Printf("[TRACE-QUEUE] Task %s of type %s requested delay: %s\n", t.GetId(), t.GetType(), nextSleepDelay.String())
 			}
 
 			sleepDelay = nextSleepDelay
+			fmt.Printf("[TRACE-QUEUE] Next sleep delay for queue %s: %s\n", q.Name, sleepDelay.String())
 
 			if taskRes.AfterHandle != nil {
+				fmt.Printf("[TRACE-QUEUE] Calling AfterHandle for task %s of type %s\n", t.GetId(), t.GetType())
 				taskRes.AfterHandle()
 			}
 
