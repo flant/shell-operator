@@ -894,18 +894,15 @@ func (q *TaskQueue) Start(ctx context.Context) {
 // sleepDelay is used to sleep before check a task, e.g. in case of failed previous task.
 // If queue is empty, then it will be checked every DelayOnQueueIsEmpty.
 func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
-	fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, sleepDelay=%s\n", q.Name, sleepDelay.String())
 	// Check Done channel.
 	select {
 	case <-q.ctx.Done():
-		fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, context done, returning nil\n", q.Name)
 		return nil
 	default:
 	}
 
 	// Shortcut: return the first task if the queue is not empty and delay is not required.
 	if !q.IsEmpty() && sleepDelay == 0 {
-		fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, shortcut - queue not empty and no delay, returning first task\n", q.Name)
 		return q.GetFirst()
 	}
 
@@ -936,13 +933,11 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	// Wait for the queued task with some delay.
 	// Every tick increases the 'elapsed' counter until it outgrows the waitUntil value.
 	// Or, delay can be canceled to handle new head task immediately.
-	fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, starting wait loop, waitUntil=%s\n", q.Name, waitUntil.String())
 	for {
 		checkTask := false
 		select {
 		case <-q.ctx.Done():
 			// Queue is stopped.
-			fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, context done in wait loop, returning nil\n", q.Name)
 			return nil
 		case <-checkTicker.C:
 			// Check and update waitUntil.
@@ -966,10 +961,8 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 		if checkTask {
 			if q.IsEmpty() {
 				// No task to return: increase wait time.
-				fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, queue empty, increasing wait time\n", q.Name)
 				waitUntil += q.DelayOnQueueIsEmpty
 			} else {
-				fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, returning first task\n", q.Name)
 				return q.GetFirst()
 			}
 		}
