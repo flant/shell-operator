@@ -85,6 +85,21 @@ func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Con
 	tqs.m.Unlock()
 }
 
+func (tqs *TaskQueueSet) NewNamedQueueWithCallback(name string, handler func(ctx context.Context, t task.Task) TaskResult, taskTypesToMerge []task.TaskType, compactionCallback func(compactedTasks []task.Task, targetTask task.Task)) {
+	q := NewTasksQueue()
+	q.WithName(name)
+	q.WithHandler(handler)
+	q.WithContext(tqs.ctx)
+	q.WithMetricStorage(tqs.metricStorage)
+	q.WithTaskTypesToMerge(taskTypesToMerge)
+	if compactionCallback != nil {
+		q.WithCompactionCallback(compactionCallback)
+	}
+	tqs.m.Lock()
+	tqs.Queues[name] = q
+	tqs.m.Unlock()
+}
+
 func (tqs *TaskQueueSet) GetByName(name string) *TaskQueue {
 	tqs.m.RLock()
 	defer tqs.m.RUnlock()
