@@ -82,6 +82,9 @@ type TaskQueue struct {
 	Handler func(ctx context.Context, t task.Task) TaskResult
 	Status  string
 
+	// Callback for task compaction events
+	CompactionCallback func(compactedTasks []task.Task, targetTask task.Task)
+
 	measureActionFn     func()
 	measureActionFnOnce sync.Once
 
@@ -130,6 +133,11 @@ func (q *TaskQueue) WithName(name string) *TaskQueue {
 
 func (q *TaskQueue) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueue {
 	q.Handler = fn
+	return q
+}
+
+func (q *TaskQueue) WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask task.Task)) *TaskQueue {
+	q.CompactionCallback = callback
 	return q
 }
 
@@ -503,6 +511,17 @@ func (q *TaskQueue) performGlobalCompaction() {
 
 		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s merged %d tasks into task %s\n",
 			q.Name, hookName, len(indices), targetTask.GetId())
+
+		// Call compaction callback if set
+		if q.CompactionCallback != nil && len(indices) > 1 {
+			compactedTasks := make([]task.Task, 0, len(indices)-1)
+			for _, idx := range indices {
+				if idx != minIndex {
+					compactedTasks = append(compactedTasks, q.items[idx])
+				}
+			}
+			q.CompactionCallback(compactedTasks, targetTask)
+		}
 	}
 
 	positionMap := make(map[task.Task]int, len(q.items))
