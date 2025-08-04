@@ -165,7 +165,7 @@ func (q *TaskQueue) IsEmpty() bool {
 	q.m.RLock()
 	defer q.m.RUnlock()
 	isEmpty := q.isEmpty()
-	fmt.Printf("[TRACE-QUEUE] IsEmpty: queue=%s, isEmpty=%v, length=%d\n", q.Name, isEmpty, len(q.items))
+
 	return isEmpty
 }
 
@@ -218,7 +218,6 @@ func (q *TaskQueue) RemoveFirst() task.Task {
 
 // removeFirst deletes a head element, so head is moved.
 func (q *TaskQueue) removeFirst() task.Task {
-	fmt.Printf("[TRACE-QUEUE] removeFirst: queue=%s, isEmpty=%v, length=%d\n", q.Name, q.isEmpty(), len(q.items))
 	if q.isEmpty() {
 		return nil
 	}
