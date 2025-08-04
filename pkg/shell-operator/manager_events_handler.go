@@ -2,7 +2,6 @@ package shell_operator
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -88,7 +87,6 @@ func (m *ManagerEventsHandler) Start() {
 			}
 
 			m.taskQueues.DoWithLock(func(tqs *queue.TaskQueueSet) {
-				fmt.Printf("[EVENTS MANAGER] ADD LAST: Adding %d tasks to queues\n", len(tailTasks))
 				for _, resTask := range tailTasks {
 					if q := tqs.Queues[resTask.GetQueueName()]; q == nil {
 						log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
