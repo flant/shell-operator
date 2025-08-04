@@ -514,6 +514,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 
 		// Call compaction callback if set
 		if q.CompactionCallback != nil && len(indices) > 1 {
+			fmt.Printf("[TRACE-COMPACTION] performGlobalCompaction: calling callback for hook=%s, indices=%d\n", hookName, len(indices))
 			compactedTasks := make([]task.Task, 0, len(indices)-1)
 			for _, idx := range indices {
 				if idx != minIndex {
@@ -521,6 +522,9 @@ func (q *TaskQueue) performGlobalCompaction() {
 				}
 			}
 			q.CompactionCallback(compactedTasks, targetTask)
+			fmt.Printf("[TRACE-COMPACTION] performGlobalCompaction: callback completed for hook=%s\n", hookName)
+		} else {
+			fmt.Printf("[TRACE-COMPACTION] performGlobalCompaction: no callback or single task for hook=%s, callback=%v, indices=%d\n", hookName, q.CompactionCallback != nil, len(indices))
 		}
 	}
 
