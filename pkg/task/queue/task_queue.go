@@ -164,7 +164,9 @@ func (q *TaskQueue) IsEmpty() bool {
 	defer q.MeasureActionTime("IsEmpty")()
 	q.m.RLock()
 	defer q.m.RUnlock()
-	return q.isEmpty()
+	isEmpty := q.isEmpty()
+	fmt.Printf("[TRACE-QUEUE] IsEmpty: queue=%s, isEmpty=%v, length=%d\n", q.Name, isEmpty, len(q.items))
+	return isEmpty
 }
 
 func (q *TaskQueue) isEmpty() bool {
@@ -180,19 +182,24 @@ func (q *TaskQueue) Length() int {
 
 // AddFirst adds new head element.
 func (q *TaskQueue) AddFirst(t task.Task) {
+	fmt.Printf("[TRACE-QUEUE] AddFirst: queue=%s, task=%s, type=%s, id=%s\n", q.Name, t.GetDescription(), t.GetType(), t.GetId())
 	defer q.MeasureActionTime("AddFirst")()
 	q.withLock(func() {
 		q.addFirst(t)
 	})
+	fmt.Printf("[TRACE-QUEUE] AddFirst: queue=%s, new length=%d\n", q.Name, len(q.items))
 }
 
 // addFirst adds new head element.
 func (q *TaskQueue) addFirst(t task.Task) {
+	fmt.Printf("[TRACE-QUEUE] addFirst: queue=%s, before length=%d\n", q.Name, len(q.items))
 	q.items = append([]task.Task{t}, q.items...)
+	fmt.Printf("[TRACE-QUEUE] addFirst: queue=%s, after length=%d\n", q.Name, len(q.items))
 }
 
 // RemoveFirst deletes a head element, so head is moved.
 func (q *TaskQueue) RemoveFirst() task.Task {
+	fmt.Printf("[TRACE-QUEUE] RemoveFirst: queue=%s, before length=%d\n", q.Name, len(q.items))
 	defer q.MeasureActionTime("RemoveFirst")()
 	var t task.Task
 
@@ -200,17 +207,26 @@ func (q *TaskQueue) RemoveFirst() task.Task {
 		t = q.removeFirst()
 	})
 
+	if t != nil {
+		fmt.Printf("[TRACE-QUEUE] RemoveFirst: queue=%s, removed task=%s, type=%s, id=%s, after length=%d\n", q.Name, t.GetDescription(), t.GetType(), t.GetId(), len(q.items))
+	} else {
+		fmt.Printf("[TRACE-QUEUE] RemoveFirst: queue=%s, no task to remove, after length=%d\n", q.Name, len(q.items))
+	}
+
 	return t
 }
 
 // removeFirst deletes a head element, so head is moved.
 func (q *TaskQueue) removeFirst() task.Task {
+	fmt.Printf("[TRACE-QUEUE] removeFirst: queue=%s, isEmpty=%v, length=%d\n", q.Name, q.isEmpty(), len(q.items))
 	if q.isEmpty() {
 		return nil
 	}
 
 	t := q.items[0]
+	fmt.Printf("[TRACE-QUEUE] removeFirst: queue=%s, removing task=%s, type=%s, id=%s\n", q.Name, t.GetDescription(), t.GetType(), t.GetId())
 	q.items = q.items[1:]
+	fmt.Printf("[TRACE-QUEUE] removeFirst: queue=%s, after removal length=%d\n", q.Name, len(q.items))
 
 	return t
 }
@@ -221,37 +237,46 @@ func (q *TaskQueue) GetFirst() task.Task {
 	q.m.RLock()
 	defer q.m.RUnlock()
 	if q.isEmpty() {
+		fmt.Printf("[TRACE-QUEUE] GetFirst: queue=%s, queue is empty, returning nil\n", q.Name)
 		return nil
 	}
-	return q.items[0]
+	task := q.items[0]
+	fmt.Printf("[TRACE-QUEUE] GetFirst: queue=%s, returning task=%s, type=%s, id=%s\n", q.Name, task.GetDescription(), task.GetType(), task.GetId())
+	return task
 }
 
 // AddLast adds new tail element.
 func (q *TaskQueue) AddLast(t task.Task) {
+	fmt.Printf("[TRACE-QUEUE] AddLast: queue=%s, task=%s, type=%s, id=%s\n", q.Name, t.GetDescription(), t.GetType(), t.GetId())
 	defer q.MeasureActionTime("AddLast")()
 	q.withLock(func() {
 		q.addLast(t)
 	})
+	fmt.Printf("[TRACE-QUEUE] AddLast: queue=%s, new length=%d, isDirty=%v\n", q.Name, len(q.items), q.isDirty)
 }
 
 // addFirst adds new tail element.
 func (q *TaskQueue) addLast(t task.Task) {
+	fmt.Printf("[TRACE-QUEUE] addLast: queue=%s, before length=%d\n", q.Name, len(q.items))
 	q.items = append(q.items, t)
+	fmt.Printf("[TRACE-QUEUE] addLast: queue=%s, after append length=%d\n", q.Name, len(q.items))
 
 	taskType := t.GetType()
+	fmt.Printf("[TRACE-QUEUE] addLast: queue=%s, taskType=%s, isMergeable=%v\n", q.Name, taskType, q.taskTypesToMerge != nil)
 	if _, ok := q.taskTypesToMerge[taskType]; ok {
-		q.isDirty = true
+		fmt.Printf("[TRACE-QUEUE] addLast: queue=%s, setting isDirty=true, current length=%d\n", q.Name, len(q.items))
 		// Only trigger compaction if queue is getting long and we have mergeable tasks
-		if len(q.items) > 100 && q.isDirty {
-			q.performGlobalCompaction()
-		}
+		fmt.Printf("[TRACE-QUEUE] addLast: queue=%s, triggering compaction, length=%d\n", q.Name, len(q.items))
+		q.performGlobalCompaction()
 	}
 }
 
 // performGlobalCompaction merges HookRun tasks for the same hook.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
 func (q *TaskQueue) performGlobalCompaction() {
+	fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, start, length=%d\n", q.Name, len(q.items))
 	if len(q.items) == 0 {
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, empty queue, skipping\n", q.Name)
 		return
 	}
 
@@ -260,14 +285,18 @@ func (q *TaskQueue) performGlobalCompaction() {
 
 	hookGroups := make(map[string][]int, 10) // hookName -> []indices
 	var hookOrder []string
+	fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, starting grouping phase\n", q.Name)
 
 	for i, task := range q.items {
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, processing task[%d]=%s, type=%s, id=%s\n", q.Name, i, task.GetDescription(), task.GetType(), task.GetId())
 		if _, ok := q.taskTypesToMerge[task.GetType()]; !ok {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, task[%d] not mergeable, adding to result\n", q.Name, i)
 			result = append(result, task)
 			continue
 		}
 		hm := task.GetMetadata()
 		if isNil(hm) || task.IsProcessing() {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, task[%d] has nil metadata or is processing, adding to result\n", q.Name, i)
 			result = append(result, task) // Nil metadata и processing задачи сразу в результат
 			continue
 		}
@@ -275,10 +304,12 @@ func (q *TaskQueue) performGlobalCompaction() {
 		// Safety check to ensure we can access hook name
 		hookNameAccessor, ok := hm.(task_metadata.HookNameAccessor)
 		if !ok {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, task[%d] cannot access hook name, adding to result\n", q.Name, i)
 			result = append(result, task) // Cannot access hook name, skip compaction
 			continue
 		}
 		hookName := hookNameAccessor.GetHookName()
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, task[%d] hookName=%s\n", q.Name, i, hookName)
 		if _, exists := hookGroups[hookName]; !exists {
 			hookOrder = append(hookOrder, hookName)
 		}
@@ -286,11 +317,14 @@ func (q *TaskQueue) performGlobalCompaction() {
 	}
 
 	// Обрабатываем группы хуков - O(N) в худшем случае
+	fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, processing hook groups, total groups=%d\n", q.Name, len(hookOrder))
 	for _, hookName := range hookOrder {
 		indices := hookGroups[hookName]
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, processing hook=%s, indices=%v\n", q.Name, hookName, indices)
 
 		if len(indices) == 1 {
 			// Только одна задача - добавляем как есть
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s has only 1 task, adding as-is\n", q.Name, hookName)
 			result = append(result, q.items[indices[0]])
 			continue
 		}
@@ -302,25 +336,30 @@ func (q *TaskQueue) performGlobalCompaction() {
 				minIndex = idx
 			}
 		}
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s target task index=%d\n", q.Name, hookName, minIndex)
 
 		// Safety check to ensure minIndex is valid
 		if minIndex < 0 || minIndex >= len(q.items) {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s invalid minIndex=%d, queue length=%d, skipping\n", q.Name, hookName, minIndex, len(q.items))
 			continue
 		}
 
 		targetTask := q.items[minIndex]
 		targetHm := targetTask.GetMetadata()
 		if targetHm == nil {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s target task has nil metadata, skipping\n", q.Name, hookName)
 			continue
 		}
 
 		// Safety checks for type assertions
 		bindingContextAccessor, ok := targetHm.(task_metadata.BindingContextAccessor)
 		if !ok {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s target task cannot access binding context, skipping\n", q.Name, hookName)
 			continue
 		}
 		monitorIDAccessor, ok := targetHm.(task_metadata.MonitorIDAccessor)
 		if !ok {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s target task cannot access monitor IDs, skipping\n", q.Name, hookName)
 			continue
 		}
 
@@ -329,6 +368,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 		// Предварительно вычисляем общий размер
 		totalContexts := len(contexts)
 		totalMonitorIDs := len(monitorIDs)
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s target task has contexts=%d, monitorIDs=%d\n", q.Name, hookName, totalContexts, totalMonitorIDs)
 
 		for _, idx := range indices {
 			if idx == minIndex {
@@ -344,6 +384,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 				}
 			}
 		}
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s calculated total contexts=%d, total monitorIDs=%d\n", q.Name, hookName, totalContexts, totalMonitorIDs)
 
 		// Создаем новые слайсы с правильным размером
 		// Safety check to ensure we don't create negative-sized slices
@@ -355,6 +396,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 		}
 		newContexts := make([]bindingcontext.BindingContext, totalContexts)
 		newMonitorIDs := make([]string, totalMonitorIDs)
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s created slices: contexts=%d, monitorIDs=%d\n", q.Name, hookName, len(newContexts), len(newMonitorIDs))
 
 		// Копируем контексты целевой задачи
 		if len(contexts) > 0 && len(newContexts) > 0 {
@@ -375,6 +417,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 		// Копируем контексты от остальных задач
 		contextIndex := len(contexts)
 		monitorIndex := len(monitorIDs)
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s starting merge from index: context=%d, monitor=%d\n", q.Name, hookName, contextIndex, monitorIndex)
 
 		for _, idx := range indices {
 			if idx == minIndex {
@@ -382,25 +425,30 @@ func (q *TaskQueue) performGlobalCompaction() {
 			}
 			// Safety check to ensure idx is valid
 			if idx < 0 || idx >= len(q.items) {
+				fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s invalid index=%d, queue length=%d, skipping\n", q.Name, hookName, idx, len(q.items))
 				continue
 			}
 			existingHm := q.items[idx].GetMetadata()
 			if existingHm == nil {
+				fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s task[%d] has nil metadata, skipping\n", q.Name, hookName, idx)
 				continue
 			}
 
 			// Safety checks for type assertions
 			bindingContextAccessor, ok := existingHm.(task_metadata.BindingContextAccessor)
 			if !ok {
+				fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s task[%d] cannot access binding context, skipping\n", q.Name, hookName, idx)
 				continue
 			}
 			monitorIDAccessor, ok := existingHm.(task_metadata.MonitorIDAccessor)
 			if !ok {
+				fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s task[%d] cannot access monitor IDs, skipping\n", q.Name, hookName, idx)
 				continue
 			}
 
 			existingContexts := bindingContextAccessor.GetBindingContext()
 			existingMonitorIDs := monitorIDAccessor.GetMonitorIDs()
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s task[%d] has contexts=%d, monitorIDs=%d\n", q.Name, hookName, idx, len(existingContexts), len(existingMonitorIDs))
 
 			if len(existingContexts) > 0 && contextIndex < len(newContexts) {
 				// Safety check to ensure we don't exceed slice bounds
@@ -411,6 +459,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 						copySize = remainingSpace
 					}
 					copy(newContexts[contextIndex:contextIndex+copySize], existingContexts[:copySize])
+					fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s task[%d] copied %d contexts to index %d\n", q.Name, hookName, idx, copySize, contextIndex)
 				}
 			}
 			contextIndex += len(existingContexts)
@@ -424,6 +473,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 						copySize = remainingSpace
 					}
 					copy(newMonitorIDs[monitorIndex:monitorIndex+copySize], existingMonitorIDs[:copySize])
+					fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s task[%d] copied %d monitorIDs to index %d\n", q.Name, hookName, idx, copySize, monitorIndex)
 				}
 			}
 			monitorIndex += len(existingMonitorIDs)
@@ -435,22 +485,25 @@ func (q *TaskQueue) performGlobalCompaction() {
 		// Обновляем метаданные
 		bindingContextSetter, ok := targetHm.(task_metadata.BindingContextSetter)
 		if !ok {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s target task cannot set binding context, skipping\n", q.Name, hookName)
 			continue
 		}
 		withContext := bindingContextSetter.SetBindingContext(compactBindingContextsOptimized(newContexts))
 
 		monitorIDSetter, ok := withContext.(task_metadata.MonitorIDSetter)
 		if !ok {
+			fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s target task cannot set monitor IDs, skipping\n", q.Name, hookName)
 			continue
 		}
 		withContext = monitorIDSetter.SetMonitorIDs(newMonitorIDs)
 		targetTask.UpdateMetadata(withContext)
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s updated target task metadata\n", q.Name, hookName)
 
 		// Просто добавляем в конец, потом отсортируем
 		result = append(result, targetTask)
 
-		fmt.Printf("[TRACE-QUEUE] Global compaction: merged %d tasks for hook '%s' into task %s\n",
-			len(indices), hookName, targetTask.GetId())
+		fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, hook=%s merged %d tasks into task %s\n",
+			q.Name, hookName, len(indices), targetTask.GetId())
 	}
 
 	positionMap := make(map[task.Task]int, len(q.items))
@@ -464,13 +517,17 @@ func (q *TaskQueue) performGlobalCompaction() {
 		return posI < posJ
 	})
 
+	fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, final result length=%d\n", q.Name, len(result))
 	q.items = result
+	fmt.Printf("[TRACE-QUEUE] performGlobalCompaction: queue=%s, compaction completed, new length=%d\n", q.Name, len(q.items))
 }
 
 // compactBindingContexts mimics the logic from shell-operator's CombineBindingContextForHook.
 // It removes intermediate states for the same group, keeping only the most recent one.
 func compactBindingContextsOptimized(combinedContext []bindingcontext.BindingContext) []bindingcontext.BindingContext {
+	fmt.Printf("[TRACE-QUEUE] compactBindingContextsOptimized: input length=%d\n", len(combinedContext))
 	if len(combinedContext) < 2 {
+		fmt.Printf("[TRACE-QUEUE] compactBindingContextsOptimized: no compaction needed, returning as-is\n")
 		return combinedContext
 	}
 
@@ -498,16 +555,20 @@ func compactBindingContextsOptimized(combinedContext []bindingcontext.BindingCon
 		}
 		// Same group as previous - skip (keep = false)
 	}
+	fmt.Printf("[TRACE-QUEUE] compactBindingContextsOptimized: writeIndex=%d, input length=%d\n", writeIndex, len(combinedContext))
 
 	// Safety check to prevent slice bounds panic
 	if writeIndex <= 0 {
+		fmt.Printf("[TRACE-QUEUE] compactBindingContextsOptimized: writeIndex <= 0, returning empty slice\n")
 		return []bindingcontext.BindingContext{}
 	}
 	if writeIndex > len(combinedContext) {
 		writeIndex = len(combinedContext)
 	}
 
-	return combinedContext[:writeIndex]
+	result := combinedContext[:writeIndex]
+	fmt.Printf("[TRACE-QUEUE] compactBindingContextsOptimized: returning length=%d\n", len(result))
+	return result
 }
 
 // compactionGroup represents a group of tasks that can be merged
@@ -600,6 +661,7 @@ func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 
 // addAfter inserts a task after the task with specified id.
 func (q *TaskQueue) addAfter(id string, newTask task.Task) {
+	fmt.Printf("[TRACE-QUEUE] addAfter: queue=%s, inserting task=%s, type=%s, id=%s after id=%s\n", q.Name, newTask.GetDescription(), newTask.GetType(), newTask.GetId(), id)
 	newItems := make([]task.Task, len(q.items)+1)
 
 	idFound := false
@@ -611,6 +673,7 @@ func (q *TaskQueue) addAfter(id string, newTask task.Task) {
 				idFound = true
 				// when id is found, inject new task after task with equal id
 				newItems[i+1] = newTask
+				fmt.Printf("[TRACE-QUEUE] addAfter: queue=%s, found target id=%s at index=%d, inserted new task at index=%d\n", q.Name, id, i, i+1)
 			}
 		} else {
 			// when id is found, copy other tasks to i+1 position
@@ -618,6 +681,12 @@ func (q *TaskQueue) addAfter(id string, newTask task.Task) {
 		}
 	}
 
+	if !idFound {
+		fmt.Printf("[TRACE-QUEUE] addAfter: queue=%s, target id=%s not found, appending to end\n", q.Name, id)
+		newItems[len(q.items)] = newTask
+	}
+
+	fmt.Printf("[TRACE-QUEUE] addAfter: queue=%s, new length=%d\n", q.Name, len(newItems))
 	q.items = newItems
 }
 
@@ -668,6 +737,7 @@ func (q *TaskQueue) Remove(id string) task.Task {
 }
 
 func (q *TaskQueue) remove(id string) task.Task {
+	fmt.Printf("[TRACE-QUEUE] remove: queue=%s, looking for id=%s, current length=%d\n", q.Name, id, len(q.items))
 	delId := -1
 	for i, item := range q.items {
 		if item.GetId() == id {
@@ -676,11 +746,14 @@ func (q *TaskQueue) remove(id string) task.Task {
 		}
 	}
 	if delId == -1 {
+		fmt.Printf("[TRACE-QUEUE] remove: queue=%s, id=%s not found\n", q.Name, id)
 		return nil
 	}
 
 	t := q.items[delId]
+	fmt.Printf("[TRACE-QUEUE] remove: queue=%s, removing task=%s, type=%s, id=%s at index=%d\n", q.Name, t.GetDescription(), t.GetType(), t.GetId(), delId)
 	q.items = append(q.items[:delId], q.items[delId+1:]...)
+	fmt.Printf("[TRACE-QUEUE] remove: queue=%s, after removal length=%d\n", q.Name, len(q.items))
 
 	return t
 }
@@ -703,45 +776,47 @@ func (q *TaskQueue) Stop() {
 }
 
 func (q *TaskQueue) Start(ctx context.Context) {
+	fmt.Printf("[TRACE-QUEUE] Start: queue=%s, started=%v\n", q.Name, q.started)
 	if q.started {
+		fmt.Printf("[TRACE-QUEUE] Start: queue=%s, already started, returning\n", q.Name)
 		return
 	}
 
 	if q.Handler == nil {
+		fmt.Printf("[TRACE-QUEUE] Start: queue=%s, no handler set, error\n", q.Name)
 		log.Error("should set handler before start in queue", slog.String("name", q.Name))
 		q.SetStatus("no handler set")
 		return
 	}
 
 	go func() {
+		fmt.Printf("[TRACE-QUEUE] Start: queue=%s, starting goroutine\n", q.Name)
 		q.SetStatus("")
 		var sleepDelay time.Duration
 		for {
 			q.debugf("queue %s: wait for task, delay %d", q.Name, sleepDelay)
 			t := q.waitForTask(sleepDelay)
 			if t == nil {
+				fmt.Printf("[TRACE-QUEUE] Start: queue=%s, no task returned, stopping\n", q.Name)
 				q.SetStatus("stop")
 				log.Info("queue stopped", slog.String("name", q.Name))
 				return
 			}
-
-			q.withLock(func() {
-				if q.isDirty {
-					q.performGlobalCompaction()
-				}
-			})
 
 			// dump task and a whole queue
 			q.debugf("queue %s: tasks after wait %s", q.Name, q.String())
 			q.debugf("queue %s: task to handle '%s'", q.Name, t.GetType())
 
 			// set that current task is being processed, so we don't merge it with other tasks
+			fmt.Printf("[TRACE-QUEUE] Start: queue=%s, handling task=%s, type=%s, id=%s\n", q.Name, t.GetDescription(), t.GetType(), t.GetId())
 			t.SetProcessing(true)
 
 			// Now the task can be handled!
 			var nextSleepDelay time.Duration
 			q.SetStatus("run first task")
+			fmt.Printf("[TRACE-QUEUE] Start: queue=%s, calling handler for task=%s\n", q.Name, t.GetId())
 			taskRes := q.Handler(ctx, t)
+			fmt.Printf("[TRACE-QUEUE] Start: queue=%s, handler returned status=%s\n", q.Name, taskRes.Status)
 
 			// Check Done channel after long-running operation.
 			select {
@@ -754,6 +829,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 
 			switch taskRes.Status {
 			case Fail:
+				fmt.Printf("[TRACE-QUEUE] Start: queue=%s, task failed, failureCount=%d\n", q.Name, t.GetFailureCount())
 				// Reset processing flag for failed task
 				t.SetProcessing(false)
 				// Exponential backoff delay before retry.
@@ -761,6 +837,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				t.IncrementFailureCount()
 				q.SetStatus(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
 			case Success, Keep:
+				fmt.Printf("[TRACE-QUEUE] Start: queue=%s, task %s, headTasks=%d, tailTasks=%d, afterTasks=%d\n", q.Name, taskRes.Status, len(taskRes.HeadTasks), len(taskRes.TailTasks), len(taskRes.AfterTasks))
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
 					for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
@@ -786,6 +863,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				})
 				q.SetStatus("")
 			case Repeat:
+				fmt.Printf("[TRACE-QUEUE] Start: queue=%s, task repeat\n", q.Name)
 				// Reset processing flag for repeated task
 				t.SetProcessing(false)
 				// repeat a current task after a small delay
@@ -804,9 +882,11 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				taskRes.AfterHandle()
 			}
 
+			fmt.Printf("[TRACE-QUEUE] Start: queue=%s, next sleep delay=%s\n", q.Name, sleepDelay.String())
 			q.debugf("queue %s: tasks after handle %s", q.Name, q.String())
 		}
 	}()
+	fmt.Printf("[TRACE-QUEUE] Start: queue=%s, goroutine started, setting started=true\n", q.Name)
 	q.started = true
 }
 
@@ -814,15 +894,18 @@ func (q *TaskQueue) Start(ctx context.Context) {
 // sleepDelay is used to sleep before check a task, e.g. in case of failed previous task.
 // If queue is empty, then it will be checked every DelayOnQueueIsEmpty.
 func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
+	fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, sleepDelay=%s\n", q.Name, sleepDelay.String())
 	// Check Done channel.
 	select {
 	case <-q.ctx.Done():
+		fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, context done, returning nil\n", q.Name)
 		return nil
 	default:
 	}
 
 	// Shortcut: return the first task if the queue is not empty and delay is not required.
 	if !q.IsEmpty() && sleepDelay == 0 {
+		fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, shortcut - queue not empty and no delay, returning first task\n", q.Name)
 		return q.GetFirst()
 	}
 
@@ -853,11 +936,13 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	// Wait for the queued task with some delay.
 	// Every tick increases the 'elapsed' counter until it outgrows the waitUntil value.
 	// Or, delay can be canceled to handle new head task immediately.
+	fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, starting wait loop, waitUntil=%s\n", q.Name, waitUntil.String())
 	for {
 		checkTask := false
 		select {
 		case <-q.ctx.Done():
 			// Queue is stopped.
+			fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, context done in wait loop, returning nil\n", q.Name)
 			return nil
 		case <-checkTicker.C:
 			// Check and update waitUntil.
@@ -881,8 +966,10 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 		if checkTask {
 			if q.IsEmpty() {
 				// No task to return: increase wait time.
+				fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, queue empty, increasing wait time\n", q.Name)
 				waitUntil += q.DelayOnQueueIsEmpty
 			} else {
+				fmt.Printf("[TRACE-QUEUE] waitForTask: queue=%s, returning first task\n", q.Name)
 				return q.GetFirst()
 			}
 		}
