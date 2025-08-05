@@ -240,23 +240,22 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 
 			q.performGlobalCompaction()
 			// Verify IDs and order
-			finalIDs := make([]string, 0, len(q.items))
-			for _, item := range q.items {
-				finalIDs = append(finalIDs, item.GetId())
-			}
+			finalIDs := make([]string, 0, q.Length())
+			q.Iterate(func(t task.Task) {
+				finalIDs = append(finalIDs, t.GetId())
+			})
 			assert.Equal(t, tt.expectedIDs, finalIDs, "Task IDs and order should match expected")
 
 			// Verify binding context counts
-			for _, item := range q.items {
-				if mt, ok := item.(*mockTask); ok && mt.GetType() == metadata.HookRun {
-
+			q.Iterate(func(task task.Task) {
+				if mt, ok := task.(*mockTask); ok && mt.GetType() == metadata.HookRun {
 					expectedCount, found := tt.expectedBCs[mt.GetId()]
 					require.True(t, found, "Task ID %s should be in expectedBCs map", mt.GetId())
 					hm := task_metadata.HookMetadataAccessor(mt)
 					require.NotNil(t, hm, "HookMetadataAccessor should not return nil for hook task")
 					assert.Len(t, hm.BindingContext, expectedCount, "BindingContext count for task %s should match", mt.GetId())
 				}
-			}
+			})
 		})
 	}
 }

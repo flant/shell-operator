@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -22,44 +21,11 @@ import (
 )
 
 /*
-A working queue (a pipeline) for sequential execution of tasks.
-
-Tasks are added to the tail and executed from the head. Also a task can be pushed
-to the head to implement a meta-tasks.
-
-Each task is executed until success. This can be controlled with allowFailure: true
-config parameter.
-
+WARNING: This file is deprecated and will be removed in the future.
+Mainly used for benchmark purposes.
 */
 
-var (
-	DefaultWaitLoopCheckInterval    = 125 * time.Millisecond
-	DefaultDelayOnQueueIsEmpty      = 250 * time.Millisecond
-	DefaultInitialDelayOnFailedTask = 5 * time.Second
-	DefaultDelayOnRepeat            = 25 * time.Millisecond
-)
-
-type TaskStatus string
-
-const (
-	Success TaskStatus = "Success"
-	Fail    TaskStatus = "Fail"
-	Repeat  TaskStatus = "Repeat"
-	Keep    TaskStatus = "Keep"
-)
-
-type TaskResult struct {
-	Status     TaskStatus
-	HeadTasks  []task.Task
-	TailTasks  []task.Task
-	AfterTasks []task.Task
-
-	DelayBeforeNextTask time.Duration
-
-	AfterHandle func()
-}
-
-type TaskQueue struct {
+type TaskQueueSlice struct {
 	m             sync.RWMutex
 	metricStorage metric.Storage
 	ctx           context.Context
@@ -95,8 +61,8 @@ type TaskQueue struct {
 	ExponentialBackoffFn  func(failureCount int) time.Duration
 }
 
-func NewTasksQueue() *TaskQueue {
-	return &TaskQueue{
+func NewTasksQueueSlice() *TaskQueueSlice {
+	return &TaskQueueSlice{
 		items: make([]task.Task, 0),
 		// Default timings
 		WaitLoopCheckInterval: DefaultWaitLoopCheckInterval,
@@ -108,17 +74,17 @@ func NewTasksQueue() *TaskQueue {
 	}
 }
 
-func (q *TaskQueue) WithContext(ctx context.Context) {
+func (q *TaskQueueSlice) WithContext(ctx context.Context) {
 	q.ctx, q.cancel = context.WithCancel(ctx)
 }
 
-func (q *TaskQueue) WithMetricStorage(mstor metric.Storage) *TaskQueue {
+func (q *TaskQueueSlice) WithMetricStorage(mstor metric.Storage) *TaskQueueSlice {
 	q.metricStorage = mstor
 
 	return q
 }
 
-func (q *TaskQueue) WithTaskTypesToMerge(taskTypes []task.TaskType) *TaskQueue {
+func (q *TaskQueueSlice) WithTaskTypesToMerge(taskTypes []task.TaskType) *TaskQueueSlice {
 	q.taskTypesToMerge = make(map[task.TaskType]struct{}, len(taskTypes))
 	for _, taskType := range taskTypes {
 		q.taskTypesToMerge[taskType] = struct{}{}
@@ -126,23 +92,26 @@ func (q *TaskQueue) WithTaskTypesToMerge(taskTypes []task.TaskType) *TaskQueue {
 	return q
 }
 
-func (q *TaskQueue) WithName(name string) *TaskQueue {
+func (q *TaskQueueSlice) WithName(name string) *TaskQueueSlice {
 	q.Name = name
 	return q
 }
 
-func (q *TaskQueue) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueue {
+func (q *TaskQueueSlice) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueueSlice {
 	q.Handler = fn
 	return q
 }
 
-func (q *TaskQueue) WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask task.Task)) *TaskQueue {
+func (q *TaskQueueSlice) WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask task.Task)) *TaskQueueSlice {
 	q.CompactionCallback = callback
 	return q
 }
 
 // MeasureActionTime is a helper to measure execution time of queue's actions
-func (q *TaskQueue) MeasureActionTime(action string) func() {
+func (q *TaskQueueSlice) MeasureActionTime(action string) func() {
+	if q.metricStorage == nil {
+		return func() {}
+	}
 	q.measureActionFnOnce.Do(func() {
 		if os.Getenv("QUEUE_ACTIONS_METRICS") == "no" {
 			q.measureActionFn = func() {}
@@ -155,20 +124,20 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 	return q.measureActionFn
 }
 
-func (q *TaskQueue) GetStatus() string {
+func (q *TaskQueueSlice) GetStatus() string {
 	defer q.MeasureActionTime("GetStatus")()
 	q.m.RLock()
 	defer q.m.RUnlock()
 	return q.Status
 }
 
-func (q *TaskQueue) SetStatus(status string) {
+func (q *TaskQueueSlice) SetStatus(status string) {
 	q.m.Lock()
 	q.Status = status
 	q.m.Unlock()
 }
 
-func (q *TaskQueue) IsEmpty() bool {
+func (q *TaskQueueSlice) IsEmpty() bool {
 	defer q.MeasureActionTime("IsEmpty")()
 	q.m.RLock()
 	defer q.m.RUnlock()
@@ -177,11 +146,11 @@ func (q *TaskQueue) IsEmpty() bool {
 	return isEmpty
 }
 
-func (q *TaskQueue) isEmpty() bool {
+func (q *TaskQueueSlice) isEmpty() bool {
 	return len(q.items) == 0
 }
 
-func (q *TaskQueue) Length() int {
+func (q *TaskQueueSlice) Length() int {
 	defer q.MeasureActionTime("Length")()
 	q.m.RLock()
 	defer q.m.RUnlock()
@@ -189,7 +158,7 @@ func (q *TaskQueue) Length() int {
 }
 
 // AddFirst adds new head element.
-func (q *TaskQueue) AddFirst(t task.Task) {
+func (q *TaskQueueSlice) AddFirst(t task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
 	q.withLock(func() {
 		q.addFirst(t)
@@ -197,12 +166,12 @@ func (q *TaskQueue) AddFirst(t task.Task) {
 }
 
 // addFirst adds new head element.
-func (q *TaskQueue) addFirst(t task.Task) {
+func (q *TaskQueueSlice) addFirst(t task.Task) {
 	q.items = append([]task.Task{t}, q.items...)
 }
 
 // RemoveFirst deletes a head element, so head is moved.
-func (q *TaskQueue) RemoveFirst() task.Task {
+func (q *TaskQueueSlice) RemoveFirst() task.Task {
 	defer q.MeasureActionTime("RemoveFirst")()
 	var t task.Task
 
@@ -214,7 +183,7 @@ func (q *TaskQueue) RemoveFirst() task.Task {
 }
 
 // removeFirst deletes a head element, so head is moved.
-func (q *TaskQueue) removeFirst() task.Task {
+func (q *TaskQueueSlice) removeFirst() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
@@ -226,7 +195,7 @@ func (q *TaskQueue) removeFirst() task.Task {
 }
 
 // GetFirst returns a head element.
-func (q *TaskQueue) GetFirst() task.Task {
+func (q *TaskQueueSlice) GetFirst() task.Task {
 	defer q.MeasureActionTime("GetFirst")()
 	q.m.RLock()
 	defer q.m.RUnlock()
@@ -238,7 +207,7 @@ func (q *TaskQueue) GetFirst() task.Task {
 }
 
 // AddLast adds new tail element.
-func (q *TaskQueue) AddLast(t task.Task) {
+func (q *TaskQueueSlice) AddLast(t task.Task) {
 	defer q.MeasureActionTime("AddLast")()
 	q.withLock(func() {
 		q.addLast(t)
@@ -246,7 +215,7 @@ func (q *TaskQueue) AddLast(t task.Task) {
 }
 
 // addFirst adds new tail element.
-func (q *TaskQueue) addLast(t task.Task) {
+func (q *TaskQueueSlice) addLast(t task.Task) {
 	q.items = append(q.items, t)
 	taskType := t.GetType()
 
@@ -261,7 +230,7 @@ func (q *TaskQueue) addLast(t task.Task) {
 
 // performGlobalCompaction merges HookRun tasks for the same hook.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func (q *TaskQueue) performGlobalCompaction() {
+func (q *TaskQueueSlice) performGlobalCompaction() {
 	if len(q.items) == 0 {
 		return
 	}
@@ -446,7 +415,7 @@ func (q *TaskQueue) performGlobalCompaction() {
 		if !ok {
 			continue
 		}
-		withContext := bindingContextSetter.SetBindingContext(compactBindingContextsOptimized(newContexts))
+		withContext := bindingContextSetter.SetBindingContext(compactBindingContexts(newContexts))
 
 		monitorIDSetter, ok := withContext.(task_metadata.MonitorIDSetter)
 		if !ok {
@@ -482,62 +451,12 @@ func (q *TaskQueue) performGlobalCompaction() {
 	})
 
 	q.items = result
-}
-
-// compactBindingContexts mimics the logic from shell-operator's CombineBindingContextForHook.
-// It removes intermediate states for the same group, keeping only the most recent one.
-func compactBindingContextsOptimized(combinedContext []bindingcontext.BindingContext) []bindingcontext.BindingContext {
-	if len(combinedContext) < 2 {
-		return combinedContext
-	}
-
-	// Use the same slice to avoid allocation
-	writeIndex := 0
-	prevGroup := ""
-
-	for i := 0; i < len(combinedContext); i++ {
-		current := combinedContext[i]
-		currentGroup := current.Metadata.Group
-
-		// Fast path: empty group always kept
-		if currentGroup == "" {
-			combinedContext[writeIndex] = current
-			writeIndex++
-			prevGroup = ""
-			continue
-		}
-
-		// Fast path: different group always kept
-		if currentGroup != prevGroup {
-			combinedContext[writeIndex] = current
-			writeIndex++
-			prevGroup = currentGroup
-		}
-		// Same group as previous - skip (keep = false)
-	}
-
-	// Safety check to prevent slice bounds panic
-	if writeIndex <= 0 {
-		return []bindingcontext.BindingContext{}
-	}
-	if writeIndex > len(combinedContext) {
-		writeIndex = len(combinedContext)
-	}
-
-	result := combinedContext[:writeIndex]
-	return result
-}
-
-// compactionGroup represents a group of tasks that can be merged
-type compactionGroup struct {
-	targetIndex     int
-	indicesToMerge  []int
-	totalContexts   int
-	totalMonitorIDs int
+	// reset dirty flag
+	q.isDirty = false
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
-func (q *TaskQueue) RemoveLast() task.Task {
+func (q *TaskQueueSlice) RemoveLast() task.Task {
 	defer q.MeasureActionTime("RemoveLast")()
 	var t task.Task
 
@@ -549,7 +468,7 @@ func (q *TaskQueue) RemoveLast() task.Task {
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
-func (q *TaskQueue) removeLast() task.Task {
+func (q *TaskQueueSlice) removeLast() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
@@ -565,7 +484,7 @@ func (q *TaskQueue) removeLast() task.Task {
 }
 
 // GetLast returns a tail element.
-func (q *TaskQueue) GetLast() task.Task {
+func (q *TaskQueueSlice) GetLast() task.Task {
 	defer q.MeasureActionTime("GetLast")()
 	var t task.Task
 
@@ -577,7 +496,7 @@ func (q *TaskQueue) GetLast() task.Task {
 }
 
 // GetLast returns a tail element.
-func (q *TaskQueue) getLast() task.Task {
+func (q *TaskQueueSlice) getLast() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
@@ -586,7 +505,7 @@ func (q *TaskQueue) getLast() task.Task {
 }
 
 // Get returns a task by id.
-func (q *TaskQueue) Get(id string) task.Task {
+func (q *TaskQueueSlice) Get(id string) task.Task {
 	defer q.MeasureActionTime("Get")()
 	var t task.Task
 
@@ -598,7 +517,7 @@ func (q *TaskQueue) Get(id string) task.Task {
 }
 
 // Get returns a task by id.
-func (q *TaskQueue) get(id string) task.Task {
+func (q *TaskQueueSlice) get(id string) task.Task {
 	for _, t := range q.items {
 		if t.GetId() == id {
 			return t
@@ -609,7 +528,7 @@ func (q *TaskQueue) get(id string) task.Task {
 }
 
 // AddAfter inserts a task after the task with specified id.
-func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
+func (q *TaskQueueSlice) AddAfter(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
 	q.withLock(func() {
 		q.addAfter(id, newTask)
@@ -617,7 +536,7 @@ func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
 }
 
 // addAfter inserts a task after the task with specified id.
-func (q *TaskQueue) addAfter(id string, newTask task.Task) {
+func (q *TaskQueueSlice) addAfter(id string, newTask task.Task) {
 	newItems := make([]task.Task, len(q.items)+1)
 
 	idFound := false
@@ -644,7 +563,7 @@ func (q *TaskQueue) addAfter(id string, newTask task.Task) {
 }
 
 // AddBefore inserts a task before the task with specified id.
-func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
+func (q *TaskQueueSlice) AddBefore(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddBefore")()
 	q.withLock(func() {
 		q.addBefore(id, newTask)
@@ -652,7 +571,7 @@ func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 }
 
 // addBefore inserts a task before the task with specified id.
-func (q *TaskQueue) addBefore(id string, newTask task.Task) {
+func (q *TaskQueueSlice) addBefore(id string, newTask task.Task) {
 	newItems := make([]task.Task, len(q.items)+1)
 
 	idFound := false
@@ -678,7 +597,7 @@ func (q *TaskQueue) addBefore(id string, newTask task.Task) {
 }
 
 // Remove finds element by id and deletes it.
-func (q *TaskQueue) Remove(id string) task.Task {
+func (q *TaskQueueSlice) Remove(id string) task.Task {
 	defer q.MeasureActionTime("Remove")()
 	var t task.Task
 
@@ -689,7 +608,7 @@ func (q *TaskQueue) Remove(id string) task.Task {
 	return t
 }
 
-func (q *TaskQueue) remove(id string) task.Task {
+func (q *TaskQueueSlice) remove(id string) task.Task {
 	delId := -1
 	for i, item := range q.items {
 		if item.GetId() == id {
@@ -707,24 +626,24 @@ func (q *TaskQueue) remove(id string) task.Task {
 	return t
 }
 
-func (q *TaskQueue) SetDebug(debug bool) {
+func (q *TaskQueueSlice) SetDebug(debug bool) {
 	q.debug = debug
 }
 
-func (q *TaskQueue) debugf(format string, args ...interface{}) {
+func (q *TaskQueueSlice) debugf(format string, args ...interface{}) {
 	if !q.debug {
 		return
 	}
 	log.Debug("DEBUG", fmt.Sprintf(format, args...))
 }
 
-func (q *TaskQueue) Stop() {
+func (q *TaskQueueSlice) Stop() {
 	if q.cancel != nil {
 		q.cancel()
 	}
 }
 
-func (q *TaskQueue) Start(ctx context.Context) {
+func (q *TaskQueueSlice) Start(ctx context.Context) {
 	if q.started {
 		return
 	}
@@ -836,7 +755,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 // waitForTask returns a task that can be processed or a nil if context is canceled.
 // sleepDelay is used to sleep before check a task, e.g. in case of failed previous task.
 // If queue is empty, then it will be checked every DelayOnQueueIsEmpty.
-func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
+func (q *TaskQueueSlice) waitForTask(sleepDelay time.Duration) task.Task {
 	// Check Done channel.
 	select {
 	case <-q.ctx.Done():
@@ -922,7 +841,7 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 }
 
 // CancelTaskDelay breaks wait loop. Useful to break the possible long sleep delay.
-func (q *TaskQueue) CancelTaskDelay() {
+func (q *TaskQueueSlice) CancelTaskDelay() {
 	q.waitMu.Lock()
 	if q.waitInProgress {
 		q.cancelDelay = true
@@ -931,7 +850,7 @@ func (q *TaskQueue) CancelTaskDelay() {
 }
 
 // Iterate run doFn for every task.
-func (q *TaskQueue) Iterate(doFn func(task.Task)) {
+func (q *TaskQueueSlice) Iterate(doFn func(task.Task)) {
 	if doFn == nil {
 		return
 	}
@@ -946,7 +865,7 @@ func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 }
 
 // Filter run filterFn on every task and remove each with false result.
-func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
+func (q *TaskQueueSlice) Filter(filterFn func(task.Task) bool) {
 	if filterFn == nil {
 		return
 	}
@@ -967,7 +886,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 // TODO define mapping method with QueueAction to insert, modify and delete tasks.
 
 // Dump tasks in queue to one line
-func (q *TaskQueue) String() string {
+func (q *TaskQueueSlice) String() string {
 	var buf strings.Builder
 	var index int
 	qLen := q.Length()
@@ -983,29 +902,14 @@ func (q *TaskQueue) String() string {
 	return buf.String()
 }
 
-func (q *TaskQueue) withLock(fn func()) {
+func (q *TaskQueueSlice) withLock(fn func()) {
 	q.m.Lock()
 	fn()
 	q.m.Unlock()
 }
 
-func (q *TaskQueue) withRLock(fn func()) {
+func (q *TaskQueueSlice) withRLock(fn func()) {
 	q.m.RLock()
 	fn()
 	q.m.RUnlock()
-}
-
-func isNil(v interface{}) bool {
-	if v == nil {
-		return true
-	}
-
-	// Use reflection to check if the interface contains a nil concrete value
-	rv := reflect.ValueOf(v)
-	switch rv.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
-		return rv.IsNil()
-	default:
-		return false
-	}
 }
