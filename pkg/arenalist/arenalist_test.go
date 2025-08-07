@@ -2,19 +2,18 @@ package arenalist
 
 import (
 	"container/list"
-	"fmt"
 	"runtime"
 	"testing"
 )
 
-func BenchmarkContainerListPushBack(b *testing.B) {
+func Benchmark_STDLib_LinkedList_PushBack(b *testing.B) {
 	l := list.New()
 	for i := 0; i < b.N; i++ {
 		l.PushBack(i)
 	}
 }
 
-func BenchmarkArenaListPushBack(b *testing.B) {
+func Benchmark_ArenaList_PushBack(b *testing.B) {
 	l := New[int]()
 	for i := 0; i < b.N; i++ {
 		l.PushBack(i)
@@ -22,7 +21,7 @@ func BenchmarkArenaListPushBack(b *testing.B) {
 }
 
 // Benchmarks for a large number of elements
-func BenchmarkContainerList100kElements(b *testing.B) {
+func Benchmark_STDLib_LinkedList_100kElements(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		l := list.New()
 		for j := 0; j < 100000; j++ {
@@ -31,7 +30,7 @@ func BenchmarkContainerList100kElements(b *testing.B) {
 	}
 }
 
-func BenchmarkArenaList100kElements(b *testing.B) {
+func Benchmark_ArenaList_100kElements(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		l := New[int]()
 		for j := 0; j < 100000; j++ {
@@ -41,7 +40,7 @@ func BenchmarkArenaList100kElements(b *testing.B) {
 }
 
 // Benchmarks for insert operations in the middle
-func BenchmarkContainerListInsertMiddle(b *testing.B) {
+func Benchmark_STDLib_LinkedList_InsertMiddle(b *testing.B) {
 	l := list.New()
 	// Prepare the list with elements
 	for i := 0; i < 100000; i++ {
@@ -59,7 +58,7 @@ func BenchmarkContainerListInsertMiddle(b *testing.B) {
 	}
 }
 
-func BenchmarkArenaListInsertMiddle(b *testing.B) {
+func Benchmark_ArenaList_InsertMiddle(b *testing.B) {
 	l := New[int]()
 	// Prepare the list with elements
 	for i := 0; i < 100000; i++ {
@@ -78,7 +77,7 @@ func BenchmarkArenaListInsertMiddle(b *testing.B) {
 }
 
 // Benchmarks for iterating over the list
-func BenchmarkContainerListIteration(b *testing.B) {
+func Benchmark_STDLib_LinkedList_Iteration(b *testing.B) {
 	l := list.New()
 	for i := 0; i < 100000; i++ {
 		l.PushBack(i)
@@ -94,7 +93,7 @@ func BenchmarkContainerListIteration(b *testing.B) {
 	}
 }
 
-func BenchmarkArenaListIteration(b *testing.B) {
+func Benchmark_ArenaList_Iteration(b *testing.B) {
 	l := New[int]()
 	for i := 0; i < 100000; i++ {
 		l.PushBack(i)
@@ -111,7 +110,7 @@ func BenchmarkArenaListIteration(b *testing.B) {
 }
 
 // Benchmarks for removing elements
-func BenchmarkContainerListRemove(b *testing.B) {
+func Benchmark_STDLib_LinkedList_Remove(b *testing.B) {
 	l := list.New()
 	for i := 0; i < 100000; i++ {
 		l.PushBack(i)
@@ -131,7 +130,7 @@ func BenchmarkContainerListRemove(b *testing.B) {
 	}
 }
 
-func BenchmarkArenaListRemove(b *testing.B) {
+func Benchmark_ArenaList_Remove(b *testing.B) {
 	l := New[int]()
 	for i := 0; i < 100000; i++ {
 		l.PushBack(i)
@@ -492,55 +491,55 @@ func TestChunkAllocationAfterPartialRemove(t *testing.T) {
 	}
 }
 
-func TestArenaListVisualDemo(t *testing.T) {
-	fmt.Println("=== Visual demonstration of arenalist and chunks ===")
-	l := New[int]()
-	values := make([]int, 300)
-	for i := 0; i < 300; i++ {
-		values[i] = i + 1
-	}
-	var elems []*Element[int]
+// func TestArenaListVisualDemo(t *testing.T) {
+// 	fmt.Println("=== Visual demonstration of arenalist and chunks ===")
+// 	l := New[int]()
+// 	values := make([]int, 300)
+// 	for i := 0; i < 300; i++ {
+// 		values[i] = i + 1
+// 	}
+// 	var elems []*Element[int]
 
-	// Add elements to create several chunks
-	for i, v := range values {
-		e := l.PushBack(v)
-		elems = append(elems, e)
-		fmt.Printf("PushBack '%d' → Element at chunk %p idx %d\n", v, e.Chunk(), e.Index())
-		if (i+1)%ChunkSize == 0 {
-			fmt.Printf("--- Chunk is full, a new one will be created on the next insert ---\n")
-		}
-	}
+// 	// Add elements to create several chunks
+// 	for i, v := range values {
+// 		e := l.PushBack(v)
+// 		elems = append(elems, e)
+// 		fmt.Printf("PushBack '%d' → Element at chunk %p idx %d\n", v, e.Chunk(), e.Index())
+// 		if (i+1)%ChunkSize == 0 {
+// 			fmt.Printf("--- Chunk is full, a new one will be created on the next insert ---\n")
+// 		}
+// 	}
 
-	fmt.Println("\n=== List of elements and their chunks ===")
-	for e := l.Front(); e != nil; e = e.Next() {
-		fmt.Printf("Value: %d | chunk: %p | idx: %d | prev: %p | next: %p\n", e.Value, e.Chunk(), e.Index(), e.Prev(), e.Next())
-	}
+// 	fmt.Println("\n=== List of elements and their chunks ===")
+// 	for e := l.Front(); e != nil; e = e.Next() {
+// 		fmt.Printf("Value: %d | chunk: %p | idx: %d | prev: %p | next: %p\n", e.Value, e.Chunk(), e.Index(), e.Prev(), e.Next())
+// 	}
 
-	fmt.Println("\n=== Chunk structure ===")
-	for c := l.Chunks(); c != nil; c = c.next {
-		fmt.Printf("Chunk %p: ", c)
-		for i := 0; i < c.used; i++ {
-			el := &c.elements[i]
-			fmt.Printf("[%d idx:%d] ", el.Value, el.index)
-		}
-		fmt.Printf("→ next: %p\n", c.next)
-	}
+// 	fmt.Println("\n=== Chunk structure ===")
+// 	for c := l.Chunks(); c != nil; c = c.next {
+// 		fmt.Printf("Chunk %p: ", c)
+// 		for i := 0; i < c.used; i++ {
+// 			el := &c.elements[i]
+// 			fmt.Printf("[%d idx:%d] ", el.Value, el.index)
+// 		}
+// 		fmt.Printf("→ next: %p\n", c.next)
+// 	}
 
-	fmt.Println("\n=== Checking element links (next/prev) ===")
-	for _, e := range elems {
-		prevVal := 0
-		nextVal := 0
-		if e.Prev() != nil {
-			prevVal = e.Prev().Value
-		}
-		if e.Next() != nil {
-			nextVal = e.Next().Value
-		}
-		fmt.Printf("Element '%d': prev = %d, next = %d\n", e.Value, prevVal, nextVal)
-	}
+// 	fmt.Println("\n=== Checking element links (next/prev) ===")
+// 	for _, e := range elems {
+// 		prevVal := 0
+// 		nextVal := 0
+// 		if e.Prev() != nil {
+// 			prevVal = e.Prev().Value
+// 		}
+// 		if e.Next() != nil {
+// 			nextVal = e.Next().Value
+// 		}
+// 		fmt.Printf("Element '%d': prev = %d, next = %d\n", e.Value, prevVal, nextVal)
+// 	}
 
-	fmt.Println("\n=== Summary: head/tail/len ===")
-	fmt.Printf("Head: %d\n", l.Front().Value)
-	fmt.Printf("Tail: %d\n", l.Back().Value)
-	fmt.Printf("Len: %d\n", l.Len())
-}
+// 	fmt.Println("\n=== Summary: head/tail/len ===")
+// 	fmt.Printf("Head: %d\n", l.Front().Value)
+// 	fmt.Printf("Tail: %d\n", l.Back().Value)
+// 	fmt.Printf("Len: %d\n", l.Len())
+// }

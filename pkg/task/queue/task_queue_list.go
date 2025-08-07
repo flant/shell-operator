@@ -334,7 +334,7 @@ func (q *TaskQueue) GetFirst() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
-	return q.items.Front().Value.(task.Task)
+	return q.items.Front().Value
 }
 
 // AddLast adds new tail element.
@@ -457,7 +457,7 @@ func (q *TaskQueue) compaction() {
 			continue
 		}
 
-		targetTask := group.targetElement.Value.(task.Task)
+		targetTask := group.targetElement.Value
 		targetMetadata := targetTask.GetMetadata()
 
 		// Get slices from pools
@@ -480,7 +480,7 @@ func (q *TaskQueue) compaction() {
 
 		// Append contexts from other tasks and remove them
 		for _, elementToMerge := range group.elementsToMerge {
-			taskToMerge := elementToMerge.Value.(task.Task)
+			taskToMerge := elementToMerge.Value
 			mergeMetadata := taskToMerge.GetMetadata()
 			mergeContexts := mergeMetadata.(task_metadata.BindingContextAccessor).GetBindingContext()
 			mergeMonitorIDs := mergeMetadata.(task_metadata.MonitorIDAccessor).GetMonitorIDs()
@@ -503,7 +503,7 @@ func (q *TaskQueue) compaction() {
 		if q.CompactionCallback != nil && len(group.elementsToMerge) > 0 {
 			compactedTasks := make([]task.Task, 0, len(group.elementsToMerge))
 			for _, elementToMerge := range group.elementsToMerge {
-				compactedTasks = append(compactedTasks, elementToMerge.Value.(task.Task))
+				compactedTasks = append(compactedTasks, elementToMerge.Value)
 			}
 			q.CompactionCallback(compactedTasks, targetTask)
 		}
@@ -609,7 +609,7 @@ func (q *TaskQueue) getLast() task.Task {
 		return nil
 	}
 
-	return q.items.Back().Value.(task.Task)
+	return q.items.Back().Value
 }
 
 // Get returns a task by id.
@@ -627,7 +627,7 @@ func (q *TaskQueue) Get(id string) task.Task {
 // get returns a task by id.
 func (q *TaskQueue) get(id string) task.Task {
 	if element, ok := q.idIndex[id]; ok {
-		return element.Value.(task.Task)
+		return element.Value
 	}
 
 	return nil
@@ -933,7 +933,7 @@ func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 
 	q.withRLock(func() {
 		for e := q.items.Front(); e != nil; e = e.Next() {
-			doFn(e.Value.(task.Task))
+			doFn(e.Value)
 		}
 	})
 }
@@ -950,7 +950,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 		for e := q.items.Front(); e != nil; {
 			current := e
 			e = e.Next()
-			t := current.Value.(task.Task)
+			t := current.Value
 			if !filterFn(t) {
 				q.items.Remove(current)
 				delete(q.idIndex, t.GetId())

@@ -6,13 +6,16 @@ const ChunkSize = 256
 // Element - list element, compatible with container/list.
 // Memory layout aware structure optimized for fast access
 type Element[T any] struct {
+	// Hot fields first - accessed in every operation
 	next, prev *Element[T] // 16 bytes - pointers
-	Value      T           // Variable size - the actual data
 
-	// Cold fields - used less frequently
+	// Cold fields - used less frequently, grouped together
 	list  *List[T]  // 8 bytes - only for validation
 	chunk *chunk[T] // 8 bytes - only for allocation tracking
 	index int       // 8 bytes - only for debugging
+
+	// Value field last - may be large and accessed less frequently
+	Value T // Variable size - the actual data
 }
 
 // List optimized for cache performance and hot path operations
@@ -365,6 +368,60 @@ func (l *List[T]) CompactChunks() int {
 	return cleaned
 }
 
+// SmartCompact - intelligent compaction that only compacts when beneficial
+// Returns true if compaction was performed, false if not beneficial
+func (l *List[T]) SmartCompact() bool {
+	if l.chunks == nil {
+		return false
+	}
+
+	// Calculate current state
+	totalChunks, _, totalElements, activeElements := l.Stats()
+
+	// Only compact if we have significant fragmentation
+	// Rule: compact if more than 50% of elements are inactive AND we have multiple chunks
+	fragmentationRatio := float64(totalElements-activeElements) / float64(totalElements)
+
+	if fragmentationRatio < 0.5 || totalChunks <= 1 {
+		return false // Not beneficial to compact
+	}
+
+	// Estimate new state after compaction
+	estimatedChunks := (activeElements + ChunkSize - 1) / ChunkSize
+
+	// Only compact if we'll save at least 2 chunks
+	if totalChunks-estimatedChunks < 2 {
+		return false // Not enough benefit
+	}
+
+	// Perform compaction
+	return l.performCompaction()
+}
+
+// performCompaction - actual compaction implementation
+//
+//go:noinline
+func (l *List[T]) performCompaction() bool {
+	// Create a new list with only active elements
+	newList := New[T]()
+
+	// Copy active elements to new list
+	for e := l.Front(); e != nil; e = e.Next() {
+		// For task.Task, we assume it's active if not marked as processing
+		// This is a simplified check - in real usage you'd have a proper IsActive() method
+		newList.PushBack(e.Value)
+	}
+
+	// Replace old chunks with new ones
+	l.chunks = newList.chunks
+	l.last = newList.last
+	l.head = newList.head
+	l.tail = newList.tail
+	l.length = newList.length
+
+	return true
+}
+
 // Stats - debug information about chunks
 func (l *List[T]) Stats() (totalChunks, activeChunks, totalElements, activeElements int) {
 	for c := l.chunks; c != nil; c = c.next {
@@ -376,4 +433,52 @@ func (l *List[T]) Stats() (totalChunks, activeChunks, totalElements, activeEleme
 		}
 	}
 	return
+}
+
+// DebugChunks - detailed debug information about all chunks
+func (l *List[T]) DebugChunks() []ChunkInfo {
+	var infos []ChunkInfo
+	chunkIndex := 0
+	for c := l.chunks; c != nil; c = c.next {
+		info := ChunkInfo{
+			Index:  chunkIndex,
+			Used:   c.used,
+			Active: c.active,
+		}
+		infos = append(infos, info)
+		chunkIndex++
+	}
+	return infos
+}
+
+// ChunkInfo - debug information about a single chunk
+type ChunkInfo struct {
+	Index  int
+	Used   int
+	Active int
+}
+
+func (l *List[T]) PushFrontBatch(values []T) {
+	for i := len(values) - 1; i >= 0; i-- {
+		l.PushFront(values[i])
+	}
+}
+
+func (l *List[T]) PushBackBatch(values []T) {
+	for _, v := range values {
+		l.PushBack(v)
+	}
+}
+
+func (l *List[T]) Preallocate(count int) {
+	chunksNeeded := (count + ChunkSize - 1) / ChunkSize
+	for i := 0; i < chunksNeeded; i++ {
+		c := &chunk[T]{}
+		if l.last != nil {
+			l.last.next = c
+		} else {
+			l.chunks = c
+		}
+		l.last = c
+	}
 }

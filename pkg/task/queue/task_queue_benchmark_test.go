@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 
+	"github.com/flant/shell-operator/pkg/arenalist"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/task"
@@ -225,14 +226,21 @@ func createCompactionBenchmarkData(b *testing.B, size int) []task.Task {
 }
 
 func benchmarkTaskQueueCompaction(b *testing.B, size int) {
+	q := NewTasksQueue()
+	q.WithCompactableTypes([]task.TaskType{task_metadata.HookRun})
+
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		q := NewTasksQueue()
-		q.WithCompactableTypes([]task.TaskType{task_metadata.HookRun})
+		// Очищаем очередь для следующей итерации
+		q.items = arenalist.New[task.Task]()
+		q.idIndex = make(map[string]*arenalist.Element[task.Task])
+		q.isCompactable = false
+
 		tasks := createCompactionBenchmarkData(b, size)
 		// Setup queue without triggering compaction
 		for _, t := range tasks {
 			q.items.PushBack(t)
+			q.idIndex[t.GetId()] = q.items.Back()
 		}
 
 		b.StartTimer()
