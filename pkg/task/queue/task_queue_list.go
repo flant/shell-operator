@@ -1,7 +1,6 @@
 package queue
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	"log/slog"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	"github.com/flant/shell-operator/pkg/arenalist"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -65,7 +65,7 @@ var (
 	compactionGroupPool = sync.Pool{
 		New: func() interface{} {
 			return &compactionGroup{
-				elementsToMerge: make([]*list.Element, 0, 8),
+				elementsToMerge: make([]*arenalist.Element[task.Task], 0, 8),
 			}
 		},
 	}
@@ -92,8 +92,8 @@ var (
 )
 
 type compactionGroup struct {
-	targetElement   *list.Element
-	elementsToMerge []*list.Element
+	targetElement   *arenalist.Element[task.Task]
+	elementsToMerge []*arenalist.Element[task.Task]
 	totalContexts   int
 	totalMonitorIDs int
 }
@@ -118,8 +118,8 @@ type TaskQueue struct {
 	waitInProgress bool
 	cancelDelay    bool
 
-	items   *list.List
-	idIndex map[string]*list.Element
+	items   *arenalist.List[task.Task]
+	idIndex map[string]*arenalist.Element[task.Task]
 
 	started bool // a flag to ignore multiple starts
 
@@ -150,8 +150,8 @@ type TaskQueue struct {
 
 func NewTasksQueue() *TaskQueue {
 	return &TaskQueue{
-		items:   list.New(),
-		idIndex: make(map[string]*list.Element),
+		items:   arenalist.New[task.Task](),
+		idIndex: make(map[string]*arenalist.Element[task.Task]),
 		// Default timings
 		WaitLoopCheckInterval: DefaultWaitLoopCheckInterval,
 		DelayOnQueueIsEmpty:   DefaultDelayOnQueueIsEmpty,
@@ -321,7 +321,7 @@ func (q *TaskQueue) removeFirst() task.Task {
 	}
 
 	element := q.items.Front()
-	t := q.items.Remove(element).(task.Task)
+	t := q.items.Remove(element).Value
 	delete(q.idIndex, t.GetId())
 	return t
 }
@@ -586,7 +586,7 @@ func (q *TaskQueue) removeLast() task.Task {
 	}
 
 	element := q.items.Back()
-	t := q.items.Remove(element).(task.Task)
+	t := q.items.Remove(element).Value
 	delete(q.idIndex, t.GetId())
 
 	return t
@@ -679,7 +679,7 @@ func (q *TaskQueue) Remove(id string) task.Task {
 
 func (q *TaskQueue) remove(id string) task.Task {
 	if element, ok := q.idIndex[id]; ok {
-		t := q.items.Remove(element).(task.Task)
+		t := q.items.Remove(element).Value
 		delete(q.idIndex, id)
 		return t
 	}

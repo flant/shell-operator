@@ -115,45 +115,45 @@ func benchmarkGetByID(b *testing.B, queue Queue, size int) {
 }
 
 /* Old code */
-func BenchmarkTaskQueueSlice_AddLast_100(b *testing.B) {
-	benchmarkAddLast(b, NewTasksQueueSlice(), 100)
-}
+// func BenchmarkTaskQueueSlice_AddLast_100(b *testing.B) {
+// 	benchmarkAddLast(b, NewTasksQueueSlice(), 100)
+// }
 
-func BenchmarkTaskQueueSlice_AddLast_1000(b *testing.B) {
-	benchmarkAddLast(b, NewTasksQueueSlice(), 1000)
-}
+// func BenchmarkTaskQueueSlice_AddLast_1000(b *testing.B) {
+// 	benchmarkAddLast(b, NewTasksQueueSlice(), 1000)
+// }
 
-func BenchmarkTaskQueueSlice_AddFirst_100(b *testing.B) {
-	benchmarkAddFirst(b, NewTasksQueueSlice(), 100)
-}
+// func BenchmarkTaskQueueSlice_AddFirst_100(b *testing.B) {
+// 	benchmarkAddFirst(b, NewTasksQueueSlice(), 100)
+// }
 
-func BenchmarkTaskQueueSlice_AddFirst_1000(b *testing.B) {
-	benchmarkAddFirst(b, NewTasksQueueSlice(), 1000)
-}
+// func BenchmarkTaskQueueSlice_AddFirst_1000(b *testing.B) {
+// 	benchmarkAddFirst(b, NewTasksQueueSlice(), 1000)
+// }
 
-func BenchmarkTaskQueueSlice_RemoveFirst_100(b *testing.B) {
-	benchmarkRemoveFirst(b, NewTasksQueueSlice(), 100)
-}
+// func BenchmarkTaskQueueSlice_RemoveFirst_100(b *testing.B) {
+// 	benchmarkRemoveFirst(b, NewTasksQueueSlice(), 100)
+// }
 
-func BenchmarkTaskQueueSlice_RemoveFirst_1000(b *testing.B) {
-	benchmarkRemoveFirst(b, NewTasksQueueSlice(), 1000)
-}
+// func BenchmarkTaskQueueSlice_RemoveFirst_1000(b *testing.B) {
+// 	benchmarkRemoveFirst(b, NewTasksQueueSlice(), 1000)
+// }
 
-func BenchmarkTaskQueueSlice_GetFirst_100(b *testing.B) {
-	benchmarkGetFirst(b, NewTasksQueueSlice(), 100)
-}
+// func BenchmarkTaskQueueSlice_GetFirst_100(b *testing.B) {
+// 	benchmarkGetFirst(b, NewTasksQueueSlice(), 100)
+// }
 
-func BenchmarkTaskQueueSlice_GetFirst_1000(b *testing.B) {
-	benchmarkGetFirst(b, NewTasksQueueSlice(), 1000)
-}
+// func BenchmarkTaskQueueSlice_GetFirst_1000(b *testing.B) {
+// 	benchmarkGetFirst(b, NewTasksQueueSlice(), 1000)
+// }
 
-func BenchmarkTaskQueueSlice_GetByID_100(b *testing.B) {
-	benchmarkGetByID(b, NewTasksQueueSlice(), 100)
-}
+// func BenchmarkTaskQueueSlice_GetByID_100(b *testing.B) {
+// 	benchmarkGetByID(b, NewTasksQueueSlice(), 100)
+// }
 
-func BenchmarkTaskQueueSlice_GetByID_1000(b *testing.B) {
-	benchmarkGetByID(b, NewTasksQueueSlice(), 1000)
-}
+// func BenchmarkTaskQueueSlice_GetByID_1000(b *testing.B) {
+// 	benchmarkGetByID(b, NewTasksQueueSlice(), 1000)
+// }
 
 /* New code */
 func BenchmarkTaskQueue_AddLast_100(b *testing.B)   { benchmarkAddLast(b, NewTasksQueue(), 100) }
