@@ -350,13 +350,15 @@ func (q *TaskQueue) AddLast(t task.Task) {
 // addLast adds a new tail element.
 // It implements the merging logic for HookRun tasks by scanning the whole queue.
 func (q *TaskQueue) addLast(t task.Task) {
-	q.logger.Debug("adding task to queue",
-		slog.String("queue", q.Name),
-		slog.String("task_id", t.GetId()),
-		slog.String("task_type", string(t.GetType())),
-		slog.String("task_description", t.GetDescription()),
-		slog.Int("queue_length_before", q.items.Len()),
-	)
+	q.lazydebug("adding task to queue", func() []any {
+		return []any{
+			slog.String("queue", q.Name),
+			slog.String("task_id", t.GetId()),
+			slog.String("task_type", string(t.GetType())),
+			slog.String("task_description", t.GetDescription()),
+			slog.Int("queue_length_before", q.items.Len()),
+		}
+	})
 
 	if _, ok := q.idIndex[t.GetId()]; ok {
 		q.logger.Warn("task collision detected, unexpected behavior possible", slog.String("queue", q.Name), slog.String("task_id", t.GetId()))
@@ -369,36 +371,44 @@ func (q *TaskQueue) addLast(t task.Task) {
 	if _, ok := q.compactableTypes[taskType]; ok {
 		q.isCompactable = true
 
-		q.logger.Debug("task is mergeable, marking queue as dirty",
-			slog.String("queue", q.Name),
-			slog.String("task_id", t.GetId()),
-			slog.String("task_type", string(taskType)),
-			slog.Int("queue_length", q.items.Len()),
-			slog.Bool("queue_is_dirty", q.isCompactable),
-		)
+		q.lazydebug("task is mergeable, marking queue as dirty", func() []any {
+			return []any{
+				slog.String("queue", q.Name),
+				slog.String("task_id", t.GetId()),
+				slog.String("task_type", string(taskType)),
+				slog.Int("queue_length", q.items.Len()),
+				slog.Bool("queue_is_dirty", q.isCompactable),
+			}
+		})
 
 		// Only trigger compaction if queue is getting long and we have mergeable tasks
 		if q.items.Len() > compactionThreshold && q.isCompactable {
-			q.logger.Debug("triggering compaction due to queue length",
-				slog.String("queue", q.Name),
-				slog.Int("queue_length", q.items.Len()),
-				slog.Int("compaction_threshold", compactionThreshold),
-			)
+			q.lazydebug("triggering compaction due to queue length", func() []any {
+				return []any{
+					slog.String("queue", q.Name),
+					slog.Int("queue_length", q.items.Len()),
+					slog.Int("compaction_threshold", compactionThreshold),
+				}
+			})
 			currentQueue := q.items.Len()
 			q.compaction()
-			q.logger.Debug("compaction finished",
-				slog.String("queue", q.Name),
-				slog.Int("queue_length_before", currentQueue),
-				slog.Int("queue_length_after", q.items.Len()),
-			)
+			q.lazydebug("compaction finished", func() []any {
+				return []any{
+					slog.String("queue", q.Name),
+					slog.Int("queue_length_before", currentQueue),
+					slog.Int("queue_length_after", q.items.Len()),
+				}
+			})
 			q.isCompactable = false
 		}
 	} else {
-		q.logger.Debug("task is not mergeable",
-			slog.String("queue", q.Name),
-			slog.String("task_id", t.GetId()),
-			slog.String("task_type", string(taskType)),
-		)
+		q.lazydebug("task is not mergeable", func() []any {
+			return []any{
+				slog.String("queue", q.Name),
+				slog.String("task_id", t.GetId()),
+				slog.String("task_type", string(taskType)),
+			}
+		})
 	}
 }
 
