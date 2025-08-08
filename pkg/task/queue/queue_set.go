@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
+
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
@@ -73,12 +75,26 @@ func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
 	tqs.m.Unlock()
 }
 
-func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult) {
+type QueueOpts struct {
+	Handler            func(ctx context.Context, t task.Task) TaskResult
+	CompactableTypes   []task.TaskType
+	CompactionCallback func(compactedTasks []task.Task, targetTask task.Task)
+	Logger             *log.Logger
+}
+
+func (tqs *TaskQueueSet) NewNamedQueue(name string, opts QueueOpts) {
 	q := NewTasksQueue()
 	q.WithName(name)
-	q.WithHandler(handler)
+	q.WithHandler(opts.Handler)
 	q.WithContext(tqs.ctx)
 	q.WithMetricStorage(tqs.metricStorage)
+	q.WithCompactableTypes(opts.CompactableTypes)
+	if opts.CompactionCallback != nil {
+		q.WithCompactionCallback(opts.CompactionCallback)
+	}
+	if opts.Logger != nil {
+		q.WithLogger(opts.Logger)
+	}
 	tqs.m.Lock()
 	tqs.Queues[name] = q
 	tqs.m.Unlock()
