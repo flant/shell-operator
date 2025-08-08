@@ -146,6 +146,11 @@ type TaskQueue struct {
 	contextBuffer   []bindingcontext.BindingContext
 	monitorIDBuffer []string
 	groupBuffer     map[string]*compactionGroup
+
+	// Background compaction
+	compactionCh          chan struct{}
+	lastCompactionAt      time.Time
+	compactionMinInterval time.Duration
 }
 
 func NewTasksQueue() *TaskQueue {
@@ -161,9 +166,11 @@ func NewTasksQueue() *TaskQueue {
 		},
 		logger: log.NewNop(),
 		// Pre-allocate buffers
-		contextBuffer:   make([]bindingcontext.BindingContext, 0, 128),
-		monitorIDBuffer: make([]string, 0, 128),
-		groupBuffer:     make(map[string]*compactionGroup, 32),
+		contextBuffer:         make([]bindingcontext.BindingContext, 0, 128),
+		monitorIDBuffer:       make([]string, 0, 128),
+		groupBuffer:           make(map[string]*compactionGroup, 32),
+		compactionCh:          make(chan struct{}, 1),
+		compactionMinInterval: 300 * time.Millisecond,
 	}
 }
 
@@ -375,21 +382,12 @@ func (q *TaskQueue) addLast(t task.Task) {
 			slog.Bool("queue_is_dirty", q.isCompactable),
 		)
 
-		// Only trigger compaction if queue is getting long and we have mergeable tasks
-		if q.items.Len() > 100 && q.isCompactable {
-			q.logger.Debug("triggering compaction due to queue length",
-				slog.String("queue", q.Name),
-				slog.Int("queue_length", q.items.Len()),
-				slog.Int("compaction_threshold", 100),
-			)
-			currentQueue := q.items.Len()
-			q.compaction()
-			q.logger.Debug("compaction finished",
-				slog.String("queue", q.Name),
-				slog.Int("queue_length_before", currentQueue),
-				slog.Int("queue_length_after", q.items.Len()),
-			)
-			q.isCompactable = false
+		// Signal background compaction worker (non-blocking) when queue is long
+		if q.items.Len() > 100 {
+			select {
+			case q.compactionCh <- struct{}{}:
+			default:
+			}
 		}
 	} else {
 		q.logger.Debug("task is not mergeable",
@@ -420,7 +418,7 @@ func (q *TaskQueue) compaction() {
 
 	// First pass: identify groups and calculate sizes
 	for e := q.items.Front(); e != nil; e = e.Next() {
-		t := e.Value.(task.Task)
+		t := e.Value
 		taskType := t.GetType()
 
 		if _, ok := q.compactableTypes[taskType]; !ok {
@@ -496,7 +494,9 @@ func (q *TaskQueue) compaction() {
 		compactedContexts := compactBindingContexts(newContexts)
 
 		withContext := targetMetadata.(task_metadata.BindingContextSetter).SetBindingContext(compactedContexts)
-		withContext = withContext.(task_metadata.MonitorIDSetter).SetMonitorIDs(newMonitorIDs)
+		// Copy monitor IDs to detach from pooled storage
+		copiedMonitorIDs := append([]string(nil), newMonitorIDs...)
+		withContext = withContext.(task_metadata.MonitorIDSetter).SetMonitorIDs(copiedMonitorIDs)
 		targetTask.UpdateMetadata(withContext)
 
 		// Call compaction callback if set
@@ -712,6 +712,41 @@ func (q *TaskQueue) Start(ctx context.Context) {
 		return
 	}
 
+	// background compaction worker
+	go func() {
+		ticker := time.NewTicker(q.compactionMinInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-q.ctx.Done():
+				return
+			case <-q.compactionCh:
+				q.withLock(func() {
+					// throttle by time window
+					if time.Since(q.lastCompactionAt) < q.compactionMinInterval {
+						return
+					}
+					if q.isCompactable && q.items.Len() > 1 {
+						q.compaction()
+						q.isCompactable = false
+						q.lastCompactionAt = time.Now()
+					}
+				})
+			case <-ticker.C:
+				// periodic check, compact if queue is long and marked dirty
+				q.withLock(func() {
+					if q.isCompactable && q.items.Len() > 100 {
+						q.compaction()
+						q.isCompactable = false
+						q.lastCompactionAt = time.Now()
+					}
+				})
+			}
+		}
+	}()
+
 	go func() {
 		q.SetStatus("")
 		var sleepDelay time.Duration
@@ -729,8 +764,12 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					q.lazydebug("triggering compaction before task processing", func() []any {
 						return []any{slog.String("queue", q.Name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.items.Len())}
 					})
-					q.compaction()
-					q.isCompactable = false
+					// Compact here only if throttling allows it
+					if time.Since(q.lastCompactionAt) >= q.compactionMinInterval {
+						q.compaction()
+						q.isCompactable = false
+						q.lastCompactionAt = time.Now()
+					}
 
 					q.lazydebug("compaction completed, queue no longer dirty", func() []any {
 						return []any{slog.String("queue", q.Name), slog.Int("queue_length_after", q.items.Len())}

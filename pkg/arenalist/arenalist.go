@@ -13,6 +13,8 @@ type Element[T any] struct {
 	list  *List[T]  // 8 bytes - only for validation
 	chunk *chunk[T] // 8 bytes - only for allocation tracking
 	index int       // 8 bytes - only for debugging
+	// Generation used to invalidate stale pointers across compactions
+	generation int
 
 	// Value field last - may be large and accessed less frequently
 	Value T // Variable size - the actual data
@@ -23,6 +25,7 @@ type List[T any] struct {
 	// Hot fields first - used constantly
 	head, tail *Element[T] // 16 bytes - critical for all operations
 	length     int         // 8 bytes - checked frequently
+	generation int         // 8 bytes - increments on compaction
 
 	// Cold fields - arena management
 	last   *chunk[T] // 8 bytes - only for allocation
@@ -96,7 +99,7 @@ func (l *List[T]) PushBack(v T) *Element[T] {
 }
 
 func (l *List[T]) InsertBefore(v T, mark *Element[T]) *Element[T] {
-	if mark.list != l {
+	if mark == nil || mark.list != l || mark.generation != l.generation {
 		return nil
 	}
 	e := l.alloc(v)
@@ -113,7 +116,7 @@ func (l *List[T]) InsertBefore(v T, mark *Element[T]) *Element[T] {
 }
 
 func (l *List[T]) InsertAfter(v T, mark *Element[T]) *Element[T] {
-	if mark.list != l {
+	if mark == nil || mark.list != l || mark.generation != l.generation {
 		return nil
 	}
 	e := l.alloc(v)
@@ -131,7 +134,7 @@ func (l *List[T]) InsertAfter(v T, mark *Element[T]) *Element[T] {
 
 // Remove - fast removal with validation for public API
 func (l *List[T]) Remove(e *Element[T]) *Element[T] {
-	if e == nil || e.list != l || e.list == nil {
+	if e == nil || e.list != l || e.list == nil || e.generation != l.generation {
 		return nil
 	}
 
@@ -149,20 +152,15 @@ func (l *List[T]) Remove(e *Element[T]) *Element[T] {
 
 	// Decrease active count and maybe cleanup chunk
 	if e.chunk != nil {
-		e.chunk.active--
+		if e.chunk.active > 0 {
+			e.chunk.active--
+		}
 		// Reset chunk for reuse when it becomes empty
 		if e.chunk.active == 0 {
-			e.chunk.used = 0 // Reset for reuse!
-
-			// Special case: if both first and last chunks are empty, merge them
-			if l.chunks != l.last && l.chunks.active == 0 && l.last.active == 0 {
-				// Make first chunk the only chunk
-				l.last = l.chunks
-				// Clean up the old last chunk
-				l.сleanupсhunk(e.chunk)
-			} else if e.chunk != l.chunks && e.chunk != l.last {
-				// Only cleanup non-essential chunks (not first or last)
-				l.сleanupсhunk(e.chunk)
+			e.chunk.used = 0 // Reset for reuse
+			// Only cleanup non-essential chunks (not first or last)
+			if e.chunk != l.chunks && e.chunk != l.last {
+				l.cleanupChunk(e.chunk)
 			}
 		}
 	}
@@ -171,16 +169,28 @@ func (l *List[T]) Remove(e *Element[T]) *Element[T] {
 	e.next = nil
 	e.prev = nil
 	e.list = nil // Mark as removed for double-remove protection
+	e.chunk = nil
 	// Keep Value for caller
 
 	l.length--
+	// If list is empty, collapse all chunks into a single reusable first chunk
+	if l.length == 0 && l.chunks != nil {
+		// Ensure the first chunk is kept and detached from the rest
+		first := l.chunks
+		// Reset counters for clean reuse
+		first.used = 0
+		first.active = 0
+		// Drop the rest of the chain for GC
+		first.next = nil
+		l.last = first
+	}
 	return e
 }
 
 // MoveToFront - optimized movement without allocation
 func (l *List[T]) MoveToFront(e *Element[T]) {
 	// Validation and fast path
-	if e == nil || e.list != l || l.head == e {
+	if e == nil || e.list != l || e.generation != l.generation || l.head == e {
 		return
 	}
 
@@ -207,7 +217,7 @@ func (l *List[T]) MoveToFront(e *Element[T]) {
 // MoveToBack - optimized movement without allocation
 func (l *List[T]) MoveToBack(e *Element[T]) {
 	// Validation and fast path
-	if e == nil || e.list != l || l.tail == e {
+	if e == nil || e.list != l || e.generation != l.generation || l.tail == e {
 		return
 	}
 
@@ -243,6 +253,7 @@ func (l *List[T]) alloc(val T) *Element[T] {
 		e.list = l
 		e.chunk = last
 		e.index = i
+		e.generation = l.generation
 		e.next = nil
 		e.prev = nil
 
@@ -277,6 +288,7 @@ func (l *List[T]) allocSlow(val T) *Element[T] {
 	e.list = l
 	e.chunk = c
 	e.index = 0
+	e.generation = l.generation
 	e.next = nil
 	e.prev = nil
 
@@ -300,8 +312,8 @@ func (l *List[T]) LastChunk() *chunk[T] {
 	return l.last
 }
 
-// maybeCleanupChunk - aggressive cleanup of empty chunks to prevent memory leaks
-func (l *List[T]) сleanupсhunk(targetChunk *chunk[T]) {
+// cleanupChunk - aggressive cleanup of empty chunks to prevent memory leaks
+func (l *List[T]) cleanupChunk(targetChunk *chunk[T]) {
 	if targetChunk == nil || targetChunk.active > 0 {
 		return // Chunk still has active elements
 	}
@@ -366,60 +378,6 @@ func (l *List[T]) CompactChunks() int {
 	}
 
 	return cleaned
-}
-
-// SmartCompact - intelligent compaction that only compacts when beneficial
-// Returns true if compaction was performed, false if not beneficial
-func (l *List[T]) SmartCompact() bool {
-	if l.chunks == nil {
-		return false
-	}
-
-	// Calculate current state
-	totalChunks, _, totalElements, activeElements := l.Stats()
-
-	// Only compact if we have significant fragmentation
-	// Rule: compact if more than 50% of elements are inactive AND we have multiple chunks
-	fragmentationRatio := float64(totalElements-activeElements) / float64(totalElements)
-
-	if fragmentationRatio < 0.5 || totalChunks <= 1 {
-		return false // Not beneficial to compact
-	}
-
-	// Estimate new state after compaction
-	estimatedChunks := (activeElements + ChunkSize - 1) / ChunkSize
-
-	// Only compact if we'll save at least 2 chunks
-	if totalChunks-estimatedChunks < 2 {
-		return false // Not enough benefit
-	}
-
-	// Perform compaction
-	return l.performCompaction()
-}
-
-// performCompaction - actual compaction implementation
-//
-//go:noinline
-func (l *List[T]) performCompaction() bool {
-	// Create a new list with only active elements
-	newList := New[T]()
-
-	// Copy active elements to new list
-	for e := l.Front(); e != nil; e = e.Next() {
-		// For task.Task, we assume it's active if not marked as processing
-		// This is a simplified check - in real usage you'd have a proper IsActive() method
-		newList.PushBack(e.Value)
-	}
-
-	// Replace old chunks with new ones
-	l.chunks = newList.chunks
-	l.last = newList.last
-	l.head = newList.head
-	l.tail = newList.tail
-	l.length = newList.length
-
-	return true
 }
 
 // Stats - debug information about chunks

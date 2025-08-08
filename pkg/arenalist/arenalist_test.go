@@ -338,7 +338,7 @@ func TestChunkCleanupEdgeCases(t *testing.T) {
 	e1 := l.PushBack(1)
 
 	// Try to cleanup first chunk (should be protected)
-	l.сleanupсhunk(l.chunks)
+	l.cleanupChunk(l.chunks)
 
 	totalChunks, _, _, _ := l.Stats()
 	if totalChunks != 1 {
