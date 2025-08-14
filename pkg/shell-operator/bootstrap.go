@@ -52,10 +52,10 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		return nil, err
 	}
 
-	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, []string{
-		"hook",
-		"binding",
-		"queue",
+	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, map[string]string{
+		"hook":    "",
+		"binding": "",
+		"queue":   "",
 	})
 	if err != nil {
 		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble common operator", log.Err(err))
@@ -74,7 +74,7 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 // AssembleCommonOperator instantiate common dependencies. These dependencies
 // may be used for shell-operator derivatives, like addon-operator.
 // requires listenAddress, listenPort to run http server for operator APIs
-func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string) error {
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels map[string]string) error {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics

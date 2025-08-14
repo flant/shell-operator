@@ -338,6 +338,11 @@ func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[st
 		return nil
 	}
 
+	err := operation.ValidateOperations(ops)
+	if err != nil {
+		return err
+	}
+
 	// Group operations by 'Group' value.
 	groupedOps := make(map[string][]operation.MetricOperation)
 	nonGroupedOps := make([]operation.MetricOperation, 0)
@@ -359,7 +364,7 @@ func (m *MetricStorage) SendBatch(ops []operation.MetricOperation, labels map[st
 	}
 
 	// Send non-grouped metrics.
-	err := m.sendBatchV0(nonGroupedOps, labels)
+	err = m.sendBatchV0(nonGroupedOps, labels)
 	if err != nil {
 		return err
 	}

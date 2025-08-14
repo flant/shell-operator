@@ -3,21 +3,18 @@ package shell_operator
 import (
 	"net/http"
 
-	metricstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/metric"
-	oldmetricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 )
 
 func (op *ShellOperator) setupHookMetricStorage() {
-	oldmetricStorage := oldmetricstorage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, true, op.logger.Named("metric-storage"))
-	metricStorage := metricstorage.NewMetricStorage(app.PrometheusMetricsPrefix, metricstorage.WithNewRegistry(), metricstorage.WithLogger(op.logger.Named("metric-storage")))
+	metricStorage := metricstorage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, true, op.logger.Named("metric-storage"))
 
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics/hooks", metricStorage.Handler().ServeHTTP)
 	// create new metric storage for hooks
 	// register scrape handler
-	op.HookMetricStorage = oldmetricStorage
-	op.NewHookMetricStorage = metricStorage
+	op.HookMetricStorage = metricStorage
 }
 
 // specific metrics for shell-operator HookManager
