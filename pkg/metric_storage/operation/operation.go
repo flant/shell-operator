@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
-	"github.com/hashicorp/go-multierror"
+	"github.com/deckhouse/deckhouse/pkg/metrics-storage/operation"
 )
 
 type MetricOperation struct {
@@ -24,40 +23,8 @@ type MetricOperation struct {
 	Action  string            `json:"action,omitempty"`
 }
 
-func (m MetricOperation) String() string {
-	parts := make([]string, 0)
-
-	if m.Group != "" {
-		parts = append(parts, "group="+m.Group)
-	}
-	if m.Name != "" {
-		parts = append(parts, "name="+m.Name)
-	}
-	if m.Action != "" {
-		parts = append(parts, "action="+m.Action)
-	}
-
-	if m.Value != nil {
-		parts = append(parts, fmt.Sprintf("value=%f", *m.Value))
-	}
-	if m.Set != nil {
-		parts = append(parts, fmt.Sprintf("set=%f", *m.Set))
-	}
-	if m.Add != nil {
-		parts = append(parts, fmt.Sprintf("add=%f", *m.Add))
-	}
-	if m.Buckets != nil {
-		parts = append(parts, fmt.Sprintf("buckets=%+v", m.Buckets))
-	}
-	if m.Labels != nil {
-		parts = append(parts, fmt.Sprintf("labels=%+v", m.Labels))
-	}
-
-	return "[" + strings.Join(parts, ", ") + "]"
-}
-
-func MetricOperationsFromReader(r io.Reader, defaultGroup string) ([]MetricOperation, error) {
-	operations := make([]MetricOperation, 0)
+func MetricOperationsFromReader(r io.Reader, defaultGroup string) ([]operation.MetricOperation, error) {
+	operations := make([]operation.MetricOperation, 0)
 
 	dec := json.NewDecoder(r)
 	for {
@@ -83,17 +50,53 @@ func MetricOperationsFromReader(r io.Reader, defaultGroup string) ([]MetricOpera
 			metricOperation.Group = defaultGroup
 		}
 
-		operations = append(operations, metricOperation)
+		op := operation.MetricOperation{
+			Name:    metricOperation.Name,
+			Value:   metricOperation.Value,
+			Buckets: metricOperation.Buckets,
+			Labels:  metricOperation.Labels,
+			Group:   metricOperation.Group,
+		}
+
+		operations = append(operations, op)
 	}
 
 	return operations, nil
 }
 
-func MetricOperationsFromBytes(data []byte, defaultGroup string) ([]MetricOperation, error) {
+func remapMetricOperations(ops []MetricOperation) []operation.MetricOperation {
+	newOps := make([]operation.MetricOperation, len(ops))
+	for _, op := range ops {
+		newOp := operation.MetricOperation{
+			Name:    op.Name,
+			Value:   op.Value,
+			Buckets: op.Buckets,
+			Labels:  op.Labels,
+			Group:   op.Group,
+		}
+
+		switch op.Action {
+		case "add":
+			newOp.Action = operation.ActionCounterAdd
+		case "set":
+			newOp.Action = operation.ActionGaugeSet
+		case "observe":
+			newOp.Action = operation.ActionHistogramObserve
+		case "expire":
+			newOp.Action = operation.ActionExpireMetrics
+		}
+
+		newOps = append(newOps, newOp)
+	}
+
+	return newOps
+}
+
+func MetricOperationsFromBytes(data []byte, defaultGroup string) ([]operation.MetricOperation, error) {
 	return MetricOperationsFromReader(bytes.NewReader(data), defaultGroup)
 }
 
-func MetricOperationsFromFile(filePath, defaultGroup string) ([]MetricOperation, error) {
+func MetricOperationsFromFile(filePath, defaultGroup string) ([]operation.MetricOperation, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %s", filePath, err)
@@ -102,62 +105,6 @@ func MetricOperationsFromFile(filePath, defaultGroup string) ([]MetricOperation,
 	if len(data) == 0 {
 		return nil, nil
 	}
+
 	return MetricOperationsFromBytes(data, defaultGroup)
-}
-
-func ValidateOperations(ops []MetricOperation) error {
-	var opsErrs *multierror.Error
-
-	for _, op := range ops {
-		err := ValidateMetricOperation(op)
-		if err != nil {
-			opsErrs = multierror.Append(opsErrs, err)
-		}
-	}
-
-	return opsErrs.ErrorOrNil()
-}
-
-func ValidateMetricOperation(op MetricOperation) error {
-	var opErrs *multierror.Error
-
-	if op.Action == "" {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("one of: 'action', 'set' or 'add' is required: %s", op))
-	}
-
-	if op.Group == "" {
-		if op.Action != "set" && op.Action != "add" && op.Action != "observe" {
-			opErrs = multierror.Append(opErrs, fmt.Errorf("unsupported action '%s': %s", op.Action, op))
-		}
-	} else {
-		if op.Action != "expire" && op.Action != "set" && op.Action != "add" {
-			opErrs = multierror.Append(opErrs, fmt.Errorf("unsupported action '%s': %s", op.Action, op))
-		}
-	}
-
-	if op.Name == "" && op.Group == "" {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("'name' is required: %s", op))
-	}
-	if op.Name == "" && op.Group != "" && op.Action != "expire" {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("'name' is required when action is not 'expire': %s", op))
-	}
-
-	if op.Action == "set" && op.Value == nil {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("'value' is required for action 'set': %s", op))
-	}
-	if op.Action == "add" && op.Value == nil {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("'value' is required for action 'add': %s", op))
-	}
-	if op.Action == "observe" && op.Value == nil {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("'value' is required for action 'observe': %s", op))
-	}
-	if op.Action == "observe" && op.Buckets == nil {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("'buckets' is required for action 'observe': %s", op))
-	}
-
-	if op.Set != nil && op.Add != nil {
-		opErrs = multierror.Append(opErrs, fmt.Errorf("'set' and 'add' are mutual exclusive: %s", op))
-	}
-
-	return opErrs.ErrorOrNil()
 }
