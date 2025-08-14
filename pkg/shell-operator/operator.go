@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/otel"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -46,11 +47,13 @@ type ShellOperator struct {
 	APIServer *baseHTTPServer
 
 	// MetricStorage collects and store metrics for built-in operator primitives, hook execution
-	MetricStorage metric.Storage
+	MetricStorage    metric.Storage
+	NewMetricStorage metricsstorage.Storage
 	// HookMetricStorage separate metric storage for metrics, which are returned by user hooks
-	HookMetricStorage metric.Storage
-	KubeClient        *klient.Client
-	ObjectPatcher     *objectpatch.ObjectPatcher
+	HookMetricStorage    metric.Storage
+	NewHookMetricStorage metricsstorage.Storage
+	KubeClient           *klient.Client
+	ObjectPatcher        *objectpatch.ObjectPatcher
 
 	ScheduleManager   schedulemanager.ScheduleManager
 	KubeEventsManager kubeeventsmanager.KubeEventsManager
@@ -676,7 +679,7 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 	}
 
 	// Try to update custom metrics
-	err = op.HookMetricStorage.SendBatch(result.Metrics, map[string]string{
+	err = op.NewHookMetricStorage.ApplyBatchOperations(result.Metrics, map[string]string{
 		"hook": hookMeta.HookName,
 	})
 	if err != nil {

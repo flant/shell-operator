@@ -15,13 +15,14 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/time/rate"
 
+	"github.com/deckhouse/deckhouse/pkg/metrics-storage/operation"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/metric_storage/operation"
+	operationpkg "github.com/flant/shell-operator/pkg/metric_storage/operation"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -175,7 +176,7 @@ func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.Bin
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
 
-	result.Metrics, err = operation.MetricOperationsFromFile(metricsPath, h.Name)
+	result.Metrics, err = operationpkg.MetricOperationsFromFile(metricsPath, h.Name)
 	if err != nil {
 		return result, fmt.Errorf("got bad metrics: %s", err)
 	}
