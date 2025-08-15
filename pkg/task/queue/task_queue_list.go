@@ -40,28 +40,6 @@ var (
 	DefaultDelayOnRepeat            = 25 * time.Millisecond
 )
 
-type TaskStatus string
-
-const (
-	Success TaskStatus = "Success"
-	Fail    TaskStatus = "Fail"
-	Repeat  TaskStatus = "Repeat"
-	Keep    TaskStatus = "Keep"
-)
-
-const compactionThreshold = 100
-
-type TaskResult struct {
-	Status     TaskStatus
-	HeadTasks  []task.Task
-	TailTasks  []task.Task
-	AfterTasks []task.Task
-
-	DelayBeforeNextTask time.Duration
-
-	AfterHandle func()
-}
-
 // Global object pools for reducing allocations
 var (
 	compactionGroupPool = sync.Pool{
@@ -139,7 +117,7 @@ type TaskQueue struct {
 	ExponentialBackoffFn  func(failureCount int) time.Duration
 
 	// Compaction
-	CompactionCallback func(compactedTasks []task.Task, targetTask task.Task)
+	compactionCallback func(compactedTasks []task.Task, targetTask task.Task)
 
 	isCompactable    bool
 	compactableTypes map[task.TaskType]struct{}
@@ -228,19 +206,6 @@ func (q *TaskQueue) WithHandler(fn func(ctx context.Context, t task.Task) TaskRe
 	return q
 }
 
-func (q *TaskQueue) WithLogger(logger *log.Logger) *TaskQueue {
-	q.logger = logger
-	return q
-}
-
-func (q *TaskQueue) WithCompactableTypes(taskTypes []task.TaskType) *TaskQueue {
-	q.compactableTypes = make(map[task.TaskType]struct{}, len(taskTypes))
-	for _, taskType := range taskTypes {
-		q.compactableTypes[taskType] = struct{}{}
-	}
-	return q
-}
-
 // MeasureActionTime is a helper to measure execution time of queue's actions
 func (q *TaskQueue) MeasureActionTime(action string) func() {
 	if q.metricStorage == nil {
@@ -291,17 +256,22 @@ func (q *TaskQueue) Length() int {
 }
 
 // AddFirst adds new head element.
-func (q *TaskQueue) AddFirst(t task.Task) {
+func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
 	q.withLock(func() {
-		q.addFirst(t)
+		q.addFirst(tasks...)
 	})
 }
 
 // addFirst adds new head element.
-func (q *TaskQueue) addFirst(t task.Task) {
-	element := q.items.PushFront(t)
-	q.idIndex[t.GetId()] = element
+func (q *TaskQueue) addFirst(tasks ...task.Task) {
+	// Also, add tasks in reverse order
+	// at the start of the queue. The first task in HeadTasks
+	// become the new first task in the queue.
+	for i := len(tasks) - 1; i >= 0; i-- {
+		element := q.items.PushFront(tasks[i])
+		q.idIndex[tasks[i].GetId()] = element
+	}
 }
 
 // RemoveFirst deletes a head element, so head is moved.
@@ -340,75 +310,79 @@ func (q *TaskQueue) GetFirst() task.Task {
 }
 
 // AddLast adds new tail element.
-func (q *TaskQueue) AddLast(t task.Task) {
+func (q *TaskQueue) AddLast(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddLast")()
 	q.withLock(func() {
-		q.addLast(t)
+		q.addLast(tasks...)
 	})
 }
 
 // addLast adds a new tail element.
 // It implements the merging logic for HookRun tasks by scanning the whole queue.
-func (q *TaskQueue) addLast(t task.Task) {
-	q.lazydebug("adding task to queue", func() []any {
-		return []any{
-			slog.String("queue", q.Name),
-			slog.String("task_id", t.GetId()),
-			slog.String("task_type", string(t.GetType())),
-			slog.String("task_description", t.GetDescription()),
-			slog.Int("queue_length_before", q.items.Len()),
-		}
-	})
-
-	if _, ok := q.idIndex[t.GetId()]; ok {
-		q.logger.Warn("task collision detected, unexpected behavior possible", slog.String("queue", q.Name), slog.String("task_id", t.GetId()))
-	}
-
-	element := q.items.PushBack(t)
-	q.idIndex[t.GetId()] = element
-
-	taskType := t.GetType()
-	if _, ok := q.compactableTypes[taskType]; ok {
-		q.isCompactable = true
-
-		q.lazydebug("task is mergeable, marking queue as dirty", func() []any {
+func (q *TaskQueue) addLast(tasks ...task.Task) {
+	for _, t := range tasks {
+		q.lazydebug("adding task to queue", func() []any {
 			return []any{
 				slog.String("queue", q.Name),
 				slog.String("task_id", t.GetId()),
-				slog.String("task_type", string(taskType)),
-				slog.Int("queue_length", q.items.Len()),
-				slog.Bool("queue_is_dirty", q.isCompactable),
+				slog.String("task_type", string(t.GetType())),
+				slog.String("task_description", t.GetDescription()),
+				slog.Int("queue_length_before", q.items.Len()),
 			}
 		})
 
-		// Only trigger compaction if queue is getting long and we have mergeable tasks
-		if q.items.Len() > compactionThreshold && q.isCompactable {
-			q.lazydebug("triggering compaction due to queue length", func() []any {
+		if _, ok := q.idIndex[t.GetId()]; ok {
+			q.logger.Warn("task collision detected, unexpected behavior possible", slog.String("queue", q.Name), slog.String("task_id", t.GetId()))
+		}
+
+		element := q.items.PushBack(t)
+		q.idIndex[t.GetId()] = element
+
+		// TODO: skip compactable check if is already compactable
+
+		taskType := t.GetType()
+		if _, ok := q.compactableTypes[taskType]; ok {
+			q.isCompactable = true
+
+			q.lazydebug("task is mergeable, marking queue as dirty", func() []any {
 				return []any{
 					slog.String("queue", q.Name),
+					slog.String("task_id", t.GetId()),
+					slog.String("task_type", string(taskType)),
 					slog.Int("queue_length", q.items.Len()),
-					slog.Int("compaction_threshold", compactionThreshold),
+					slog.Bool("queue_is_dirty", q.isCompactable),
 				}
 			})
-			currentQueue := q.items.Len()
-			q.compaction()
-			q.lazydebug("compaction finished", func() []any {
+
+			// Only trigger compaction if queue is getting long and we have mergeable tasks
+			if q.items.Len() > compactionThreshold && q.isCompactable {
+				q.lazydebug("triggering compaction due to queue length", func() []any {
+					return []any{
+						slog.String("queue", q.Name),
+						slog.Int("queue_length", q.items.Len()),
+						slog.Int("compaction_threshold", compactionThreshold),
+					}
+				})
+				currentQueue := q.items.Len()
+				q.compaction()
+				q.lazydebug("compaction finished", func() []any {
+					return []any{
+						slog.String("queue", q.Name),
+						slog.Int("queue_length_before", currentQueue),
+						slog.Int("queue_length_after", q.items.Len()),
+					}
+				})
+				q.isCompactable = false
+			}
+		} else {
+			q.lazydebug("task is not mergeable", func() []any {
 				return []any{
 					slog.String("queue", q.Name),
-					slog.Int("queue_length_before", currentQueue),
-					slog.Int("queue_length_after", q.items.Len()),
+					slog.String("task_id", t.GetId()),
+					slog.String("task_type", string(taskType)),
 				}
 			})
-			q.isCompactable = false
 		}
-	} else {
-		q.lazydebug("task is not mergeable", func() []any {
-			return []any{
-				slog.String("queue", q.Name),
-				slog.String("task_id", t.GetId()),
-				slog.String("task_type", string(taskType)),
-			}
-		})
 	}
 }
 
@@ -557,12 +531,12 @@ func (q *TaskQueue) compaction() {
 		targetTask.UpdateMetadata(withContext)
 
 		// Call compaction callback if set
-		if q.CompactionCallback != nil && len(group.elementsToMerge) > 0 {
+		if q.compactionCallback != nil && len(group.elementsToMerge) > 0 {
 			compactedTasks := make([]task.Task, 0, len(group.elementsToMerge))
 			for _, elementToMerge := range group.elementsToMerge {
 				compactedTasks = append(compactedTasks, elementToMerge.Value.(task.Task))
 			}
-			q.CompactionCallback(compactedTasks, targetTask)
+			q.compactionCallback(compactedTasks, targetTask)
 		}
 
 		// Return slices to pools
@@ -691,18 +665,21 @@ func (q *TaskQueue) get(id string) task.Task {
 }
 
 // AddAfter inserts a task after the task with specified id.
-func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
+func (q *TaskQueue) AddAfter(id string, tasks ...task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
 	q.withLock(func() {
-		q.addAfter(id, newTask)
+		q.addAfter(id, tasks...)
 	})
 }
 
 // addAfter inserts a task after the task with specified id.
-func (q *TaskQueue) addAfter(id string, newTask task.Task) {
+func (q *TaskQueue) addAfter(id string, tasks ...task.Task) {
 	if element, ok := q.idIndex[id]; ok {
-		newElement := q.items.InsertAfter(newTask, element)
-		q.idIndex[newTask.GetId()] = newElement
+		// Insert new tasks right after the id task in reverse order.
+		for i := len(tasks) - 1; i >= 0; i-- {
+			newElement := q.items.InsertAfter(tasks[i], element)
+			q.idIndex[tasks[i].GetId()] = newElement
+		}
 	}
 }
 
@@ -836,9 +813,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
-					for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
-						q.addAfter(t.GetId(), taskRes.AfterTasks[i])
-					}
+					q.addAfter(t.GetId(), taskRes.afterTasks...)
 
 					if taskRes.Status == Success {
 						q.remove(t.GetId())
@@ -848,13 +823,10 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
 					// become the new first task in the queue.
-					for i := len(taskRes.HeadTasks) - 1; i >= 0; i-- {
-						q.addFirst(taskRes.HeadTasks[i])
-					}
+					q.addFirst(taskRes.headTasks...)
+
 					// Add tasks to the end of the queue
-					for _, newTask := range taskRes.TailTasks {
-						q.addLast(newTask)
-					}
+					q.addLast(taskRes.GetTailTasks()...)
 				})
 				q.SetStatus("")
 			case Repeat:
@@ -1014,11 +986,6 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 			}
 		}
 	})
-}
-
-func (q *TaskQueue) WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask task.Task)) *TaskQueue {
-	q.CompactionCallback = callback
-	return q
 }
 
 // TODO define mapping method with QueueAction to insert, modify and delete tasks.

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -138,6 +139,42 @@ func (t *mockTask) IncrementFailureCount() {
 	t.FailureCount++
 }
 
+func (t *mockTask) deepCopy() *mockTask {
+	newTask := &mockTask{
+		Id:             t.Id,
+		Type:           t.Type,
+		FailureCount:   t.FailureCount,
+		FailureMessage: t.FailureMessage,
+		QueueName:      t.QueueName,
+		QueuedAt:       t.QueuedAt,
+		Metadata:       t.Metadata,
+	}
+
+	// Deep copy LogLabels
+	newTask.LogLabels = make(map[string]string)
+	for k, v := range t.LogLabels {
+		newTask.LogLabels[k] = v
+	}
+
+	// Deep copy Props
+	newTask.Props = make(map[string]interface{})
+	for k, v := range t.Props {
+		newTask.Props[k] = v
+	}
+
+	// Copy atomic bool value
+	newTask.processing.Store(t.processing.Load())
+
+	return newTask
+}
+
+func (t *mockTask) DeepCopyWithNewUUID() task.Task {
+	newTask := t.deepCopy()
+	newTask.Id = uuid.Must(uuid.NewV4()).String()
+	newTask.LogLabels["task.id"] = newTask.Id
+	return newTask
+}
+
 func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -249,7 +286,7 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			q := NewTasksQueue()
 			q.WithName("test_queue")
-			q.WithCompactableTypes([]task.TaskType{task_metadata.HookRun})
+			q.compactableTypes = map[task.TaskType]struct{}{task_metadata.HookRun: {}}
 			for _, task := range tt.initialQueue {
 				q.addLast(task)
 			}
