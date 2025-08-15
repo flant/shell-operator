@@ -265,9 +265,12 @@ func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 
 // addFirst adds new head element.
 func (q *TaskQueue) addFirst(tasks ...task.Task) {
-	for _, t := range tasks {
-		element := q.items.PushFront(t)
-		q.idIndex[t.GetId()] = element
+	// Also, add tasks in reverse order
+	// at the start of the queue. The first task in HeadTasks
+	// become the new first task in the queue.
+	for i := len(tasks) - 1; i >= 0; i-- {
+		element := q.items.PushFront(tasks[i])
+		q.idIndex[tasks[i].GetId()] = element
 	}
 }
 
@@ -662,18 +665,21 @@ func (q *TaskQueue) get(id string) task.Task {
 }
 
 // AddAfter inserts a task after the task with specified id.
-func (q *TaskQueue) AddAfter(id string, newTask task.Task) {
+func (q *TaskQueue) AddAfter(id string, tasks ...task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
 	q.withLock(func() {
-		q.addAfter(id, newTask)
+		q.addAfter(id, tasks...)
 	})
 }
 
 // addAfter inserts a task after the task with specified id.
-func (q *TaskQueue) addAfter(id string, newTask task.Task) {
+func (q *TaskQueue) addAfter(id string, tasks ...task.Task) {
 	if element, ok := q.idIndex[id]; ok {
-		newElement := q.items.InsertAfter(newTask, element)
-		q.idIndex[newTask.GetId()] = newElement
+		// Insert new tasks right after the id task in reverse order.
+		for i := len(tasks) - 1; i >= 0; i-- {
+			newElement := q.items.InsertAfter(tasks[i], element)
+			q.idIndex[tasks[i].GetId()] = newElement
+		}
 	}
 }
 
@@ -807,9 +813,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
-					for i := len(taskRes.afterTasks) - 1; i >= 0; i-- {
-						q.addAfter(t.GetId(), taskRes.afterTasks[i])
-					}
+					q.addAfter(t.GetId(), taskRes.afterTasks...)
 
 					if taskRes.Status == Success {
 						q.remove(t.GetId())
@@ -819,9 +823,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
 					// become the new first task in the queue.
-					for i := len(taskRes.headTasks) - 1; i >= 0; i-- {
-						q.addFirst(taskRes.headTasks[i])
-					}
+					q.addFirst(taskRes.headTasks...)
 
 					// Add tasks to the end of the queue
 					q.addLast(taskRes.GetTailTasks()...)

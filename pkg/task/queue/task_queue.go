@@ -175,8 +175,11 @@ func (q *TaskQueueSlice) AddFirst(tasks ...task.Task) {
 
 // addFirst adds new head element.
 func (q *TaskQueueSlice) addFirst(tasks ...task.Task) {
-	for _, t := range tasks {
-		q.items = append([]task.Task{t}, q.items...)
+	// Also, add tasks in reverse order
+	// at the start of the queue. The first task in HeadTasks
+	// become the new first task in the queue.
+	for i := len(tasks) - 1; i >= 0; i-- {
+		q.items = append([]task.Task{tasks[i]}, q.items...)
 	}
 }
 
@@ -732,12 +735,8 @@ func (q *TaskQueueSlice) Start(ctx context.Context) {
 						// Reset processing flag for kept task
 						t.SetProcessing(false)
 					}
-					// Also, add HeadTasks in reverse order
-					// at the start of the queue. The first task in HeadTasks
-					// become the new first task in the queue.
-					for i := len(taskRes.headTasks) - 1; i >= 0; i-- {
-						q.addFirst(taskRes.headTasks[i])
-					}
+
+					q.addFirst(taskRes.headTasks...)
 
 					// Add tasks to the end of the queue
 					q.addLast(taskRes.GetTailTasks()...)
