@@ -28,6 +28,18 @@ type TaskResult struct {
 	AfterHandle func()
 }
 
+func (res *TaskResult) GetHeadTasks() []task.Task {
+	return res.headTasks
+}
+
+func (res *TaskResult) GetTailTasks() []task.Task {
+	return res.tailTasks
+}
+
+func (res *TaskResult) GetAfterTasks() []task.Task {
+	return res.afterTasks
+}
+
 func (res *TaskResult) AddHeadTasks(t ...task.Task) {
 	if res.headTasks == nil {
 		res.headTasks = make([]task.Task, 0, len(t))
