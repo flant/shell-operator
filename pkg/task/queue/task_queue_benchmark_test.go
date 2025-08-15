@@ -53,6 +53,27 @@ func (t *mockTaskBench) SetProp(_ string, _ interface{})    {}
 func (t *mockTaskBench) GetQueuedAt() time.Time             { return time.Now() }
 func (t *mockTaskBench) WithQueuedAt(_ time.Time) task.Task { return t }
 
+func (t *mockTaskBench) deepCopy() *mockTaskBench {
+	newTask := &mockTaskBench{
+		Id:             t.Id,
+		Type:           t.Type,
+		FailureCount:   t.FailureCount,
+		FailureMessage: t.FailureMessage,
+		Metadata:       t.Metadata,
+	}
+
+	// Copy atomic bool value
+	newTask.processing.Store(t.processing.Load())
+
+	return newTask
+}
+
+func (t *mockTaskBench) DeepCopyWithNewUUID() task.Task {
+	newTask := t.deepCopy()
+	newTask.Id = uuid.Must(uuid.NewV4()).String()
+	return newTask
+}
+
 type Queue interface {
 	AddLast(tasks ...task.Task)
 	AddFirst(tasks ...task.Task)
