@@ -249,7 +249,7 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			q := NewTasksQueue()
 			q.WithName("test_queue")
-			q.WithCompactableTypes([]task.TaskType{task_metadata.HookRun})
+			q.compactableTypes = map[task.TaskType]struct{}{task_metadata.HookRun: {}}
 			for _, task := range tt.initialQueue {
 				q.addLast(task)
 			}

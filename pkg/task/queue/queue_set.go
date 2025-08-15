@@ -75,26 +75,44 @@ func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
 	tqs.m.Unlock()
 }
 
-type QueueOpts struct {
-	Handler            func(ctx context.Context, t task.Task) TaskResult
-	CompactableTypes   []task.TaskType
-	CompactionCallback func(compactedTasks []task.Task, targetTask task.Task)
-	Logger             *log.Logger
+type QueueOption func(*TaskQueue)
+
+func WithCompactableTypes(taskTypes ...task.TaskType) QueueOption {
+	return func(q *TaskQueue) {
+		q.compactableTypes = make(map[task.TaskType]struct{}, len(taskTypes))
+		for _, taskType := range taskTypes {
+			q.compactableTypes[taskType] = struct{}{}
+		}
+	}
 }
 
-func (tqs *TaskQueueSet) NewNamedQueue(name string, opts QueueOpts) {
+func WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask task.Task)) QueueOption {
+	return func(q *TaskQueue) {
+		q.compactionCallback = callback
+	}
+}
+
+func WithLogger(logger *log.Logger) QueueOption {
+	return func(q *TaskQueue) {
+		q.logger = logger
+	}
+}
+
+func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, opts ...QueueOption) {
 	q := NewTasksQueue()
 	q.WithName(name)
-	q.WithHandler(opts.Handler)
+	q.WithHandler(handler)
 	q.WithContext(tqs.ctx)
 	q.WithMetricStorage(tqs.metricStorage)
-	q.WithCompactableTypes(opts.CompactableTypes)
-	if opts.CompactionCallback != nil {
-		q.WithCompactionCallback(opts.CompactionCallback)
+
+	for _, opt := range opts {
+		opt(q)
 	}
-	if opts.Logger != nil {
-		q.WithLogger(opts.Logger)
+
+	if q.logger == nil {
+		q.logger = log.NewLogger().Named("task_queue")
 	}
+
 	tqs.m.Lock()
 	tqs.Queues[name] = q
 	tqs.m.Unlock()

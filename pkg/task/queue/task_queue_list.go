@@ -139,7 +139,7 @@ type TaskQueue struct {
 	ExponentialBackoffFn  func(failureCount int) time.Duration
 
 	// Compaction
-	CompactionCallback func(compactedTasks []task.Task, targetTask task.Task)
+	compactionCallback func(compactedTasks []task.Task, targetTask task.Task)
 
 	isCompactable    bool
 	compactableTypes map[task.TaskType]struct{}
@@ -225,19 +225,6 @@ func (q *TaskQueue) WithName(name string) *TaskQueue {
 
 func (q *TaskQueue) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueue {
 	q.Handler = fn
-	return q
-}
-
-func (q *TaskQueue) WithLogger(logger *log.Logger) *TaskQueue {
-	q.logger = logger
-	return q
-}
-
-func (q *TaskQueue) WithCompactableTypes(taskTypes []task.TaskType) *TaskQueue {
-	q.compactableTypes = make(map[task.TaskType]struct{}, len(taskTypes))
-	for _, taskType := range taskTypes {
-		q.compactableTypes[taskType] = struct{}{}
-	}
 	return q
 }
 
@@ -557,12 +544,12 @@ func (q *TaskQueue) compaction() {
 		targetTask.UpdateMetadata(withContext)
 
 		// Call compaction callback if set
-		if q.CompactionCallback != nil && len(group.elementsToMerge) > 0 {
+		if q.compactionCallback != nil && len(group.elementsToMerge) > 0 {
 			compactedTasks := make([]task.Task, 0, len(group.elementsToMerge))
 			for _, elementToMerge := range group.elementsToMerge {
 				compactedTasks = append(compactedTasks, elementToMerge.Value.(task.Task))
 			}
-			q.CompactionCallback(compactedTasks, targetTask)
+			q.compactionCallback(compactedTasks, targetTask)
 		}
 
 		// Return slices to pools
@@ -1014,11 +1001,6 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 			}
 		}
 	})
-}
-
-func (q *TaskQueue) WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask task.Task)) *TaskQueue {
-	q.CompactionCallback = callback
-	return q
 }
 
 // TODO define mapping method with QueueAction to insert, modify and delete tasks.

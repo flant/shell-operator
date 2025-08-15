@@ -822,12 +822,11 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 
 	// Prepopulate main queue with 'onStartup' tasks and 'enable kubernetes bindings' tasks.
 	tqs.WithMainName("main")
-	tqs.NewNamedQueue("main", queue.QueueOpts{
-		Handler:            op.taskHandler,
-		CompactableTypes:   []task.TaskType{task_metadata.HookRun},
-		CompactionCallback: nil,
-		Logger:             op.logger.With("operator.component", "mainQueue"),
-	})
+	tqs.NewNamedQueue("main",
+		op.taskHandler,
+		queue.WithCompactableTypes(task_metadata.HookRun),
+		queue.WithLogger(op.logger.With("operator.component", "mainQueue")),
+	)
 
 	mainQueue := tqs.GetMain()
 
@@ -896,12 +895,11 @@ func (op *ShellOperator) initAndStartHookQueues() {
 		h := op.HookManager.GetHook(hookName)
 		for _, hookBinding := range h.Config.Schedules {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
-				op.TaskQueues.NewNamedQueue(hookBinding.Queue, queue.QueueOpts{
-					Handler:            op.taskHandler,
-					CompactableTypes:   []task.TaskType{task_metadata.HookRun},
-					CompactionCallback: nil,
-					Logger:             op.logger.With("operator.component", "hookQueue", "hook", hookName, "queue", hookBinding.Queue),
-				})
+				op.TaskQueues.NewNamedQueue(hookBinding.Queue,
+					op.taskHandler,
+					queue.WithCompactableTypes(task_metadata.HookRun),
+					queue.WithLogger(op.logger.With("operator.component", "hookQueue", "hook", hookName, "queue", hookBinding.Queue)),
+				)
 				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
 		}
@@ -912,12 +910,11 @@ func (op *ShellOperator) initAndStartHookQueues() {
 		h := op.HookManager.GetHook(hookName)
 		for _, hookBinding := range h.Config.OnKubernetesEvents {
 			if op.TaskQueues.GetByName(hookBinding.Queue) == nil {
-				op.TaskQueues.NewNamedQueue(hookBinding.Queue, queue.QueueOpts{
-					Handler:            op.taskHandler,
-					CompactableTypes:   []task.TaskType{task_metadata.HookRun},
-					CompactionCallback: nil,
-					Logger:             op.logger.With("operator.component", "hookQueue", "hook", hookName, "queue", hookBinding.Queue),
-				})
+				op.TaskQueues.NewNamedQueue(hookBinding.Queue,
+					op.taskHandler,
+					queue.WithCompactableTypes(task_metadata.HookRun),
+					queue.WithLogger(op.logger.With("operator.component", "hookQueue", "hook", hookName, "queue", hookBinding.Queue)),
+				)
 				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
 		}

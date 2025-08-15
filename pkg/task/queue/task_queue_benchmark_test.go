@@ -228,7 +228,7 @@ func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		q := NewTasksQueue()
-		q.WithCompactableTypes([]task.TaskType{task_metadata.HookRun})
+		q.compactableTypes = map[task.TaskType]struct{}{task_metadata.HookRun: {}}
 		tasks := createCompactionBenchmarkData(b, size)
 		// Setup queue without triggering compaction
 		for _, t := range tasks {

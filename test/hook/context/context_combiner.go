@@ -35,11 +35,9 @@ func NewContextCombiner() *ContextCombiner {
 	op.MetricStorage = metricstorage.NewMetricStorage(context.Background(), "test-prefix", false, log.NewNop())
 	op.TaskQueues = queue.NewTaskQueueSet().WithMetricStorage(op.MetricStorage)
 	op.TaskQueues.WithContext(context.Background())
-	op.TaskQueues.NewNamedQueue(TestQueueName, queue.QueueOpts{
-		Handler:            nil,
-		CompactableTypes:   []task.TaskType{task_metadata.HookRun},
-		CompactionCallback: nil,
-	})
+	op.TaskQueues.NewNamedQueue(TestQueueName, nil,
+		queue.WithCompactableTypes(task_metadata.HookRun),
+	)
 
 	return &ContextCombiner{
 		op: op,
