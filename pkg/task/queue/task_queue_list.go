@@ -824,7 +824,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					}
 
 					// Add tasks to the end of the queue
-					q.addLast(taskRes.tailTasks...)
+					q.addLast(taskRes.GetTailTasks()...)
 				})
 				q.SetStatus("")
 			case Repeat:
