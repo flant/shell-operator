@@ -59,7 +59,7 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 			// If there are other tasks in the queue, move this task to the end.
 			if q.Length() > 1 {
 				res := TaskResult{Status: Success}
-				res.TailTasks = append(res.TailTasks, tsk)
+				res.tailTasks = append(res.tailTasks, tsk)
 
 				return res
 			}
@@ -171,7 +171,7 @@ func Test_TaskQueue_Requeue(t *testing.T) {
 		if tsk.GetId() == "RequeueTask" {
 			// If there are other tasks in the queue, move this task to the end.
 			if q.Length() > 1 {
-				return TaskResult{Status: Success, TailTasks: []task.Task{tsk}}
+				return TaskResult{Status: Success, tailTasks: []task.Task{tsk}}
 			}
 
 			// If no other tasks, wait for the signal to finish.

@@ -54,8 +54,8 @@ func (t *mockTaskBench) GetQueuedAt() time.Time             { return time.Now() 
 func (t *mockTaskBench) WithQueuedAt(_ time.Time) task.Task { return t }
 
 type Queue interface {
-	AddLast(t task.Task)
-	AddFirst(t task.Task)
+	AddLast(tasks ...task.Task)
+	AddFirst(tasks ...task.Task)
 	GetFirst() task.Task
 	RemoveFirst() task.Task
 	Get(id string) task.Task

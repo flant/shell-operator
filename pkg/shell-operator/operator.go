@@ -505,7 +505,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 		for _, t := range hookRunTasks {
 			t.WithQueuedAt(now)
 		}
-		res.HeadTasks = hookRunTasks
+		res.AddHeadTasks(hookRunTasks...)
 	}
 
 	op.MetricStorage.CounterAdd("{PREFIX}hook_enable_kubernetes_bindings_errors_total", errors, metricLabels)
