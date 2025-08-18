@@ -107,11 +107,7 @@ func Test_Dump(t *testing.T) {
 
 	// Create and fill main queue.
 	t.Run("single main queue", func(t *testing.T) {
-		tqs.NewNamedQueue("main", queue.QueueOpts{
-			Handler:            nil,
-			CompactableTypes:   []task.TaskType{task_metadata.HookRun},
-			CompactionCallback: nil,
-		})
+		tqs.NewNamedQueue("main", nil, queue.WithCompactableTypes(task_metadata.HookRun))
 
 		// Single empty main should be reported only as summary.
 		dump := testDumpQueuesWrapper(tqs, "text", true)
@@ -135,11 +131,8 @@ func Test_Dump(t *testing.T) {
 
 	// Create and fill active queue.
 	t.Run("fill active queue", func(_ *testing.T) {
-		tqs.NewNamedQueue("active-queue", queue.QueueOpts{
-			Handler:            nil,
-			CompactableTypes:   []task.TaskType{task_metadata.HookRun},
-			CompactionCallback: nil,
-		})
+		tqs.NewNamedQueue("active-queue", nil, queue.WithCompactableTypes(task_metadata.HookRun))
+
 		fillQueue(tqs.GetByName("active-queue"), activeTasks)
 
 		dump := testDumpQueuesWrapper(tqs, "text", true)
@@ -150,11 +143,7 @@ func Test_Dump(t *testing.T) {
 
 	// Create empty queue.
 	t.Run("create empty queue", func(t *testing.T) {
-		tqs.NewNamedQueue("empty", queue.QueueOpts{
-			Handler:            nil,
-			CompactableTypes:   []task.TaskType{task_metadata.HookRun},
-			CompactionCallback: nil,
-		})
+		tqs.NewNamedQueue("empty", nil, queue.WithCompactableTypes(task_metadata.HookRun))
 
 		dump := testDumpQueuesWrapper(tqs, "text", true)
 		t.Log(dump)

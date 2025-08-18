@@ -31,6 +31,7 @@ type Task interface {
 	SetProp(key string, value interface{})
 	IsProcessing() bool
 	SetProcessing(bool)
+	DeepCopyWithNewUUID() Task
 }
 
 type BaseTask struct {
@@ -59,6 +60,45 @@ func NewTask(taskType TaskType) *BaseTask {
 		LogLabels:    map[string]string{"task.id": taskId},
 		Props:        make(map[string]interface{}),
 	}
+}
+
+func (t *BaseTask) deepCopy() *BaseTask {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	newTask := &BaseTask{
+		Id:             t.Id,
+		Type:           t.Type,
+		FailureCount:   t.FailureCount,
+		FailureMessage: t.FailureMessage,
+		QueueName:      t.QueueName,
+		QueuedAt:       t.QueuedAt,
+		Metadata:       t.Metadata,
+	}
+
+	// Deep copy LogLabels
+	newTask.LogLabels = make(map[string]string)
+	for k, v := range t.LogLabels {
+		newTask.LogLabels[k] = v
+	}
+
+	// Deep copy Props
+	newTask.Props = make(map[string]interface{})
+	for k, v := range t.Props {
+		newTask.Props[k] = v
+	}
+
+	// Copy atomic bool value
+	newTask.processing.Store(t.processing.Load())
+
+	return newTask
+}
+
+func (t *BaseTask) DeepCopyWithNewUUID() Task {
+	newTask := t.deepCopy()
+	newTask.Id = uuid.Must(uuid.NewV4()).String()
+	newTask.LogLabels["task.id"] = newTask.Id
+	return newTask
 }
 
 func (t *BaseTask) WithLogLabels(labels map[string]string) *BaseTask {

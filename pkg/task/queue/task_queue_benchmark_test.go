@@ -53,9 +53,30 @@ func (t *mockTaskBench) SetProp(_ string, _ interface{})    {}
 func (t *mockTaskBench) GetQueuedAt() time.Time             { return time.Now() }
 func (t *mockTaskBench) WithQueuedAt(_ time.Time) task.Task { return t }
 
+func (t *mockTaskBench) deepCopy() *mockTaskBench {
+	newTask := &mockTaskBench{
+		Id:             t.Id,
+		Type:           t.Type,
+		FailureCount:   t.FailureCount,
+		FailureMessage: t.FailureMessage,
+		Metadata:       t.Metadata,
+	}
+
+	// Copy atomic bool value
+	newTask.processing.Store(t.processing.Load())
+
+	return newTask
+}
+
+func (t *mockTaskBench) DeepCopyWithNewUUID() task.Task {
+	newTask := t.deepCopy()
+	newTask.Id = uuid.Must(uuid.NewV4()).String()
+	return newTask
+}
+
 type Queue interface {
-	AddLast(t task.Task)
-	AddFirst(t task.Task)
+	AddLast(tasks ...task.Task)
+	AddFirst(tasks ...task.Task)
 	GetFirst() task.Task
 	RemoveFirst() task.Task
 	Get(id string) task.Task
@@ -228,7 +249,7 @@ func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		q := NewTasksQueue()
-		q.WithCompactableTypes([]task.TaskType{task_metadata.HookRun})
+		q.compactableTypes = map[task.TaskType]struct{}{task_metadata.HookRun: {}}
 		tasks := createCompactionBenchmarkData(b, size)
 		// Setup queue without triggering compaction
 		for _, t := range tasks {

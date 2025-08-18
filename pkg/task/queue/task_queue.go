@@ -166,16 +166,21 @@ func (q *TaskQueueSlice) Length() int {
 }
 
 // AddFirst adds new head element.
-func (q *TaskQueueSlice) AddFirst(t task.Task) {
+func (q *TaskQueueSlice) AddFirst(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
 	q.withLock(func() {
-		q.addFirst(t)
+		q.addFirst(tasks...)
 	})
 }
 
 // addFirst adds new head element.
-func (q *TaskQueueSlice) addFirst(t task.Task) {
-	q.items = append([]task.Task{t}, q.items...)
+func (q *TaskQueueSlice) addFirst(tasks ...task.Task) {
+	// Also, add tasks in reverse order
+	// at the start of the queue. The first task in HeadTasks
+	// become the new first task in the queue.
+	for i := len(tasks) - 1; i >= 0; i-- {
+		q.items = append([]task.Task{tasks[i]}, q.items...)
+	}
 }
 
 // RemoveFirst deletes a head element, so head is moved.
@@ -215,20 +220,26 @@ func (q *TaskQueueSlice) GetFirst() task.Task {
 }
 
 // AddLast adds new tail element.
-func (q *TaskQueueSlice) AddLast(t task.Task) {
+func (q *TaskQueueSlice) AddLast(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddLast")()
 	q.withLock(func() {
-		q.addLast(t)
+		q.addLast(tasks...)
 	})
 }
 
 // addFirst adds new tail element.
-func (q *TaskQueueSlice) addLast(t task.Task) {
-	q.items = append(q.items, t)
-	taskType := t.GetType()
+func (q *TaskQueueSlice) addLast(tasks ...task.Task) {
+	for _, t := range tasks {
+		q.items = append(q.items, t)
+		taskType := t.GetType()
 
-	if _, ok := q.CompactableTypes[taskType]; ok {
-		q.isCompactable = true
+		if q.isCompactable {
+			continue
+		}
+
+		if _, ok := q.CompactableTypes[taskType]; ok {
+			q.isCompactable = true
+		}
 	}
 
 	if q.isCompactable && len(q.items) > 100 {
@@ -714,8 +725,8 @@ func (q *TaskQueueSlice) Start(ctx context.Context) {
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
-					for i := len(taskRes.AfterTasks) - 1; i >= 0; i-- {
-						q.addAfter(t.GetId(), taskRes.AfterTasks[i])
+					for i := len(taskRes.afterTasks) - 1; i >= 0; i-- {
+						q.addAfter(t.GetId(), taskRes.afterTasks[i])
 					}
 					// Remove current task on success.
 					if taskRes.Status == Success {
@@ -724,16 +735,11 @@ func (q *TaskQueueSlice) Start(ctx context.Context) {
 						// Reset processing flag for kept task
 						t.SetProcessing(false)
 					}
-					// Also, add HeadTasks in reverse order
-					// at the start of the queue. The first task in HeadTasks
-					// become the new first task in the queue.
-					for i := len(taskRes.HeadTasks) - 1; i >= 0; i-- {
-						q.addFirst(taskRes.HeadTasks[i])
-					}
+
+					q.addFirst(taskRes.headTasks...)
+
 					// Add tasks to the end of the queue
-					for _, newTask := range taskRes.TailTasks {
-						q.addLast(newTask)
-					}
+					q.addLast(taskRes.GetTailTasks()...)
 				})
 				q.SetStatus("")
 			case Repeat:
