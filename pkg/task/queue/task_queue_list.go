@@ -830,16 +830,10 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			}
 
 			switch taskRes.Status {
-			case Fail:
-				t.SetProcessing(false)
-				// Exponential backoff delay before retry.
-				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
-				t.IncrementFailureCount()
-				q.SetStatus(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
-					q.addAfter(t.GetId(), taskRes.afterTasks...)
+					q.addAfter(t.GetId(), taskRes.GetAfterTasks()...)
 
 					if taskRes.Status == Success {
 						q.remove(t.GetId())
@@ -849,13 +843,33 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					// Also, add HeadTasks in reverse order
 					// at the start of the queue. The first task in HeadTasks
 					// become the new first task in the queue.
-					q.addFirst(taskRes.headTasks...)
+					q.addFirst(taskRes.GetHeadTasks()...)
 
 					// Add tasks to the end of the queue
 					q.addLast(taskRes.GetTailTasks()...)
 				})
 				q.SetStatus("")
+			case Fail:
+				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
+					q.logger.Warn("result is fail, cannot process tasks in result",
+						slog.Int("after_task_count", len(taskRes.GetAfterTasks())),
+						slog.Int("head_task_count", len(taskRes.GetHeadTasks())),
+						slog.Int("tail_task_count", len(taskRes.GetTailTasks())))
+				}
+
+				t.SetProcessing(false)
+				// Exponential backoff delay before retry.
+				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
+				t.IncrementFailureCount()
+				q.SetStatus(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
 			case Repeat:
+				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
+					q.logger.Warn("result is repeat, cannot process tasks in result",
+						slog.Int("after_task_count", len(taskRes.GetAfterTasks())),
+						slog.Int("head_task_count", len(taskRes.GetHeadTasks())),
+						slog.Int("tail_task_count", len(taskRes.GetTailTasks())))
+				}
+
 				// repeat a current task after a small delay
 				t.SetProcessing(false)
 				nextSleepDelay = q.DelayOnRepeat
