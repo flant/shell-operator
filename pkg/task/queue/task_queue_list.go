@@ -515,6 +515,7 @@ func (q *TaskQueue) compaction() {
 
 			q.items.Remove(elementToMerge)
 			delete(q.idIndex, taskToMerge.GetId())
+			q.queueTasksCounter.Remove(taskToMerge.GetCompactionID())
 		}
 
 		// Update target task with compacted slices
@@ -999,6 +1000,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 			if !filterFn(t) {
 				q.items.Remove(current)
 				delete(q.idIndex, t.GetId())
+				q.queueTasksCounter.Remove(t.GetCompactionID())
 			}
 		}
 	})
