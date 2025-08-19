@@ -1,7 +1,6 @@
 package queue
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	"log/slog"
@@ -18,6 +17,7 @@ import (
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
+	"github.com/flant/shell-operator/pkg/utils/list"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
@@ -45,7 +45,7 @@ var (
 	compactionGroupPool = sync.Pool{
 		New: func() interface{} {
 			return &compactionGroup{
-				elementsToMerge: make([]*list.Element, 0, 8),
+				elementsToMerge: make([]*list.Element[task.Task], 0, 8),
 			}
 		},
 	}
@@ -72,8 +72,8 @@ var (
 )
 
 type compactionGroup struct {
-	targetElement   *list.Element
-	elementsToMerge []*list.Element
+	targetElement   *list.Element[task.Task]
+	elementsToMerge []*list.Element[task.Task]
 	totalContexts   int
 	totalMonitorIDs int
 }
@@ -98,8 +98,8 @@ type TaskQueue struct {
 	waitInProgress bool
 	cancelDelay    bool
 
-	items   *list.List
-	idIndex map[string]*list.Element
+	items   *list.List[task.Task]
+	idIndex map[string]*list.Element[task.Task]
 
 	started bool // a flag to ignore multiple starts
 
@@ -119,8 +119,9 @@ type TaskQueue struct {
 	// Compaction
 	compactionCallback func(compactedTasks []task.Task, targetTask task.Task)
 
-	isCompactable    bool
 	compactableTypes map[task.TaskType]struct{}
+
+	queueTasksCounter *TaskCounter
 
 	// Pre-allocated buffers for compaction
 	contextBuffer   []bindingcontext.BindingContext
@@ -130,8 +131,8 @@ type TaskQueue struct {
 
 func NewTasksQueue() *TaskQueue {
 	return &TaskQueue{
-		items:   list.New(),
-		idIndex: make(map[string]*list.Element),
+		items:   list.New[task.Task](),
+		idIndex: make(map[string]*list.Element[task.Task]),
 		// Default timings
 		WaitLoopCheckInterval: DefaultWaitLoopCheckInterval,
 		DelayOnQueueIsEmpty:   DefaultDelayOnQueueIsEmpty,
@@ -141,9 +142,10 @@ func NewTasksQueue() *TaskQueue {
 		},
 		logger: log.NewNop(),
 		// Pre-allocate buffers
-		contextBuffer:   make([]bindingcontext.BindingContext, 0, 128),
-		monitorIDBuffer: make([]string, 0, 128),
-		groupBuffer:     make(map[string]*compactionGroup, 32),
+		contextBuffer:     make([]bindingcontext.BindingContext, 0, 128),
+		monitorIDBuffer:   make([]string, 0, 128),
+		groupBuffer:       make(map[string]*compactionGroup, 32),
+		queueTasksCounter: NewTaskCounter(),
 	}
 }
 
@@ -271,6 +273,8 @@ func (q *TaskQueue) addFirst(tasks ...task.Task) {
 	for i := len(tasks) - 1; i >= 0; i-- {
 		element := q.items.PushFront(tasks[i])
 		q.idIndex[tasks[i].GetId()] = element
+
+		q.queueTasksCounter.Add(tasks[i].GetCompactionID())
 	}
 }
 
@@ -293,8 +297,11 @@ func (q *TaskQueue) removeFirst() task.Task {
 	}
 
 	element := q.items.Front()
-	t := q.items.Remove(element).(task.Task)
+	t := q.items.Remove(element)
 	delete(q.idIndex, t.GetId())
+
+	q.queueTasksCounter.Remove(t.GetCompactionID())
+
 	return t
 }
 
@@ -306,7 +313,7 @@ func (q *TaskQueue) GetFirst() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
-	return q.items.Front().Value.(task.Task)
+	return q.items.Front().Value
 }
 
 // AddLast adds new tail element.
@@ -337,25 +344,24 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 
 		element := q.items.PushBack(t)
 		q.idIndex[t.GetId()] = element
+		q.queueTasksCounter.Add(t.GetCompactionID())
 
 		// TODO: skip compactable check if is already compactable
 
 		taskType := t.GetType()
 		if _, ok := q.compactableTypes[taskType]; ok {
-			q.isCompactable = true
-
 			q.lazydebug("task is mergeable, marking queue as dirty", func() []any {
 				return []any{
 					slog.String("queue", q.Name),
 					slog.String("task_id", t.GetId()),
 					slog.String("task_type", string(taskType)),
 					slog.Int("queue_length", q.items.Len()),
-					slog.Bool("queue_is_dirty", q.isCompactable),
+					slog.Bool("queue_is_dirty", q.queueTasksCounter.IsAnyCapReached()),
 				}
 			})
 
 			// Only trigger compaction if queue is getting long and we have mergeable tasks
-			if q.items.Len() > compactionThreshold && q.isCompactable {
+			if q.items.Len() > compactionThreshold && q.queueTasksCounter.IsAnyCapReached() {
 				q.lazydebug("triggering compaction due to queue length", func() []any {
 					return []any{
 						slog.String("queue", q.Name),
@@ -372,7 +378,6 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 						slog.Int("queue_length_after", q.items.Len()),
 					}
 				})
-				q.isCompactable = false
 			}
 		} else {
 			q.lazydebug("task is not mergeable", func() []any {
@@ -389,6 +394,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 // compaction merges HookRun tasks for the same hook.
 // It iterates through the list once, making it an O(N) operation.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
+// TODO: consider compaction only for tasks with one compaction ID (to not affect good tasks)
 func (q *TaskQueue) compaction() {
 	if q.items.Len() < 2 {
 		return
@@ -406,7 +412,7 @@ func (q *TaskQueue) compaction() {
 
 	// First pass: identify groups and calculate sizes
 	for e := q.items.Front(); e != nil; e = e.Next() {
-		t := e.Value.(task.Task)
+		t := e.Value
 		taskType := t.GetType()
 
 		if _, ok := q.compactableTypes[taskType]; !ok {
@@ -456,7 +462,7 @@ func (q *TaskQueue) compaction() {
 			continue
 		}
 
-		targetTask := group.targetElement.Value.(task.Task)
+		targetTask := group.targetElement.Value
 		targetMetadata := targetTask.GetMetadata()
 
 		// Get slices from pools
@@ -489,7 +495,7 @@ func (q *TaskQueue) compaction() {
 
 		// Append contexts from other tasks and remove them
 		for _, elementToMerge := range group.elementsToMerge {
-			taskToMerge := elementToMerge.Value.(task.Task)
+			taskToMerge := elementToMerge.Value
 			mergeMetadata := taskToMerge.GetMetadata()
 
 			mergeBindingContextAcessor, ok := mergeMetadata.(task_metadata.BindingContextAccessor)
@@ -534,7 +540,7 @@ func (q *TaskQueue) compaction() {
 		if q.compactionCallback != nil && len(group.elementsToMerge) > 0 {
 			compactedTasks := make([]task.Task, 0, len(group.elementsToMerge))
 			for _, elementToMerge := range group.elementsToMerge {
-				compactedTasks = append(compactedTasks, elementToMerge.Value.(task.Task))
+				compactedTasks = append(compactedTasks, elementToMerge.Value)
 			}
 			q.compactionCallback(compactedTasks, targetTask)
 		}
@@ -543,6 +549,8 @@ func (q *TaskQueue) compaction() {
 		q.putContextSlice(&newContexts)
 		q.putMonitorIDSlice(&newMonitorIDs)
 	}
+
+	q.queueTasksCounter.ResetReachedCap()
 }
 
 // compactBindingContexts mimics the logic from shell-operator's CombineBindingContextForHook.
@@ -617,8 +625,10 @@ func (q *TaskQueue) removeLast() task.Task {
 	}
 
 	element := q.items.Back()
-	t := q.items.Remove(element).(task.Task)
+	t := q.items.Remove(element)
 	delete(q.idIndex, t.GetId())
+
+	q.queueTasksCounter.Remove(t.GetCompactionID())
 
 	return t
 }
@@ -640,7 +650,7 @@ func (q *TaskQueue) getLast() task.Task {
 		return nil
 	}
 
-	return q.items.Back().Value.(task.Task)
+	return q.items.Back().Value
 }
 
 // Get returns a task by id.
@@ -658,7 +668,7 @@ func (q *TaskQueue) Get(id string) task.Task {
 // get returns a task by id.
 func (q *TaskQueue) get(id string) task.Task {
 	if element, ok := q.idIndex[id]; ok {
-		return element.Value.(task.Task)
+		return element.Value
 	}
 
 	return nil
@@ -679,6 +689,8 @@ func (q *TaskQueue) addAfter(id string, tasks ...task.Task) {
 		for i := len(tasks) - 1; i >= 0; i-- {
 			newElement := q.items.InsertAfter(tasks[i], element)
 			q.idIndex[tasks[i].GetId()] = newElement
+
+			q.queueTasksCounter.Add(tasks[i].GetCompactionID())
 		}
 	}
 }
@@ -696,6 +708,8 @@ func (q *TaskQueue) addBefore(id string, newTask task.Task) {
 	if element, ok := q.idIndex[id]; ok {
 		newElement := q.items.InsertBefore(newTask, element)
 		q.idIndex[newTask.GetId()] = newElement
+
+		q.queueTasksCounter.Add(newTask.GetCompactionID())
 	}
 }
 
@@ -713,8 +727,11 @@ func (q *TaskQueue) Remove(id string) task.Task {
 
 func (q *TaskQueue) remove(id string) task.Task {
 	if element, ok := q.idIndex[id]; ok {
-		t := q.items.Remove(element).(task.Task)
+		t := q.items.Remove(element)
 		delete(q.idIndex, id)
+
+		q.queueTasksCounter.Remove(t.GetCompactionID())
+
 		return t
 	}
 	return nil
@@ -759,12 +776,11 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			}
 
 			q.withLock(func() {
-				if q.isCompactable {
+				if q.queueTasksCounter.IsAnyCapReached() {
 					q.lazydebug("triggering compaction before task processing", func() []any {
 						return []any{slog.String("queue", q.Name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.items.Len())}
 					})
 					q.compaction()
-					q.isCompactable = false
 
 					q.lazydebug("compaction completed, queue no longer dirty", func() []any {
 						return []any{slog.String("queue", q.Name), slog.Int("queue_length_after", q.items.Len())}
@@ -962,7 +978,7 @@ func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 
 	q.withRLock(func() {
 		for e := q.items.Front(); e != nil; e = e.Next() {
-			doFn(e.Value.(task.Task))
+			doFn(e.Value)
 		}
 	})
 }
@@ -979,7 +995,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 		for e := q.items.Front(); e != nil; {
 			current := e
 			e = e.Next()
-			t := current.Value.(task.Task)
+			t := current.Value
 			if !filterFn(t) {
 				q.items.Remove(current)
 				delete(q.idIndex, t.GetId())

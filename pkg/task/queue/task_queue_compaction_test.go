@@ -175,6 +175,10 @@ func (t *mockTask) DeepCopyWithNewUUID() task.Task {
 	return newTask
 }
 
+func (t *mockTask) GetCompactionID() string {
+	return t.Id
+}
+
 func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 	tests := []struct {
 		name         string

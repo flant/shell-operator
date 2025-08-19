@@ -32,6 +32,7 @@ type Task interface {
 	IsProcessing() bool
 	SetProcessing(bool)
 	DeepCopyWithNewUUID() Task
+	GetCompactionID() string
 }
 
 type BaseTask struct {
@@ -48,6 +49,8 @@ type BaseTask struct {
 	lock     sync.RWMutex
 	Metadata interface{}
 
+	compactionID string
+
 	processing atomic.Bool
 }
 
@@ -59,6 +62,7 @@ func NewTask(taskType TaskType) *BaseTask {
 		Type:         taskType,
 		LogLabels:    map[string]string{"task.id": taskId},
 		Props:        make(map[string]interface{}),
+		compactionID: taskId,
 	}
 }
 
@@ -101,6 +105,10 @@ func (t *BaseTask) DeepCopyWithNewUUID() Task {
 	return newTask
 }
 
+func (t *BaseTask) GetCompactionID() string {
+	return t.compactionID
+}
+
 func (t *BaseTask) WithLogLabels(labels map[string]string) *BaseTask {
 	t.LogLabels = utils.MergeLabels(t.LogLabels, labels)
 	return t
@@ -114,6 +122,13 @@ func (t *BaseTask) WithQueueName(name string) *BaseTask {
 func (t *BaseTask) WithMetadata(metadata interface{}) *BaseTask {
 	t.lock.Lock()
 	t.Metadata = metadata
+	t.lock.Unlock()
+	return t
+}
+
+func (t *BaseTask) WithCompactionID(id string) *BaseTask {
+	t.lock.Lock()
+	t.compactionID = id
 	t.lock.Unlock()
 	return t
 }

@@ -74,6 +74,10 @@ func (t *mockTaskBench) DeepCopyWithNewUUID() task.Task {
 	return newTask
 }
 
+func (t *mockTaskBench) GetCompactionID() string {
+	return t.Id
+}
+
 type Queue interface {
 	AddLast(tasks ...task.Task)
 	AddFirst(tasks ...task.Task)

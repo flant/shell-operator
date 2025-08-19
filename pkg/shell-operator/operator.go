@@ -151,7 +151,8 @@ func (op *ShellOperator) initHookManager() error {
 					Group:          info.Group,
 				}).
 				WithLogLabels(logLabels).
-				WithQueueName(info.QueueName)
+				WithQueueName(info.QueueName).
+				WithCompactionID(hook.Name)
 
 			logEntry.With("queue", info.QueueName).
 				Info("queue task", slog.String("name", newTask.GetDescription()))
@@ -178,7 +179,8 @@ func (op *ShellOperator) initHookManager() error {
 					Group:          info.Group,
 				}).
 				WithLogLabels(logLabels).
-				WithQueueName(info.QueueName)
+				WithQueueName(info.QueueName).
+				WithCompactionID(hook.Name)
 
 			logEntry.With("queue", info.QueueName).
 				Info("queue task", slog.String("name", newTask.GetDescription()))
@@ -243,7 +245,9 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 					Binding:        info.Binding,
 					Group:          info.Group,
 				}).
-				WithLogLabels(logLabels)
+				WithLogLabels(logLabels).
+				WithCompactionID(hook.Name)
+
 			admissionTask = newTask
 		})
 
@@ -354,7 +358,9 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 						Binding:        info.Binding,
 						Group:          info.Group,
 					}).
-					WithLogLabels(logLabels)
+					WithLogLabels(logLabels).
+					WithCompactionID(hook.Name)
+
 				convTask = newTask
 			})
 
@@ -483,7 +489,9 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 				ExecuteOnSynchronization: info.KubernetesBinding.ExecuteHookOnSynchronization,
 			}).
 			WithLogLabels(hookLogLabels).
-			WithQueueName("main")
+			WithQueueName("main").
+			WithCompactionID(taskHook.Name)
+
 		hookRunTasks = append(hookRunTasks, newTask)
 	})
 
@@ -849,7 +857,9 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 				BindingType:    types.OnStartup,
 				BindingContext: []bindingcontext.BindingContext{bc},
 			}).
+			WithCompactionID(hookName).
 			WithQueuedAt(time.Now())
+
 		mainQueue.AddLast(newTask)
 		logEntry.Info("queue task with hook",
 			slog.String("task", newTask.GetDescription()),
@@ -866,6 +876,7 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 					HookName: hookName,
 					Binding:  string(task_metadata.EnableKubernetesBindings),
 				}).
+				WithCompactionID(hookName).
 				WithQueuedAt(time.Now())
 			mainQueue.AddLast(newTask)
 			logEntry.Info("queue task with hook",
@@ -879,6 +890,7 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 					HookName: hookName,
 					Binding:  string(task_metadata.EnableScheduleBindings),
 				}).
+				WithCompactionID(hookName).
 				WithQueuedAt(time.Now())
 			mainQueue.AddLast(newTask)
 			logEntry.Info("queue task with hook",
