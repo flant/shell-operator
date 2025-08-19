@@ -283,19 +283,19 @@ func TestMove(t *testing.T) {
 
 // Test PushFront, PushBack, PushFrontList, PushBackList with uninitialized List
 func TestZeroList(t *testing.T) {
-	var l1 = new(List[int])
+	l1 := new(List[int])
 	l1.PushFront(1)
 	checkList(t, l1, []int{1})
 
-	var l2 = new(List[int])
+	l2 := new(List[int])
 	l2.PushBack(1)
 	checkList(t, l2, []int{1})
 
-	var l3 = new(List[int])
+	l3 := new(List[int])
 	l3.PushFrontList(l1)
 	checkList(t, l3, []int{1})
 
-	var l4 = new(List[int])
+	l4 := new(List[int])
 	l4.PushBackList(l2)
 	checkList(t, l4, []int{1})
 }
