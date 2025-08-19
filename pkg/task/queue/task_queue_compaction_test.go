@@ -297,7 +297,7 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 
 			q.addLast(tt.taskToAdd)
 
-			q.compaction()
+			q.compaction(nil)
 			// Verify IDs and order
 			finalIDs := make([]string, 0, q.Length())
 			q.Iterate(func(t task.Task) {

@@ -369,8 +369,10 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 						slog.Int("compaction_threshold", compactionThreshold),
 					}
 				})
+
 				currentQueue := q.items.Len()
-				q.compaction()
+				q.compaction(q.queueTasksCounter.GetReachedCap())
+
 				q.lazydebug("compaction finished", func() []any {
 					return []any{
 						slog.String("queue", q.Name),
@@ -395,7 +397,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 // It iterates through the list once, making it an O(N) operation.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
 // TODO: consider compaction only for tasks with one compaction ID (to not affect good tasks)
-func (q *TaskQueue) compaction() {
+func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 	if q.items.Len() < 2 {
 		return
 	}
@@ -417,6 +419,12 @@ func (q *TaskQueue) compaction() {
 
 		if _, ok := q.compactableTypes[taskType]; !ok {
 			continue
+		}
+
+		if len(compactionIDs) > 0 {
+			if _, ok := compactionIDs[t.GetCompactionID()]; !ok {
+				continue
+			}
 		}
 
 		metadata := t.GetMetadata()
@@ -781,7 +789,8 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					q.lazydebug("triggering compaction before task processing", func() []any {
 						return []any{slog.String("queue", q.Name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.items.Len())}
 					})
-					q.compaction()
+
+					q.compaction(q.queueTasksCounter.GetReachedCap())
 
 					q.lazydebug("compaction completed, queue no longer dirty", func() []any {
 						return []any{slog.String("queue", q.Name), slog.Int("queue_length_after", q.items.Len())}

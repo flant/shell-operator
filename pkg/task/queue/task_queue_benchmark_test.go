@@ -261,7 +261,7 @@ func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 		}
 
 		b.StartTimer()
-		q.compaction()
+		q.compaction(nil)
 	}
 }
 

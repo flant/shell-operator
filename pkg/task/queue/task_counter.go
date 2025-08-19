@@ -4,13 +4,13 @@ const taskCap = 100
 
 type TaskCounter struct {
 	counter    map[string]uint
-	reachedCap []string
+	reachedCap map[string]struct{}
 }
 
 func NewTaskCounter() *TaskCounter {
 	return &TaskCounter{
 		counter:    make(map[string]uint, 32),
-		reachedCap: make([]string, 0, 32),
+		reachedCap: make(map[string]struct{}, 32),
 	}
 }
 
@@ -25,7 +25,7 @@ func (tc *TaskCounter) Add(taskID string) {
 	tc.counter[taskID] = counter
 
 	if counter == taskCap {
-		tc.reachedCap = append(tc.reachedCap, taskID)
+		tc.reachedCap[taskID] = struct{}{}
 	}
 }
 
@@ -44,7 +44,7 @@ func (tc *TaskCounter) Remove(taskID string) {
 	}
 }
 
-func (tc *TaskCounter) GetReachedCap() []string {
+func (tc *TaskCounter) GetReachedCap() map[string]struct{} {
 	return tc.reachedCap
 }
 
@@ -53,5 +53,5 @@ func (tc *TaskCounter) IsAnyCapReached() bool {
 }
 
 func (tc *TaskCounter) ResetReachedCap() {
-	tc.reachedCap = make([]string, 0, 32)
+	tc.reachedCap = make(map[string]struct{}, 32)
 }
