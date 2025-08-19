@@ -49,12 +49,14 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				}
 			}
 
-			out, err := Queue(DefaultClient()).List(outputFormat, showEmpty)
-			if err != nil {
-				return err
-			}
+			client := Queue(DefaultClient())
 
 			for {
+				out, err := client.List(outputFormat, showEmpty)
+				if err != nil {
+					return err
+				}
+
 				_, _ = output.Write(out)
 				if !watch {
 					break
