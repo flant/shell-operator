@@ -185,8 +185,8 @@ func BenchmarkTaskQueueSlice_GetByID_1000(b *testing.B) {
 
 func newBenchmarkTasksQueue(b *testing.B) *TaskQueue {
 	metricStorage := metric.NewStorageMock(b)
-	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		// Mock implementation for metrics
+	metricStorage.HistogramObserveMock.Set(func(_ string, _ float64, _ map[string]string, _ []float64) {
+		// skip any observe hit
 	})
 
 	return NewTasksQueue(metricStorage)
@@ -195,15 +195,19 @@ func newBenchmarkTasksQueue(b *testing.B) *TaskQueue {
 func BenchmarkTaskQueue_AddLast_100(b *testing.B) {
 	benchmarkAddLast(b, newBenchmarkTasksQueue(b), 100)
 }
+
 func BenchmarkTaskQueue_AddLast_1000(b *testing.B) {
 	benchmarkAddLast(b, newBenchmarkTasksQueue(b), 1000)
 }
+
 func BenchmarkTaskQueue_AddFirst_100(b *testing.B) {
 	benchmarkAddFirst(b, newBenchmarkTasksQueue(b), 100)
 }
+
 func BenchmarkTaskQueue_AddFirst_1000(b *testing.B) {
 	benchmarkAddFirst(b, newBenchmarkTasksQueue(b), 1000)
 }
+
 func BenchmarkTaskQueue_RemoveFirst_100(b *testing.B) {
 	benchmarkRemoveFirst(b, newBenchmarkTasksQueue(b), 100)
 }
