@@ -13,6 +13,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -125,7 +126,7 @@ func (q *TaskQueueSlice) MeasureActionTime(action string) func() {
 			q.measureActionFn = func() {}
 		} else {
 			q.measureActionFn = measure.Duration(func(d time.Duration) {
-				q.metricStorage.HistogramObserve("{PREFIX}tasks_queue_action_duration_seconds", d.Seconds(), map[string]string{"queue_name": q.Name, "queue_action": action}, nil)
+				q.metricStorage.HistogramObserve(metrics.TasksQueueActionDurationSeconds, d.Seconds(), map[string]string{"queue_name": q.Name, "queue_action": action}, nil)
 			})
 		}
 	})

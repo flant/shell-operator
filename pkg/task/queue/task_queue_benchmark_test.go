@@ -11,6 +11,7 @@ import (
 
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -181,32 +182,50 @@ func BenchmarkTaskQueueSlice_GetByID_1000(b *testing.B) {
 }
 
 /* New code */
-func BenchmarkTaskQueue_AddLast_100(b *testing.B)   { benchmarkAddLast(b, NewTasksQueue(), 100) }
-func BenchmarkTaskQueue_AddLast_1000(b *testing.B)  { benchmarkAddLast(b, NewTasksQueue(), 1000) }
-func BenchmarkTaskQueue_AddFirst_100(b *testing.B)  { benchmarkAddFirst(b, NewTasksQueue(), 100) }
-func BenchmarkTaskQueue_AddFirst_1000(b *testing.B) { benchmarkAddFirst(b, NewTasksQueue(), 1000) }
+
+func newBenchmarkTasksQueue(b *testing.B) *TaskQueue {
+	metricStorage := metric.NewStorageMock(b)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		// Mock implementation for metrics
+	})
+
+	return NewTasksQueue(metricStorage)
+}
+
+func BenchmarkTaskQueue_AddLast_100(b *testing.B) {
+	benchmarkAddLast(b, newBenchmarkTasksQueue(b), 100)
+}
+func BenchmarkTaskQueue_AddLast_1000(b *testing.B) {
+	benchmarkAddLast(b, newBenchmarkTasksQueue(b), 1000)
+}
+func BenchmarkTaskQueue_AddFirst_100(b *testing.B) {
+	benchmarkAddFirst(b, newBenchmarkTasksQueue(b), 100)
+}
+func BenchmarkTaskQueue_AddFirst_1000(b *testing.B) {
+	benchmarkAddFirst(b, newBenchmarkTasksQueue(b), 1000)
+}
 func BenchmarkTaskQueue_RemoveFirst_100(b *testing.B) {
-	benchmarkRemoveFirst(b, NewTasksQueue(), 100)
+	benchmarkRemoveFirst(b, newBenchmarkTasksQueue(b), 100)
 }
 
 func BenchmarkTaskQueue_RemoveFirst_1000(b *testing.B) {
-	benchmarkRemoveFirst(b, NewTasksQueue(), 1000)
+	benchmarkRemoveFirst(b, newBenchmarkTasksQueue(b), 1000)
 }
 
 func BenchmarkTaskQueue_GetFirst_100(b *testing.B) {
-	benchmarkGetFirst(b, NewTasksQueue(), 100)
+	benchmarkGetFirst(b, newBenchmarkTasksQueue(b), 100)
 }
 
 func BenchmarkTaskQueue_GetFirst_1000(b *testing.B) {
-	benchmarkGetFirst(b, NewTasksQueue(), 1000)
+	benchmarkGetFirst(b, newBenchmarkTasksQueue(b), 1000)
 }
 
 func BenchmarkTaskQueue_GetByID_100(b *testing.B) {
-	benchmarkGetByID(b, NewTasksQueue(), 100)
+	benchmarkGetByID(b, newBenchmarkTasksQueue(b), 100)
 }
 
 func BenchmarkTaskQueue_GetByID_1000(b *testing.B) {
-	benchmarkGetByID(b, NewTasksQueue(), 1000)
+	benchmarkGetByID(b, newBenchmarkTasksQueue(b), 1000)
 }
 
 // --- Compaction Benchmarks ---
@@ -252,8 +271,10 @@ func createCompactionBenchmarkData(b *testing.B, size int) []task.Task {
 func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		q := NewTasksQueue()
-		q.compactableTypes = map[task.TaskType]struct{}{task_metadata.HookRun: {}}
+
+		metricStorage := metric.NewStorageMock(b)
+
+		q := NewTasksQueue(metricStorage, WithCompactableTypes(task_metadata.HookRun))
 		tasks := createCompactionBenchmarkData(b, size)
 		// Setup queue without triggering compaction
 		for _, t := range tasks {

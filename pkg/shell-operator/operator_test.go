@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -23,7 +24,7 @@ func Test_Operator_startup_tasks(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddLast",

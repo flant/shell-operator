@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -32,7 +33,7 @@ func Test_TasksQueue_Remove(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddFirst",
@@ -41,7 +42,7 @@ func Test_TasksQueue_Remove(t *testing.T) {
 		assert.Nil(t, buckets)
 	})
 
-	q := NewTasksQueue().WithMetricStorage(metricStorage)
+	q := NewTasksQueue(metricStorage)
 
 	// Remove just one element
 	Task := &task.BaseTask{Id: "First one"}
@@ -97,7 +98,7 @@ func Test_TasksQueue_RemoveFirst(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddFirst",
@@ -106,7 +107,7 @@ func Test_TasksQueue_RemoveFirst(t *testing.T) {
 		assert.Nil(t, buckets)
 	})
 
-	q := NewTasksQueue().WithMetricStorage(metricStorage)
+	q := NewTasksQueue(metricStorage)
 
 	// Remove just one element
 	Task := &task.BaseTask{Id: "First one"}
@@ -161,7 +162,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddFirst",
@@ -171,9 +172,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 	})
 
 	// Init and prefill queue.
-	q := NewTasksQueue().WithMetricStorage(metricStorage)
-	q.WithContext(context.TODO())
-	q.WithName("test-queue")
+	q := NewTasksQueue(metricStorage, WithContext(context.TODO()), WithName("test-queue"))
 	// Since we don't want the test to run for too long, we don't
 	// want to use lengthy times.
 	q.WaitLoopCheckInterval = 5 * time.Millisecond // default is 125ms
@@ -189,7 +188,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 	const fails = 10
 	failsCount := fails
 	queueStopCh := make(chan struct{}, 1)
-	q.WithHandler(func(_ context.Context, t task.Task) TaskResult {
+	q.Handler = func(_ context.Context, t task.Task) TaskResult {
 		var res TaskResult
 		runsAt = append(runsAt, time.Now())
 		failureCounts = append(failureCounts, t.GetFailureCount())
@@ -206,7 +205,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 		}
 
 		return res
-	})
+	}
 
 	// Set exponential backoff to the constant delay just to wait more than DelayOnQueueIsEmpty.
 	// It is a test of delaying between task runs, not a test of exponential distribution.
@@ -258,7 +257,7 @@ func Test_CancelDelay(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddFirst",
@@ -268,9 +267,7 @@ func Test_CancelDelay(t *testing.T) {
 	})
 
 	// Init and prefill queue.
-	q := NewTasksQueue().WithMetricStorage(metricStorage)
-	q.WithContext(context.TODO())
-	q.WithName("test-queue")
+	q := NewTasksQueue(metricStorage, WithContext(context.TODO()), WithName("test-queue"))
 	// Since we don't want the test to run for too long, we don't
 	// want to use lengthy times.
 	q.WaitLoopCheckInterval = 5 * time.Millisecond // default is 125ms
@@ -288,7 +285,7 @@ func Test_CancelDelay(t *testing.T) {
 	endedAt := startedAt
 	delayStartsCh := make(chan struct{}, 1)
 	healingDoneCh := make(chan struct{}, 1)
-	q.WithHandler(func(_ context.Context, t task.Task) TaskResult {
+	q.Handler = func(_ context.Context, t task.Task) TaskResult {
 		var res TaskResult
 		if t.GetId() == ErrTask.GetId() {
 			res.Status = Fail
@@ -312,7 +309,7 @@ func Test_CancelDelay(t *testing.T) {
 		res.Status = Success
 
 		return res
-	})
+	}
 
 	// Set exponential backoff to the constant delay just to wait more than DelayOnQueueIsEmpty.
 	// It is a test of delaying between task runs, not a test of exponential distribution.
@@ -356,7 +353,7 @@ func Test_QueueDump_HookMetadata_Task_Description(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddLast",
@@ -365,7 +362,7 @@ func Test_QueueDump_HookMetadata_Task_Description(t *testing.T) {
 		assert.Nil(t, buckets)
 	})
 
-	q := NewTasksQueue().WithMetricStorage(metricStorage)
+	q := NewTasksQueue(metricStorage)
 
 	q.AddLast(task.NewTask(task_metadata.EnableKubernetesBindings).
 		WithMetadata(task_metadata.HookMetadata{

@@ -3,6 +3,7 @@ package shell_operator
 import (
 	"net/http"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/metric"
 	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
@@ -32,7 +33,7 @@ func registerCommonMetrics(metricStorage metric.Storage) {
 // This function is used in the addon-operator
 func registerTaskQueueMetrics(metricStorage metric.Storage) {
 	metricStorage.RegisterHistogram(
-		"{PREFIX}tasks_queue_action_duration_seconds",
+		metrics.TasksQueueActionDurationSeconds,
 		map[string]string{
 			"queue_name":   "",
 			"queue_action": "",

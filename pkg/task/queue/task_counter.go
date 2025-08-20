@@ -1,36 +1,74 @@
 package queue
 
+import (
+	"github.com/flant/shell-operator/internal/metrics"
+	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/task"
+)
+
 const taskCap = 100
 
 type TaskCounter struct {
-	counter    map[string]uint
-	reachedCap map[string]struct{}
+	queueName      string
+	counter        map[string]uint
+	reachedCap     map[string]struct{}
+	metricStorage  metric.Storage
+	countableTypes map[task.TaskType]struct{}
 }
 
-func NewTaskCounter() *TaskCounter {
+func NewTaskCounter(name string, countableTypes map[task.TaskType]struct{}, metricStorage metric.Storage) *TaskCounter {
+	if metricStorage == nil {
+		panic("metricStorage cannot be nil")
+	}
+
 	return &TaskCounter{
-		counter:    make(map[string]uint, 32),
-		reachedCap: make(map[string]struct{}, 32),
+		queueName:      name,
+		counter:        make(map[string]uint, 32),
+		reachedCap:     make(map[string]struct{}, 32),
+		metricStorage:  metricStorage,
+		countableTypes: countableTypes,
 	}
 }
 
-func (tc *TaskCounter) Add(taskID string) {
-	counter, ok := tc.counter[taskID]
+func (tc *TaskCounter) Add(task task.Task) {
+	if _, ok := tc.countableTypes[task.GetType()]; !ok {
+		return
+	}
+
+	id := task.GetCompactionID()
+
+	counter, ok := tc.counter[id]
 	if !ok {
-		tc.counter[taskID] = 0
+		tc.counter[id] = 0
 	}
 
 	counter++
 
-	tc.counter[taskID] = counter
+	tc.counter[id] = counter
+
+	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionCounter, float64(counter), map[string]string{
+		"queue_name": tc.queueName,
+		"task_id":    id,
+	})
 
 	if counter == taskCap {
-		tc.reachedCap[taskID] = struct{}{}
+		tc.reachedCap[id] = struct{}{}
+
+		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 1, map[string]string{
+			"queue_name": tc.queueName,
+			"task_id":    id,
+		})
 	}
 }
 
-func (tc *TaskCounter) Remove(taskID string) {
-	counter, ok := tc.counter[taskID]
+func (tc *TaskCounter) Remove(task task.Task) {
+	if _, ok := tc.countableTypes[task.GetType()]; !ok {
+		return
+	}
+
+	id := task.GetCompactionID()
+
+	counter, ok := tc.counter[id]
 	if !ok {
 		return
 	}
@@ -38,9 +76,14 @@ func (tc *TaskCounter) Remove(taskID string) {
 	counter--
 
 	if counter == 0 {
-		delete(tc.counter, taskID)
+		delete(tc.counter, id)
 	} else {
-		tc.counter[taskID] = counter
+		tc.counter[id] = counter
+
+		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionCounter, float64(counter), map[string]string{
+			"queue_name": task.GetQueueName(),
+			"task_id":    id,
+		})
 	}
 }
 
@@ -53,5 +96,12 @@ func (tc *TaskCounter) IsAnyCapReached() bool {
 }
 
 func (tc *TaskCounter) ResetReachedCap() {
+	for id := range tc.reachedCap {
+		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 0, map[string]string{
+			"queue_name": tc.queueName,
+			"task_id":    id,
+		})
+	}
+
 	tc.reachedCap = make(map[string]struct{}, 32)
 }

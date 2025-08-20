@@ -12,6 +12,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -129,8 +130,55 @@ type TaskQueue struct {
 	groupBuffer     map[string]*compactionGroup
 }
 
-func NewTasksQueue() *TaskQueue {
-	return &TaskQueue{
+// TaskQueueOption defines a functional option for TaskQueue configuration
+type TaskQueueOption func(*TaskQueue)
+
+// WithContext sets the context for the TaskQueue
+func WithContext(ctx context.Context) TaskQueueOption {
+	return func(q *TaskQueue) {
+		q.ctx, q.cancel = context.WithCancel(ctx)
+	}
+}
+
+// WithName sets the name for the TaskQueue
+func WithName(name string) TaskQueueOption {
+	return func(q *TaskQueue) {
+		q.Name = name
+	}
+}
+
+// WithHandler sets the task handler for the TaskQueue
+func WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) TaskQueueOption {
+	return func(q *TaskQueue) {
+		q.Handler = fn
+	}
+}
+
+// WithCompactableTypes sets the compactable task types for the TaskQueue
+func WithCompactableTypes(taskTypes ...task.TaskType) TaskQueueOption {
+	return func(q *TaskQueue) {
+		q.compactableTypes = make(map[task.TaskType]struct{}, len(taskTypes))
+		for _, taskType := range taskTypes {
+			q.compactableTypes[taskType] = struct{}{}
+		}
+	}
+}
+
+func WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask task.Task)) TaskQueueOption {
+	return func(q *TaskQueue) {
+		q.compactionCallback = callback
+	}
+}
+
+func WithLogger(logger *log.Logger) TaskQueueOption {
+	return func(q *TaskQueue) {
+		q.logger = logger
+	}
+}
+
+// NewTasksQueue creates a new TaskQueue with the provided options
+func NewTasksQueue(metricStorage metric.Storage, opts ...TaskQueueOption) *TaskQueue {
+	q := &TaskQueue{
 		items:   list.New[task.Task](),
 		idIndex: make(map[string]*list.Element[task.Task]),
 		// Default timings
@@ -142,11 +190,20 @@ func NewTasksQueue() *TaskQueue {
 		},
 		logger: log.NewNop(),
 		// Pre-allocate buffers
-		contextBuffer:     make([]bindingcontext.BindingContext, 0, 128),
-		monitorIDBuffer:   make([]string, 0, 128),
-		groupBuffer:       make(map[string]*compactionGroup, 32),
-		queueTasksCounter: NewTaskCounter(),
+		contextBuffer:   make([]bindingcontext.BindingContext, 0, 128),
+		monitorIDBuffer: make([]string, 0, 128),
+		groupBuffer:     make(map[string]*compactionGroup, 32),
+		metricStorage:   metricStorage,
 	}
+
+	// Apply all options
+	for _, opt := range opts {
+		opt(q)
+	}
+
+	q.queueTasksCounter = NewTaskCounter(q.Name, q.compactableTypes, q.metricStorage)
+
+	return q
 }
 
 func (q *TaskQueue) getCompactionGroup() *compactionGroup {
@@ -188,26 +245,6 @@ func (q *TaskQueue) putHookGroupsMap(m map[string]*compactionGroup) {
 	hookGroupsMapPool.Put(m)
 }
 
-func (q *TaskQueue) WithContext(ctx context.Context) {
-	q.ctx, q.cancel = context.WithCancel(ctx)
-}
-
-func (q *TaskQueue) WithMetricStorage(mstor metric.Storage) *TaskQueue {
-	q.metricStorage = mstor
-
-	return q
-}
-
-func (q *TaskQueue) WithName(name string) *TaskQueue {
-	q.Name = name
-	return q
-}
-
-func (q *TaskQueue) WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) *TaskQueue {
-	q.Handler = fn
-	return q
-}
-
 // MeasureActionTime is a helper to measure execution time of queue's actions
 func (q *TaskQueue) MeasureActionTime(action string) func() {
 	if q.metricStorage == nil {
@@ -215,14 +252,16 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 	}
 
 	q.measureActionFnOnce.Do(func() {
+		// TODO: remove this metrics switch
 		if os.Getenv("QUEUE_ACTIONS_METRICS") == "no" {
 			q.measureActionFn = func() {}
 		} else {
 			q.measureActionFn = measure.Duration(func(d time.Duration) {
-				q.metricStorage.HistogramObserve("{PREFIX}tasks_queue_action_duration_seconds", d.Seconds(), map[string]string{"queue_name": q.Name, "queue_action": action}, nil)
+				q.metricStorage.HistogramObserve(metrics.TasksQueueActionDurationSeconds, d.Seconds(), map[string]string{"queue_name": q.Name, "queue_action": action}, nil)
 			})
 		}
 	})
+
 	return q.measureActionFn
 }
 
@@ -274,7 +313,7 @@ func (q *TaskQueue) addFirst(tasks ...task.Task) {
 		element := q.items.PushFront(tasks[i])
 		q.idIndex[tasks[i].GetId()] = element
 
-		q.queueTasksCounter.Add(tasks[i].GetCompactionID())
+		q.queueTasksCounter.Add(tasks[i])
 	}
 }
 
@@ -300,7 +339,7 @@ func (q *TaskQueue) removeFirst() task.Task {
 	t := q.items.Remove(element)
 	delete(q.idIndex, t.GetId())
 
-	q.queueTasksCounter.Remove(t.GetCompactionID())
+	q.queueTasksCounter.Remove(t)
 
 	return t
 }
@@ -344,7 +383,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 
 		element := q.items.PushBack(t)
 		q.idIndex[t.GetId()] = element
-		q.queueTasksCounter.Add(t.GetCompactionID())
+		q.queueTasksCounter.Add(t)
 
 		// TODO: skip compactable check if is already compactable
 
@@ -523,7 +562,7 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 
 			q.items.Remove(elementToMerge)
 			delete(q.idIndex, taskToMerge.GetId())
-			q.queueTasksCounter.Remove(taskToMerge.GetCompactionID())
+			q.queueTasksCounter.Remove(taskToMerge)
 		}
 
 		// Update target task with compacted slices
@@ -637,7 +676,7 @@ func (q *TaskQueue) removeLast() task.Task {
 	t := q.items.Remove(element)
 	delete(q.idIndex, t.GetId())
 
-	q.queueTasksCounter.Remove(t.GetCompactionID())
+	q.queueTasksCounter.Remove(t)
 
 	return t
 }
@@ -699,7 +738,7 @@ func (q *TaskQueue) addAfter(id string, tasks ...task.Task) {
 			newElement := q.items.InsertAfter(tasks[i], element)
 			q.idIndex[tasks[i].GetId()] = newElement
 
-			q.queueTasksCounter.Add(tasks[i].GetCompactionID())
+			q.queueTasksCounter.Add(tasks[i])
 		}
 	}
 }
@@ -718,7 +757,7 @@ func (q *TaskQueue) addBefore(id string, newTask task.Task) {
 		newElement := q.items.InsertBefore(newTask, element)
 		q.idIndex[newTask.GetId()] = newElement
 
-		q.queueTasksCounter.Add(newTask.GetCompactionID())
+		q.queueTasksCounter.Add(newTask)
 	}
 }
 
@@ -739,7 +778,7 @@ func (q *TaskQueue) remove(id string) task.Task {
 		t := q.items.Remove(element)
 		delete(q.idIndex, id)
 
-		q.queueTasksCounter.Remove(t.GetCompactionID())
+		q.queueTasksCounter.Remove(t)
 
 		return t
 	}
@@ -1023,7 +1062,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 			if !filterFn(t) {
 				q.items.Remove(current)
 				delete(q.idIndex, t.GetId())
-				q.queueTasksCounter.Remove(t.GetCompactionID())
+				q.queueTasksCounter.Remove(t)
 			}
 		}
 	})
