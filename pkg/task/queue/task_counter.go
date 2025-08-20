@@ -48,7 +48,7 @@ func (tc *TaskCounter) Add(task task.Task) {
 
 	tc.counter[id] = counter
 
-	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionCounter, float64(counter), map[string]string{
+	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, float64(counter), map[string]string{
 		"queue_name": tc.queueName,
 		"task_id":    id,
 	})
@@ -83,7 +83,7 @@ func (tc *TaskCounter) Remove(task task.Task) {
 		tc.counter[id] = counter
 	}
 
-	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionCounter, float64(counter), map[string]string{
+	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, float64(counter), map[string]string{
 		"queue_name": task.GetQueueName(),
 		"task_id":    id,
 	})
