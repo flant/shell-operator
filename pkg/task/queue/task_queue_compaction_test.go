@@ -13,6 +13,7 @@ import (
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -175,6 +176,10 @@ func (t *mockTask) DeepCopyWithNewUUID() task.Task {
 	return newTask
 }
 
+func (t *mockTask) GetCompactionID() string {
+	return t.Id
+}
+
 func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -284,16 +289,21 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := NewTasksQueue()
-			q.WithName("test_queue")
-			q.compactableTypes = map[task.TaskType]struct{}{task_metadata.HookRun: {}}
+			metricStorage := metric.NewStorageMock(t)
+			metricStorage.HistogramObserveMock.Set(func(_ string, _ float64, _ map[string]string, _ []float64) {
+			})
+			metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+			})
+
+			q := NewTasksQueue(metricStorage, WithName("test_queue"), WithCompactableTypes(task_metadata.HookRun))
+
 			for _, task := range tt.initialQueue {
 				q.addLast(task)
 			}
 
 			q.addLast(tt.taskToAdd)
 
-			q.compaction()
+			q.compaction(nil)
 			// Verify IDs and order
 			finalIDs := make([]string, 0, q.Length())
 			q.Iterate(func(t task.Task) {

@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
@@ -20,13 +21,15 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddLast",
 			"queue_name":   "requeue-test-queue",
 		}, labels)
 		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	// A channel to control when RequeueTask can finish.
@@ -40,17 +43,18 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 	mu := &sync.Mutex{}
 
 	// Create a new task queue
-	q := NewTasksQueue()
-	q.WithMetricStorage(metricStorage)
-	q.WithName("requeue-test-queue")
-	q.WithContext(context.Background())
+	q := NewTasksQueue(
+		metricStorage,
+		WithName("requeue-test-queue"),
+		WithContext(context.Background()),
+	)
 
 	q.WaitLoopCheckInterval = 5 * time.Millisecond
 	q.DelayOnQueueIsEmpty = 5 * time.Millisecond
 	q.DelayOnRepeat = 5 * time.Millisecond
 
 	// Define the handler for tasks
-	q.WithHandler(func(_ context.Context, tsk task.Task) TaskResult {
+	q.Handler = func(_ context.Context, tsk task.Task) TaskResult {
 		mu.Lock()
 		executionOrder = append(executionOrder, tsk.GetId())
 		mu.Unlock()
@@ -72,7 +76,7 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 
 		// For simple tasks, just succeed.
 		return TaskResult{Status: Success}
-	})
+	}
 
 	// Add the "requeue" task first.
 	requeueTask := task.BaseTask{Id: "RequeueTask", Type: task_metadata.HookRun}
@@ -133,7 +137,7 @@ func Test_TaskQueue_Requeue(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddLast",

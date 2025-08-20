@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
@@ -22,13 +23,15 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddLast",
 			"queue_name":   "test_multiple_hooks",
 		}, labels)
 		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
@@ -130,13 +133,15 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddLast",
 			"queue_name":   "test_no_combine",
 		}, labels)
 		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
@@ -203,13 +208,15 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddLast",
 			"queue_name":   "test_multiple_hooks",
 		}, labels)
 		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
@@ -319,13 +326,15 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, "{PREFIX}tasks_queue_action_duration_seconds")
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string{
 			"queue_action": "AddLast",
 			"queue_name":   "test_multiple_hooks",
 		}, labels)
 		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)

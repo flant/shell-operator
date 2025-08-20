@@ -75,35 +75,13 @@ func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
 	tqs.m.Unlock()
 }
 
-type QueueOption func(*TaskQueue)
-
-func WithCompactableTypes(taskTypes ...task.TaskType) QueueOption {
-	return func(q *TaskQueue) {
-		q.compactableTypes = make(map[task.TaskType]struct{}, len(taskTypes))
-		for _, taskType := range taskTypes {
-			q.compactableTypes[taskType] = struct{}{}
-		}
-	}
-}
-
-func WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask task.Task)) QueueOption {
-	return func(q *TaskQueue) {
-		q.compactionCallback = callback
-	}
-}
-
-func WithLogger(logger *log.Logger) QueueOption {
-	return func(q *TaskQueue) {
-		q.logger = logger
-	}
-}
-
-func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, opts ...QueueOption) {
-	q := NewTasksQueue()
-	q.WithName(name)
-	q.WithHandler(handler)
-	q.WithContext(tqs.ctx)
-	q.WithMetricStorage(tqs.metricStorage)
+func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, opts ...TaskQueueOption) {
+	q := NewTasksQueue(
+		tqs.metricStorage,
+		WithName(name),
+		WithHandler(handler),
+		WithContext(tqs.ctx),
+	)
 
 	for _, opt := range opts {
 		opt(q)
