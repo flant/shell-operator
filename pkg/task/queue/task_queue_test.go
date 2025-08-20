@@ -369,6 +369,8 @@ func Test_QueueDump_HookMetadata_Task_Description(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
 
 	q := NewTasksQueue(metricStorage)
 
