@@ -292,11 +292,10 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 			metricStorage := metric.NewStorageMock(t)
 			metricStorage.HistogramObserveMock.Set(func(_ string, _ float64, _ map[string]string, _ []float64) {
 			})
+			metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+			})
 
-			q := NewTasksQueue(metricStorage, WithName("test_queue"))
-
-			// to ignore compaction metrics
-			q.compactableTypes = map[task.TaskType]struct{}{task_metadata.HookRun: {}}
+			q := NewTasksQueue(metricStorage, WithName("test_queue"), WithCompactableTypes(task_metadata.HookRun))
 
 			for _, task := range tt.initialQueue {
 				q.addLast(task)

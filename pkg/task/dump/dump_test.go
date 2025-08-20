@@ -95,6 +95,8 @@ func Test_Dump(t *testing.T) {
 		assert.Contains(t, mapSlice, labels)
 		assert.Nil(t, buckets)
 	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
 
 	tqs := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	tqs.WithMainName("main")

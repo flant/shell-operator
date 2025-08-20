@@ -31,8 +31,10 @@ func NewTaskCounter(name string, countableTypes map[task.TaskType]struct{}, metr
 }
 
 func (tc *TaskCounter) Add(task task.Task) {
-	if _, ok := tc.countableTypes[task.GetType()]; !ok {
-		return
+	if len(tc.countableTypes) > 0 {
+		if _, ok := tc.countableTypes[task.GetType()]; !ok {
+			return
+		}
 	}
 
 	id := task.GetCompactionID()
@@ -62,29 +64,29 @@ func (tc *TaskCounter) Add(task task.Task) {
 }
 
 func (tc *TaskCounter) Remove(task task.Task) {
-	if _, ok := tc.countableTypes[task.GetType()]; !ok {
-		return
+	if len(tc.countableTypes) > 0 {
+		if _, ok := tc.countableTypes[task.GetType()]; !ok {
+			return
+		}
 	}
 
 	id := task.GetCompactionID()
 
 	counter, ok := tc.counter[id]
-	if !ok {
-		return
+	if ok {
+		counter--
 	}
-
-	counter--
 
 	if counter == 0 {
 		delete(tc.counter, id)
 	} else {
 		tc.counter[id] = counter
-
-		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionCounter, float64(counter), map[string]string{
-			"queue_name": task.GetQueueName(),
-			"task_id":    id,
-		})
 	}
+
+	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionCounter, float64(counter), map[string]string{
+		"queue_name": task.GetQueueName(),
+		"task_id":    id,
+	})
 }
 
 func (tc *TaskCounter) GetReachedCap() map[string]struct{} {

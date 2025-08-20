@@ -41,6 +41,8 @@ func Test_TasksQueue_Remove(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
 
 	q := NewTasksQueue(metricStorage)
 
@@ -106,6 +108,8 @@ func Test_TasksQueue_RemoveFirst(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
 
 	q := NewTasksQueue(metricStorage)
 
@@ -169,6 +173,8 @@ func Test_ExponentialBackoff(t *testing.T) {
 			"queue_name":   "test-queue",
 		}, labels)
 		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	// Init and prefill queue.
@@ -264,6 +270,8 @@ func Test_CancelDelay(t *testing.T) {
 			"queue_name":   "test-queue",
 		}, labels)
 		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	// Init and prefill queue.

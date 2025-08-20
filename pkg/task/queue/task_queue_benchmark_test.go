@@ -188,6 +188,8 @@ func newBenchmarkTasksQueue(b *testing.B) *TaskQueue {
 	metricStorage.HistogramObserveMock.Set(func(_ string, _ float64, _ map[string]string, _ []float64) {
 		// skip any observe hit
 	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
 
 	return NewTasksQueue(metricStorage)
 }
@@ -277,6 +279,8 @@ func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 		b.StopTimer()
 
 		metricStorage := metric.NewStorageMock(b)
+		metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+		})
 
 		q := NewTasksQueue(metricStorage, WithCompactableTypes(task_metadata.HookRun))
 		tasks := createCompactionBenchmarkData(b, size)

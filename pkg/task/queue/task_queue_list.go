@@ -389,6 +389,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 
 		taskType := t.GetType()
 		if _, ok := q.compactableTypes[taskType]; ok {
+
 			q.lazydebug("task is mergeable, marking queue as dirty", func() []any {
 				return []any{
 					slog.String("queue", q.Name),

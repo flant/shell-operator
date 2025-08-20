@@ -29,6 +29,8 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
 
 	// A channel to control when RequeueTask can finish.
 	requeueTaskCanFinish := make(chan struct{})
