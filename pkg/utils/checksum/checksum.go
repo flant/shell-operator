@@ -1,20 +1,22 @@
 package checksum
 
 import (
-	"crypto/md5"
 	"encoding/hex"
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 func CalculateChecksum(stringArr ...string) string {
-	hasher := md5.New()
+	digest := xxhash.New()
 	sort.Strings(stringArr)
 	for _, value := range stringArr {
-		_, _ = hasher.Write([]byte(value))
+		_, _ = digest.Write([]byte(value))
 	}
-	return hex.EncodeToString(hasher.Sum(nil))
+
+	return hex.EncodeToString(digest.Sum(nil))
 }
 
 func CalculateChecksumOfFile(path string) (string, error) {
