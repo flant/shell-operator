@@ -15,6 +15,7 @@ import (
 
 type Client struct {
 	SocketPath string
+	httpClient *http.Client
 }
 
 func NewClient() *Client {
@@ -26,6 +27,10 @@ func (c *Client) WithSocketPath(path string) {
 }
 
 func (c *Client) newHttpClient() (http.Client, error) {
+	if c.httpClient != nil {
+		return *c.httpClient, nil
+	}
+
 	exists, err := utils.FileExists(c.SocketPath)
 	if err != nil {
 		return http.Client{}, fmt.Errorf("check debug socket '%s': %s", c.SocketPath, err)
@@ -34,17 +39,27 @@ func (c *Client) newHttpClient() (http.Client, error) {
 		return http.Client{}, fmt.Errorf("debug socket '%s' is not exists", c.SocketPath)
 	}
 
-	return http.Client{
+	client := http.Client{
 		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				dialer := &net.Dialer{
-					Timeout:   10 * time.Second,
-					KeepAlive: 30 * time.Second,
+					Timeout: 10 * time.Second,
 				}
-				return dialer.Dial("unix", c.SocketPath)
+				return dialer.DialContext(ctx, "unix", c.SocketPath)
 			},
+			DisableKeepAlives: true,
 		},
-	}, nil
+	}
+	c.httpClient = &client
+	return client, nil
+}
+
+func (c *Client) Close() {
+	if c.httpClient != nil && c.httpClient.Transport != nil {
+		if transport, ok := c.httpClient.Transport.(*http.Transport); ok {
+			transport.CloseIdleConnections()
+		}
+	}
 }
 
 func DefaultClient() *Client {
