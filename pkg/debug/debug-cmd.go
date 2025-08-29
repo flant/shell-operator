@@ -28,7 +28,10 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 			var refreshInterval time.Duration
 			output := termenv.NewOutput(os.Stdout)
 
-			debugClient := DefaultClient()
+			debugClient, err := DefaultClient()
+			if err != nil {
+				return err
+			}
 			defer debugClient.Close()
 
 			if watch {
@@ -89,7 +92,11 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	queueMainCmd := queueCmd.Command("main", "Dump tasks in the main queue.").
 		Action(func(_ *kingpin.ParseContext) error {
-			out, err := Queue(DefaultClient()).Main(outputFormat)
+			client, err := DefaultClient()
+			if err != nil {
+				return err
+			}
+			out, err := Queue(client).Main(outputFormat)
 			if err != nil {
 				return err
 			}
@@ -104,7 +111,11 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 	configListCmd := configCmd.Command("list", "List available runtime parameters.").
 		Action(func(_ *kingpin.ParseContext) error {
-			out, err := Config(DefaultClient()).List(outputFormat)
+			client, err := DefaultClient()
+			if err != nil {
+				return err
+			}
+			out, err := Config(client).List(outputFormat)
 			if err != nil {
 				return err
 			}
@@ -119,7 +130,11 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 	var paramDuration time.Duration
 	configSetCmd := configCmd.Command("set", "Set runtime parameter.").
 		Action(func(_ *kingpin.ParseContext) error {
-			out, err := Config(DefaultClient()).Set(paramName, paramValue, paramDuration)
+			client, err := DefaultClient()
+			if err != nil {
+				return err
+			}
+			out, err := Config(client).Set(paramName, paramValue, paramDuration)
 			if err != nil {
 				return err
 			}
@@ -135,8 +150,12 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 	var rawUrl string
 	rawCommand := app.CommandWithDefaultUsageTemplate(kpApp, "raw", "Make a raw request to debug endpoint.").
 		Action(func(_ *kingpin.ParseContext) error {
+			client, err := DefaultClient()
+			if err != nil {
+				return err
+			}
 			url := fmt.Sprintf("http://unix%s", rawUrl)
-			resp, err := DefaultClient().Get(url)
+			resp, err := client.Get(url)
 			if err != nil {
 				return err
 			}
@@ -152,7 +171,11 @@ func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
 	hookCmd := app.CommandWithDefaultUsageTemplate(kpApp, "hook", "Actions for hooks")
 	hookListCmd := hookCmd.Command("list", "List all hooks.").
 		Action(func(_ *kingpin.ParseContext) error {
-			outBytes, err := Hook(DefaultClient()).List(outputFormat)
+			client, err := DefaultClient()
+			if err != nil {
+				return err
+			}
+			outBytes, err := Hook(client).List(outputFormat)
 			if err != nil {
 				return err
 			}
@@ -166,7 +189,11 @@ func DefineDebugCommandsSelf(kpApp *kingpin.Application) {
 	var hookName string
 	hookSnapshotCmd := hookCmd.Command("snapshot", "Dump hook snapshots.").
 		Action(func(_ *kingpin.ParseContext) error {
-			outBytes, err := Hook(DefaultClient()).Name(hookName).Snapshots(outputFormat)
+			client, err := DefaultClient()
+			if err != nil {
+				return err
+			}
+			outBytes, err := Hook(client).Name(hookName).Snapshots(outputFormat)
 			if err != nil {
 				return err
 			}
