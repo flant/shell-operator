@@ -35,14 +35,6 @@ func newDebugConfig() *debugConfig {
 	return &debugConfig{}
 }
 
-type jqConfig struct {
-	LibraryPath string `env:"LIBRARY_PATH"`
-}
-
-func newJQConfig() *jqConfig {
-	return &jqConfig{}
-}
-
 type kubeConfig struct {
 	// Settings for Kubernetes connection.
 	ContextName   string `env:"CONTEXT"`
@@ -114,7 +106,6 @@ func newLogConfig() *logConfig {
 
 type Config struct {
 	AppConfig               *appConfig               `envPrefix:"SHELL_OPERATOR_"`
-	JQConfig                *jqConfig                `envPrefix:"JQ_"`
 	KubeConfig              *kubeConfig              `envPrefix:"KUBE_"`
 	ObjectPatcherConfig     *objectPatcherConfig     `envPrefix:"OBJECT_PATCHER_"`
 	ValidatingWebhookConfig *validatingWebhookConfig `envPrefix:"VALIDATING_WEBHOOK_"`
@@ -131,7 +122,6 @@ type Config struct {
 func NewConfig() *Config {
 	return &Config{
 		AppConfig:               newAppConfig(),
-		JQConfig:                newJQConfig(),
 		KubeConfig:              newKubeConfig(),
 		ObjectPatcherConfig:     newObjectPatcherConfig(),
 		ValidatingWebhookConfig: newValidatingWebhookConfig(),
@@ -177,8 +167,6 @@ func (cfg *Config) SetupGlobalVars() {
 	setIfNotEmpty(&DebugKeepTmpFiles, cfg.DebugConfig.KeepTemporaryFiles == "true" || cfg.DebugConfig.KeepTemporaryFiles == "yes")
 	setIfNotEmpty(&DebugKubernetesAPI, cfg.DebugConfig.KubernetesAPI)
 	setIfNotEmpty(&DebugUnixSocket, cfg.DebugConfig.UnixSocket)
-
-	setIfNotEmpty(&JqLibraryPath, cfg.JQConfig.LibraryPath)
 
 	setIfNotEmpty(&KubeContext, cfg.KubeConfig.ContextName)
 	setIfNotEmpty(&KubeConfig, cfg.KubeConfig.ConfigPath)
