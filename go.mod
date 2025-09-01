@@ -36,6 +36,7 @@ require (
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.12-flant.0
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/deckhouse/module-sdk v0.3.7
 	github.com/gojuno/minimock/v3 v3.4.5
 	github.com/itchyny/gojq v0.12.17
@@ -137,5 +138,4 @@ require (
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
-
 )
