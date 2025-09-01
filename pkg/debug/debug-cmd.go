@@ -28,11 +28,11 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 			var refreshInterval time.Duration
 			output := termenv.NewOutput(os.Stdout)
 
-			debugClient, err := DefaultClient()
+			client, err := DefaultClient()
 			if err != nil {
 				return err
 			}
-			defer debugClient.Close()
+			defer client.Close()
 
 			if watch {
 				c := make(chan os.Signal, 1)
@@ -40,7 +40,7 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 
 				go func() {
 					<-c
-					debugClient.Close()
+					client.Close()
 					output.ExitAltScreen()
 					os.Exit(0)
 				}()
@@ -56,10 +56,10 @@ func DefineDebugCommands(kpApp *kingpin.Application) {
 				}
 			}
 
-			client := Queue(debugClient)
+			queueClient := Queue(client)
 
 			for {
-				out, err := client.List(outputFormat, showEmpty)
+				out, err := queueClient.List(outputFormat, showEmpty)
 				if err != nil {
 					return err
 				}
