@@ -46,34 +46,34 @@ jobs:
       fail-fast: true
       matrix:
         include:
-        - k8s_version: "1.23"
-          kind_node_image: "kindest/node:v1.23.17"
-          cluster_name: "kube-1-23"
-        - k8s_version: "1.24"
-          kind_node_image: "kindest/node:v1.24.15"
-          cluster_name: "kube-1-24"
-        - k8s_version: "1.25"
-          kind_node_image: "kindest/node:v1.25.11"
-          cluster_name: "kube-1-25"
-        - k8s_version: "1.26"
-          kind_node_image: "kindest/node:v1.26.6"
-          cluster_name: "kube-1-26"
-        - k8s_version: "1.27"
-          kind_node_image: "kindest/node:v1.27.3"
-          cluster_name: "kube-1-27"
+          - k8s_version: "1.28"
+            kind_node_image: "kindest/node:v1.28.15"
+            cluster_name: "kube-1-28"
+          - k8s_version: "1.29"
+            kind_node_image: "kindest/node:v1.29.14"
+            cluster_name: "kube-1-29"
+          - k8s_version: "1.30"
+            kind_node_image: "kindest/node:v1.30.10"
+            cluster_name: "kube-1-30"
+          - k8s_version: "1.31"
+            kind_node_image: "kindest/node:v1.31.6"
+            cluster_name: "kube-1-31"
+          - k8s_version: "1.32"
+            kind_node_image: "kindest/node:v1.32.3"
+            cluster_name: "kube-1-32"
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.22
+      - name: Set up Go 1.23
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.23"
 
       - name: Check out shell-operator code
         uses: actions/checkout@v4
 
       - name: Restore Go modules
         id: go-modules-cache
-        uses: actions/cache@v4.1.2
+        uses: actions/cache@v4.2.3
         with:
           path: |
             ~/go/pkg/mod
@@ -87,13 +87,9 @@ jobs:
           go mod download
           echo -n "Go modules unpacked size is: " && du -sh $HOME/go/pkg/mod
 
-      - name: Download prebuilt libjq static libraries
-        run: |
-          curl -sSfL https://github.com/flant/libjq-go/releases/download/jq-b6be13d5-0/libjq-glibc-amd64.tgz | tar zxf -
-
       - name: Install ginkgo
         run: |
-          go install github.com/onsi/ginkgo/ginkgo
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
           echo $PATH
           ls -la $GOPATH/bin
           ginkgo version
@@ -101,7 +97,7 @@ jobs:
       - name: Start kind cluster
         uses: engineerd/setup-kind@v0.6.2
         with:
-          version: "v0.20.0"
+          version: "v0.27.0"
           image: ${{ matrix.kind_node_image }}
           name: ${{ matrix.cluster_name }}
 
@@ -109,14 +105,10 @@ jobs:
         env:
           CLUSTER_NAME: ${{ matrix.cluster_name }}
         run: |
-          export CGO_ENABLED=1
-          export CGO_CFLAGS="-I$GITHUB_WORKSPACE/libjq/include"
-          export CGO_LDFLAGS="-L$GITHUB_WORKSPACE/libjq/lib"
           export GOOS=linux
 
           ginkgo \
             --tags 'integration test'  \
             --vet off \
-            --race \
             -p \
             -r test/integration

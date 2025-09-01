@@ -188,7 +188,7 @@ type HaveMetricMatcher struct {
 	promScraper *PromScraper
 }
 
-func (matcher *HaveMetricMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *HaveMetricMatcher) Match(actual interface{}) (bool, error) {
 	promScraper, ok := actual.(*PromScraper)
 	if !ok {
 		return false, fmt.Errorf("HaveMetric must be passed a *PromScraper. Got %T\n", actual)
@@ -199,11 +199,11 @@ func (matcher *HaveMetricMatcher) Match(actual interface{}) (success bool, err e
 	return !promScraper.FindExact(matcher.pmv).IsEmpty(), nil
 }
 
-func (matcher *HaveMetricMatcher) FailureMessage(_ interface{}) (message string) {
+func (matcher *HaveMetricMatcher) FailureMessage(_ interface{}) string {
 	return "Expected ShellOperator has metric"
 }
 
-func (matcher *HaveMetricMatcher) NegatedFailureMessage(_ interface{}) (message string) {
+func (matcher *HaveMetricMatcher) NegatedFailureMessage(_ interface{}) string {
 	return "Expected ShellOperator has no metric"
 }
 

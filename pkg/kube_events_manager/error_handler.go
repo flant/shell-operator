@@ -1,25 +1,27 @@
 package kubeeventsmanager
 
 import (
+	"errors"
 	"io"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/metric"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type WatchErrorHandler struct {
 	description   string
 	kind          string
-	metricStorage *metricstorage.MetricStorage
+	metricStorage metric.Storage
 
 	logger *log.Logger
 }
 
-func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage *metricstorage.MetricStorage, logger *log.Logger) *WatchErrorHandler {
+func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage metric.Storage, logger *log.Logger) *WatchErrorHandler {
 	return &WatchErrorHandler{
 		description:   description,
 		kind:          kind,
@@ -38,16 +40,25 @@ func (weh *WatchErrorHandler) handler(_ *cache.Reflector, err error) {
 		// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 		// has a semantic that it returns data at least as fresh as provided RV.
 		// So first try to LIST with setting RV to resource version of last observed object.
-		weh.logger.Errorf("%s: Watch of %v closed with: %v", weh.description, weh.kind, err)
+		weh.logger.Error("Watch closed",
+			slog.String("description", weh.description),
+			slog.String("kind", weh.kind),
+			log.Err(err))
 		errorType = "expired"
 	case err == io.EOF:
 		// watch closed normally
 		errorType = "eof"
-	case err == io.ErrUnexpectedEOF:
-		weh.logger.Errorf("%s: Watch for %v closed with unexpected EOF: %v", weh.description, weh.kind, err)
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		weh.logger.Error("Watch closed with unexpected EOF",
+			slog.String("description", weh.description),
+			slog.String("kind", weh.kind),
+			log.Err(err))
 		errorType = "unexpected-eof"
 	case err != nil:
-		weh.logger.Errorf("%s: Failed to watch %v: %v", weh.description, weh.kind, err)
+		weh.logger.Error("Watch Failed",
+			slog.String("description", weh.description),
+			slog.String("kind", weh.kind),
+			log.Err(err))
 		errorType = "fail"
 	}
 

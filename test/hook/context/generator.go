@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -15,6 +16,7 @@ import (
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
@@ -40,7 +42,7 @@ type BindingContextController struct {
 	fakeCluster *fake.Cluster
 
 	mu      sync.Mutex
-	started bool
+	started atomic.Bool
 
 	logger *log.Logger
 }
@@ -64,8 +66,9 @@ func NewBindingContextController(config string, logger *log.Logger, version ...f
 	}
 
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client, b.logger.Named("kube-events-manager"))
+	b.KubeEventsManager.WithMetricStorage(metricstorage.NewMetricStorage(ctx, "metrics-prefix", false, log.NewNop()))
 	// Re-create factory to drop informers created using different b.fakeCluster.Client.
-	kubeeventsmanager.DefaultFactoryStore = kubeeventsmanager.NewFactoryStore()
+	kubeeventsmanager.DefaultFactoryStore.Reset()
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager(ctx, b.logger.Named("schedule-manager"))
 
@@ -92,9 +95,8 @@ func (b *BindingContextController) RegisterCRD(group, version, kind string, name
 func (b *BindingContextController) Run(initialState string) (GeneratedBindingContexts, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
-	if b.started {
-		return GeneratedBindingContexts{}, fmt.Errorf("attempt to runner started runner, it cannot be started twice")
+	if b.started.Load() {
+		return GeneratedBindingContexts{}, fmt.Errorf("attempt to start an already started runner, it cannot be started twice")
 	}
 
 	err := b.Controller.SetInitialState(initialState)
@@ -119,7 +121,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	b.Hook.WithHookController(b.HookCtrl)
 
 	cc := NewContextCombiner()
-	err = b.HookCtrl.HandleEnableKubernetesBindings(func(info controller.BindingExecutionInfo) {
+	err = b.HookCtrl.HandleEnableKubernetesBindings(context.Background(), func(info controller.BindingExecutionInfo) {
 		if info.KubernetesBinding.ExecuteHookOnSynchronization {
 			cc.AddBindingContext(types.OnKubernetesEvent, info)
 		}
@@ -129,7 +131,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	b.HookCtrl.UnlockKubernetesEvents()
-	b.started = true
+	b.started.Store(true)
 
 	time.Sleep(50 * time.Millisecond)
 	return cc.CombinedAndUpdated(b.HookCtrl)
@@ -156,7 +158,7 @@ outer:
 			case "STOP_EVENTS":
 				break outer
 			default:
-				b.HookCtrl.HandleKubeEvent(ev, func(info controller.BindingExecutionInfo) {
+				b.HookCtrl.HandleKubeEvent(context.TODO(), ev, func(info controller.BindingExecutionInfo) {
 					cc.AddBindingContext(types.OnKubernetesEvent, info)
 				})
 			}
@@ -167,12 +169,12 @@ outer:
 	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
-func (b *BindingContextController) RunSchedule(crontab string) (GeneratedBindingContexts, error) {
+func (b *BindingContextController) RunSchedule(ctx context.Context, crontab string) (GeneratedBindingContexts, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	cc := NewContextCombiner()
-	b.HookCtrl.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
+	b.HookCtrl.HandleScheduleEvent(ctx, crontab, func(info controller.BindingExecutionInfo) {
 		cc.AddBindingContext(types.Schedule, info)
 	})
 	return cc.CombinedAndUpdated(b.HookCtrl)

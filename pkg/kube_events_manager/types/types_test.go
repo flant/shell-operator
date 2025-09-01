@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+//nolint:unparam
 func newObj(kind, ns, name, filterResult string) *ObjectAndFilterResult {
 	return &ObjectAndFilterResult{
 		FilterResult: filterResult,

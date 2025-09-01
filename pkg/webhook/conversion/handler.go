@@ -1,6 +1,7 @@
 package conversion
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,7 +36,7 @@ func NewWebhookHandler() *WebhookHandler {
 	})
 
 	rtr.Group(func(r chi.Router) {
-		r.Use(structuredLogger.NewStructuredLogger(log.NewLogger(log.Options{}).Named("conversionWebhook"), "conversionWebhook"))
+		r.Use(structuredLogger.NewStructuredLogger(log.NewLogger().Named("conversionWebhook"), "conversionWebhook"))
 		r.Use(middleware.Recoverer)
 		r.Use(middleware.AllowContentType("application/json"))
 		r.Post("/*", h.serveReviewRequest)
@@ -46,14 +47,16 @@ func NewWebhookHandler() *WebhookHandler {
 
 func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	ctx := r.Context()
 
 	crdName := detectCrdName(r.URL.Path)
-	log.Infof("Got ConversionReview request for crd/%s", crdName)
+	log.Info("Got ConversionReview request for crd",
+		slog.String("name", crdName))
 
 	var convertReview v1.ConversionReview
 	err := json.NewDecoder(r.Body).Decode(&convertReview)
 	if err != nil {
-		log.Errorf("failed to read conversion request: %v", err)
+		log.Error("failed to read conversion request", log.Err(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -64,7 +67,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	conversionResponse, err := h.handleReviewRequest(crdName, convertReview.Request)
+	conversionResponse, err := h.handleReviewRequest(ctx, crdName, convertReview.Request)
 	if err != nil {
 		log.Error("failed to convert", "request", convertReview.Request.UID, log.Err(err))
 		convertReview.Response = errored(err)
@@ -80,19 +83,19 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error json encoding ConversionReview"))
-		log.Errorf("Error json encoding ConversionReview: %v", err)
+		log.Error("Error json encoding ConversionReview", log.Err(err))
 		return
 	}
 }
 
 // See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#write-a-conversion-webhook-server
 // This code always response with v1 ConversionReview: it works for 1.16+.
-func (h *WebhookHandler) handleReviewRequest(crdName string, request *v1.ConversionRequest) (*v1.ConversionResponse, error) {
+func (h *WebhookHandler) handleReviewRequest(ctx context.Context, crdName string, request *v1.ConversionRequest) (*v1.ConversionResponse, error) {
 	if h.Manager.EventHandlerFn == nil {
 		return nil, fmt.Errorf("ConversionReview handler is not defined")
 	}
 
-	conversionResponse, err := h.Manager.EventHandlerFn(crdName, request)
+	conversionResponse, err := h.Manager.EventHandlerFn(ctx, crdName, request)
 	if err != nil {
 		return nil, err
 	}

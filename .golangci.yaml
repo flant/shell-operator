@@ -1,66 +1,56 @@
-run:
-  timeout: 15m
+version: "2"
+run:  
+  timeout: 15m  
+
 linters:
-  disable-all: true
+  default: none
   enable:
     - asciicheck
     - bodyclose
+    - copyloopvar
     - depguard
     - dogsled
     - durationcheck
-    - exportloopref
-    - gci
+    - errcheck
     - gochecknoinits
     - gocritic
-    - gofmt
-    - gofumpt
     - goprintffuncname
-    - gosimple
     - govet
     - ineffassign
     - misspell
+    - musttag
     - nolintlint
+    - nonamedreturns
     - prealloc
     - revive
     - sloglint
     - staticcheck
-    - stylecheck
     - unconvert
+    - unparam
     - unused
     - whitespace
-linters-settings:
-  gci:
-    sections:
-      - standard
-      - default
-      - prefix(github.com/flant/)
-  goimports:
-    local-prefixes: github.com/flant/
-  nolintlint:
-    allow-unused: true
-  # TODO: replace deprecated methods
-  # ignore deprecated 
-  # https://staticcheck.dev/docs/checks/#SA1019
-  staticcheck:
-    checks: ["all","-SA1019"]
-  sloglint:
-      # Enforce not mixing key-value pairs and attributes.
+    - usestdlibvars
+  settings:
+    depguard:
+      rules:
+        Main:
+          files:
+            - $all
+          deny:
+            - pkg: gopkg.in/satori/go.uuid.v1
+              desc: Use https://github.com/gofrs/uuid instead. Satori/go.uuid is no longer maintained and has critical vulnerabilities.
+    nolintlint:
+      allow-unused: true
+    nonamedreturns:
+      report-error-in-defer: false
+    sloglint:
       no-mixed-args: true
-      # Enforce using key-value pairs only (overrides no-mixed-args, incompatible with attr-only).
       kv-only: false
-      # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).
       attr-only: false
-      # Enforce not using global loggers.
       no-global: ""
-      # Enforce using methods that accept a context.
       context: ""
-      # Enforce using static values for log messages.
       static-msg: false
-      # Enforce using constants instead of raw keys.
       no-raw-keys: false
-      # Enforce a single key naming convention.
-      key-naming-case: ""
-      # Enforce not using specific keys.
       forbidden-keys:
         - level
         - msg
@@ -68,46 +58,70 @@ linters-settings:
         - source
         - stacktrace
         - time
-      # Enforce putting arguments on separate lines.
       args-on-sep-lines: false
-  depguard:
+    staticcheck:
+      checks:
+        - all
+        - '-QF1008' # not need to fix; we understand how to call nested structs
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      Main:
-        files:
-          - $all
-        deny:
-          - pkg: "gopkg.in/satori/go.uuid.v1"
-            desc: "Use https://github.com/gofrs/uuid instead. Satori/go.uuid is no longer maintained and has critical vulnerabilities."
+      - path: (.+)\.go$
+        text: 'var-naming: don''t use an underscore in package name'
+      - path: (.+)\.go$
+        text: 'ST1003: should not use underscores in package names'
+      - path: (.+)\.go$
+        text: 'ST1005: error strings should not be capitalized'
+      - path: (.+)\.go$
+        text: 'error-strings: error strings should not be capitalized or end with punctuation or a newline'
+      - path: (.+)\.go$
+        text: 'ST1005: error strings should not end with punctuation or newlines'
+      - path: (.+)\.go$
+        text: 'dot-imports: should not use dot imports'
+      - path: (.+)\.go$
+        text: 'ST1001: should not use dot imports'
+      - path: (.+)\.go$
+        text: don't use `init` function
+      - path: (.+)\.go$
+        text: 'var-naming:'
+      - path: (.+)\.go$
+        text: 'ST1003: '
+      - path: (.+)\.go$
+        text: 'exported: type name will be used as'
+      - path: (.+)\.go$
+        text: 'unexported-return: exported func (.*), which can be annoying to use'
+    paths:
+      - test/integration
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-dirs:
-    - test/integration
-  exclude:
-    # Using underscores is a common practice, refactor in the future
-    - "var-naming: don't use an underscore in package name" # revive
-    - "ST1003: should not use underscores in package names" # stylecheck
-
-    # Sometime errors are used to propagate messages for end-users
-    - "ST1005: error strings should not be capitalized" # stylecheck
-    - "error-strings: error strings should not be capitalized or end with punctuation or a newline" # revive
-    - "ST1005: error strings should not end with punctuation or newlines" # stylecheck
-
-    # Dot imports are used for types, consider refactoring
-    - "dot-imports: should not use dot imports" # revive
-    - "ST1001: should not use dot imports" # stylecheck
-
-    # Init functions are used for global variables' initialization, consider refactoring
-    - "don't use `init` function"
-
-    # Suggests changing Json -> JSON. Figure out which style we want to follow.
-    - "var-naming:" # revive
-    - "ST1003: " # stylecheck
-
-    # Exported name should not start with the package name, e.g., helm3.Helm3Options.
-    # However, this penetrates all the code and sometimes is used to avoid name collisions.
-    # Nice to refactor, but not necessary.
-    - "exported: type name will be used as" # revive
-
-    # It is annoying be design, consider refactoring
-    - "unexported-return: exported func (.*), which can be annoying to use" # revive
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/flant/)
+    goimports:
+      local-prefixes:
+        - github.com/flant/
+  exclusions:
+    generated: lax
+    paths:
+      - test/integration
+      - third_party$
+      - builtin$
+      - examples$

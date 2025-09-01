@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
@@ -43,40 +46,35 @@ func NewServer(prefix, socketPath, httpAddr string, logger *log.Logger) *Server 
 	}
 }
 
-func (s *Server) Init() (err error) {
+func (s *Server) Init() error {
 	address := s.SocketPath
 
-	err = os.MkdirAll(path.Dir(address), 0o700)
-	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to create socket '%s': %v", address, err)
-		return err
+	if err := os.MkdirAll(path.Dir(address), 0o700); err != nil {
+		return fmt.Errorf("Debug HTTP server fail to create socket '%s': %w", address, err)
 	}
 
 	exists, err := utils.FileExists(address)
 	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to check socket '%s': %v", address, err)
-		return err
+		return fmt.Errorf("Debug HTTP server fail to check socket '%s': %w", address, err)
 	}
+
 	if exists {
-		err = os.Remove(address)
-		if err != nil {
-			s.logger.Errorf("Debug HTTP server fail to remove existing socket '%s': %v", address, err)
-			return err
+		if err := os.Remove(address); err != nil {
+			return fmt.Errorf("Debug HTTP server fail to check socket '%s': %w", address, err)
 		}
 	}
 
 	// Check if socket is available
 	listener, err := net.Listen("unix", address)
 	if err != nil {
-		s.logger.Errorf("Debug HTTP server fail to listen on '%s': %v", address, err)
-		return err
+		return fmt.Errorf("Debug HTTP server fail to listen on '%s': %w", address, err)
 	}
 
-	s.logger.Infof("Debug endpoint listen on %s", address)
+	s.logger.Info("Debug endpoint listen on address", slog.String("address", address))
 
 	go func() {
 		if err := http.Serve(listener, s.Router); err != nil {
-			s.logger.Errorf("Error starting Debug socket server: %s", err)
+			s.logger.Error("Error starting Debug socket server", log.Err(err))
 			os.Exit(1)
 		}
 	}()
@@ -84,7 +82,7 @@ func (s *Server) Init() (err error) {
 	if s.HttpAddr != "" {
 		go func() {
 			if err := http.ListenAndServe(s.HttpAddr, s.Router); err != nil {
-				s.logger.Errorf("Error starting Debug HTTP server: %s", err)
+				s.logger.Error("Error starting Debug HTTP server", log.Err(err))
 				os.Exit(1)
 			}
 		}()
@@ -121,12 +119,15 @@ func (s *Server) RegisterHandler(method, pattern string, handler func(request *h
 func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, handler func(request *http.Request) (interface{}, error)) {
 	out, err := handler(request)
 	if err != nil {
-		if _, ok := err.(*BadRequestError); ok {
+		switch err.(type) {
+		case *BadRequestError:
 			http.Error(writer, err.Error(), http.StatusBadRequest)
-			return
+		case *NotFoundError:
+			http.Error(writer, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
 
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if out == nil {
@@ -134,8 +135,17 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		return
 	}
 
-	format := FormatFromRequest(request)
-	structuredLogger.GetLogEntry(request).Debugf("use format '%s'", format)
+	// Trying to get format from chi
+	format := chi.URLParam(request, "format")
+	if format == "" { // If failed, trying to parse uri
+		uri := request.URL.Path
+		uriFragments := strings.Split(uri, "/")
+		uriLastFragment := uriFragments[len(uriFragments)-1] // string after last "/" to ignore garbage
+		format = filepath.Ext(uriLastFragment)               // Extracts extension of path (like .yaml), may return empty string
+		format = strings.TrimPrefix(format, ".")
+	}
+
+	structuredLogger.GetLogEntry(request).Debug("used format", slog.String("format", format))
 
 	switch format {
 	case "text":
@@ -144,6 +154,10 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		writer.Header().Set("Content-Type", "application/json")
 	case "yaml":
 		writer.Header().Set("Content-Type", "application/yaml")
+	// support for old behavior. If the extension is not indicated, we use text by default
+	case "":
+		format = "text"
+		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	writer.WriteHeader(http.StatusOK)
 
@@ -153,7 +167,9 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 	}
 }
 
-func transformUsingFormat(w io.Writer, val interface{}, format string) (err error) {
+func transformUsingFormat(w io.Writer, val interface{}, format string) error {
+	var err error
+
 	switch format {
 	case "yaml":
 		enc := yaml.NewEncoder(w)
@@ -197,4 +213,12 @@ type BadRequestError struct {
 
 func (be *BadRequestError) Error() string {
 	return be.Msg
+}
+
+type NotFoundError struct {
+	Msg string
+}
+
+func (nf *NotFoundError) Error() string {
+	return nf.Msg
 }

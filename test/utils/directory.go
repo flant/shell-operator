@@ -18,7 +18,10 @@ import (
 // Example:
 // dir, err := ExtractExistedDirectoryPath(os.Getenv("DIR"), defaultDir)
 
-func ChooseExistedDirectoryPath(paths ...string) (path string, err error) {
+func ChooseExistedDirectoryPath(paths ...string) (string, error) {
+	var path string
+	var err error
+
 	for _, p := range paths {
 		if p != "" {
 			path = p
@@ -32,7 +35,7 @@ func ChooseExistedDirectoryPath(paths ...string) (path string, err error) {
 
 	path, err = ToAbsolutePath(path)
 	if err != nil {
-		return
+		return path, err
 	}
 
 	if exists := utils_file.DirExists(path); !exists {

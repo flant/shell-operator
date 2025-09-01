@@ -46,23 +46,22 @@ func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructu
 	}
 
 	// Render obj to JSON text to apply jq filter.
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-
 	if jqFilter == "" {
+		data, err := json.Marshal(obj)
+		if err != nil {
+			return nil, err
+		}
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))
 	} else {
 		var err error
-		var filtered string
-		filtered, err = fl.ApplyFilter(jqFilter, data)
+		var filtered []byte
+		filtered, err = fl.ApplyFilter(jqFilter, obj.UnstructuredContent())
 		if err != nil {
 			return nil, fmt.Errorf("jqFilter: %v", err)
 		}
 
-		res.FilterResult = filtered
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(filtered)
+		res.FilterResult = string(filtered)
+		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filtered))
 	}
 
 	return res, nil

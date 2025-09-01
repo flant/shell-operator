@@ -1,7 +1,10 @@
 package hook
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +21,7 @@ import (
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
+	"github.com/flant/shell-operator/pkg/task"
 	utils_file "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
@@ -92,7 +96,9 @@ func (hm *Manager) Init() error {
 	hm.hooksByName = make(map[string]*Hook)
 
 	if err := utils_file.RecursiveCheckLibDirectory(hm.workingDir); err != nil {
-		log.Errorf("failed to check lib directory %s: %v", hm.workingDir, err)
+		log.Error("failed to check lib directory",
+			slog.String("workingDir", hm.workingDir),
+			log.Err(err))
 	}
 
 	hooksRelativePaths, err := utils_file.RecursiveGetExecutablePaths(hm.workingDir)
@@ -102,7 +108,7 @@ func (hm *Manager) Init() error {
 
 	// sort hooks by path
 	sort.Strings(hooksRelativePaths)
-	log.Debugf("  Search hooks in this paths: %+v", hooksRelativePaths)
+	log.Debug("Search hooks in paths", slog.Any("paths", hooksRelativePaths))
 
 	for _, hookPath := range hooksRelativePaths {
 		hook, err := hm.loadHook(hookPath)
@@ -128,31 +134,31 @@ func (hm *Manager) Init() error {
 }
 
 // TODO move --config execution to a Hook method
-func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
+func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 	hookName, err := filepath.Rel(hm.workingDir, hookPath)
 	if err != nil {
 		return nil, err
 	}
-	hook = NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
 
+	hook := NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
 	hookEntry := hm.logger.With("hook", hook.Name).
 		With("phase", "config")
 
-	hookEntry.Infof("Load config from '%s'", hookPath)
+	hookEntry.Info("Load config", slog.String("path", hookPath))
 
 	envs := make([]string, 0)
 	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
-		hookEntry.Errorf("Hook config output:\n%s", string(configOutput))
-		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
-			hookEntry.Errorf("Hook config stderr:\n%s", string(ee.Stderr))
+		hookEntry.Error("Hook config output", slog.String("value", string(configOutput)))
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
+			hookEntry.Error("Hook config stderr", slog.String("value", string(ee.Stderr)))
 		}
-		return nil, fmt.Errorf("cannot get config for hook '%s': %s", hookPath, err)
+		return nil, fmt.Errorf("cannot get config for hook '%s': %w", hookPath, err)
 	}
 
-	_, err = hook.LoadConfig(configOutput)
-	if err != nil {
-		return nil, fmt.Errorf("creating hook '%s': %s", hookName, err.Error())
+	if _, err = hook.LoadConfig(configOutput); err != nil {
+		return nil, fmt.Errorf("creating hook '%s': %w", hookName, err)
 	}
 
 	// Add hook info as log labels, update MetricLabels
@@ -164,6 +170,7 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 			"queue":   kubeCfg.Queue,
 		}
 	}
+
 	for _, conversionCfg := range hook.GetConfig().KubernetesConversion {
 		conversionCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
 		conversionCfg.Webhook.Metadata.MetricLabels = map[string]string{
@@ -180,6 +187,7 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 		}
 		validatingCfg.Webhook.UpdateIds("", validatingCfg.BindingName)
 	}
+
 	for _, mutatingCfg := range hook.GetConfig().KubernetesMutating {
 		mutatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
 		mutatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
@@ -204,7 +212,7 @@ func (hm *Manager) loadHook(hookPath string) (hook *Hook, err error) {
 		return nil, fmt.Errorf("hook %q is marked as executable but doesn't contain config section", hook.Path)
 	}
 
-	hookEntry.Infof("Loaded config: %s", hook.GetConfigDescription())
+	hookEntry.Info("Loaded config", slog.String("value", hook.GetConfigDescription()))
 
 	return hook, nil
 }
@@ -225,14 +233,14 @@ func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint str
 	debugEntry := hm.logger.With("hook", hookName).
 		With("cmd", strings.Join(args, " "))
 
-	debugEntry.Debugf("Executing hook in %s", dir)
+	debugEntry.Debug("Executing hook", slog.String("dir", dir))
 
 	output, err := hookCmd.Output()
 	if err != nil {
 		return output, err
 	}
 
-	debugEntry.Debugf("output:\n%s", string(output))
+	debugEntry.Debug("execCommandOutput", slog.String("output", string(output)))
 
 	return output, nil
 }
@@ -242,7 +250,7 @@ func (hm *Manager) GetHook(name string) *Hook {
 	if exists {
 		return hook
 	}
-	log.Errorf("Possible bug!!! Hook '%s' not found in hook manager", name)
+	log.Error("Possible bug!!! Hook not found in hook manager", slog.String("name", name))
 	return nil
 }
 
@@ -278,42 +286,61 @@ func (hm *Manager) GetHooksInOrder(bindingType htypes.BindingType) ([]string, er
 	return hooksNames, nil
 }
 
-func (hm *Manager) HandleKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) CreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	kubeHooks, _ := hm.GetHooksInOrder(htypes.OnKubernetesEvent)
+	tasks := make([]task.Task, 0)
 
 	for _, hookName := range kubeHooks {
 		h := hm.GetHook(hookName)
 
 		if h.HookController.CanHandleKubeEvent(kubeEvent) {
-			h.HookController.HandleKubeEvent(kubeEvent, func(info controller.BindingExecutionInfo) {
+			task := h.HookController.HandleKubeEventWithFormTask(context.TODO(), kubeEvent, func(info controller.BindingExecutionInfo) task.Task {
 				if createTaskFn != nil {
-					createTaskFn(h, info)
+					return createTaskFn(h, info)
 				}
+
+				return nil
 			})
+
+			if task != nil {
+				tasks = append(tasks, task)
+			}
 		}
 	}
+
+	return tasks
 }
 
-func (hm *Manager) HandleScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleCreateTasksFromScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task {
 	schHooks, _ := hm.GetHooksInOrder(htypes.Schedule)
+	tasks := make([]task.Task, 0)
+
 	for _, hookName := range schHooks {
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleScheduleEvent(crontab) {
-			h.HookController.HandleScheduleEvent(crontab, func(info controller.BindingExecutionInfo) {
+			newTasks := h.HookController.HandleScheduleEventWithFormTasks(context.TODO(), crontab, func(info controller.BindingExecutionInfo) task.Task {
 				if createTaskFn != nil {
-					createTaskFn(h, info)
+					return createTaskFn(h, info)
 				}
+
+				return nil
 			})
+
+			if len(newTasks) > 0 {
+				tasks = append(tasks, newTasks...)
+			}
 		}
 	}
+
+	return tasks
 }
 
-func (hm *Manager) HandleAdmissionEvent(event admission.Event, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleAdmissionEvent(ctx context.Context, event admission.Event, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(htypes.KubernetesValidating)
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleAdmissionEvent(event) {
-			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
+			h.HookController.HandleAdmissionEvent(ctx, event, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
 				}
@@ -325,7 +352,7 @@ func (hm *Manager) HandleAdmissionEvent(event admission.Event, createTaskFn func
 	for _, hookName := range mHooks {
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleAdmissionEvent(event) {
-			h.HookController.HandleAdmissionEvent(event, func(info controller.BindingExecutionInfo) {
+			h.HookController.HandleAdmissionEvent(ctx, event, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
 				}
@@ -351,18 +378,23 @@ func (hm *Manager) DetectAdmissionEventType(event admission.Event) htypes.Bindin
 		}
 	}
 
-	log.Errorf("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s", event.ConfigurationId, event.WebhookId, event.Request.Kind, event.Request.Name, event.Request.Namespace)
+	log.Error("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s",
+		slog.String("configId", event.ConfigurationId),
+		slog.String("webhookId", event.WebhookId),
+		slog.String("kind", event.Request.Kind.String()),
+		slog.String("name", event.Request.Name),
+		slog.String("namespace", event.Request.Namespace))
 	return ""
 }
 
 // HandleConversionEvent receives a crdName and calculates a sequence of hooks to run.
-func (hm *Manager) HandleConversionEvent(crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
+func (hm *Manager) HandleConversionEvent(ctx context.Context, crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo)) {
 	vHooks, _ := hm.GetHooksInOrder(htypes.KubernetesConversion)
 
 	for _, hookName := range vHooks {
 		h := hm.GetHook(hookName)
 		if h.HookController.CanHandleConversionEvent(crdName, request, rule) {
-			h.HookController.HandleConversionEvent(crdName, request, rule, func(info controller.BindingExecutionInfo) {
+			h.HookController.HandleConversionEvent(ctx, crdName, request, rule, func(info controller.BindingExecutionInfo) {
 				if createTaskFn != nil {
 					createTaskFn(h, info)
 				}

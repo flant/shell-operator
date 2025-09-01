@@ -229,6 +229,18 @@ properties:
         timeoutSeconds:
           type: integer
           example: 10
+        matchConditions:
+          type: array
+          items:
+            type: object
+            required:
+              - expression
+              - name
+            properties:
+              expression:
+                type: string
+              name:
+                type: string
         labelSelector:
           "$ref": "#/definitions/labelSelector"
         namespace:
@@ -318,6 +330,18 @@ properties:
         timeoutSeconds:
           type: integer
           example: 10
+        matchConditions:
+          type: array
+          items:
+            type: object
+            required:
+              - expression
+              - name
+            properties:
+              expression:
+                type: string
+              name:
+                type: string
         labelSelector:
           "$ref": "#/definitions/labelSelector"
         namespace:

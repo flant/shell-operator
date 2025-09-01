@@ -65,19 +65,14 @@ func unmarshalFromYaml(yamlSpecs []byte) ([]OperationSpec, error) {
 }
 
 func applyJQPatch(jqFilter string, fl filter.Filter, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	objBytes, err := obj.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	filterResult, err := fl.ApplyFilter(jqFilter, objBytes)
+	filterResult, err := fl.ApplyFilter(jqFilter, obj.UnstructuredContent())
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply jqFilter:\n%sto Object:\n%s\n"+
 			"error: %s", jqFilter, obj, err)
 	}
 
 	retObj := &unstructured.Unstructured{}
-	_, _, err = unstructured.UnstructuredJSONScheme.Decode([]byte(filterResult), nil, retObj)
+	_, _, err = unstructured.UnstructuredJSONScheme.Decode(filterResult, nil, retObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert filterResult:\n%s\nto Unstructured Object\nerror: %s", filterResult, err)
 	}
@@ -85,15 +80,15 @@ func applyJQPatch(jqFilter string, fl filter.Filter, obj *unstructured.Unstructu
 	return retObj, nil
 }
 
-func generateSubresources(subresource string) (ret []string) {
+func generateSubresources(subresource string) []string {
 	if subresource != "" {
-		ret = append(ret, subresource)
+		return []string{subresource}
 	}
 
-	return
+	return nil
 }
 
-func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
+func toUnstructured(obj any) (*unstructured.Unstructured, error) {
 	switch v := obj.(type) {
 	case []byte:
 		mft, err := manifest.NewFromYAML(string(v))
@@ -107,7 +102,7 @@ func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 			return nil, err
 		}
 		return mft.Unstructured(), nil
-	case map[string]interface{}:
+	case map[string]any:
 		return &unstructured.Unstructured{Object: v}, nil
 	default:
 		objectContent, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
@@ -118,9 +113,9 @@ func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 	}
 }
 
-func convertPatchToBytes(patch interface{}) ([]byte, error) {
+func convertPatchToBytes(patch any) ([]byte, error) {
 	var err error
-	var intermediate interface{}
+	var intermediate any
 	switch v := patch.(type) {
 	case []byte:
 		err = k8yaml.Unmarshal(v, &intermediate)

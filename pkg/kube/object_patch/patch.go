@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	sdkpkg "github.com/deckhouse/module-sdk/pkg"
 	"github.com/hashicorp/go-multierror"
 	gerror "github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -39,13 +41,13 @@ func NewObjectPatcher(kubeClient KubeClient, logger *log.Logger) *ObjectPatcher 
 	}
 }
 
-func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
+func (o *ObjectPatcher) ExecuteOperations(ops []sdkpkg.PatchCollectorOperation) error {
 	log.Debug("Starting execute operations process")
 	defer log.Debug("Finished execute operations process")
 
 	applyErrors := &multierror.Error{}
 	for _, op := range ops {
-		log.Debugf("Applying operation: %s", op.Description())
+		log.Debug("Applying operation", slog.String("name", op.Description()))
 		if err := o.ExecuteOperation(op); err != nil {
 			err = gerror.WithMessage(err, op.Description())
 			applyErrors = multierror.Append(applyErrors, err)
@@ -55,7 +57,7 @@ func (o *ObjectPatcher) ExecuteOperations(ops []Operation) error {
 	return applyErrors.ErrorOrNil()
 }
 
-func (o *ObjectPatcher) ExecuteOperation(operation Operation) error {
+func (o *ObjectPatcher) ExecuteOperation(operation sdkpkg.PatchCollectorOperation) error {
 	if operation == nil {
 		return nil
 	}
@@ -66,9 +68,11 @@ func (o *ObjectPatcher) ExecuteOperation(operation Operation) error {
 	case *deleteOperation:
 		return o.executeDeleteOperation(v)
 	case *patchOperation:
+		if v.hasFilterFn() {
+			return o.executeFilterOperation(v)
+		}
+
 		return o.executePatchOperation(v)
-	case *filterOperation:
-		return o.executeFilterOperation(v)
 	}
 
 	return nil
@@ -79,7 +83,7 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 		return fmt.Errorf("cannot create empty object")
 	}
 
-	// Convert object from interface{}.
+	// Convert object from any.
 	object, err := toUnstructured(op.object)
 	if err != nil {
 		return err
@@ -191,12 +195,12 @@ func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 
 // executeFilterOperation retrieves a specified object, modified it with
 // filterFunc and calls update.
-
+//
 // Other options:
 // - WithSubresource — a subresource argument for Patch or Update API call.
 // - IgnoreMissingObject — do not return error if the specified object is missing.
 // - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
-func (o *ObjectPatcher) executeFilterOperation(op *filterOperation) error {
+func (o *ObjectPatcher) executeFilterOperation(op *patchOperation) error {
 	var err error
 
 	if op.filterFunc == nil {
@@ -282,9 +286,9 @@ func (o *ObjectPatcher) executeDeleteOperation(op *deleteOperation) error {
 
 	log.Debug("Waiting for object deletion")
 
-	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, 20*time.Second, false, func(ctx context.Context) (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, 20*time.Second, false, func(ctx context.Context) (bool, error) {
 		log.Debug("Started Get API call")
-		_, err = o.kubeClient.Dynamic().
+		_, err := o.kubeClient.Dynamic().
 			Resource(gvk).
 			Namespace(op.namespace).
 			Get(ctx, op.name, metav1.GetOptions{})

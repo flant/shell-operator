@@ -1,8 +1,11 @@
 package utils
 
 import (
+	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -20,14 +23,19 @@ func FileExists(path string) (bool, error) {
 	return true, nil
 }
 
-func IsFileExecutable(f os.FileInfo) bool {
-	return f.Mode()&0o111 != 0
+func CheckExecutablePermissions(f os.FileInfo) error {
+	if f.Mode()&0o111 == 0 {
+		return ErrFileNoExecutablePermissions
+	}
+
+	return nil
 }
 
 // RecursiveGetExecutablePaths finds recursively all executable files
 // inside a dir directory. Hidden directories and files are ignored.
-func RecursiveGetExecutablePaths(dir string) ([]string, error) {
+func RecursiveGetExecutablePaths(dir string, excludedDirs ...string) ([]string, error) {
 	paths := make([]string, 0)
+	excludedDirs = append(excludedDirs, "lib")
 	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -35,15 +43,22 @@ func RecursiveGetExecutablePaths(dir string) ([]string, error) {
 
 		if f.IsDir() {
 			// Skip hidden and lib directories inside initial directory
-			if strings.HasPrefix(f.Name(), ".") || f.Name() == "lib" {
+			if strings.HasPrefix(f.Name(), ".") || slices.Contains(excludedDirs, f.Name()) {
 				return filepath.SkipDir
 			}
 
 			return nil
 		}
 
-		if !isExecutableHookFile(f) {
-			log.Warnf("File '%s' is skipped: no executable permissions, chmod +x is required to run this hook", path)
+		if err := checkExecutableHookFile(f); err != nil {
+			if errors.Is(err, ErrFileNoExecutablePermissions) {
+				log.Warn("file is skipped", slog.String("path", path), log.Err(err))
+
+				return nil
+			}
+
+			log.Debug("file is skipped", slog.String("path", path), log.Err(err))
+
 			return nil
 		}
 
@@ -78,8 +93,10 @@ func RecursiveCheckLibDirectory(dir string) error {
 
 			return nil
 		}
-		if isExecutableHookFile(f) {
-			log.Warnf("File '%s' has executable permissions and is located in the ignored 'lib' directory", strings.TrimPrefix(path, dir))
+
+		if err := checkExecutableHookFile(f); err == nil {
+			log.Warn("file has executable permissions and is located in the ignored 'lib' directory",
+				slog.String("file", strings.TrimPrefix(path, dir)))
 		}
 
 		return nil
@@ -91,17 +108,23 @@ func RecursiveCheckLibDirectory(dir string) error {
 	return nil
 }
 
-func isExecutableHookFile(f os.FileInfo) bool {
+var (
+	ErrFileHasWrongExtension       = errors.New("file has wrong extension")
+	ErrFileIsHidden                = errors.New("file is hidden")
+	ErrFileNoExecutablePermissions = errors.New("no executable permissions, chmod +x is required to run this hook")
+)
+
+func checkExecutableHookFile(f os.FileInfo) error {
 	// ignore hidden files
 	if strings.HasPrefix(f.Name(), ".") {
-		return false
+		return ErrFileIsHidden
 	}
 
 	// ignore .yaml, .json, .txt, .md files
 	switch filepath.Ext(f.Name()) {
 	case ".yaml", ".json", ".md", ".txt":
-		return false
+		return ErrFileHasWrongExtension
 	}
 
-	return IsFileExecutable(f)
+	return CheckExecutablePermissions(f)
 }

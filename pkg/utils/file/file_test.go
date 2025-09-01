@@ -49,9 +49,10 @@ func prepareTestDirTree() (string, error) {
 
 func createExecutableFile(file string) error {
 	if _, err := os.Create(file); err != nil {
-		return err
+		return fmt.Errorf("create: %w", err)
 	}
-	os.Chmod(file, 0o777)
+
+	_ = os.Chmod(file, 0o777)
 
 	return nil
 }
@@ -122,17 +123,17 @@ func TestRecursiveCheckLibDirectory(t *testing.T) {
 	for _, tt := range tests {
 		var buf bytes.Buffer
 
-		logger := log.NewLogger(log.Options{
-			Output: &buf,
-			TimeFunc: func(_ time.Time) time.Time {
+		logger := log.NewLogger(
+			log.WithOutput(&buf),
+			log.WithTimeFunc(func(_ time.Time) time.Time {
 				parsedTime, err := time.Parse(time.DateTime, "2006-01-02 15:04:05")
 				if err != nil {
 					assert.NoError(t, err)
 				}
 
 				return parsedTime
-			},
-		})
+			}),
+		)
 
 		log.SetDefault(logger)
 
@@ -143,7 +144,7 @@ func TestRecursiveCheckLibDirectory(t *testing.T) {
 
 			assert.Equal(t,
 				buf.String(),
-				`{"level":"warn","msg":"File '/lib.py' has executable permissions and is located in the ignored 'lib' directory","time":"2006-01-02T15:04:05Z"}`+"\n")
+				`{"level":"warn","msg":"file has executable permissions and is located in the ignored 'lib' directory","file":"/lib.py","time":"2006-01-02T15:04:05Z"}`+"\n")
 		})
 	}
 

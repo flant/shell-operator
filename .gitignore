@@ -15,6 +15,7 @@
 .idea
 *.iml
 *.proj
+.vscode
 
 # C Dependency
 libjq

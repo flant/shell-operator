@@ -14,14 +14,19 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"go.opentelemetry.io/otel"
 
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
+)
+
+const (
+	serviceName = "executor"
 )
 
 func Run(cmd *exec.Cmd) error {
 	// TODO context: hook name, hook phase, hook binding
 	// TODO observability
-	log.Debugf("Executing command '%s' in '%s' dir", strings.Join(cmd.Args, " "), cmd.Dir)
+	log.Debug("Executing command", slog.String("command", strings.Join(cmd.Args, " ")), slog.String("dir", cmd.Dir))
 
 	return cmd.Run()
 }
@@ -55,6 +60,18 @@ func (e *Executor) WithLogger(logger *log.Logger) *Executor {
 	return e
 }
 
+func (e *Executor) WithChroot(path string) *Executor {
+	if len(path) > 0 {
+		e.cmd.SysProcAttr = &syscall.SysProcAttr{
+			Chroot: path,
+		}
+		e.cmd.Path = strings.TrimPrefix(e.cmd.Path, path)
+		e.cmd.Dir = "/"
+	}
+
+	return e
+}
+
 func (e *Executor) WithCMDStdout(w io.Writer) *Executor {
 	e.cmd.Stdout = w
 
@@ -75,14 +92,16 @@ func NewExecutor(dir string, entrypoint string, args []string, envs []string) *E
 	ex := &Executor{
 		cmd:          cmd,
 		proxyJsonKey: "proxyJsonLog",
-		logger:       log.NewLogger(log.Options{}).Named("auto-executor"),
+		logger:       log.NewLogger().Named("auto-executor"),
 	}
 
 	return ex
 }
 
 func (e *Executor) Output() ([]byte, error) {
-	e.logger.Debugf("Executing command '%s' in '%s' dir", strings.Join(e.cmd.Args, " "), e.cmd.Dir)
+	e.logger.Debug("Executing command",
+		slog.String("command", strings.Join(e.cmd.Args, " ")),
+		slog.String("dir", e.cmd.Dir))
 	return e.cmd.Output()
 }
 
@@ -92,16 +111,35 @@ type CmdUsage struct {
 	MaxRss int64
 }
 
-func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error) {
+func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]string) (*CmdUsage, error) {
+	ctx, span := otel.Tracer(serviceName).Start(ctx, "RunAndLogLines")
+	defer span.End()
+
 	stdErr := bytes.NewBuffer(nil)
 	logEntry := utils.EnrichLoggerWithLabels(e.logger, logLabels)
 	stdoutLogEntry := logEntry.With("output", "stdout")
 	stderrLogEntry := logEntry.With("output", "stderr")
 
-	logEntry.Debugf("Executing command '%s' in '%s' dir", strings.Join(e.cmd.Args, " "), e.cmd.Dir)
+	log.Debug("Executing command",
+		slog.String("command", strings.Join(e.cmd.Args, " ")),
+		slog.String("dir", e.cmd.Dir))
 
-	plo := &proxyLogger{e.logProxyHookJSON, e.proxyJsonKey, stdoutLogEntry, make([]byte, 0)}
-	ple := &proxyLogger{e.logProxyHookJSON, e.proxyJsonKey, stderrLogEntry, make([]byte, 0)}
+	plo := &proxyLogger{
+		ctx:              ctx,
+		logProxyHookJSON: e.logProxyHookJSON,
+		proxyJsonLogKey:  e.proxyJsonKey,
+		logger:           stdoutLogEntry,
+		buf:              make([]byte, 0),
+	}
+
+	ple := &proxyLogger{
+		ctx:              ctx,
+		logProxyHookJSON: e.logProxyHookJSON,
+		proxyJsonLogKey:  e.proxyJsonKey,
+		logger:           stderrLogEntry,
+		buf:              make([]byte, 0),
+	}
+
 	e.cmd.Stdout = plo
 	e.cmd.Stderr = io.MultiWriter(ple, stdErr)
 
@@ -133,12 +171,12 @@ func (e *Executor) RunAndLogLines(logLabels map[string]string) (*CmdUsage, error
 }
 
 type proxyLogger struct {
+	ctx context.Context
+
 	logProxyHookJSON bool
 	proxyJsonLogKey  string
-
-	logger *log.Logger
-
-	buf []byte
+	logger           *log.Logger
+	buf              []byte
 }
 
 func (pl *proxyLogger) Write(p []byte) (int, error) {
@@ -178,50 +216,66 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
-	// logEntry.Log(log.FatalLevel, string(logLine))
-	pl.mergeAndLogInputLog(context.TODO(), logMap, "hook")
+	pl.mergeAndLogInputLog(pl.ctx, logMap, "hook")
 
 	return len(p), nil
 }
 
 func (pl *proxyLogger) writerScanner(p []byte) {
 	scanner := bufio.NewScanner(bytes.NewReader(p))
-
-	// Set the buffer size to the maximum token size to avoid buffer overflows
 	scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize)
 
-	// Define a split function to split the input into chunks of up to 64KB
+	var jsonBuf []string
+	// Split large entries into chunks
 	chunkSize := bufio.MaxScanTokenSize // 64KB
 	splitFunc := func(data []byte, atEOF bool) (int, []byte, error) {
 		if len(data) >= chunkSize {
 			return chunkSize, data[:chunkSize], nil
 		}
-
 		return bufio.ScanLines(data, atEOF)
 	}
-
-	// Use the custom split function to split the input
 	scanner.Split(splitFunc)
-
 	// Scan the input and write it to the logger using the specified print function
 	for scanner.Scan() {
-		// prevent empty logging
-		str := strings.TrimSpace(scanner.Text())
-		if str == "" {
+		// Prevent empty logging
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
 			continue
 		}
 
-		if len(str) > 10000 {
-			str = fmt.Sprintf("%s:truncated", str[:10000])
+		if len(jsonBuf) > 0 || strings.HasPrefix(line, "{") {
+			jsonBuf = append(jsonBuf, line)
+			joined := strings.Join(jsonBuf, "\n")
+			if err := pl.tryLogJSON(joined); err == nil {
+				jsonBuf = nil
+			}
+			continue
 		}
 
-		pl.logger.Info(str)
-	}
+		if len(line) > 10000 {
+			line = fmt.Sprintf("%s:truncated", line[:10000])
+		}
 
+		if err := pl.tryLogJSON(line); err == nil {
+			continue
+		}
+		pl.logger.Info(line)
+	}
 	// If there was an error while scanning the input, log an error
 	if err := scanner.Err(); err != nil {
 		pl.logger.Error("reading from scanner", log.Err(err))
 	}
+}
+
+// tryLogJSON tries to parse the string as JSON and log it if it succeeds
+func (pl *proxyLogger) tryLogJSON(s string) error {
+	var m map[string]interface{}
+	err := json.Unmarshal([]byte(s), &m)
+	if err == nil {
+		pl.mergeAndLogInputLog(pl.ctx, m, "hook")
+		return nil
+	}
+	return fmt.Errorf("failed to parse json: %w", err)
 }
 
 // level = level
@@ -242,6 +296,7 @@ func (pl *proxyLogger) mergeAndLogInputLog(ctx context.Context, inputLog map[str
 	if !ok {
 		msg = "hook result"
 	}
+
 	delete(inputLog, slog.MessageKey)
 	delete(inputLog, slog.TimeKey)
 

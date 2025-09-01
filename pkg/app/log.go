@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -70,7 +71,7 @@ func SetupLogging(runtimeConfig *config.Config, logger *log.Logger) {
 		fmt.Sprintf("Global log level. Default duration for debug level is %s", ForcedDurationForDebugLevel),
 		strings.ToLower(LogLevel),
 		func(_ string, newValue string) error {
-			logger.Infof("Set log level to '%s'", newValue)
+			logger.Info("Change log level", slog.String("value", newValue))
 			log.SetDefaultLevel(log.LogLevelFromStr(newValue))
 			return nil
 		}, func(_ string, newValue string) time.Duration {

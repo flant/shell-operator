@@ -2,6 +2,7 @@ package shell_operator
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -27,8 +28,8 @@ type ManagerEventsHandler struct {
 	kubeEventsManager kubeeventsmanager.KubeEventsManager
 	scheduleManager   schedulemanager.ScheduleManager
 
-	kubeEventCb func(kubeEvent kemtypes.KubeEvent) []task.Task
-	scheduleCb  func(crontab string) []task.Task
+	kubeEventCb func(ctx context.Context, kubeEvent kemtypes.KubeEvent) []task.Task
+	scheduleCb  func(ctx context.Context, crontab string) []task.Task
 
 	taskQueues *queue.TaskQueueSet
 
@@ -36,9 +37,6 @@ type ManagerEventsHandler struct {
 }
 
 func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfig) *ManagerEventsHandler {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &ManagerEventsHandler{
@@ -53,13 +51,13 @@ func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfi
 
 // WithKubeEventHandler sets custom function for event handling.
 // This function is used inside addon-operator.
-func (m *ManagerEventsHandler) WithKubeEventHandler(fn func(kubeEvent kemtypes.KubeEvent) []task.Task) {
+func (m *ManagerEventsHandler) WithKubeEventHandler(fn func(ctx context.Context, kubeEvent kemtypes.KubeEvent) []task.Task) {
 	m.kubeEventCb = fn
 }
 
 // WithScheduleEventHandler sets custom scheduler function.
 // This function is used inside addon-operator.
-func (m *ManagerEventsHandler) WithScheduleEventHandler(fn func(crontab string) []task.Task) {
+func (m *ManagerEventsHandler) WithScheduleEventHandler(fn func(ctx context.Context, crontab string) []task.Task) {
 	m.scheduleCb = fn
 }
 
@@ -69,27 +67,31 @@ func (m *ManagerEventsHandler) Start() {
 		for {
 			var tailTasks []task.Task
 			logEntry := m.logger.With("operator.component", "handleEvents")
+
+			ctx := context.Background()
+
 			select {
 			case crontab := <-m.scheduleManager.Ch():
 				if m.scheduleCb != nil {
-					tailTasks = m.scheduleCb(crontab)
+					tailTasks = m.scheduleCb(ctx, crontab)
 				}
 
 			case kubeEvent := <-m.kubeEventsManager.Ch():
 				if m.kubeEventCb != nil {
-					tailTasks = m.kubeEventCb(kubeEvent)
+					tailTasks = m.kubeEventCb(ctx, kubeEvent)
 				}
 
 			case <-m.ctx.Done():
-				logEntry.Infof("Stop")
+				logEntry.Info("Stop")
 				return
 			}
 
 			m.taskQueues.DoWithLock(func(tqs *queue.TaskQueueSet) {
 				for _, resTask := range tailTasks {
-					q := tqs.GetByName(resTask.GetQueueName())
-					if q == nil {
-						log.Errorf("Possible bug!!! Got task for queue '%s' but queue is not created yet. task: %s", resTask.GetQueueName(), resTask.GetDescription())
+					if q := tqs.Queues[resTask.GetQueueName()]; q == nil {
+						log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
+							slog.String("queueName", resTask.GetQueueName()),
+							slog.String("description", resTask.GetDescription()))
 					} else {
 						q.AddLast(resTask)
 					}

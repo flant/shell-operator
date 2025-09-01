@@ -2,6 +2,7 @@ package shell_operator
 
 import (
 	"fmt"
+	"log/slog"
 
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
@@ -22,7 +23,7 @@ type CombineResult struct {
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
+func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q *queue.TaskQueue, t task.Task) *CombineResult {
 	if q == nil {
 		return nil
 	}
@@ -41,26 +42,28 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 		if stopIterate {
 			return
 		}
+
 		// ignore current task
 		if tsk.GetId() == t.GetId() {
 			return
 		}
+
 		hm := tsk.GetMetadata()
+
 		// Stop on task without metadata
 		if hm == nil {
 			stopIterate = true
 			return
 		}
+
 		nextHookName := hm.(HookNameAccessor).GetHookName()
+
 		// Only tasks for the same hook and of the same type can be combined (HookRun cannot be combined with OnStartup).
 		// Using stopCombineFn function more stricter combine rules can be defined.
-		if nextHookName == hookName && t.GetType() == tsk.GetType() {
-			if stopCombineFn != nil {
-				stopIterate = stopCombineFn(tsk)
-			}
-		} else {
+		if nextHookName != hookName || t.GetType() != tsk.GetType() {
 			stopIterate = true
 		}
+
 		if !stopIterate {
 			otherTasks = append(otherTasks, tsk)
 		}
@@ -118,7 +121,11 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 	} else {
 		compactMsg = fmt.Sprintf("are combined to %d contexts", len(combinedContext))
 	}
-	op.logger.Infof("Binding contexts from %d tasks %s. %d tasks are dropped from queue '%s'", len(otherTasks)+1, compactMsg, len(tasksFilter)-1, t.GetQueueName())
+	op.logger.Info("Binding contexts from are dropped from queue",
+		slog.Int("count", len(otherTasks)+1),
+		slog.String("message", compactMsg),
+		slog.Int("dropped", len(tasksFilter)-1),
+		slog.String("queue", t.GetQueueName()))
 
 	res.BindingContexts = compactedContext
 	res.MonitorIDs = monitorIDs

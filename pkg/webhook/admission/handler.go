@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
-type EventHandlerFn func(event Event) (*Response, error)
+type EventHandlerFn func(ctx context.Context, event Event) (*Response, error)
 
 type WebhookHandler struct {
 	Router  chi.Router
@@ -35,7 +36,7 @@ func NewWebhookHandler() *WebhookHandler {
 	})
 
 	rtr.Group(func(r chi.Router) {
-		r.Use(structuredLogger.NewStructuredLogger(log.NewLogger(log.Options{}).Named("admissionWebhook"), "admissionWebhook"))
+		r.Use(structuredLogger.NewStructuredLogger(log.NewLogger().Named("admissionWebhook"), "admissionWebhook"))
 		r.Use(middleware.Recoverer)
 		r.Use(middleware.AllowContentType("application/json"))
 		r.Post("/*", h.serveReviewRequest)
@@ -46,11 +47,12 @@ func NewWebhookHandler() *WebhookHandler {
 
 func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	ctx := r.Context()
 
 	var admissionReview v1.AdmissionReview
 	err := json.NewDecoder(r.Body).Decode(&admissionReview)
 	if err != nil {
-		log.Errorf("failed to read admission request: %v", err)
+		log.Error("failed to read admission request", log.Err(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -61,7 +63,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	admissionResponse, err := h.handleReviewRequest(r.URL.Path, admissionReview.Request)
+	admissionResponse, err := h.handleReviewRequest(ctx, r.URL.Path, admissionReview.Request)
 	if err != nil {
 		log.Error("validation failed", "request", admissionReview.Request.UID, log.Err(err))
 		admissionReview.Response = errored(err)
@@ -77,14 +79,16 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error json encoding AdmissionReview"))
-		log.Errorf("Error json encoding AdmissionReview: %v", err)
+		log.Error("Error json encoding AdmissionReview", log.Err(err))
 		return
 	}
 }
 
-func (h *WebhookHandler) handleReviewRequest(path string, request *v1.AdmissionRequest) (*v1.AdmissionResponse, error) {
+func (h *WebhookHandler) handleReviewRequest(ctx context.Context, path string, request *v1.AdmissionRequest) (*v1.AdmissionResponse, error) {
 	configurationID, webhookID := detectConfigurationAndWebhook(path)
-	log.Infof("Got AdmissionReview request for confId='%s' webhookId='%s'", configurationID, webhookID)
+	log.Info("Got AdmissionReview request",
+		slog.String("configurationID", configurationID),
+		slog.String("webhookID", webhookID))
 
 	if h.Handler == nil {
 		return nil, fmt.Errorf("AdmissionReview handler is not defined")
@@ -96,7 +100,7 @@ func (h *WebhookHandler) handleReviewRequest(path string, request *v1.AdmissionR
 		Request:         request,
 	}
 
-	admissionResponse, err := h.Handler(event)
+	admissionResponse, err := h.Handler(ctx, event)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +133,8 @@ func (h *WebhookHandler) handleReviewRequest(path string, request *v1.AdmissionR
 }
 
 // detectConfigurationAndWebhook extracts configurationID and a webhookID from the url path.
-func detectConfigurationAndWebhook(path string) (configurationID string, webhookID string) {
+func detectConfigurationAndWebhook(path string) (string /*configurationID*/, string /*webhookID*/) {
+	var configurationID string
 	parts := strings.Split(path, "/")
 	webhookParts := make([]string, 0)
 	for _, p := range parts {
@@ -142,9 +147,9 @@ func detectConfigurationAndWebhook(path string) (configurationID string, webhook
 		}
 		webhookParts = append(webhookParts, p)
 	}
-	webhookID = strings.Join(webhookParts, "/")
+	webhookID := strings.Join(webhookParts, "/")
 
-	return
+	return configurationID, webhookID
 }
 
 func errored(err error) *v1.AdmissionResponse {

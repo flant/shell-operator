@@ -48,6 +48,9 @@ kubernetesValidating:
   failurePolicy: Ignore | Fail (default)
   sideEffects: None (default) | NoneOnDryRun
   timeoutSeconds: 2 (default is 10)
+  matchConditions:
+  - name: "exclude-user"
+    expression: '("system:apiserver" != request.userInfo.username)'
 ```
 
 ## Parameters
@@ -69,6 +72,8 @@ kubernetesValidating:
 - `sideEffects` — determine whether the hook is `dryRun`-aware. See [side effects][side-effect] documentation. Default is `None`.
 
 - `timeoutSeconds` — a seconds API server should wait for a hook to respond before treating the call as a failure. See [timeouts][timeouts]. Default is 10 (seconds).
+
+- `matchConditions` — an optional list of [match conditions][match-conditions] for fine-grained request filtering. Available only since v1.27 of Kubernetes. 
 
 As you can see, it is the close copy of a [Webhook configuration][webhook-configuration]. Differences are:
 - `objectSelector` is a `labelSelector` as in the `kubernetes` binding.
@@ -254,3 +259,4 @@ Command line options:
 [timeouts]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#timeouts
 [validating-webhook-example]: https://github.com/flant/shell-operator/tree/main/examples/204-validating-webhook
 [webhook-configuration]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#webhook-configuration
+[match-conditions]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchconditions

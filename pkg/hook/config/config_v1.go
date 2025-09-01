@@ -71,7 +71,7 @@ type KubeFieldSelectorV1 kemtypes.FieldSelector
 
 type KubeNamespaceSelectorV1 kemtypes.NamespaceSelector
 
-// version 1 of kubernetes vali configuration
+// version 1 of kubernetes validation configuration
 type KubernetesAdmissionConfigV1 struct {
 	Name                 string                   `json:"name,omitempty"`
 	IncludeSnapshotsFrom []string                 `json:"includeSnapshotsFrom,omitempty"`
@@ -82,6 +82,7 @@ type KubernetesAdmissionConfigV1 struct {
 	Namespace            *KubeNamespaceSelectorV1 `json:"namespace,omitempty"`
 	SideEffects          *v1.SideEffectClass      `json:"sideEffects"`
 	TimeoutSeconds       *int32                   `json:"timeoutSeconds,omitempty"`
+	MatchConditions      []v1.MatchCondition      `json:"matchConditions,omitempty"`
 }
 
 // version 1 of kubernetes conversion configuration
@@ -100,22 +101,21 @@ type SettingsV1 struct {
 }
 
 // ConvertAndCheck fills non-versioned structures and run inter-field checks not covered by OpenAPI schemas.
-func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
-	c.Settings, err = cv1.CheckAndConvertSettings(cv1.Settings)
-	if err != nil {
+func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) error {
+	var err error
+
+	if c.Settings, err = cv1.CheckAndConvertSettings(cv1.Settings); err != nil {
 		return err
 	}
 
-	c.OnStartup, err = c.ConvertOnStartup(cv1.OnStartup)
-	if err != nil {
+	if c.OnStartup, err = c.ConvertOnStartup(cv1.OnStartup); err != nil {
 		return err
 	}
 
 	c.OnKubernetesEvents = []htypes.OnKubernetesEventConfig{}
 	for i, kubeCfg := range cv1.OnKubernetesEvent {
-		err := cv1.CheckOnKubernetesEvent(kubeCfg, fmt.Sprintf("kubernetes[%d]", i))
-		if err != nil {
-			return fmt.Errorf("invalid kubernetes config [%d]: %v", i, err)
+		if err := cv1.CheckOnKubernetesEvent(kubeCfg, fmt.Sprintf("kubernetes[%d]", i)); err != nil {
+			return fmt.Errorf("invalid kubernetes config [%d]: %w", i, err)
 		}
 
 		monitor := &kubeeventsmanager.MonitorConfig{}
@@ -183,9 +183,8 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	// Chsck snapshots in result config.
 	for i, kubeCfg := range c.OnKubernetesEvents {
 		if len(kubeCfg.IncludeSnapshotsFrom) > 0 {
-			err := CheckIncludeSnapshots(c.OnKubernetesEvents, kubeCfg.IncludeSnapshotsFrom...)
-			if err != nil {
-				return fmt.Errorf("invalid kubernetes config [%d]: includeSnapshots %v", i, err)
+			if err := CheckIncludeSnapshots(c.OnKubernetesEvents, kubeCfg.IncludeSnapshotsFrom...); err != nil {
+				return fmt.Errorf("invalid kubernetes config [%d]: includeSnapshots %w", i, err)
 			}
 		}
 	}
@@ -194,28 +193,27 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	// are depend on kubernetes bindings.
 	c.Schedules = []htypes.ScheduleConfig{}
 	for i, rawSchedule := range cv1.Schedule {
-		err := cv1.CheckSchedule(c.OnKubernetesEvents, rawSchedule)
-		if err != nil {
-			return fmt.Errorf("invalid schedule config [%d]: %v", i, err)
+		if err := cv1.CheckSchedule(c.OnKubernetesEvents, rawSchedule); err != nil {
+			return fmt.Errorf("invalid schedule config [%d]: %w", i, err)
 		}
+
 		schedule, err := cv1.ConvertSchedule(rawSchedule)
 		if err != nil {
 			return err
 		}
+
 		c.Schedules = append(c.Schedules, schedule)
 	}
 
 	// Validating webhooks
 	c.KubernetesValidating = []htypes.ValidatingConfig{}
 	for i, rawValidating := range c.V1.KubernetesValidating {
-		err := cv1.CheckAdmission(c.OnKubernetesEvents, rawValidating)
-		if err != nil {
-			return fmt.Errorf("invalid kubernetesValidating config [%d]: %v", i, err)
+		if err := cv1.CheckAdmission(c.OnKubernetesEvents, rawValidating); err != nil {
+			return fmt.Errorf("invalid kubernetesValidating config [%d]: %w", i, err)
 		}
-		validating, err := convertValidating(rawValidating)
-		if err != nil {
-			return err
-		}
+
+		validating := convertValidating(rawValidating)
+
 		c.KubernetesValidating = append(c.KubernetesValidating, validating)
 	}
 	// Validate validatingWebhooks
@@ -223,23 +221,21 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	for _, cfg := range c.KubernetesValidating {
 		validatingWebhooks = append(validatingWebhooks, *cfg.Webhook.ValidatingWebhook)
 	}
-	err = validation.ValidateValidatingWebhooks(&v1.ValidatingWebhookConfiguration{
+
+	if err := validation.ValidateValidatingWebhooks(&v1.ValidatingWebhookConfiguration{
 		Webhooks: validatingWebhooks,
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
 	c.KubernetesMutating = []htypes.MutatingConfig{}
 	for i, rawMutating := range c.V1.KubernetesMutating {
-		err := cv1.CheckAdmission(c.OnKubernetesEvents, rawMutating)
-		if err != nil {
-			return fmt.Errorf("invalid kubernetesMutating config [%d]: %v", i, err)
+		if err := cv1.CheckAdmission(c.OnKubernetesEvents, rawMutating); err != nil {
+			return fmt.Errorf("invalid kubernetesMutating config [%d]: %w", i, err)
 		}
-		mutating, err := convertMutating(rawMutating)
-		if err != nil {
-			return err
-		}
+
+		mutating := convertMutating(rawMutating)
+
 		c.KubernetesMutating = append(c.KubernetesMutating, mutating)
 	}
 	// TODO: Validate mutatingWebhooks
@@ -247,14 +243,15 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) (err error) {
 	// Conversion webhooks.
 	c.KubernetesConversion = []htypes.ConversionConfig{}
 	for i, rawConversion := range c.V1.KubernetesConversion {
-		err := cv1.CheckConversion(c.OnKubernetesEvents, rawConversion)
-		if err != nil {
-			return fmt.Errorf("invalid kubernetesCustomResourceConversion config [%d]: %v", i, err)
+		if err := cv1.CheckConversion(c.OnKubernetesEvents, rawConversion); err != nil {
+			return fmt.Errorf("invalid kubernetesCustomResourceConversion config [%d]: %w", i, err)
 		}
+
 		conversionConfig, err := cv1.ConvertConversion(rawConversion)
 		if err != nil {
 			return err
 		}
+
 		c.KubernetesConversion = append(c.KubernetesConversion, conversionConfig)
 	}
 
@@ -344,42 +341,40 @@ func (cv1 *HookConfigV1) ConvertSchedule(schV1 ScheduleConfigV1) (htypes.Schedul
 	return res, nil
 }
 
-func (cv1 *HookConfigV1) CheckSchedule(kubeConfigs []htypes.OnKubernetesEventConfig, schV1 ScheduleConfigV1) (allErr error) {
-	var err error
-	_, err = cron.Parse(schV1.Crontab)
-	if err != nil {
-		allErr = multierror.Append(allErr, fmt.Errorf("crontab is invalid: %v", err))
+func (cv1 *HookConfigV1) CheckSchedule(kubeConfigs []htypes.OnKubernetesEventConfig, schV1 ScheduleConfigV1) error {
+	var allErr error
+
+	if _, err := cron.Parse(schV1.Crontab); err != nil {
+		allErr = multierror.Append(allErr, fmt.Errorf("crontab is invalid: %w", err))
 	}
 
 	if len(schV1.IncludeSnapshotsFrom) > 0 {
-		err = CheckIncludeSnapshots(kubeConfigs, schV1.IncludeSnapshotsFrom...)
-		if err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("includeSnapshotsFrom is invalid: %v", err))
+		if err := CheckIncludeSnapshots(kubeConfigs, schV1.IncludeSnapshotsFrom...); err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("includeSnapshotsFrom is invalid: %w", err))
 		}
 	}
 
 	return allErr
 }
 
-func (cv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV1, _ string) (allErr error) {
+func (cv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV1, _ string) error {
+	var allErr error
+
 	if kubeCfg.ApiVersion != "" {
-		_, err := schema.ParseGroupVersion(kubeCfg.ApiVersion)
-		if err != nil {
+		if _, err := schema.ParseGroupVersion(kubeCfg.ApiVersion); err != nil {
 			allErr = multierror.Append(allErr, fmt.Errorf("apiVersion is invalid"))
 		}
 	}
 
 	if kubeCfg.LabelSelector != nil {
-		_, err := kubeeventsmanager.FormatLabelSelector(kubeCfg.LabelSelector)
-		if err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %v", err))
+		if _, err := kubeeventsmanager.FormatLabelSelector(kubeCfg.LabelSelector); err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %w", err))
 		}
 	}
 
 	if kubeCfg.FieldSelector != nil {
-		_, err := kubeeventsmanager.FormatFieldSelector((*kemtypes.FieldSelector)(kubeCfg.FieldSelector))
-		if err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("fieldSelector is invalid: %v", err))
+		if _, err := kubeeventsmanager.FormatFieldSelector((*kemtypes.FieldSelector)(kubeCfg.FieldSelector)); err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("fieldSelector is invalid: %w", err))
 		}
 	}
 
@@ -396,34 +391,31 @@ func (cv1 *HookConfigV1) CheckOnKubernetesEvent(kubeCfg OnKubernetesEventConfigV
 	return allErr
 }
 
-func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []htypes.OnKubernetesEventConfig, cfgV1 KubernetesAdmissionConfigV1) (allErr error) {
-	var err error
+func (cv1 *HookConfigV1) CheckAdmission(kubeConfigs []htypes.OnKubernetesEventConfig, cfgV1 KubernetesAdmissionConfigV1) error {
+	var allErr error
 
 	if len(cfgV1.IncludeSnapshotsFrom) > 0 {
-		err = CheckIncludeSnapshots(kubeConfigs, cfgV1.IncludeSnapshotsFrom...)
-		if err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("includeSnapshotsFrom is invalid: %v", err))
+		if err := CheckIncludeSnapshots(kubeConfigs, cfgV1.IncludeSnapshotsFrom...); err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("includeSnapshotsFrom is invalid: %w", err))
 		}
 	}
 
 	if cfgV1.LabelSelector != nil {
-		_, err := kubeeventsmanager.FormatLabelSelector(cfgV1.LabelSelector)
-		if err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %v", err))
+		if _, err := kubeeventsmanager.FormatLabelSelector(cfgV1.LabelSelector); err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("labelSelector is invalid: %w", err))
 		}
 	}
 
 	if cfgV1.Namespace != nil && cfgV1.Namespace.LabelSelector != nil {
-		_, err := kubeeventsmanager.FormatLabelSelector(cfgV1.Namespace.LabelSelector)
-		if err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("namespace.labelSelector is invalid: %v", err))
+		if _, err := kubeeventsmanager.FormatLabelSelector(cfgV1.Namespace.LabelSelector); err != nil {
+			allErr = multierror.Append(allErr, fmt.Errorf("namespace.labelSelector is invalid: %w", err))
 		}
 	}
 
 	return allErr
 }
 
-func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (htypes.ValidatingConfig, error) {
+func convertValidating(cfgV1 KubernetesAdmissionConfigV1) htypes.ValidatingConfig {
 	cfg := htypes.ValidatingConfig{}
 
 	cfg.Group = cfgV1.Group
@@ -437,39 +429,47 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) (htypes.ValidatingConf
 		Name:  cfgV1.Name,
 		Rules: cfgV1.Rules,
 	}
+
 	if cfgV1.Namespace != nil {
 		webhook.NamespaceSelector = cfgV1.Namespace.LabelSelector
 	}
+
 	if cfgV1.LabelSelector != nil {
 		webhook.ObjectSelector = cfgV1.LabelSelector
 	}
+
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
 		defaultFailurePolicy := v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
 		webhook.FailurePolicy = &defaultFailurePolicy
 	}
+
 	if cfgV1.SideEffects != nil {
 		webhook.SideEffects = cfgV1.SideEffects
 	} else {
 		webhook.SideEffects = &DefaultSideEffects
 	}
+
 	if cfgV1.TimeoutSeconds != nil {
 		webhook.TimeoutSeconds = cfgV1.TimeoutSeconds
 	} else {
 		webhook.TimeoutSeconds = &DefaultTimeoutSeconds
 	}
 
+	webhook.MatchConditions = cfgV1.MatchConditions
+
 	cfg.Webhook = &admission.ValidatingWebhookConfig{
 		ValidatingWebhook: webhook,
 	}
+
 	cfg.Webhook.Metadata.LogLabels = map[string]string{}
 	cfg.Webhook.Metadata.MetricLabels = map[string]string{}
 
-	return cfg, nil
+	return cfg
 }
 
-func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (htypes.MutatingConfig, error) {
+func convertMutating(cfgV1 KubernetesAdmissionConfigV1) htypes.MutatingConfig {
 	cfg := htypes.MutatingConfig{}
 
 	cfg.Group = cfgV1.Group
@@ -484,48 +484,53 @@ func convertMutating(cfgV1 KubernetesAdmissionConfigV1) (htypes.MutatingConfig, 
 		Name:  cfgV1.Name,
 		Rules: cfgV1.Rules,
 	}
+
 	if cfgV1.Namespace != nil {
 		webhook.NamespaceSelector = cfgV1.Namespace.LabelSelector
 	}
+
 	if cfgV1.LabelSelector != nil {
 		webhook.ObjectSelector = cfgV1.LabelSelector
 	}
+
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
 		webhook.FailurePolicy = &DefaultFailurePolicy
 	}
+
 	if cfgV1.SideEffects != nil {
 		webhook.SideEffects = cfgV1.SideEffects
 	} else {
 		webhook.SideEffects = &DefaultSideEffects
 	}
+
 	if cfgV1.TimeoutSeconds != nil {
 		webhook.TimeoutSeconds = cfgV1.TimeoutSeconds
 	} else {
 		webhook.TimeoutSeconds = &DefaultTimeoutSeconds
 	}
 
+	webhook.MatchConditions = cfgV1.MatchConditions
+
 	cfg.Webhook = &admission.MutatingWebhookConfig{
 		MutatingWebhook: webhook,
 	}
+
 	cfg.Webhook.Metadata.LogLabels = map[string]string{}
 	cfg.Webhook.Metadata.MetricLabels = map[string]string{}
 
-	return cfg, nil
+	return cfg
 }
 
-func (cv1 *HookConfigV1) CheckConversion(kubeConfigs []htypes.OnKubernetesEventConfig, cfgV1 KubernetesConversionConfigV1) (allErr error) {
-	var err error
-
+func (cv1 *HookConfigV1) CheckConversion(kubeConfigs []htypes.OnKubernetesEventConfig, cfgV1 KubernetesConversionConfigV1) error {
 	if len(cfgV1.IncludeSnapshotsFrom) > 0 {
-		err = CheckIncludeSnapshots(kubeConfigs, cfgV1.IncludeSnapshotsFrom...)
-		if err != nil {
-			allErr = multierror.Append(allErr, fmt.Errorf("includeSnapshotsFrom is invalid: %v", err))
+		if err := CheckIncludeSnapshots(kubeConfigs, cfgV1.IncludeSnapshotsFrom...); err != nil {
+			return fmt.Errorf("includeSnapshotsFrom is invalid: %w", err)
 		}
 	}
 
-	return allErr
+	return nil
 }
 
 func (cv1 *HookConfigV1) ConvertConversion(cfgV1 KubernetesConversionConfigV1) (htypes.ConversionConfig, error) {
@@ -547,20 +552,23 @@ func (cv1 *HookConfigV1) ConvertConversion(cfgV1 KubernetesConversionConfigV1) (
 }
 
 // CheckAndConvertSettings validates a duration and returns a Settings struct.
-func (cv1 *HookConfigV1) CheckAndConvertSettings(settings *SettingsV1) (out *htypes.Settings, allErr error) {
+func (cv1 *HookConfigV1) CheckAndConvertSettings(settings *SettingsV1) (*htypes.Settings, error) {
 	if settings == nil {
 		return nil, nil
 	}
 
+	var allErr error
+
 	interval, err := time.ParseDuration(settings.ExecutionMinInterval)
 	if err != nil {
-		allErr = multierror.Append(allErr, fmt.Errorf("executionMinInterval is invalid: %v", err))
+		allErr = multierror.Append(allErr, fmt.Errorf("executionMinInterval is invalid: %w", err))
 	}
 
 	burst, err := strconv.ParseInt(settings.ExecutionBurst, 10, 32)
 	if err != nil {
-		allErr = multierror.Append(allErr, fmt.Errorf("executionMinInterval is invalid: %v", err))
+		allErr = multierror.Append(allErr, fmt.Errorf("executionMinInterval is invalid: %w", err))
 	}
+
 	if allErr != nil {
 		return nil, allErr
 	}

@@ -4,11 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
+	"github.com/flant/shell-operator/internal/metrics"
+	"github.com/flant/shell-operator/pkg/hook/task_metadata"
+	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -24,7 +30,21 @@ func DumpTaskIds(q *TaskQueue) string {
 
 func Test_TasksQueue_Remove(t *testing.T) {
 	g := NewWithT(t)
-	q := NewTasksQueue()
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddFirst",
+			"queue_name":   "",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
+
+	q := NewTasksQueue(metricStorage)
 
 	// Remove just one element
 	Task := &task.BaseTask{Id: "First one"}
@@ -75,12 +95,90 @@ func Test_TasksQueue_Remove(t *testing.T) {
 	))
 }
 
+func Test_TasksQueue_RemoveFirst(t *testing.T) {
+	g := NewWithT(t)
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddFirst",
+			"queue_name":   "",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
+
+	q := NewTasksQueue(metricStorage)
+
+	// Remove just one element
+	Task := &task.BaseTask{Id: "First one"}
+	q.AddFirst(Task)
+	g.Expect(q.Length()).To(Equal(1))
+	q.RemoveFirst()
+	g.Expect(q.Length()).To(Equal(0))
+
+	// Remove element in the middle
+	for i := 0; i < 5; i++ {
+		Task := &task.BaseTask{Id: fmt.Sprintf("task_%02d", i)}
+		q.AddFirst(Task)
+	}
+	g.Expect(q.Length()).To(Equal(5))
+	q.RemoveFirst()
+	g.Expect(q.Length()).To(Equal(4))
+
+	idsDump := DumpTaskIds(q)
+
+	g.Expect(idsDump).To(And(
+		ContainSubstring("task_00"),
+		ContainSubstring("task_01"),
+		ContainSubstring("task_02"),
+	))
+
+	// Remove last element
+	q.RemoveFirst()
+	g.Expect(q.Length()).To(Equal(3))
+
+	idsDump = DumpTaskIds(q)
+
+	g.Expect(idsDump).To(And(
+		ContainSubstring("task_00"),
+		ContainSubstring("task_01"),
+		ContainSubstring("task_02"),
+	))
+
+	// Remove first element by id
+	q.RemoveFirst()
+	g.Expect(q.Length()).To(Equal(2))
+
+	idsDump = DumpTaskIds(q)
+
+	g.Expect(idsDump).To(And(
+		ContainSubstring("task_01"),
+		ContainSubstring("task_00"),
+	))
+}
+
 func Test_ExponentialBackoff(t *testing.T) {
 	g := NewWithT(t)
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddFirst",
+			"queue_name":   "test-queue",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
+
 	// Init and prefill queue.
-	q := NewTasksQueue()
-	q.WithContext(context.TODO())
-	q.WithName("test-queue")
+	q := NewTasksQueue(metricStorage, WithContext(context.TODO()), WithName("test-queue"))
 	// Since we don't want the test to run for too long, we don't
 	// want to use lengthy times.
 	q.WaitLoopCheckInterval = 5 * time.Millisecond // default is 125ms
@@ -96,20 +194,24 @@ func Test_ExponentialBackoff(t *testing.T) {
 	const fails = 10
 	failsCount := fails
 	queueStopCh := make(chan struct{}, 1)
-	q.WithHandler(func(t task.Task) (res TaskResult) {
+	q.Handler = func(_ context.Context, t task.Task) TaskResult {
+		var res TaskResult
 		runsAt = append(runsAt, time.Now())
 		failureCounts = append(failureCounts, t.GetFailureCount())
 		if failsCount > 0 {
 			res.Status = Fail
 			failsCount--
-			return
+
+			return res
 		}
+
 		res.Status = Success
 		res.AfterHandle = func() {
 			close(queueStopCh)
 		}
-		return
-	})
+
+		return res
+	}
 
 	// Set exponential backoff to the constant delay just to wait more than DelayOnQueueIsEmpty.
 	// It is a test of delaying between task runs, not a test of exponential distribution.
@@ -118,7 +220,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 		return mockExponentialDelay
 	}
 
-	q.Start()
+	q.Start(context.TODO())
 
 	// Expect taskHandler returns Success result.
 	g.Eventually(queueStopCh, "5s", "20ms").Should(BeClosed(), "Should handle first task in queue successfully")
@@ -139,27 +241,41 @@ func Test_ExponentialBackoff(t *testing.T) {
 		fails, mockExponentialDelay.String(), mean.Truncate(100*time.Microsecond).String())
 }
 
-func calculateMeanDelay(in []time.Time) (mean time.Duration, deltas []int64) {
+func calculateMeanDelay(in []time.Time) (time.Duration, []int64) {
 	var sum int64
 
 	// Calculate deltas from timestamps.
 	prev := in[0].UnixNano()
+	deltas := make([]int64, 0, len(in)-1)
 	for i := 1; i < len(in); i++ {
 		delta := in[i].UnixNano() - prev
 		prev = in[i].UnixNano()
 		deltas = append(deltas, delta)
 		sum += delta
 	}
-	mean = time.Duration(sum / int64(len(deltas)))
-	return
+	mean := time.Duration(sum / int64(len(deltas)))
+
+	return mean, deltas
 }
 
 func Test_CancelDelay(t *testing.T) {
 	g := NewWithT(t)
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddFirst",
+			"queue_name":   "test-queue",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
+
 	// Init and prefill queue.
-	q := NewTasksQueue()
-	q.WithContext(context.TODO())
-	q.WithName("test-queue")
+	q := NewTasksQueue(metricStorage, WithContext(context.TODO()), WithName("test-queue"))
 	// Since we don't want the test to run for too long, we don't
 	// want to use lengthy times.
 	q.WaitLoopCheckInterval = 5 * time.Millisecond // default is 125ms
@@ -177,7 +293,8 @@ func Test_CancelDelay(t *testing.T) {
 	endedAt := startedAt
 	delayStartsCh := make(chan struct{}, 1)
 	healingDoneCh := make(chan struct{}, 1)
-	q.WithHandler(func(t task.Task) (res TaskResult) {
+	q.Handler = func(_ context.Context, t task.Task) TaskResult {
+		var res TaskResult
 		if t.GetId() == ErrTask.GetId() {
 			res.Status = Fail
 			// Close chan after first delay.
@@ -186,17 +303,21 @@ func Test_CancelDelay(t *testing.T) {
 					close(delayStartsCh)
 				}
 			}
-			return
+
+			return res
 		}
+
 		if t.GetId() == HealingTask.GetId() {
 			endedAt = time.Now()
 			res.AfterHandle = func() {
 				close(healingDoneCh)
 			}
 		}
+
 		res.Status = Success
-		return
-	})
+
+		return res
+	}
 
 	// Set exponential backoff to the constant delay just to wait more than DelayOnQueueIsEmpty.
 	// It is a test of delaying between task runs, not a test of exponential distribution.
@@ -206,7 +327,7 @@ func Test_CancelDelay(t *testing.T) {
 	}
 
 	// Start handling 'erroneous' task.
-	q.Start()
+	q.Start(context.TODO())
 
 	// Expect taskHandler returns Success result.
 	g.Eventually(delayStartsCh, "5s", "20ms").Should(BeClosed(), "Should handle failed task and starts a delay")
@@ -229,4 +350,77 @@ func Test_CancelDelay(t *testing.T) {
 	g.Expect(elapsed).Should(BeNumerically("<", 2*mockExponentialDelay),
 		"Should stop delaying after CancelTaskDelay call. Got delay of %s, expect less than %s. Check cancel delay not broken in Start or waitForTask.",
 		elapsed.String(), (2 * mockExponentialDelay).String())
+}
+
+func Test_QueueDump_HookMetadata_Task_Description(t *testing.T) {
+	g := NewWithT(t)
+
+	logLabels := map[string]string{
+		"hook": "hook1.sh",
+	}
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
+		assert.NotZero(t, value)
+		assert.Equal(t, map[string]string{
+			"queue_action": "AddLast",
+			"queue_name":   "",
+		}, labels)
+		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
+
+	q := NewTasksQueue(metricStorage)
+
+	q.AddLast(task.NewTask(task_metadata.EnableKubernetesBindings).
+		WithMetadata(task_metadata.HookMetadata{
+			HookName: "hook1.sh",
+			Binding:  string(task_metadata.EnableKubernetesBindings),
+		}))
+
+	q.AddLast(task.NewTask(task_metadata.HookRun).
+		WithMetadata(task_metadata.HookMetadata{
+			HookName:    "hook1.sh",
+			BindingType: htypes.OnKubernetesEvent,
+			Binding:     "monitor_pods",
+		}).
+		WithLogLabels(logLabels).
+		WithQueueName("main"))
+
+	q.AddLast(task.NewTask(task_metadata.HookRun).
+		WithMetadata(task_metadata.HookMetadata{
+			HookName:     "hook1.sh",
+			BindingType:  htypes.Schedule,
+			AllowFailure: true,
+			Binding:      "every 1 sec",
+			Group:        "monitor_pods",
+		}).
+		WithLogLabels(logLabels).
+		WithQueueName("main"))
+
+	queueDump := taskQueueToText(q)
+
+	g.Expect(queueDump).Should(ContainSubstring("hook1.sh"), "Queue dump should reveal a hook name.")
+	g.Expect(queueDump).Should(ContainSubstring("EnableKubernetesBindings"), "Queue dump should reveal EnableKubernetesBindings.")
+	g.Expect(queueDump).Should(ContainSubstring(":kubernetes:"), "Queue dump should show kubernetes binding.")
+	g.Expect(queueDump).Should(ContainSubstring(":schedule:"), "Queue dump should show schedule binding.")
+	g.Expect(queueDump).Should(ContainSubstring("group=monitor_pods"), "Queue dump should show group name.")
+}
+
+func taskQueueToText(q *TaskQueue) string {
+	var buf strings.Builder
+	buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", q.Name, q.Length(), q.Status))
+	buf.WriteString("\n")
+
+	index := 1
+	q.Iterate(func(task task.Task) {
+		buf.WriteString(fmt.Sprintf("%2d. ", index))
+		buf.WriteString(task.GetDescription())
+		buf.WriteString("\n")
+		index++
+	})
+
+	return buf.String()
 }

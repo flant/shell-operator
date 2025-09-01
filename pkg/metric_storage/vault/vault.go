@@ -2,6 +2,7 @@ package vault
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -33,7 +34,7 @@ func (v *GroupedVault) SetRegisterer(r prometheus.Registerer) {
 	v.registerer = r
 }
 
-// ClearAllMetrics takes each collector in collectors and clear all metrics by group.
+// ExpireGroupMetrics takes each collector in collectors and clear all metrics by group.
 func (v *GroupedVault) ExpireGroupMetrics(group string) {
 	v.mtx.Lock()
 	for _, collector := range v.collectors {
@@ -67,9 +68,11 @@ func (v *GroupedVault) GetOrCreateCounterCollector(name string, labelNames []str
 	} else if !IsSubset(collector.LabelNames(), labelNames) {
 		collector.UpdateLabels(labelNames)
 	}
+
 	if counter, ok := collector.(*metric.ConstCounterCollector); ok {
 		return counter, nil
 	}
+
 	return nil, fmt.Errorf("counter %v collector requested, but %s %v collector exists", labelNames, collector.Type(), collector.LabelNames())
 }
 
@@ -98,9 +101,17 @@ func (v *GroupedVault) CounterAdd(group string, name string, value float64, labe
 	metricName := v.resolveMetricNameFunc(name)
 	c, err := v.GetOrCreateCounterCollector(metricName, LabelNames(labels))
 	if err != nil {
-		log.Errorf("CounterAdd: %v", err)
+		log.Error(
+			"CounterAdd",
+			slog.String("group", group),
+			slog.String("name", name),
+			slog.Any("labels", labels),
+			log.Err(err),
+		)
+
 		return
 	}
+
 	c.Add(group, value, labels)
 }
 
@@ -108,8 +119,16 @@ func (v *GroupedVault) GaugeSet(group string, name string, value float64, labels
 	metricName := v.resolveMetricNameFunc(name)
 	c, err := v.GetOrCreateGaugeCollector(metricName, LabelNames(labels))
 	if err != nil {
-		log.Errorf("GaugeSet: %v", err)
+		log.Error(
+			"GaugeSet",
+			slog.String("group", group),
+			slog.String("name", name),
+			slog.Any("labels", labels),
+			log.Err(err),
+		)
+
 		return
 	}
+
 	c.Set(group, value, labels)
 }

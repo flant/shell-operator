@@ -5,7 +5,9 @@ import (
 	"sync"
 	"time"
 
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/deckhouse/deckhouse/pkg/log"
+
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -15,19 +17,18 @@ const MainQueueName = "main"
 type TaskQueueSet struct {
 	MainName string
 
-	metricStorage *metricstorage.MetricStorage
+	metricStorage metric.Storage
 
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	m      sync.Mutex
+	m      sync.RWMutex
 	Queues map[string]*TaskQueue
 }
 
 func NewTaskQueueSet() *TaskQueueSet {
 	return &TaskQueueSet{
 		Queues:   make(map[string]*TaskQueue),
-		m:        sync.Mutex{},
 		MainName: MainQueueName,
 	}
 }
@@ -40,42 +41,64 @@ func (tqs *TaskQueueSet) WithContext(ctx context.Context) {
 	tqs.ctx, tqs.cancel = context.WithCancel(ctx)
 }
 
-func (tqs *TaskQueueSet) WithMetricStorage(mstor *metricstorage.MetricStorage) {
+func (tqs *TaskQueueSet) WithMetricStorage(mstor metric.Storage) *TaskQueueSet {
 	tqs.metricStorage = mstor
+
+	return tqs
 }
 
 func (tqs *TaskQueueSet) Stop() {
+	tqs.m.RLock()
 	if tqs.cancel != nil {
 		tqs.cancel()
 	}
+
+	tqs.m.RUnlock()
 }
 
-func (tqs *TaskQueueSet) StartMain() {
-	tqs.GetByName(tqs.MainName).Start()
+func (tqs *TaskQueueSet) StartMain(ctx context.Context) {
+	tqs.GetByName(tqs.MainName).Start(ctx)
 }
 
-func (tqs *TaskQueueSet) Start() {
+func (tqs *TaskQueueSet) Start(ctx context.Context) {
+	tqs.m.RLock()
 	for _, q := range tqs.Queues {
-		q.Start()
+		q.Start(ctx)
 	}
+
+	tqs.m.RUnlock()
 }
 
 func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
+	tqs.m.Lock()
 	tqs.Queues[queue.Name] = queue
+	tqs.m.Unlock()
 }
 
-func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(task.Task) TaskResult) {
-	q := NewTasksQueue()
-	q.WithName(name)
-	q.WithHandler(handler)
-	q.WithContext(tqs.ctx)
-	q.WithMetricStorage(tqs.metricStorage)
+func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, opts ...TaskQueueOption) {
+	q := NewTasksQueue(
+		tqs.metricStorage,
+		WithName(name),
+		WithHandler(handler),
+		WithContext(tqs.ctx),
+	)
+
+	for _, opt := range opts {
+		opt(q)
+	}
+
+	if q.logger == nil {
+		q.logger = log.NewLogger().Named("task_queue")
+	}
+
 	tqs.m.Lock()
 	tqs.Queues[name] = q
 	tqs.m.Unlock()
 }
 
 func (tqs *TaskQueueSet) GetByName(name string) *TaskQueue {
+	tqs.m.RLock()
+	defer tqs.m.RUnlock()
 	ts, exists := tqs.Queues[name]
 	if exists {
 		return ts
@@ -105,9 +128,9 @@ func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
 	if doFn == nil {
 		return
 	}
-	tqs.m.Lock()
-	defer tqs.m.Unlock()
 
+	tqs.m.RLock()
+	defer tqs.m.RUnlock()
 	if len(tqs.Queues) == 0 {
 		return
 	}
@@ -126,13 +149,14 @@ func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
 }
 
 func (tqs *TaskQueueSet) Remove(name string) {
+	tqs.m.Lock()
 	ts, exists := tqs.Queues[name]
 	if exists {
 		ts.Stop()
 	}
-	tqs.m.Lock()
-	defer tqs.m.Unlock()
+
 	delete(tqs.Queues, name)
+	tqs.m.Unlock()
 }
 
 func (tqs *TaskQueueSet) WaitStopWithTimeout(timeout time.Duration) {
@@ -145,15 +169,18 @@ func (tqs *TaskQueueSet) WaitStopWithTimeout(timeout time.Duration) {
 		select {
 		case <-checkTick.C:
 			stopped := true
+			tqs.m.RLock()
 			for _, q := range tqs.Queues {
 				if q.Status != "stop" {
 					stopped = false
 					break
 				}
 			}
+			tqs.m.RUnlock()
 			if stopped {
 				return
 			}
+
 		case <-timeoutTick.C:
 			return
 		}

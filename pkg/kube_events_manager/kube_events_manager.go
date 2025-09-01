@@ -2,6 +2,8 @@ package kubeeventsmanager
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"runtime/trace"
 	"sync"
 
@@ -9,11 +11,12 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
+	"github.com/flant/shell-operator/pkg/metric"
 )
 
 type KubeEventsManager interface {
-	WithMetricStorage(mstor *metricstorage.MetricStorage)
+	WithMetricStorage(mstor metric.Storage)
+	MetricStorage() metric.Storage
 	AddMonitor(monitorConfig *MonitorConfig) error
 	HasMonitor(monitorID string) bool
 	GetMonitor(monitorID string) Monitor
@@ -33,7 +36,7 @@ type kubeEventsManager struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage *metricstorage.MetricStorage
+	metricStorage metric.Storage
 
 	m        sync.RWMutex
 	Monitors map[string]Monitor
@@ -42,7 +45,7 @@ type kubeEventsManager struct {
 }
 
 // kubeEventsManager should implement KubeEventsManager.
-var _ KubeEventsManager = &kubeEventsManager{}
+var _ KubeEventsManager = (*kubeEventsManager)(nil)
 
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
 func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) *kubeEventsManager {
@@ -59,7 +62,7 @@ func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *lo
 	return em
 }
 
-func (mgr *kubeEventsManager) WithMetricStorage(mstor *metricstorage.MetricStorage) {
+func (mgr *kubeEventsManager) WithMetricStorage(mstor metric.Storage) {
 	mgr.metricStorage = mstor
 }
 
@@ -67,7 +70,8 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor *metricstorage.MetricStora
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
-	log.Debugf("Add MONITOR %+v", monitorConfig)
+	log.Debug("Add MONITOR",
+		slog.String("config", fmt.Sprintf("%+v", monitorConfig)))
 	monitor := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,
@@ -143,4 +147,8 @@ func (mgr *kubeEventsManager) PauseHandleEvents() {
 	for _, monitor := range mgr.Monitors {
 		monitor.PauseHandleEvents()
 	}
+}
+
+func (mgr *kubeEventsManager) MetricStorage() metric.Storage {
+	return mgr.metricStorage
 }

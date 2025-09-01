@@ -2,6 +2,7 @@ package task_metadata
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -23,6 +24,14 @@ type HookNameAccessor interface {
 
 type BindingContextAccessor interface {
 	GetBindingContext() []bindingcontext.BindingContext
+}
+
+type BindingContextSetter interface {
+	SetBindingContext([]bindingcontext.BindingContext) interface{}
+}
+
+type MonitorIDSetter interface {
+	SetMonitorIDs([]string) interface{}
 }
 
 type MonitorIDAccessor interface {
@@ -48,18 +57,21 @@ var (
 	_ task.MetadataDescriptionGetter = HookMetadata{}
 )
 
-func HookMetadataAccessor(t task.Task) (hookMeta HookMetadata) {
+func HookMetadataAccessor(t task.Task) HookMetadata {
 	meta := t.GetMetadata()
 	if meta == nil {
-		log.Errorf("Possible Bug! task metadata is nil")
-		return
+		log.Error("Possible Bug! task metadata is nil")
+		return HookMetadata{}
 	}
+
 	hookMeta, ok := meta.(HookMetadata)
 	if !ok {
-		log.Errorf("Possible Bug! task metadata is not of type HookMetadata: got %T", meta)
-		return
+		log.Error("Possible Bug! task metadata is not of type HookMetadata",
+			slog.String("type", fmt.Sprintf("%T", meta)))
+		return HookMetadata{}
 	}
-	return
+
+	return hookMeta
 }
 
 func (m HookMetadata) GetHookName() string {
@@ -70,12 +82,23 @@ func (m HookMetadata) GetBindingContext() []bindingcontext.BindingContext {
 	return m.BindingContext
 }
 
+func (m HookMetadata) SetBindingContext(context []bindingcontext.BindingContext) interface{} {
+	m.BindingContext = context
+
+	return m
+}
+
 func (m HookMetadata) GetAllowFailure() bool {
 	return m.AllowFailure
 }
 
 func (m HookMetadata) GetMonitorIDs() []string {
 	return m.MonitorIDs
+}
+
+func (m HookMetadata) SetMonitorIDs(monitorIDs []string) interface{} {
+	m.MonitorIDs = monitorIDs
+	return m
 }
 
 func (m *HookMetadata) WithHookName(name string) *HookMetadata {

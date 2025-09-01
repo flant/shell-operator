@@ -105,7 +105,7 @@ data:
 	// Filter func to add a new field.
 	filter := func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		res := u.DeepCopy()
-		data := res.Object["data"].(map[string]interface{})
+		data := res.Object["data"].(map[string]any)
 		data[newField] = newValue
 		res.Object["data"] = data
 		return res, nil
@@ -145,7 +145,7 @@ data:
 				return patcher.ExecuteOperation(NewMergePatchOperation(
 					fmt.Sprintf(`{"data":{"%s":"%s"}}`, newField, newValue),
 					"v1", "ConfigMap", namespace, missingName,
-					IgnoreMissingObject(),
+					WithIgnoreMissingObject(),
 				))
 			},
 			shouldNotAdd,
@@ -155,8 +155,8 @@ data:
 			"merge patch using map",
 			func(patcher *ObjectPatcher) error {
 				return patcher.ExecuteOperation(NewMergePatchOperation(
-					map[string]interface{}{
-						"data": map[string]interface{}{
+					map[string]any{
+						"data": map[string]any{
 							newField: newValue,
 						},
 					},
@@ -295,7 +295,7 @@ mergePatch: |
 				return patcher.ExecuteOperation(NewJSONPatchOperation(
 					fmt.Sprintf(`[{ "op": "add", "path": "/data/%s", "value": "%s"}]`, newField, newValue),
 					"v1", "ConfigMap", namespace, missingName,
-					IgnoreMissingObject(),
+					WithIgnoreMissingObject(),
 				))
 			},
 			shouldNotAdd,
@@ -387,7 +387,7 @@ jsonPatch: |
 		{
 			"filter patch",
 			func(patcher *ObjectPatcher) error {
-				return patcher.ExecuteOperation(NewFilterPatchOperation(
+				return patcher.ExecuteOperation(NewPatchWithMutatingFuncOperation(
 					filter,
 					"v1", "ConfigMap", namespace, name,
 				))
@@ -398,7 +398,7 @@ jsonPatch: |
 		{
 			"filter patch missing object",
 			func(patcher *ObjectPatcher) error {
-				return patcher.ExecuteOperation(NewFilterPatchOperation(
+				return patcher.ExecuteOperation(NewPatchWithMutatingFuncOperation(
 					filter,
 					"v1", "ConfigMap", namespace, missingName,
 				))
@@ -409,10 +409,10 @@ jsonPatch: |
 		{
 			"filter patch with ignoreMissingObject",
 			func(patcher *ObjectPatcher) error {
-				return patcher.ExecuteOperation(NewFilterPatchOperation(
+				return patcher.ExecuteOperation(NewPatchWithMutatingFuncOperation(
 					filter,
 					"v1", "ConfigMap", namespace, missingName,
-					IgnoreMissingObject(),
+					WithIgnoreMissingObject(),
 				))
 			},
 			shouldNotAdd,
@@ -489,7 +489,7 @@ data:
   foo: "bar"
   %s: "%s"
 `, namespace, name, newField, newValue)).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, UpdateIfExists()))
+				return patcher.ExecuteOperation(NewCreateOrUpdateOperation(obj))
 			},
 			shouldAdd,
 			shouldNotBeError,
@@ -526,7 +526,7 @@ object:
 
 			// Apply MergePatch: add a new field in data section.
 			patcher := NewObjectPatcher(cluster.Client, log.NewNop())
-
+			fmt.Println(tt.name)
 			err := tt.fn(patcher)
 
 			// Check error expectation.
@@ -598,7 +598,7 @@ data:
 			"create new object ignore existing object",
 			func(patcher *ObjectPatcher) error {
 				obj := manifest.MustFromYAML(newConfigMap).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, IgnoreIfExists()))
+				return patcher.ExecuteOperation(NewCreateIfNotExistsOperation(obj))
 			},
 			shouldCreateNew,
 			shouldNotBeError,
@@ -616,7 +616,7 @@ data:
 			"create ignore existing object",
 			func(patcher *ObjectPatcher) error {
 				obj := manifest.MustFromYAML(existingConfigMap).Unstructured()
-				return patcher.ExecuteOperation(NewCreateOperation(obj, IgnoreIfExists()))
+				return patcher.ExecuteOperation(NewCreateIfNotExistsOperation(obj))
 			},
 			shouldNotCreateNew,
 			shouldNotBeError,
@@ -923,7 +923,7 @@ func newFakeClusterWithNamespaceAndObjects(t *testing.T, ns string, objects ...s
 	return cluster
 }
 
-func fetchObject(t *testing.T, cluster *fake.Cluster, ns string, objYAML string, object interface{}) {
+func fetchObject(t *testing.T, cluster *fake.Cluster, ns string, objYAML string, object any) {
 	t.Helper()
 	mft, err := manifest.NewFromYAML(objYAML)
 	require.NoError(t, err)

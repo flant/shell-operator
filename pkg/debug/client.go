@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/flant/shell-operator/pkg/app"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
@@ -14,47 +15,50 @@ import (
 
 type Client struct {
 	SocketPath string
+	httpClient *http.Client
 }
 
-func NewClient() *Client {
-	return &Client{}
-}
-
-func (c *Client) WithSocketPath(path string) {
-	c.SocketPath = path
-}
-
-func (c *Client) newHttpClient() (http.Client, error) {
-	exists, err := utils.FileExists(c.SocketPath)
+func NewClient(socketPath string) (*Client, error) {
+	exists, err := utils.FileExists(socketPath)
 	if err != nil {
-		return http.Client{}, fmt.Errorf("check debug socket '%s': %s", c.SocketPath, err)
+		return nil, fmt.Errorf("check debug socket '%s': %s", socketPath, err)
 	}
 	if !exists {
-		return http.Client{}, fmt.Errorf("debug socket '%s' is not exists", c.SocketPath)
+		return nil, fmt.Errorf("debug socket '%s' is not exists", socketPath)
 	}
 
-	return http.Client{
+	client := &http.Client{
 		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", c.SocketPath)
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				dialer := &net.Dialer{
+					Timeout: 10 * time.Second,
+				}
+				return dialer.DialContext(ctx, "unix", socketPath)
 			},
+			DisableKeepAlives: true,
 		},
+	}
+
+	return &Client{
+		SocketPath: socketPath,
+		httpClient: client,
 	}, nil
 }
 
-func DefaultClient() *Client {
-	cl := NewClient()
-	cl.WithSocketPath(app.DebugUnixSocket)
-	return cl
+func (c *Client) Close() {
+	if c.httpClient != nil {
+		if transport, ok := c.httpClient.Transport.(*http.Transport); ok {
+			transport.CloseIdleConnections()
+		}
+	}
+}
+
+func DefaultClient() (*Client, error) {
+	return NewClient(app.DebugUnixSocket)
 }
 
 func (c *Client) Get(url string) ([]byte, error) {
-	httpc, err := c.newHttpClient()
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpc.Get(url)
+	resp, err := c.httpClient.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -69,12 +73,7 @@ func (c *Client) Get(url string) ([]byte, error) {
 }
 
 func (c *Client) Post(targetUrl string, data map[string][]string) ([]byte, error) {
-	httpc, err := c.newHttpClient()
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpc.PostForm(targetUrl, data)
+	resp, err := c.httpClient.PostForm(targetUrl, data)
 	if err != nil {
 		return nil, err
 	}

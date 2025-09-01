@@ -11,7 +11,7 @@ import (
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
-type EventHandlerFn func(cdrName string, request *v1.ConversionRequest) (*Response, error)
+type EventHandlerFn func(ctx context.Context, cdrName string, request *v1.ConversionRequest) (*Response, error)
 
 // WebhookManager is a public interface to be used from operator.go.
 //

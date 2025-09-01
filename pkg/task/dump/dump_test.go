@@ -8,9 +8,12 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/yaml"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -69,7 +72,33 @@ func Test_Dump(t *testing.T) {
 		mainTasks   = 5
 		activeTasks = 4
 	)
-	tqs := queue.NewTaskQueueSet()
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
+		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
+		assert.NotZero(t, value)
+
+		mapSlice := []map[string]string{
+			{
+				"queue_action": "Length",
+				"queue_name":   "main",
+			},
+			{
+				"queue_action": "AddFirst",
+				"queue_name":   "active-queue",
+			},
+			{
+				"queue_action": "IsEmpty",
+				"queue_name":   "empty",
+			},
+		}
+		assert.Contains(t, mapSlice, labels)
+		assert.Nil(t, buckets)
+	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
+
+	tqs := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	tqs.WithMainName("main")
 	tqs.WithContext(context.Background())
 
@@ -81,7 +110,7 @@ func Test_Dump(t *testing.T) {
 
 	// Create and fill main queue.
 	t.Run("single main queue", func(t *testing.T) {
-		tqs.NewNamedQueue("main", nil)
+		tqs.NewNamedQueue("main", nil, queue.WithCompactableTypes(task_metadata.HookRun))
 
 		// Single empty main should be reported only as summary.
 		dump := testDumpQueuesWrapper(tqs, "text", true)
@@ -105,7 +134,8 @@ func Test_Dump(t *testing.T) {
 
 	// Create and fill active queue.
 	t.Run("fill active queue", func(_ *testing.T) {
-		tqs.NewNamedQueue("active-queue", nil)
+		tqs.NewNamedQueue("active-queue", nil, queue.WithCompactableTypes(task_metadata.HookRun))
+
 		fillQueue(tqs.GetByName("active-queue"), activeTasks)
 
 		dump := testDumpQueuesWrapper(tqs, "text", true)
@@ -116,7 +146,7 @@ func Test_Dump(t *testing.T) {
 
 	// Create empty queue.
 	t.Run("create empty queue", func(t *testing.T) {
-		tqs.NewNamedQueue("empty", nil)
+		tqs.NewNamedQueue("empty", nil, queue.WithCompactableTypes(task_metadata.HookRun))
 
 		dump := testDumpQueuesWrapper(tqs, "text", true)
 		t.Log(dump)

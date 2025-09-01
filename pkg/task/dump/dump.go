@@ -42,7 +42,7 @@ func TaskMainQueue(tqs *queue.TaskQueueSet, format string) interface{} {
 		dq = dumpQueue{
 			Name:       q.Name,
 			TasksCount: q.Length(),
-			Status:     q.Status,
+			Status:     q.GetStatus(),
 			Tasks:      tasks,
 		}
 	}
@@ -97,7 +97,7 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 				mainQueue := dumpQueue{
 					Name:       queue.Name,
 					TasksCount: queue.Length(),
-					Status:     queue.Status,
+					Status:     queue.GetStatus(),
 					Tasks:      tasks,
 				}
 				result.Active = append(result.Active, mainQueue)
@@ -119,7 +119,7 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 			result.Active = append(result.Active, dumpQueue{
 				Name:       queue.Name,
 				TasksCount: queue.Length(),
-				Status:     queue.Status,
+				Status:     queue.GetStatus(),
 				Tasks:      tasks,
 			})
 		}

@@ -1,6 +1,7 @@
 package context
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 
 func parseContexts(contexts string) []bctx.BindingContext {
 	var parsedBindingContexts []bctx.BindingContext
+	//nolint: musttag
 	_ = json.Unmarshal([]byte(contexts), &parsedBindingContexts)
 	return parsedBindingContexts
 }
@@ -129,7 +131,7 @@ metadata:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
 	// Run schedule
-	contexts, err = c.RunSchedule("* * * * *")
+	contexts, err = c.RunSchedule(context.Background(), "* * * * *")
 	g.Expect(err).ShouldNot(HaveOccurred())
 	parsedBindingContexts = parseContexts(contexts.Rendered)
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
@@ -469,7 +471,7 @@ metadata:
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
 
 	// Run schedule
-	contexts, err = c.RunSchedule("* * * * *")
+	contexts, err = c.RunSchedule(context.Background(), "* * * * *")
 	g.Expect(err).ShouldNot(HaveOccurred())
 	parsedBindingContexts = parseContexts(contexts.Rendered)
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
