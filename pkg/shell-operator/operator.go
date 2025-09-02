@@ -96,11 +96,14 @@ func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 func (op *ShellOperator) Start() {
 	log.Info("start shell-operator")
 
+	op.logger.Info("start APIServer")
 	op.APIServer.Start(op.ctx)
 
 	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
+	op.logger.Info("start bootstrapMainQueue")
 	op.bootstrapMainQueue(op.TaskQueues)
 	// Start main task queue handler
+	op.logger.Info("start TaskQueues StartMain")
 	op.TaskQueues.StartMain(op.ctx)
 	op.initAndStartHookQueues()
 
@@ -279,6 +282,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 		return admissionResponse, nil
 	})
 
+	op.logger.Info("debug ValidatingWebhookManager ValidatingResources", slog.Any("ValidatingResources", op.AdmissionWebhookManager.ValidatingResources))
 	if err := op.AdmissionWebhookManager.Start(); err != nil {
 		return fmt.Errorf("ValidatingWebhookManager start: %w", err)
 	}

@@ -63,9 +63,17 @@ func (w *ValidatingWebhookResource) Register() error {
 			slog.String("path", *webhook.ClientConfig.Service.Path),
 			slog.String("configurationName", w.opts.ConfigurationName))
 
+		log.Info("debug w.opts.ServiceName", slog.String("w.opts.ServiceName", w.opts.ServiceName))
+		log.Info("debug ValidatingWebhook client", slog.String("webhook.ValidatingWebhook.ClientConfig.Service.Name", webhook.ValidatingWebhook.ClientConfig.Service.Name))
+
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.ValidatingWebhook)
 	}
 
+	// fmt.Println(configuration.Webhooks)
+	log.Info("configuration.Webhooks length", slog.Int("len", len(configuration.Webhooks)))
+	if len(configuration.Webhooks) > 0 {
+		log.Info("debug configuration.Webhooks", slog.Any("ClientConfig.Service.Name", configuration.Webhooks[0].ClientConfig.Service.Name))
+	}
 	return w.submit(configuration)
 }
 
@@ -106,6 +114,7 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 		if err != nil {
 			log.Error("Create ValidatingWebhookConfiguration",
 				slog.String("name", conf.Name),
+				slog.String("service name", conf.Webhooks[0].ClientConfig.Service.Name),
 				log.Err(err))
 		}
 	} else {
