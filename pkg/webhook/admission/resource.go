@@ -2,12 +2,15 @@ package admission
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 
 	klient "github.com/flant/kube-client/client"
 )
@@ -100,6 +103,11 @@ func createWebhookPath(webhook IWebhookConfig) *string {
 }
 
 func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfiguration) error {
+	// debug yaml
+	data, _ := json.Marshal(conf)
+	data, _ = yaml.JSONToYAML(data)
+	fmt.Println(strings.TrimSuffix(string(data), "\n"))
+
 	client := w.opts.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations()
 
 	listOpts := metav1.ListOptions{
