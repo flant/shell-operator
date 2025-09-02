@@ -123,6 +123,7 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 			log.Error("Create ValidatingWebhookConfiguration",
 				slog.String("name", conf.Name),
 				slog.String("service name", conf.Webhooks[0].ClientConfig.Service.Name),
+				slog.String("service namespace", conf.Webhooks[0].ClientConfig.Service.Namespace),
 				log.Err(err))
 		}
 	} else {

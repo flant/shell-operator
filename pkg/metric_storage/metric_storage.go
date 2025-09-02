@@ -165,7 +165,7 @@ func (m *MetricStorage) RegisterGauge(metric string, labels map[string]string) *
 		},
 		LabelNames(labels),
 	)
-	m.Registerer.MustRegister(vec)
+	m.Registerer.Register(vec)
 	m.Gauges[metric] = vec
 	return vec
 }
@@ -230,7 +230,7 @@ func (m *MetricStorage) RegisterCounter(metric string, labels map[string]string)
 		},
 		LabelNames(labels),
 	)
-	m.Registerer.MustRegister(vec)
+	m.Registerer.Register(vec)
 	m.Counters[metric] = vec
 	return vec
 }
@@ -301,7 +301,7 @@ func (m *MetricStorage) RegisterHistogram(metric string, labels map[string]strin
 		Buckets: buckets,
 	}, LabelNames(labels))
 
-	m.Registerer.MustRegister(vec)
+	m.Registerer.Register(vec)
 	m.Histograms[metric] = vec
 	return vec
 }
