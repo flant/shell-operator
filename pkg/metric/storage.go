@@ -30,6 +30,8 @@ type Storage interface {
 	RegisterHistogram(metric string, labels map[string]string, buckets []float64) *prometheus.HistogramVec
 
 	SendBatch(ops []operation.MetricOperation, labels map[string]string) error
+
+	Cleanup()
 }
 
 type GroupedStorage interface {

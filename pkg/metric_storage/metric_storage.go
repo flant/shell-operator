@@ -436,3 +436,15 @@ func (m *MetricStorage) Handler() http.Handler {
 		Registry: m.Registry,
 	})
 }
+
+func (m *MetricStorage) Cleanup() {
+	for _, vec := range m.Counters {
+		m.Registerer.Unregister(vec)
+	}
+	for _, vec := range m.Gauges {
+		m.Registerer.Unregister(vec)
+	}
+	for _, vec := range m.Histograms {
+		m.Registerer.Unregister(vec)
+	}
+}

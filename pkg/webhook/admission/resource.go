@@ -2,12 +2,15 @@ package admission
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 
 	klient "github.com/flant/kube-client/client"
 )
@@ -63,9 +66,17 @@ func (w *ValidatingWebhookResource) Register() error {
 			slog.String("path", *webhook.ClientConfig.Service.Path),
 			slog.String("configurationName", w.opts.ConfigurationName))
 
+		log.Info("debug w.opts.ServiceName", slog.String("w.opts.ServiceName", w.opts.ServiceName))
+		log.Info("debug ValidatingWebhook client", slog.String("webhook.ValidatingWebhook.ClientConfig.Service.Name", webhook.ValidatingWebhook.ClientConfig.Service.Name))
+
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.ValidatingWebhook)
 	}
 
+	// fmt.Println(configuration.Webhooks)
+	log.Info("configuration.Webhooks length", slog.Int("len", len(configuration.Webhooks)))
+	if len(configuration.Webhooks) > 0 {
+		log.Info("debug configuration.Webhooks", slog.Any("ClientConfig.Service.Name", configuration.Webhooks[0].ClientConfig.Service.Name))
+	}
 	return w.submit(configuration)
 }
 
@@ -92,6 +103,11 @@ func createWebhookPath(webhook IWebhookConfig) *string {
 }
 
 func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfiguration) error {
+	// debug yaml
+	data, _ := json.Marshal(conf)
+	data, _ = yaml.JSONToYAML(data)
+	fmt.Println(strings.TrimSuffix(string(data), "\n"))
+
 	client := w.opts.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations()
 
 	listOpts := metav1.ListOptions{
@@ -106,6 +122,7 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 		if err != nil {
 			log.Error("Create ValidatingWebhookConfiguration",
 				slog.String("name", conf.Name),
+				slog.String("service name", conf.Webhooks[0].ClientConfig.Service.Name),
 				log.Err(err))
 		}
 	} else {

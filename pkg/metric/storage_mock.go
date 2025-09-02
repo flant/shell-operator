@@ -27,6 +27,13 @@ type StorageMock struct {
 	beforeApplyOperationCounter uint64
 	ApplyOperationMock          mStorageMockApplyOperation
 
+	funcCleanup          func()
+	funcCleanupOrigin    string
+	inspectFuncCleanup   func()
+	afterCleanupCounter  uint64
+	beforeCleanupCounter uint64
+	CleanupMock          mStorageMockCleanup
+
 	funcCounter          func(metric string, labels map[string]string) (cp1 *prometheus.CounterVec)
 	funcCounterOrigin    string
 	inspectFuncCounter   func(metric string, labels map[string]string)
@@ -129,6 +136,8 @@ func NewStorageMock(t minimock.Tester) *StorageMock {
 
 	m.ApplyOperationMock = mStorageMockApplyOperation{mock: m}
 	m.ApplyOperationMock.callArgs = []*StorageMockApplyOperationParams{}
+
+	m.CleanupMock = mStorageMockCleanup{mock: m}
 
 	m.CounterMock = mStorageMockCounter{mock: m}
 	m.CounterMock.callArgs = []*StorageMockCounterParams{}
@@ -504,6 +513,184 @@ func (m *StorageMock) MinimockApplyOperationInspect() {
 	if !m.ApplyOperationMock.invocationsDone() && afterApplyOperationCounter > 0 {
 		m.t.Errorf("Expected %d calls to StorageMock.ApplyOperation at\n%s but found %d calls",
 			mm_atomic.LoadUint64(&m.ApplyOperationMock.expectedInvocations), m.ApplyOperationMock.expectedInvocationsOrigin, afterApplyOperationCounter)
+	}
+}
+
+type mStorageMockCleanup struct {
+	optional           bool
+	mock               *StorageMock
+	defaultExpectation *StorageMockCleanupExpectation
+	expectations       []*StorageMockCleanupExpectation
+
+	expectedInvocations       uint64
+	expectedInvocationsOrigin string
+}
+
+// StorageMockCleanupExpectation specifies expectation struct of the Storage.Cleanup
+type StorageMockCleanupExpectation struct {
+	mock *StorageMock
+
+	returnOrigin string
+	Counter      uint64
+}
+
+// Marks this method to be optional. The default behavior of any method with Return() is '1 or more', meaning
+// the test will fail minimock's automatic final call check if the mocked method was not called at least once.
+// Optional() makes method check to work in '0 or more' mode.
+// It is NOT RECOMMENDED to use this option unless you really need it, as default behaviour helps to
+// catch the problems when the expected method call is totally skipped during test run.
+func (mmCleanup *mStorageMockCleanup) Optional() *mStorageMockCleanup {
+	mmCleanup.optional = true
+	return mmCleanup
+}
+
+// Expect sets up expected params for Storage.Cleanup
+func (mmCleanup *mStorageMockCleanup) Expect() *mStorageMockCleanup {
+	if mmCleanup.mock.funcCleanup != nil {
+		mmCleanup.mock.t.Fatalf("StorageMock.Cleanup mock is already set by Set")
+	}
+
+	if mmCleanup.defaultExpectation == nil {
+		mmCleanup.defaultExpectation = &StorageMockCleanupExpectation{}
+	}
+
+	return mmCleanup
+}
+
+// Inspect accepts an inspector function that has same arguments as the Storage.Cleanup
+func (mmCleanup *mStorageMockCleanup) Inspect(f func()) *mStorageMockCleanup {
+	if mmCleanup.mock.inspectFuncCleanup != nil {
+		mmCleanup.mock.t.Fatalf("Inspect function is already set for StorageMock.Cleanup")
+	}
+
+	mmCleanup.mock.inspectFuncCleanup = f
+
+	return mmCleanup
+}
+
+// Return sets up results that will be returned by Storage.Cleanup
+func (mmCleanup *mStorageMockCleanup) Return() *StorageMock {
+	if mmCleanup.mock.funcCleanup != nil {
+		mmCleanup.mock.t.Fatalf("StorageMock.Cleanup mock is already set by Set")
+	}
+
+	if mmCleanup.defaultExpectation == nil {
+		mmCleanup.defaultExpectation = &StorageMockCleanupExpectation{mock: mmCleanup.mock}
+	}
+
+	mmCleanup.defaultExpectation.returnOrigin = minimock.CallerInfo(1)
+	return mmCleanup.mock
+}
+
+// Set uses given function f to mock the Storage.Cleanup method
+func (mmCleanup *mStorageMockCleanup) Set(f func()) *StorageMock {
+	if mmCleanup.defaultExpectation != nil {
+		mmCleanup.mock.t.Fatalf("Default expectation is already set for the Storage.Cleanup method")
+	}
+
+	if len(mmCleanup.expectations) > 0 {
+		mmCleanup.mock.t.Fatalf("Some expectations are already set for the Storage.Cleanup method")
+	}
+
+	mmCleanup.mock.funcCleanup = f
+	mmCleanup.mock.funcCleanupOrigin = minimock.CallerInfo(1)
+	return mmCleanup.mock
+}
+
+// Times sets number of times Storage.Cleanup should be invoked
+func (mmCleanup *mStorageMockCleanup) Times(n uint64) *mStorageMockCleanup {
+	if n == 0 {
+		mmCleanup.mock.t.Fatalf("Times of StorageMock.Cleanup mock can not be zero")
+	}
+	mm_atomic.StoreUint64(&mmCleanup.expectedInvocations, n)
+	mmCleanup.expectedInvocationsOrigin = minimock.CallerInfo(1)
+	return mmCleanup
+}
+
+func (mmCleanup *mStorageMockCleanup) invocationsDone() bool {
+	if len(mmCleanup.expectations) == 0 && mmCleanup.defaultExpectation == nil && mmCleanup.mock.funcCleanup == nil {
+		return true
+	}
+
+	totalInvocations := mm_atomic.LoadUint64(&mmCleanup.mock.afterCleanupCounter)
+	expectedInvocations := mm_atomic.LoadUint64(&mmCleanup.expectedInvocations)
+
+	return totalInvocations > 0 && (expectedInvocations == 0 || expectedInvocations == totalInvocations)
+}
+
+// Cleanup implements Storage
+func (mmCleanup *StorageMock) Cleanup() {
+	mm_atomic.AddUint64(&mmCleanup.beforeCleanupCounter, 1)
+	defer mm_atomic.AddUint64(&mmCleanup.afterCleanupCounter, 1)
+
+	mmCleanup.t.Helper()
+
+	if mmCleanup.inspectFuncCleanup != nil {
+		mmCleanup.inspectFuncCleanup()
+	}
+
+	if mmCleanup.CleanupMock.defaultExpectation != nil {
+		mm_atomic.AddUint64(&mmCleanup.CleanupMock.defaultExpectation.Counter, 1)
+
+		return
+
+	}
+	if mmCleanup.funcCleanup != nil {
+		mmCleanup.funcCleanup()
+		return
+	}
+	mmCleanup.t.Fatalf("Unexpected call to StorageMock.Cleanup.")
+
+}
+
+// CleanupAfterCounter returns a count of finished StorageMock.Cleanup invocations
+func (mmCleanup *StorageMock) CleanupAfterCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmCleanup.afterCleanupCounter)
+}
+
+// CleanupBeforeCounter returns a count of StorageMock.Cleanup invocations
+func (mmCleanup *StorageMock) CleanupBeforeCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmCleanup.beforeCleanupCounter)
+}
+
+// MinimockCleanupDone returns true if the count of the Cleanup invocations corresponds
+// the number of defined expectations
+func (m *StorageMock) MinimockCleanupDone() bool {
+	if m.CleanupMock.optional {
+		// Optional methods provide '0 or more' call count restriction.
+		return true
+	}
+
+	for _, e := range m.CleanupMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			return false
+		}
+	}
+
+	return m.CleanupMock.invocationsDone()
+}
+
+// MinimockCleanupInspect logs each unmet expectation
+func (m *StorageMock) MinimockCleanupInspect() {
+	for _, e := range m.CleanupMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			m.t.Error("Expected call to StorageMock.Cleanup")
+		}
+	}
+
+	afterCleanupCounter := mm_atomic.LoadUint64(&m.afterCleanupCounter)
+	// if default expectation was set then invocations count should be greater than zero
+	if m.CleanupMock.defaultExpectation != nil && afterCleanupCounter < 1 {
+		m.t.Errorf("Expected call to StorageMock.Cleanup at\n%s", m.CleanupMock.defaultExpectation.returnOrigin)
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcCleanup != nil && afterCleanupCounter < 1 {
+		m.t.Errorf("Expected call to StorageMock.Cleanup at\n%s", m.funcCleanupOrigin)
+	}
+
+	if !m.CleanupMock.invocationsDone() && afterCleanupCounter > 0 {
+		m.t.Errorf("Expected %d calls to StorageMock.Cleanup at\n%s but found %d calls",
+			mm_atomic.LoadUint64(&m.CleanupMock.expectedInvocations), m.CleanupMock.expectedInvocationsOrigin, afterCleanupCounter)
 	}
 }
 
@@ -4836,6 +5023,8 @@ func (m *StorageMock) MinimockFinish() {
 		if !m.minimockDone() {
 			m.MinimockApplyOperationInspect()
 
+			m.MinimockCleanupInspect()
+
 			m.MinimockCounterInspect()
 
 			m.MinimockCounterAddInspect()
@@ -4885,6 +5074,7 @@ func (m *StorageMock) minimockDone() bool {
 	done := true
 	return done &&
 		m.MinimockApplyOperationDone() &&
+		m.MinimockCleanupDone() &&
 		m.MinimockCounterDone() &&
 		m.MinimockCounterAddDone() &&
 		m.MinimockGaugeDone() &&
