@@ -5,7 +5,7 @@ FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl as libjq
 FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.23-alpine3.21 AS builder
 
 ARG appVersion=latest
-RUN apk --no-cache add git ca-certificates gcc musl-dev libc-dev binutils-gold
+RUN apk --no-cache add git ca-certificates gcc musl-dev libc-dev binutils-gold curl
 
 # Cache-friendly download of go dependencies.
 ADD go.mod go.sum /app/
