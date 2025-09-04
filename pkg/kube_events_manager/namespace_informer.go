@@ -145,7 +145,3 @@ func (ni *namespaceInformer) start() {
 
 	log.Debug("Informer is ready", slog.String("debugName", ni.Monitor.Metadata.DebugName))
 }
-
-func (ni *namespaceInformer) pauseHandleEvents() {
-	ni.stopped = true
-}

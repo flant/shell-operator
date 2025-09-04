@@ -19,7 +19,6 @@ type Monitor interface {
 	CreateInformers() error
 	Start(context.Context)
 	Stop()
-	PauseHandleEvents()
 	Snapshot() []kemtypes.ObjectAndFilterResult
 	EnableKubeEventCb()
 	GetConfig() *MonitorConfig
@@ -370,25 +369,6 @@ func (m *monitor) Start(parentCtx context.Context) {
 func (m *monitor) Stop() {
 	if m.cancel != nil {
 		m.cancel()
-	}
-}
-
-// PauseHandleEvents set flags for all informers to ignore incoming events.
-// Useful for shutdown without panicking.
-// Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
-func (m *monitor) PauseHandleEvents() {
-	for _, informer := range m.ResourceInformers {
-		informer.pauseHandleEvents()
-	}
-
-	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
-		for _, informer := range value {
-			informer.pauseHandleEvents()
-		}
-	})
-
-	if m.NamespaceInformer != nil {
-		m.NamespaceInformer.pauseHandleEvents()
 	}
 }
 

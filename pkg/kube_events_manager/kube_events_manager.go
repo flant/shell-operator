@@ -24,7 +24,7 @@ type KubeEventsManager interface {
 	StopMonitor(monitorID string) error
 
 	Ch() chan kemtypes.KubeEvent
-	PauseHandleEvents()
+	Stop()
 }
 
 // kubeEventsManager is a main implementation of KubeEventsManager.
@@ -138,15 +138,9 @@ func (mgr *kubeEventsManager) Ch() chan kemtypes.KubeEvent {
 	return mgr.KubeEventCh
 }
 
-// PauseHandleEvents set flags for all informers to ignore incoming events.
-// Useful for shutdown without panicking.
-// Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
-func (mgr *kubeEventsManager) PauseHandleEvents() {
-	mgr.m.RLock()
-	defer mgr.m.RUnlock()
-	for _, monitor := range mgr.Monitors {
-		monitor.PauseHandleEvents()
-	}
+// Stop the kube events manager and all the informers inside monitors.
+func (mgr *kubeEventsManager) Stop() {
+	mgr.cancel()
 }
 
 func (mgr *kubeEventsManager) MetricStorage() metric.Storage {

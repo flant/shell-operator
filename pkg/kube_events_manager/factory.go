@@ -146,6 +146,7 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()),
 				log.Err(err))
 		}
+
 		delete(f.handlerRegistrations, informerId)
 		log.Debug("Factory store: decreased usage counter of the factory",
 			slog.Int("value", len(f.handlerRegistrations)),
