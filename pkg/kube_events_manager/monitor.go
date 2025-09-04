@@ -19,6 +19,7 @@ type Monitor interface {
 	CreateInformers() error
 	Start(context.Context)
 	Stop()
+	Wait()
 	Snapshot() []kemtypes.ObjectAndFilterResult
 	EnableKubeEventCb()
 	GetConfig() *MonitorConfig
@@ -369,6 +370,21 @@ func (m *monitor) Start(parentCtx context.Context) {
 func (m *monitor) Stop() {
 	if m.cancel != nil {
 		m.cancel()
+	}
+}
+
+// Wait waits for all started informers to stop
+func (m *monitor) Wait() {
+	for _, informer := range m.ResourceInformers {
+		informer.wait()
+	}
+	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
+		for _, informer := range value {
+			informer.wait()
+		}
+	})
+	if m.NamespaceInformer != nil {
+		m.NamespaceInformer.wait()
 	}
 }
 

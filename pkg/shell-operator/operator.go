@@ -960,9 +960,20 @@ func (op *ShellOperator) runMetrics() {
 
 // Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
 func (op *ShellOperator) Shutdown() {
+	log.Info("shutdown: begin")
 	op.ScheduleManager.Stop()
+	log.Info("shutdown: schedule manager stopped")
+
 	op.KubeEventsManager.Stop()
+	log.Info("shutdown: kube events manager canceled, waiting for informers")
+	if kem, ok := op.KubeEventsManager.(interface{ Wait() }); ok {
+		kem.Wait()
+	}
+	log.Info("shutdown: kube events manager done")
+
 	op.TaskQueues.Stop()
+	log.Info("shutdown: task queues stop signaled, waiting")
 	// Wait for queues to stop, but no more than 10 seconds
 	op.TaskQueues.WaitStopWithTimeout(WaitQueuesTimeout)
+	log.Info("shutdown: task queues stopped")
 }

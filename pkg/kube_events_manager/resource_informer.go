@@ -469,6 +469,11 @@ func (ei *resourceInformer) start() {
 	log.Debug("informer is ready", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 }
 
+// wait blocks until the underlying shared informer for this FactoryIndex is stopped
+func (ei *resourceInformer) wait() {
+	DefaultFactoryStore.WaitStopped(ei.FactoryIndex)
+}
+
 // CachedObjectsInfo returns info accumulated from start.
 func (ei *resourceInformer) getCachedObjectsInfo() CachedObjectsInfo {
 	ei.cacheLock.RLock()

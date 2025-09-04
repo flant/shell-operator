@@ -25,6 +25,7 @@ type KubeEventsManager interface {
 
 	Ch() chan kemtypes.KubeEvent
 	Stop()
+	Wait()
 }
 
 // kubeEventsManager is a main implementation of KubeEventsManager.
@@ -141,6 +142,18 @@ func (mgr *kubeEventsManager) Ch() chan kemtypes.KubeEvent {
 // Stop the kube events manager and all the informers inside monitors.
 func (mgr *kubeEventsManager) Stop() {
 	mgr.cancel()
+}
+
+func (mgr *kubeEventsManager) Wait() {
+	mgr.m.RLock()
+	monitors := make([]Monitor, 0, len(mgr.Monitors))
+	for _, mon := range mgr.Monitors {
+		monitors = append(monitors, mon)
+	}
+	mgr.m.RUnlock()
+	for _, mon := range monitors {
+		mon.Wait()
+	}
 }
 
 func (mgr *kubeEventsManager) MetricStorage() metric.Storage {

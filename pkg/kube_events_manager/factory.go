@@ -36,38 +36,44 @@ type Factory struct {
 	handlerRegistrations map[string]cache.ResourceEventHandlerRegistration
 	ctx                  context.Context
 	cancel               context.CancelFunc
+	// done is closed when the underlying informer.Run returns
+	done chan struct{}
 }
 
 type FactoryStore struct {
 	mu   sync.Mutex
-	data map[FactoryIndex]Factory
+	cond *sync.Cond
+	data map[FactoryIndex]*Factory
 }
 
 func NewFactoryStore() *FactoryStore {
-	return &FactoryStore{
-		data: make(map[FactoryIndex]Factory),
+	fs := &FactoryStore{
+		data: make(map[FactoryIndex]*Factory),
 	}
+	fs.cond = sync.NewCond(&fs.mu)
+	return fs
 }
 
 func (c *FactoryStore) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.data = make(map[FactoryIndex]Factory)
+	c.data = make(map[FactoryIndex]*Factory)
 }
 
 func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
 	ctx, cancel := context.WithCancel(context.Background())
-	c.data[index] = Factory{
+	c.data[index] = &Factory{
 		shared:               f,
 		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
 		ctx:                  ctx,
 		cancel:               cancel,
+		done:                 nil,
 	}
 	log.Debug("Factory store: added a new factory for index",
 		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 }
 
-func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory {
+func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) *Factory {
 	f, ok := c.data[index]
 	if ok {
 		log.Debug("Factory store: the factory with index found",
@@ -115,9 +121,18 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 		slog.Int("value", len(factory.handlerRegistrations)),
 		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 
-	if !informer.HasSynced() {
-		go informer.Run(factory.ctx.Done())
+	// Ensure informer.Run is started once and tracked
+	if factory.done == nil {
+		factory.done = make(chan struct{})
+		go func() {
+			informer.Run(factory.ctx.Done())
+			close(factory.done)
+			log.Debug("Factory store: informer goroutine exited",
+				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+		}()
+	}
 
+	if !informer.HasSynced() {
 		if err := wait.PollUntilContextCancel(ctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 			return informer.HasSynced(), nil
 		}); err != nil {
@@ -131,11 +146,10 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 
 func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	f, ok := c.data[index]
 	if !ok {
 		// already deleted
+		c.mu.Unlock()
 		return
 	}
 
@@ -152,10 +166,32 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 			slog.Int("value", len(f.handlerRegistrations)),
 			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 		if len(f.handlerRegistrations) == 0 {
+			log.Debug("Factory store: last handler removed, canceling shared informer",
+				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+			done := f.done
 			f.cancel()
+			c.mu.Unlock()
+			if done != nil {
+				<-done
+			}
+			c.mu.Lock()
 			delete(c.data, index)
 			log.Debug("Factory store: deleted factory",
 				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+			c.cond.Broadcast()
 		}
+	}
+	c.mu.Unlock()
+}
+
+// WaitStopped blocks until there is no factory for the index
+func (c *FactoryStore) WaitStopped(index FactoryIndex) {
+	c.mu.Lock()
+	for {
+		if _, ok := c.data[index]; !ok {
+			c.mu.Unlock()
+			return
+		}
+		c.cond.Wait()
 	}
 }

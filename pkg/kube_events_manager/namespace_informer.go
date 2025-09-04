@@ -21,6 +21,7 @@ type namespaceInformer struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	stopped bool
+	done    chan struct{}
 
 	KubeClient     *klient.Client
 	Monitor        *MonitorConfig
@@ -128,13 +129,18 @@ func (ni *namespaceInformer) start() {
 		return
 	}
 	cctx, cancel := context.WithCancel(ni.ctx)
+	ni.done = make(chan struct{})
 	go func() {
 		<-ni.ctx.Done()
 		ni.stopped = true
 		cancel()
 	}()
 
-	go ni.SharedInformer.Run(cctx.Done())
+	go func() {
+		ni.SharedInformer.Run(cctx.Done())
+		close(ni.done)
+		log.Debug("Namespace informer goroutine exited", slog.String("name", ni.Monitor.Metadata.DebugName))
+	}()
 
 	if err := wait.PollUntilContextCancel(cctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 		return ni.SharedInformer.HasSynced(), nil
@@ -144,4 +150,10 @@ func (ni *namespaceInformer) start() {
 	}
 
 	log.Debug("Informer is ready", slog.String("debugName", ni.Monitor.Metadata.DebugName))
+}
+
+func (ni *namespaceInformer) wait() {
+	if ni.done != nil {
+		<-ni.done
+	}
 }
