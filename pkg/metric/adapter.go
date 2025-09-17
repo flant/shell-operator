@@ -9,13 +9,6 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
-type MetricStorage interface {
-	RegisterCounter(metric string, labels map[string]string) *prometheus.CounterVec
-	CounterAdd(metric string, value float64, labels map[string]string)
-	RegisterHistogram(metric string, labels map[string]string, buckets []float64) *prometheus.HistogramVec
-	HistogramObserve(metric string, value float64, labels map[string]string, buckets []float64)
-}
-
 // this adapter is used for kube-client
 // it's deprecated, but don't know how to use it without breaking changes
 //
