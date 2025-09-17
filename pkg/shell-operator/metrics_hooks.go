@@ -3,14 +3,12 @@ package shell_operator
 import (
 	"net/http"
 
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/metric"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 )
 
 func (op *ShellOperator) setupHookMetricStorage() {
-	metricStorage := metricstorage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, true, op.logger.Named("metric-storage"))
-
+	metricStorage := metricsstorage.NewMetricStorage(app.PrometheusMetricsPrefix, metricsstorage.WithNewRegistry(), metricsstorage.WithLogger(op.logger.Named("metric-storage")))
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics/hooks", metricStorage.Handler().ServeHTTP)
 	// create new metric storage for hooks
 	// register scrape handler
@@ -18,17 +16,17 @@ func (op *ShellOperator) setupHookMetricStorage() {
 }
 
 // specific metrics for shell-operator HookManager
-func registerHookMetrics(metricStorage metric.Storage) {
+func registerHookMetrics(metricStorage metricsstorage.Storage) {
 	// Metrics for enable kubernetes bindings.
-	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", map[string]string{"hook": ""})
-	metricStorage.RegisterCounter("{PREFIX}hook_enable_kubernetes_bindings_errors_total", map[string]string{"hook": ""})
-	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_success", map[string]string{"hook": ""})
+	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", []string{"hook"})
+	metricStorage.RegisterCounter("{PREFIX}hook_enable_kubernetes_bindings_errors_total", []string{"hook"})
+	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_success", []string{"hook"})
 
 	// Metrics for hook executions.
-	labels := map[string]string{
-		"hook":    "",
-		"binding": "",
-		"queue":   "",
+	labels := []string{
+		"hook",
+		"binding",
+		"queue",
 	}
 	// Duration of hook execution.
 	metricStorage.RegisterHistogram(

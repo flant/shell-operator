@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/internal/metrics"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
-	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
 	"github.com/flant/shell-operator/pkg/utils/measure"
@@ -31,7 +31,7 @@ type TaskQueueSlice struct {
 	logger *log.Logger
 
 	m             sync.RWMutex
-	metricStorage metric.Storage
+	metricStorage metricsstorage.Storage
 	ctx           context.Context
 	cancel        context.CancelFunc
 
@@ -87,7 +87,7 @@ func (q *TaskQueueSlice) WithLogger(logger *log.Logger) {
 	q.logger = logger
 }
 
-func (q *TaskQueueSlice) WithMetricStorage(mstor metric.Storage) *TaskQueueSlice {
+func (q *TaskQueueSlice) WithMetricStorage(mstor metricsstorage.Storage) *TaskQueueSlice {
 	q.metricStorage = mstor
 
 	return q

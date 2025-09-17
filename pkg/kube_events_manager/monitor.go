@@ -8,10 +8,10 @@ import (
 	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	klient "github.com/flant/kube-client/client"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -47,7 +47,7 @@ type monitor struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage metric.Storage
+	metricStorage metricsstorage.Storage
 
 	logger *log.Logger
 }
@@ -131,7 +131,7 @@ func (c *cancelForNs) Delete(key string) {
 
 var _ Monitor = (*monitor)(nil)
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor metric.Storage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor metricsstorage.Storage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{

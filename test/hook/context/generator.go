@@ -9,6 +9,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	metricstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
@@ -16,7 +17,6 @@ import (
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 )
 
@@ -66,7 +66,7 @@ func NewBindingContextController(config string, logger *log.Logger, version ...f
 	}
 
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client, b.logger.Named("kube-events-manager"))
-	b.KubeEventsManager.WithMetricStorage(metricstorage.NewMetricStorage(ctx, "metrics-prefix", false, log.NewNop()))
+	b.KubeEventsManager.WithMetricStorage(metricstorage.NewMetricStorage("metrics-prefix", metricstorage.WithLogger(log.NewNop())))
 	// Re-create factory to drop informers created using different b.fakeCluster.Client.
 	kubeeventsmanager.DefaultFactoryStore.Reset()
 
