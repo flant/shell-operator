@@ -3,8 +3,8 @@ module github.com/flant/shell-operator
 go 1.23.8
 
 require (
-	github.com/deckhouse/deckhouse/pkg/log v0.0.0-20250814094423-e9f108b41a1a
-	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.0.0-20250917093148-02923ff3534e
+	github.com/deckhouse/deckhouse/pkg/log v0.1.0
+	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.1.0
 	github.com/flant/kube-client v1.3.1
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/go-openapi/spec v0.19.8
@@ -87,7 +87,6 @@ require (
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
