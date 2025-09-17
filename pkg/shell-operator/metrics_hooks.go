@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
 	"github.com/flant/shell-operator/pkg/app"
 )
 
@@ -18,9 +19,9 @@ func (op *ShellOperator) setupHookMetricStorage() {
 // specific metrics for shell-operator HookManager
 func registerHookMetrics(metricStorage metricsstorage.Storage) {
 	// Metrics for enable kubernetes bindings.
-	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", []string{"hook"})
-	metricStorage.RegisterCounter("{PREFIX}hook_enable_kubernetes_bindings_errors_total", []string{"hook"})
-	metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_success", []string{"hook"})
+	_, _ = metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_seconds", []string{"hook"})
+	_, _ = metricStorage.RegisterCounter("{PREFIX}hook_enable_kubernetes_bindings_errors_total", []string{"hook"})
+	_, _ = metricStorage.RegisterGauge("{PREFIX}hook_enable_kubernetes_bindings_success", []string{"hook"})
 
 	// Metrics for hook executions.
 	labels := []string{
@@ -29,7 +30,7 @@ func registerHookMetrics(metricStorage metricsstorage.Storage) {
 		"queue",
 	}
 	// Duration of hook execution.
-	metricStorage.RegisterHistogram(
+	_, _ = metricStorage.RegisterHistogram(
 		"{PREFIX}hook_run_seconds",
 		labels,
 		[]float64{
@@ -43,7 +44,7 @@ func registerHookMetrics(metricStorage metricsstorage.Storage) {
 	)
 
 	// System CPU usage.
-	metricStorage.RegisterHistogram(
+	_, _ = metricStorage.RegisterHistogram(
 		"{PREFIX}hook_run_user_cpu_seconds",
 		labels,
 		[]float64{
@@ -56,7 +57,7 @@ func registerHookMetrics(metricStorage metricsstorage.Storage) {
 		},
 	)
 	// User CPU usage.
-	metricStorage.RegisterHistogram(
+	_, _ = metricStorage.RegisterHistogram(
 		"{PREFIX}hook_run_sys_cpu_seconds",
 		labels,
 		[]float64{
@@ -69,11 +70,11 @@ func registerHookMetrics(metricStorage metricsstorage.Storage) {
 		},
 	)
 	// Max RSS in bytes.
-	metricStorage.RegisterGauge("{PREFIX}hook_run_max_rss_bytes", labels)
+	_, _ = metricStorage.RegisterGauge("{PREFIX}hook_run_max_rss_bytes", labels)
 
-	metricStorage.RegisterCounter("{PREFIX}hook_run_errors_total", labels)
-	metricStorage.RegisterCounter("{PREFIX}hook_run_allowed_errors_total", labels)
-	metricStorage.RegisterCounter("{PREFIX}hook_run_success_total", labels)
+	_, _ = metricStorage.RegisterCounter("{PREFIX}hook_run_errors_total", labels)
+	_, _ = metricStorage.RegisterCounter("{PREFIX}hook_run_allowed_errors_total", labels)
+	_, _ = metricStorage.RegisterCounter("{PREFIX}hook_run_success_total", labels)
 	// hook_run task waiting time
-	metricStorage.RegisterCounter("{PREFIX}task_wait_in_queue_seconds_total", labels)
+	_, _ = metricStorage.RegisterCounter("{PREFIX}task_wait_in_queue_seconds_total", labels)
 }

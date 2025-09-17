@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-
 	metricstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"

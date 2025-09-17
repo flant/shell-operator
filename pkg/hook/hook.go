@@ -9,13 +9,13 @@ import (
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/deckhouse/deckhouse/pkg/metrics-storage/operation"
 	uuid "github.com/gofrs/uuid/v5"
 	"github.com/kennygrant/sanitize"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/time/rate"
 
-	"github.com/deckhouse/deckhouse/pkg/metrics-storage/operation"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"

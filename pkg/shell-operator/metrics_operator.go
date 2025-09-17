@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
 	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
 )
@@ -25,13 +26,13 @@ func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels []string) {
 // registerCommonMetrics register base metric
 // This function is used in the addon-operator
 func registerCommonMetrics(metricStorage metricsstorage.Storage) {
-	metricStorage.RegisterCounter("{PREFIX}live_ticks", []string{})
+	_, _ = metricStorage.RegisterCounter("{PREFIX}live_ticks", []string{})
 }
 
 // registerTaskQueueMetrics
 // This function is used in the addon-operator
 func registerTaskQueueMetrics(metricStorage metricsstorage.Storage) {
-	metricStorage.RegisterHistogram(
+	_, _ = metricStorage.RegisterHistogram(
 		metrics.TasksQueueActionDurationSeconds,
 		[]string{
 			"queue_name",
@@ -46,16 +47,16 @@ func registerTaskQueueMetrics(metricStorage metricsstorage.Storage) {
 		},
 	)
 
-	metricStorage.RegisterGauge("{PREFIX}tasks_queue_length", []string{"queue"})
+	_, _ = metricStorage.RegisterGauge("{PREFIX}tasks_queue_length", []string{"queue"})
 }
 
 // registerKubeEventsManagerMetrics registers metrics for kube_event_manager
 // This function is used in the addon-operator
 func registerKubeEventsManagerMetrics(metricStorage metricsstorage.Storage, labels []string) {
 	// Count of objects in snapshot for one kubernets bindings.
-	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
+	_, _ = metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
 	// Duration of jqFilter applying.
-	metricStorage.RegisterHistogram(
+	_, _ = metricStorage.RegisterHistogram(
 		"{PREFIX}kube_jq_filter_duration_seconds",
 		labels,
 		[]float64{
@@ -67,7 +68,7 @@ func registerKubeEventsManagerMetrics(metricStorage metricsstorage.Storage, labe
 		},
 	)
 	// Duration of handling kubernetes event.
-	metricStorage.RegisterHistogram(
+	_, _ = metricStorage.RegisterHistogram(
 		"{PREFIX}kube_event_duration_seconds",
 		labels,
 		[]float64{
@@ -80,5 +81,5 @@ func registerKubeEventsManagerMetrics(metricStorage metricsstorage.Storage, labe
 	)
 
 	// Count of watch errors.
-	metricStorage.RegisterCounter("{PREFIX}kubernetes_client_watch_errors_total", []string{"error_type"})
+	_, _ = metricStorage.RegisterCounter("{PREFIX}kubernetes_client_watch_errors_total", []string{"error_type"})
 }

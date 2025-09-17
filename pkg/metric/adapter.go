@@ -2,11 +2,10 @@ package metric
 
 import (
 	"github.com/deckhouse/deckhouse/pkg/log"
-
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
-	klient "github.com/flant/kube-client/client"
 	"github.com/prometheus/client_golang/prometheus"
 
+	klient "github.com/flant/kube-client/client"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -17,6 +16,10 @@ type MetricStorage interface {
 	HistogramObserve(metric string, value float64, labels map[string]string, buckets []float64)
 }
 
+// this adapter is used for kube-client
+// it's deprecated, but don't know how to use it without breaking changes
+//
+//nolint:staticcheck
 var _ klient.MetricStorage = (*MetricsAdapter)(nil)
 
 type MetricsAdapter struct {

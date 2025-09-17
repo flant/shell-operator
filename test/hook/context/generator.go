@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-
 	metricstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"

@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/otel"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/hook"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
