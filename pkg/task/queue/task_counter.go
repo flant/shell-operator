@@ -1,8 +1,9 @@
 package queue
 
 import (
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
 	"github.com/flant/shell-operator/internal/metrics"
-	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -12,11 +13,11 @@ type TaskCounter struct {
 	queueName      string
 	counter        map[string]uint
 	reachedCap     map[string]struct{}
-	metricStorage  metric.Storage
+	metricStorage  metricsstorage.Storage
 	countableTypes map[task.TaskType]struct{}
 }
 
-func NewTaskCounter(name string, countableTypes map[task.TaskType]struct{}, metricStorage metric.Storage) *TaskCounter {
+func NewTaskCounter(name string, countableTypes map[task.TaskType]struct{}, metricStorage metricsstorage.Storage) *TaskCounter {
 	if metricStorage == nil {
 		panic("metricStorage cannot be nil")
 	}

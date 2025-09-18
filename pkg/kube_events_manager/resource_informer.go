@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,7 +19,6 @@ import (
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
@@ -57,7 +57,7 @@ type resourceInformer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	metricStorage metric.Storage
+	metricStorage metricsstorage.Storage
 
 	// a flag to stop handle events after Stop()
 	stopped bool
@@ -68,7 +68,7 @@ type resourceInformer struct {
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
 	client  *klient.Client
-	mstor   metric.Storage
+	mstor   metricsstorage.Storage
 	eventCb func(kemtypes.KubeEvent)
 	monitor *MonitorConfig
 

@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/internal/metrics"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
-	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
 	"github.com/flant/shell-operator/pkg/utils/list"
@@ -91,7 +91,7 @@ type TaskQueue struct {
 	logger *log.Logger
 
 	m             sync.RWMutex
-	metricStorage metric.Storage
+	metricStorage metricsstorage.Storage
 	ctx           context.Context
 	cancel        context.CancelFunc
 
@@ -177,7 +177,7 @@ func WithLogger(logger *log.Logger) TaskQueueOption {
 }
 
 // NewTasksQueue creates a new TaskQueue with the provided options
-func NewTasksQueue(metricStorage metric.Storage, opts ...TaskQueueOption) *TaskQueue {
+func NewTasksQueue(metricStorage metricsstorage.Storage, opts ...TaskQueueOption) *TaskQueue {
 	q := &TaskQueue{
 		items:   list.New[task.Task](),
 		idIndex: make(map[string]*list.Element[task.Task]),

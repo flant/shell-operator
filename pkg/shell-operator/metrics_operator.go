@@ -3,15 +3,18 @@ package shell_operator
 import (
 	"net/http"
 
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
 	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/metric"
-	metricstorage "github.com/flant/shell-operator/pkg/metric_storage"
 )
 
 // setupMetricStorage creates and initializes metrics storage for built-in operator metrics
-func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels map[string]string) {
-	metricStorage := metricstorage.NewMetricStorage(op.ctx, app.PrometheusMetricsPrefix, false, op.logger.Named("metric-storage"))
+func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels []string) {
+	metricStorage := metricsstorage.NewMetricStorage(
+		metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
+		metricsstorage.WithLogger(op.logger.Named("metric-storage")),
+	)
 
 	registerCommonMetrics(metricStorage)
 	registerTaskQueueMetrics(metricStorage)
@@ -25,18 +28,18 @@ func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels map[string]s
 
 // registerCommonMetrics register base metric
 // This function is used in the addon-operator
-func registerCommonMetrics(metricStorage metric.Storage) {
-	metricStorage.RegisterCounter("{PREFIX}live_ticks", map[string]string{})
+func registerCommonMetrics(metricStorage metricsstorage.Storage) {
+	_, _ = metricStorage.RegisterCounter("{PREFIX}live_ticks", []string{})
 }
 
 // registerTaskQueueMetrics
 // This function is used in the addon-operator
-func registerTaskQueueMetrics(metricStorage metric.Storage) {
-	metricStorage.RegisterHistogram(
+func registerTaskQueueMetrics(metricStorage metricsstorage.Storage) {
+	_, _ = metricStorage.RegisterHistogram(
 		metrics.TasksQueueActionDurationSeconds,
-		map[string]string{
-			"queue_name":   "",
-			"queue_action": "",
+		[]string{
+			"queue_name",
+			"queue_action",
 		},
 		[]float64{
 			0.0,
@@ -47,16 +50,16 @@ func registerTaskQueueMetrics(metricStorage metric.Storage) {
 		},
 	)
 
-	metricStorage.RegisterGauge("{PREFIX}tasks_queue_length", map[string]string{"queue": ""})
+	_, _ = metricStorage.RegisterGauge("{PREFIX}tasks_queue_length", []string{"queue"})
 }
 
 // registerKubeEventsManagerMetrics registers metrics for kube_event_manager
 // This function is used in the addon-operator
-func registerKubeEventsManagerMetrics(metricStorage metric.Storage, labels map[string]string) {
+func registerKubeEventsManagerMetrics(metricStorage metricsstorage.Storage, labels []string) {
 	// Count of objects in snapshot for one kubernets bindings.
-	metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
+	_, _ = metricStorage.RegisterGauge("{PREFIX}kube_snapshot_objects", labels)
 	// Duration of jqFilter applying.
-	metricStorage.RegisterHistogram(
+	_, _ = metricStorage.RegisterHistogram(
 		"{PREFIX}kube_jq_filter_duration_seconds",
 		labels,
 		[]float64{
@@ -68,7 +71,7 @@ func registerKubeEventsManagerMetrics(metricStorage metric.Storage, labels map[s
 		},
 	)
 	// Duration of handling kubernetes event.
-	metricStorage.RegisterHistogram(
+	_, _ = metricStorage.RegisterHistogram(
 		"{PREFIX}kube_event_duration_seconds",
 		labels,
 		[]float64{
@@ -81,5 +84,5 @@ func registerKubeEventsManagerMetrics(metricStorage metric.Storage, labels map[s
 	)
 
 	// Count of watch errors.
-	metricStorage.RegisterCounter("{PREFIX}kubernetes_client_watch_errors_total", map[string]string{"error_type": ""})
+	_, _ = metricStorage.RegisterCounter("{PREFIX}kubernetes_client_watch_errors_total", []string{"error_type"})
 }
