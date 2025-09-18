@@ -9,7 +9,6 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
-	metricstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/shell-operator/pkg/app"
@@ -67,7 +66,7 @@ func NewBindingContextController(config string, logger *log.Logger, version ...f
 	}
 
 	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client, b.logger.Named("kube-events-manager"))
-	b.KubeEventsManager.WithMetricStorage(metricstorage.NewMetricStorage(
+	b.KubeEventsManager.WithMetricStorage(metricsstorage.NewMetricStorage(
 		metricsstorage.WithPrefix("metrics-prefix"),
 		metricsstorage.WithLogger(log.NewNop()),
 	))
