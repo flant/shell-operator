@@ -9,7 +9,11 @@ import (
 )
 
 func (op *ShellOperator) setupHookMetricStorage() {
-	metricStorage := metricsstorage.NewMetricStorage(app.PrometheusMetricsPrefix, metricsstorage.WithNewRegistry(), metricsstorage.WithLogger(op.logger.Named("metric-storage")))
+	metricStorage := metricsstorage.NewMetricStorage(
+		metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
+		metricsstorage.WithNewRegistry(),
+		metricsstorage.WithLogger(op.logger.Named("metric-storage")),
+	)
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics/hooks", metricStorage.Handler().ServeHTTP)
 	// create new metric storage for hooks
 	// register scrape handler

@@ -36,8 +36,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/deckhouse/deckhouse/pkg/log v0.1.0 h1:2aPfyiHHSIJlX4x7ysyPOaIb7CLmyY+hUf9uDb8TYd8=
 github.com/deckhouse/deckhouse/pkg/log v0.1.0/go.mod h1:pbAxTSDcPmwyl3wwKDcEB3qdxHnRxqTV+J0K+sha8bw=
-github.com/deckhouse/deckhouse/pkg/metrics-storage v0.1.0 h1:4GwVaK/vt48jjJ90WMAnCw2qwbeC/Zx34hsBWzD2CO0=
-github.com/deckhouse/deckhouse/pkg/metrics-storage v0.1.0/go.mod h1:uVM+foGwYlP7aehi41ZtA/iHIq6r0kzAjbBddwV94mo=
+github.com/deckhouse/deckhouse/pkg/metrics-storage v0.2.0 h1:DRYxQ0m2OKxLH2Ndq4RMm6vpgo3UV0eH6NkNj3s5Uvc=
+github.com/deckhouse/deckhouse/pkg/metrics-storage v0.2.0/go.mod h1:uVM+foGwYlP7aehi41ZtA/iHIq6r0kzAjbBddwV94mo=
 github.com/deckhouse/module-sdk v0.3.7 h1:Ur9c/SBYP/XJqFUo9N1vhcc+K8mc+YZAJvSfNQS5AaE=
 github.com/deckhouse/module-sdk v0.3.7/go.mod h1:DnyDfCXEbaF6RQxQSkdc9hXJTkJX/tDXTJ+8sGAvMOI=
 github.com/docker/go-units v0.4.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=

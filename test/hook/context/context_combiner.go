@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	metricstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -32,7 +33,10 @@ type ContextCombiner struct {
 
 func NewContextCombiner() *ContextCombiner {
 	op := &shell_operator.ShellOperator{}
-	op.MetricStorage = metricstorage.NewMetricStorage("test-prefix", metricstorage.WithLogger(log.NewNop()))
+	op.MetricStorage = metricstorage.NewMetricStorage(
+		metricsstorage.WithPrefix("test-prefix"),
+		metricsstorage.WithLogger(log.NewNop()),
+	)
 	op.TaskQueues = queue.NewTaskQueueSet().WithMetricStorage(op.MetricStorage)
 	op.TaskQueues.WithContext(context.Background())
 	op.TaskQueues.NewNamedQueue(TestQueueName, nil,
