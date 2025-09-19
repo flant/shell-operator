@@ -22,7 +22,7 @@ RUN GOOS=linux \
 # Final image
 FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.21
 ARG TARGETPLATFORM
-RUN apk --no-cache add ca-certificates bash sed tini && \
+RUN apk --no-cache add ca-certificates bash sed tini curl && \
     kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
     echo "Download kubectl for ${kubectlArch}" && \
     wget https://dl.k8s.io/release/v1.30.12/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
