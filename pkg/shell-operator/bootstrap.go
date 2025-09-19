@@ -6,6 +6,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
@@ -116,7 +117,7 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) error {
 	registerRootRoute(op)
 	// for shell-operator only
-	registerHookMetrics(op.HookMetricStorage)
+	metrics.RegisterHookMetrics(op.HookMetricStorage)
 
 	op.RegisterDebugQueueRoutes(debugServer)
 	op.RegisterDebugHookRoutes(debugServer)
