@@ -79,7 +79,9 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
-	op.setupMetricStorage(kubeEventsManagerLabels)
+	if err := op.setupMetricStorage(kubeEventsManagerLabels); err != nil {
+		return fmt.Errorf("setup metric storage: %w", err)
+	}
 
 	// metrics from user's hooks
 	op.setupHookMetricStorage()
@@ -117,7 +119,9 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) error {
 	registerRootRoute(op)
 	// for shell-operator only
-	metrics.RegisterHookMetrics(op.HookMetricStorage)
+	if err := metrics.RegisterHookMetrics(op.HookMetricStorage); err != nil {
+		return fmt.Errorf("register hook metrics: %w", err)
+	}
 
 	op.RegisterDebugQueueRoutes(debugServer)
 	op.RegisterDebugHookRoutes(debugServer)

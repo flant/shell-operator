@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -36,8 +37,8 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			defer GinkgoRecover()
 			fmt.Fprintf(GinkgoWriter, "HistogramObserve: %s, value: %f\n", metric, value)
 			Expect(metric).To(Or(
-				Equal("{PREFIX}kube_jq_filter_duration_seconds"),
-				Equal("{PREFIX}kube_event_duration_seconds"),
+				Equal(metrics.KubeJqFilterDurationSeconds),
+				Equal(metrics.KubeEventDurationSeconds),
 			))
 			Expect(value).To(BeNumerically(">=", 0))
 			Expect(labels).To(BeNil())
@@ -46,7 +47,7 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 		metricStorage.GaugeSetMock.Set(func(metric string, value float64, labels map[string]string) {
 			defer GinkgoRecover()
 			fmt.Fprintf(GinkgoWriter, "GaugeSet: %s, value: %f\n", metric, value)
-			Expect(metric).To(Equal("{PREFIX}kube_snapshot_objects"))
+			Expect(metric).To(Equal(metrics.KubeSnapshotObjects))
 			Expect(value).To(BeNumerically(">=", 0))
 			Expect(labels).To(BeEmpty())
 		})
@@ -97,8 +98,8 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 			Expect(snapshot).Should(HaveLen(0), "No pods in default namespace. Snapshot at start should have no objects.")
 
 			// Trigger metrics
-			KubeEventsManager.MetricStorage().GaugeSet("{PREFIX}kube_snapshot_objects", 0, nil)
-			KubeEventsManager.MetricStorage().HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", 0, nil, nil)
+			KubeEventsManager.MetricStorage().GaugeSet(metrics.KubeSnapshotObjects, 0, nil)
+			KubeEventsManager.MetricStorage().HistogramObserve(metrics.KubeJqFilterDurationSeconds, 0, nil, nil)
 
 			fmt.Fprintf(GinkgoWriter, "Finished test: should have cached objects\n")
 		}, SpecTimeout(30*time.Second))

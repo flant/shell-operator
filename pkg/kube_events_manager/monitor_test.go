@@ -14,6 +14,7 @@ import (
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
+	"github.com/flant/shell-operator/internal/metrics"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
 )
@@ -43,18 +44,18 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		metrics := []string{
-			"{PREFIX}kube_event_duration_seconds",
-			"{PREFIX}kube_jq_filter_duration_seconds",
+		metricsList := []string{
+			metrics.KubeEventDurationSeconds,
+			metrics.KubeJqFilterDurationSeconds,
 		}
-		assert.Contains(t, metrics, metric)
+		assert.Contains(t, metricsList, metric)
 		assert.NotZero(t, value)
 		assert.Equal(t, map[string]string(nil), labels)
 		assert.Nil(t, buckets)
 	})
-	metricStorage.GaugeSetMock.When("{PREFIX}kube_snapshot_objects", 1, map[string]string(nil)).Then()
-	metricStorage.GaugeSetMock.When("{PREFIX}kube_snapshot_objects", 2, map[string]string(nil)).Then()
-	metricStorage.GaugeSetMock.When("{PREFIX}kube_snapshot_objects", 3, map[string]string(nil)).Then()
+	metricStorage.GaugeSetMock.When(metrics.KubeSnapshotObjects, 1, map[string]string(nil)).Then()
+	metricStorage.GaugeSetMock.When(metrics.KubeSnapshotObjects, 2, map[string]string(nil)).Then()
+	metricStorage.GaugeSetMock.When(metrics.KubeSnapshotObjects, 3, map[string]string(nil)).Then()
 
 	mon := NewMonitor(context.Background(), fc.Client, metricStorage, monitorCfg, func(ev kemtypes.KubeEvent) {
 		objsMutex.Lock()
