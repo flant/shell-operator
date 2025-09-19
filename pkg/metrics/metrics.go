@@ -218,7 +218,7 @@ func registerHookExecutionMetrics(metricStorage metricsstorage.Storage) error {
 	return nil
 }
 
-func RegisterOperatorMetrics(metricStorage metricsstorage.Storage) error {
+func RegisterOperatorMetrics(metricStorage metricsstorage.Storage, kubeEventManagerLabels []string) error {
 	if err := RegisterCommonMetrics(metricStorage); err != nil {
 		return fmt.Errorf("register common metrics: %w", err)
 	}
@@ -227,7 +227,7 @@ func RegisterOperatorMetrics(metricStorage metricsstorage.Storage) error {
 		return fmt.Errorf("register task queue metrics: %w", err)
 	}
 
-	if err := RegisterKubeEventsManagerMetrics(metricStorage, []string{"hook", "binding", "queue"}); err != nil {
+	if err := RegisterKubeEventsManagerMetrics(metricStorage, kubeEventManagerLabels); err != nil {
 		return fmt.Errorf("register kube events manager metrics: %w", err)
 	}
 

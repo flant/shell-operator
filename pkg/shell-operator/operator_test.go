@@ -22,10 +22,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/flant/shell-operator/internal/metrics"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 )

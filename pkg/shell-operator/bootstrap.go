@@ -25,13 +25,13 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
-	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	"github.com/flant/shell-operator/pkg/hook"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/metrics"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	operatorconfig "github.com/flant/shell-operator/pkg/shell-operator/config"
 	"github.com/flant/shell-operator/pkg/task/queue"
@@ -97,7 +97,7 @@ func NewShellOperatorWithConfig(ctx context.Context, cfg *operatorconfig.ShellOp
 		return nil, fmt.Errorf("failed to start debug server: %w", err)
 	}
 
-	err = metrics.RegisterOperatorMetrics(op.MetricStorage)
+	err = metrics.RegisterOperatorMetrics(op.MetricStorage, []string{"hook", "binding", "queue"})
 	if err != nil {
 		return nil, fmt.Errorf("failed to register operator metrics: %w", err)
 	}

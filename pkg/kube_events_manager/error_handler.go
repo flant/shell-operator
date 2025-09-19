@@ -10,7 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/flant/shell-operator/internal/metrics"
+	"github.com/flant/shell-operator/pkg/metrics"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

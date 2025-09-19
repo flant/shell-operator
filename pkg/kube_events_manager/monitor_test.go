@@ -14,9 +14,9 @@ import (
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
-	"github.com/flant/shell-operator/internal/metrics"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 )
 
 func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {

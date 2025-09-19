@@ -13,11 +13,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	. "github.com/flant/shell-operator/test/integration/suite"
 	testutils "github.com/flant/shell-operator/test/utils"
 )
