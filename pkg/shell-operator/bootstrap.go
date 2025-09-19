@@ -1,3 +1,21 @@
+// Copyright 2025 Flant JSC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package shell_operator provides bootstrap functionality for creating and initializing ShellOperator instances.
+//
+// This file contains the initialization and assembly logic for ShellOperator.
+// Configuration is handled via the ShellOperatorConfig struct and related functions defined in config.go.
 package shell_operator
 
 import (
@@ -5,7 +23,6 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
@@ -21,90 +38,11 @@ import (
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
-// ShellOperatorConfig holds configuration for ShellOperator initialization
-type ShellOperatorConfig struct {
-	Logger              *log.Logger
-	ListenAddress       string
-	ListenPort          string
-	HooksDir            string
-	TempDir             string
-	DebugUnixSocket     string
-	DebugHttpServerAddr string
-	MetricStorage       metricsstorage.Storage
-	HookMetricStorage   metricsstorage.Storage
-}
-
-// DefaultShellOperatorConfig returns a default configuration using app package settings
-func DefaultShellOperatorConfig(logger *log.Logger) *ShellOperatorConfig {
-	return &ShellOperatorConfig{
-		Logger:              logger,
-		ListenAddress:       app.ListenAddress,
-		ListenPort:          app.ListenPort,
-		HooksDir:            app.HooksDir,
-		TempDir:             app.TempDir,
-		DebugUnixSocket:     app.DebugUnixSocket,
-		DebugHttpServerAddr: app.DebugHttpServerAddr,
-	}
-}
-
-// NewShellOperatorConfigBuilder returns a builder for ShellOperatorConfig
-func NewShellOperatorConfigBuilder(logger *log.Logger) *ShellOperatorConfigBuilder {
-	return &ShellOperatorConfigBuilder{
-		config: DefaultShellOperatorConfig(logger),
-	}
-}
-
-// ShellOperatorConfigBuilder provides a fluent interface for building ShellOperatorConfig
-type ShellOperatorConfigBuilder struct {
-	config *ShellOperatorConfig
-}
-
-// WithListenAddress sets the listen address for the HTTP server
-func (b *ShellOperatorConfigBuilder) WithListenAddress(address string) *ShellOperatorConfigBuilder {
-	b.config.ListenAddress = address
-	return b
-}
-
-// WithListenPort sets the listen port for the HTTP server
-func (b *ShellOperatorConfigBuilder) WithListenPort(port string) *ShellOperatorConfigBuilder {
-	b.config.ListenPort = port
-	return b
-}
-
-// WithHooksDir sets the directory containing hooks
-func (b *ShellOperatorConfigBuilder) WithHooksDir(dir string) *ShellOperatorConfigBuilder {
-	b.config.HooksDir = dir
-	return b
-}
-
-// WithTempDir sets the temporary directory
-func (b *ShellOperatorConfigBuilder) WithTempDir(dir string) *ShellOperatorConfigBuilder {
-	b.config.TempDir = dir
-	return b
-}
-
-// WithMetricStorage sets a custom metric storage for built-in metrics
-func (b *ShellOperatorConfigBuilder) WithMetricStorage(storage metricsstorage.Storage) *ShellOperatorConfigBuilder {
-	b.config.MetricStorage = storage
-	return b
-}
-
-// WithHookMetricStorage sets a custom metric storage for hook metrics
-func (b *ShellOperatorConfigBuilder) WithHookMetricStorage(storage metricsstorage.Storage) *ShellOperatorConfigBuilder {
-	b.config.HookMetricStorage = storage
-	return b
-}
-
-// Build returns the built ShellOperatorConfig
-func (b *ShellOperatorConfigBuilder) Build() *ShellOperatorConfig {
-	return b.config
-}
-
-// NewShellOperator creates a fully configured ShellOperator instance with all dependencies.
+// NewShellOperatorWithConfig creates a fully configured ShellOperator instance with all dependencies.
 // This replaces the old Init function with a more flexible constructor approach.
 func NewShellOperatorWithConfig(ctx context.Context, cfg *ShellOperatorConfig) (*ShellOperator, error) {
-	if cfg.Logger == nil {
-		return nil, fmt.Errorf("logger is required")
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	logger := cfg.Logger
@@ -129,21 +67,11 @@ func NewShellOperatorWithConfig(ctx context.Context, cfg *ShellOperatorConfig) (
 		return nil, fmt.Errorf("temp directory setup failed: %w", err)
 	}
 
-	// Build options for ShellOperator constructor
-	opts := []Option{
-		WithLogger(logger),
-	}
-
-	if cfg.MetricStorage != nil {
-		opts = append(opts, WithMetricStorage(cfg.MetricStorage))
-	}
-
-	if cfg.HookMetricStorage != nil {
-		opts = append(opts, WithHookMetricStorage(cfg.HookMetricStorage))
-	}
-
 	// Create the operator instance
-	op := NewShellOperator(ctx, opts...)
+	op := newShellOperator(ctx)
+	op.MetricStorage = cfg.MetricStorage
+	op.HookMetricStorage = cfg.HookMetricStorage
+	op.logger = logger
 
 	// Start debug server
 	debugServer, err := RunDefaultDebugServer(cfg.DebugUnixSocket, cfg.DebugHttpServerAddr,
@@ -165,11 +93,16 @@ func NewShellOperatorWithConfig(ctx context.Context, cfg *ShellOperatorConfig) (
 	return op, nil
 }
 
+// NewShellOperator creates a ShellOperator instance using functional options.
+func NewShellOperator(ctx context.Context, options ...ConfigOption) (*ShellOperator, error) {
+	cfg := NewShellOperatorConfig(options...)
+	return NewShellOperatorWithConfig(ctx, cfg)
+}
+
 // Init provides backward compatibility with the old initialization function.
-// Deprecated: Use NewShellOperatorWithConfig for more flexibility.
+// Deprecated: Use NewShellOperatorWithOptions for more flexibility.
 func Init(logger *log.Logger) (*ShellOperator, error) {
-	cfg := DefaultShellOperatorConfig(logger)
-	return NewShellOperatorWithConfig(context.TODO(), cfg)
+	return NewShellOperator(context.TODO(), WithLogger(logger))
 }
 
 // AssembleCommonOperator instantiate common dependencies. These dependencies

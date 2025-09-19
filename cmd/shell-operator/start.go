@@ -30,7 +30,7 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 		ctx := context.Background()
 		telemetryShutdown := registerTelemetry(ctx)
 		// Init logging and initialize a ShellOperator instance.
-		operator, err := shell_operator.Init(logger.Named("shell-operator"))
+		operator, err := shell_operator.NewShellOperator(context.TODO(), shell_operator.WithLogger(logger))
 		if err != nil {
 			return fmt.Errorf("init failed: %w", err)
 		}

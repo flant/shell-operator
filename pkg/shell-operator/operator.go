@@ -1,3 +1,17 @@
+// Copyright 2025 Flant JSC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package shell_operator
 
 import (
@@ -67,44 +81,12 @@ type ShellOperator struct {
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
-// Option defines configuration options for ShellOperator
-type Option func(operator *ShellOperator)
-
-// WithLogger sets the logger for the operator
-func WithLogger(logger *log.Logger) Option {
-	return func(operator *ShellOperator) {
-		operator.logger = logger
-	}
-}
-
-// WithMetricStorage sets the main metric storage for built-in operator metrics
-func WithMetricStorage(storage metricsstorage.Storage) Option {
-	return func(operator *ShellOperator) {
-		operator.MetricStorage = storage
-	}
-}
-
-// WithHookMetricStorage sets the metric storage for user hook metrics
-func WithHookMetricStorage(storage metricsstorage.Storage) Option {
-	return func(operator *ShellOperator) {
-		operator.HookMetricStorage = storage
-	}
-}
-
-func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
+func newShellOperator(ctx context.Context) *ShellOperator {
 	cctx, cancel := context.WithCancel(ctx)
 
 	so := &ShellOperator{
 		ctx:    cctx,
 		cancel: cancel,
-	}
-
-	for _, opt := range opts {
-		opt(so)
-	}
-
-	if so.logger == nil {
-		so.logger = log.NewLogger().Named("shell-operator")
 	}
 
 	return so
