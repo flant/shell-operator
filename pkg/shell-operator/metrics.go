@@ -15,30 +15,13 @@
 package shell_operator
 
 import (
-	"fmt"
 	"net/http"
-
-	"github.com/flant/shell-operator/internal/metrics"
 )
 
 // setupMetricStorage creates and initializes metrics storage for built-in operator metrics.
 // If MetricStorage is already set via options, it uses that; otherwise creates a new one.
-func (op *ShellOperator) setupMetricStorage() error {
-	if err := metrics.RegisterCommonMetrics(op.MetricStorage); err != nil {
-		return fmt.Errorf("register common metrics: %w", err)
-	}
-
-	if err := metrics.RegisterTaskQueueMetrics(op.MetricStorage); err != nil {
-		return fmt.Errorf("register task queue metrics: %w", err)
-	}
-
-	if err := metrics.RegisterKubeEventsManagerMetrics(op.MetricStorage, []string{"hook", "binding", "queue"}); err != nil {
-		return fmt.Errorf("register kube events manager metrics: %w", err)
-	}
-
+func (op *ShellOperator) setupMetricStorage() {
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", op.MetricStorage.Handler().ServeHTTP)
-
-	return nil
 }
 
 // setupHookMetricStorage creates and initializes metrics storage for hook metrics.

@@ -97,6 +97,11 @@ func NewShellOperatorWithConfig(ctx context.Context, cfg *operatorconfig.ShellOp
 		return nil, fmt.Errorf("failed to start debug server: %w", err)
 	}
 
+	err = metrics.RegisterOperatorMetrics(op.MetricStorage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register operator metrics: %w", err)
+	}
+
 	// Assemble common components
 	if err := op.AssembleCommonOperator(cfg.ListenAddress, cfg.ListenPort); err != nil {
 		return nil, fmt.Errorf("failed to assemble common operator: %w", err)
@@ -129,9 +134,7 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
-	if err := op.setupMetricStorage(); err != nil {
-		return fmt.Errorf("setup metric storage: %w", err)
-	}
+	op.setupMetricStorage()
 
 	// metrics from user's hooks
 	op.setupHookMetricStorage()

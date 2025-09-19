@@ -218,6 +218,22 @@ func registerHookExecutionMetrics(metricStorage metricsstorage.Storage) error {
 	return nil
 }
 
+func RegisterOperatorMetrics(metricStorage metricsstorage.Storage) error {
+	if err := RegisterCommonMetrics(metricStorage); err != nil {
+		return fmt.Errorf("register common metrics: %w", err)
+	}
+
+	if err := RegisterTaskQueueMetrics(metricStorage); err != nil {
+		return fmt.Errorf("register task queue metrics: %w", err)
+	}
+
+	if err := RegisterKubeEventsManagerMetrics(metricStorage, []string{"hook", "binding", "queue"}); err != nil {
+		return fmt.Errorf("register kube events manager metrics: %w", err)
+	}
+
+	return nil
+}
+
 // RegisterCommonMetrics registers base metrics used across shell-operator and addon-operator.
 // These are fundamental metrics that indicate the health and activity of the operator.
 func RegisterCommonMetrics(metricStorage metricsstorage.Storage) error {
