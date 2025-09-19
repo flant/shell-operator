@@ -40,7 +40,7 @@ func TaskMainQueue(tqs *queue.TaskQueueSet, format string) interface{} {
 	} else {
 		tasks := getTasksForQueue(q)
 		dq = dumpQueue{
-			Name:       q.Name,
+			Name:       q.GetName(),
 			TasksCount: q.Length(),
 			Status:     q.GetStatus(),
 			Tasks:      tasks,
@@ -78,16 +78,16 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 	tasksCount := 0
 	mainTasksCount := 0
 
-	tqs.Iterate(func(queue *queue.TaskQueue) {
+	tqs.Iterate(func(queue task.TaskQueue) {
 		if queue == nil {
 			return
 		}
 
-		if queue.Name == tqs.MainName {
+		if queue.GetName() == tqs.MainName {
 			mainTasksCount = queue.Length()
 			if queue.IsEmpty() {
 				mainQueue := dumpQueue{
-					Name:       queue.Name,
+					Name:       queue.GetName(),
 					TasksCount: queue.Length(),
 				}
 				result.Empty = append(result.Empty, mainQueue)
@@ -95,7 +95,7 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 			} else {
 				tasks := getTasksForQueue(queue)
 				mainQueue := dumpQueue{
-					Name:       queue.Name,
+					Name:       queue.GetName(),
 					TasksCount: queue.Length(),
 					Status:     queue.GetStatus(),
 					Tasks:      tasks,
@@ -110,14 +110,14 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 		if queue.IsEmpty() {
 			emptyQueues++
 			result.Empty = append(result.Empty, dumpQueue{
-				Name: queue.Name,
+				Name: queue.GetName(),
 			})
 		} else {
 			activeQueues++
 			tasksCount += queue.Length()
 			tasks := getTasksForQueue(queue)
 			result.Active = append(result.Active, dumpQueue{
-				Name:       queue.Name,
+				Name:       queue.GetName(),
 				TasksCount: queue.Length(),
 				Status:     queue.GetStatus(),
 				Tasks:      tasks,
@@ -156,7 +156,7 @@ func pluralize(n int, zero, one, many string) string {
 	return fmt.Sprintf("%d %s", n, description)
 }
 
-func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
+func getTasksForQueue(q task.TaskQueue) []dumpTask {
 	tasks := make([]dumpTask, 0, q.Length())
 
 	index := 1

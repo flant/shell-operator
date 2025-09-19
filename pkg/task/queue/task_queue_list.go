@@ -272,6 +272,12 @@ func (q *TaskQueue) GetStatus() string {
 	return q.Status
 }
 
+func (q *TaskQueue) GetName() string {
+	q.m.RLock()
+	defer q.m.RUnlock()
+	return q.Name
+}
+
 func (q *TaskQueue) SetStatus(status string) {
 	q.m.Lock()
 	q.Status = status

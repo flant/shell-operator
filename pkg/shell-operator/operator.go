@@ -151,7 +151,8 @@ func (op *ShellOperator) Start() {
 	op.initAndStartHookQueues()
 
 	// Start emit "live" metrics
-	op.runMetrics()
+	metrics.StartLiveTicksUpdater(op.MetricStorage)
+	metrics.StartTasksQueueLengthUpdater(op.MetricStorage, op.TaskQueues)
 
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
@@ -762,7 +763,7 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 // If input task has no metadata, result will be nil.
 // Metadata should implement HookNameAccessor, BindingContextAccessor and MonitorIDAccessor interfaces.
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
-func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
+func (op *ShellOperator) CombineBindingContextForHook(q task.TaskQueue, t task.Task, stopCombineFn func(tsk task.Task) bool) *CombineResult {
 	if q == nil {
 		return nil
 	}
@@ -977,31 +978,6 @@ func (op *ShellOperator) initAndStartHookQueues() {
 			}
 		}
 	}
-}
-
-func (op *ShellOperator) runMetrics() {
-	if op.MetricStorage == nil {
-		return
-	}
-
-	// live ticks.
-	go func() {
-		for {
-			op.MetricStorage.CounterAdd(metrics.LiveTicks, 1.0, map[string]string{})
-			time.Sleep(10 * time.Second)
-		}
-	}()
-
-	// task queue length
-	go func() {
-		for {
-			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
-				queueLen := float64(queue.Length())
-				op.MetricStorage.GaugeSet(metrics.TasksQueueLength, queueLen, map[string]string{"queue": queue.Name})
-			})
-			time.Sleep(5 * time.Second)
-		}
-	}()
 }
 
 // Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
