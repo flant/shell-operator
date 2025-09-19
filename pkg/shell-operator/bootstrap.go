@@ -15,7 +15,7 @@
 // Package shell_operator provides bootstrap functionality for creating and initializing ShellOperator instances.
 //
 // This file contains the initialization and assembly logic for ShellOperator.
-// Configuration is handled via the ShellOperatorConfig struct and related functions defined in config.go.
+// Configuration is handled via the ShellOperatorConfig struct and related functions defined in config/config.go.
 package shell_operator
 
 import (
@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/app"
@@ -32,6 +33,7 @@ import (
 	"github.com/flant/shell-operator/pkg/hook"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
+	operatorconfig "github.com/flant/shell-operator/pkg/shell-operator/config"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
@@ -40,21 +42,21 @@ import (
 
 // NewShellOperatorWithConfig creates a fully configured ShellOperator instance with all dependencies.
 // This replaces the old Init function with a more flexible constructor approach.
-func NewShellOperatorWithConfig(ctx context.Context, cfg *ShellOperatorConfig) (*ShellOperator, error) {
+func NewShellOperatorWithConfig(ctx context.Context, cfg *operatorconfig.ShellOperatorConfig) (*ShellOperator, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	logger := cfg.Logger
+	op := NewShellOperator(ctx, WithLogger(cfg.Logger))
 
 	// Initialize runtime configuration and logging
-	runtimeConfig := config.NewConfig(logger)
-	app.SetupLogging(runtimeConfig, logger)
+	runtimeConfig := config.NewConfig(op.logger)
+	app.SetupLogging(runtimeConfig, op.logger)
 
 	// Log version and jq filtering implementation
-	logger.Info(app.AppStartMessage)
+	op.logger.Info(app.AppStartMessage)
 	fl := jq.NewFilter()
-	logger.Debug(fl.FilterInfo())
+	op.logger.Debug(fl.FilterInfo())
 
 	// Validate and prepare directories
 	hooksDir, err := utils.RequireExistingDirectory(cfg.HooksDir)
@@ -68,10 +70,25 @@ func NewShellOperatorWithConfig(ctx context.Context, cfg *ShellOperatorConfig) (
 	}
 
 	// Create the operator instance
-	op := newShellOperator(ctx)
 	op.MetricStorage = cfg.MetricStorage
 	op.HookMetricStorage = cfg.HookMetricStorage
-	op.logger = logger
+
+	// Use provided metric storage or create default
+	if op.MetricStorage == nil {
+		op.MetricStorage = metricsstorage.NewMetricStorage(
+			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
+			metricsstorage.WithLogger(op.logger.Named("metric-storage")),
+		)
+	}
+
+	// Use provided hook metric storage or create default
+	if op.HookMetricStorage == nil {
+		op.HookMetricStorage = metricsstorage.NewMetricStorage(
+			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
+			metricsstorage.WithNewRegistry(),
+			metricsstorage.WithLogger(op.logger.Named("hook-metric-storage")),
+		)
+	}
 
 	// Start debug server
 	debugServer, err := RunDefaultDebugServer(cfg.DebugUnixSocket, cfg.DebugHttpServerAddr,
@@ -93,16 +110,16 @@ func NewShellOperatorWithConfig(ctx context.Context, cfg *ShellOperatorConfig) (
 	return op, nil
 }
 
-// NewShellOperator creates a ShellOperator instance using functional options.
-func NewShellOperator(ctx context.Context, options ...ConfigOption) (*ShellOperator, error) {
-	cfg := NewShellOperatorConfig(options...)
+// NewShellOperatorWithOptions creates a ShellOperator instance using functional options.
+func NewShellOperatorWithOptions(ctx context.Context, options ...operatorconfig.ConfigOption) (*ShellOperator, error) {
+	cfg := operatorconfig.NewShellOperatorConfig(options...)
 	return NewShellOperatorWithConfig(ctx, cfg)
 }
 
 // Init provides backward compatibility with the old initialization function.
 // Deprecated: Use NewShellOperatorWithOptions for more flexibility.
 func Init(logger *log.Logger) (*ShellOperator, error) {
-	return NewShellOperator(context.TODO(), WithLogger(logger))
+	return NewShellOperatorWithOptions(context.TODO(), operatorconfig.WithLogger(logger))
 }
 
 // AssembleCommonOperator instantiate common dependencies. These dependencies

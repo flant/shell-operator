@@ -81,12 +81,28 @@ type ShellOperator struct {
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
-func newShellOperator(ctx context.Context) *ShellOperator {
+type Option func(operator *ShellOperator)
+
+func WithLogger(logger *log.Logger) Option {
+	return func(operator *ShellOperator) {
+		operator.logger = logger
+	}
+}
+
+func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 	cctx, cancel := context.WithCancel(ctx)
 
 	so := &ShellOperator{
 		ctx:    cctx,
 		cancel: cancel,
+	}
+
+	for _, opt := range opts {
+		opt(so)
+	}
+
+	if so.logger == nil {
+		so.logger = log.NewLogger().Named("shell-operator")
 	}
 
 	return so

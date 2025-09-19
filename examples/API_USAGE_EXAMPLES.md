@@ -20,14 +20,15 @@ operator := shell_operator.NewShellOperator()
 import (
     "context"
     "github.com/flant/shell-operator/pkg/shell-operator"
+    "github.com/flant/shell-operator/pkg/shell-operator/config"
 )
 
 // Using the flexible configuration system
 operator, err := shell_operator.NewShellOperatorWithOptions(ctx,
-    shell_operator.WithLogger(logger),
-    shell_operator.WithMetricStorage(storage),
-    shell_operator.WithHookMetricStorage(hookStorage), 
-    shell_operator.WithHooksDir("/custom/hooks"),
+    config.WithLogger(logger),
+    config.WithMetricStorage(storage),
+    config.WithHookMetricStorage(hookStorage), 
+    config.WithHooksDir("/custom/hooks"),
 )
 ```
 
@@ -58,7 +59,7 @@ storage := metricsstorage.NewStorage("my-app")
 
 // Set both metric storages at once
 operator, err := shell_operator.NewShellOperatorWithOptions(ctx,
-    shell_operator.WithMetricStorages(storage, storage), // Same storage for both
+    config.WithMetricStorages(storage, storage), // Same storage for both
 )
 ```
 
@@ -66,7 +67,7 @@ operator, err := shell_operator.NewShellOperatorWithOptions(ctx,
 ```go
 // When you primarily need to provide a logger
 operator, err := shell_operator.NewShellOperatorWithLogger(ctx, logger,
-    shell_operator.WithMetricStorage(storage),
+    config.WithMetricStorage(storage),
 )
 ```
 
@@ -84,14 +85,14 @@ operator, err := shell_operator.NewShellOperatorWithConfig(ctx, cfg)
 ### 7. Advanced Configuration
 ```go
 // Full control over configuration
-cfg := shell_operator.NewShellOperatorConfig(
-    shell_operator.WithLogger(customLogger),
-    shell_operator.WithMetricStorage(metricsStorage),
-    shell_operator.WithHookMetricStorage(hookMetricsStorage),
-    shell_operator.WithListenAddress("0.0.0.0"),
-    shell_operator.WithListenPort("9090"),
-    shell_operator.WithHooksDir("/app/hooks"),
-    shell_operator.WithTempDir("/tmp/shell-operator"),
+cfg := config.NewShellOperatorConfig(
+    config.WithLogger(customLogger),
+    config.WithMetricStorage(metricsStorage),
+    config.WithHookMetricStorage(hookMetricsStorage),
+    config.WithListenAddress("0.0.0.0"),
+    config.WithListenPort("9090"),
+    config.WithHooksDir("/app/hooks"),
+    config.WithTempDir("/tmp/shell-operator"),
 )
 
 operator, err := shell_operator.NewShellOperatorWithConfig(ctx, cfg)
@@ -100,22 +101,23 @@ operator, err := shell_operator.NewShellOperatorWithConfig(ctx, cfg)
 ## Available Configuration Options
 
 ### Configuration Options (for NewShellOperatorWithOptions)
-- `WithLogger(logger *log.Logger)` - Set the logger
-- `WithMetricStorage(storage)` - Set the main metrics storage
-- `WithHookMetricStorage(storage)` - Set the hook-specific metrics storage
-- `WithMetricStorages(metricStorage, hookStorage)` - Set both metric storages at once
-- `WithListenAddress(address string)` - HTTP server listen address
-- `WithListenPort(port string)` - HTTP server listen port
-- `WithHooksDir(dir string)` - Directory containing hooks
-- `WithTempDir(dir string)` - Temporary directory
-- `WithDebugUnixSocket(socket string)` - Debug unix socket path
-- `WithDebugHttpServerAddr(addr string)` - Debug HTTP server address
+All configuration options are available in the `config` package:
+- `config.WithLogger(logger *log.Logger)` - Set the logger
+- `config.WithMetricStorage(storage)` - Set the main metrics storage
+- `config.WithHookMetricStorage(storage)` - Set the hook-specific metrics storage
+- `config.WithMetricStorages(metricStorage, hookStorage)` - Set both metric storages at once
+- `config.WithListenAddress(address string)` - HTTP server listen address
+- `config.WithListenPort(port string)` - HTTP server listen port
+- `config.WithHooksDir(dir string)` - Directory containing hooks
+- `config.WithTempDir(dir string)` - Temporary directory
+- `config.WithDebugUnixSocket(socket string)` - Debug unix socket path
+- `config.WithDebugHttpServerAddr(addr string)` - Debug HTTP server address
 
 ### Convenience Options
-- `WithListenConfig(address, port string)` - Set both listen address and port
-- `WithDirectories(hooksDir, tempDir string)` - Set both hooks and temp directories
-- `WithDebugConfig(unixSocket, httpAddr string)` - Set both debug configurations
-- `WithMetricStorages(metricStorage, hookStorage)` - Set both metric storages
+- `config.WithListenConfig(address, port string)` - Set both listen address and port
+- `config.WithDirectories(hooksDir, tempDir string)` - Set both hooks and temp directories
+- `config.WithDebugConfig(unixSocket, httpAddr string)` - Set both debug configurations
+- `config.WithMetricStorages(metricStorage, hookStorage)` - Set both metric storages
 
 ## Migration from Old API
 
@@ -129,13 +131,13 @@ operator, err := shell_operator.Init(logger, metricsStorage)
 ```go
 // New way - flexible configuration options
 operator, err := shell_operator.NewShellOperatorWithOptions(ctx,
-    shell_operator.WithLogger(logger),
-    shell_operator.WithMetricStorage(metricsStorage),
+    config.WithLogger(logger),
+    config.WithMetricStorage(metricsStorage),
 )
 
 // Or using convenience function
 operator, err := shell_operator.NewShellOperatorWithLogger(ctx, logger,
-    shell_operator.WithMetricStorage(metricsStorage),
+    config.WithMetricStorage(metricsStorage),
 )
 ```
 

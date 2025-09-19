@@ -49,7 +49,7 @@ func Test_Operator_startup_tasks(t *testing.T) {
 	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
-	op := newShellOperator(context.Background())
+	op := NewShellOperator(context.Background())
 	op.MetricStorage = metricStorage
 	op.logger = log.NewNop()
 

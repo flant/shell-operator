@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package shell_operator
+package config
 
 import (
 	"fmt"
@@ -56,36 +56,11 @@ func NewShellOperatorConfig(options ...ConfigOption) *ShellOperatorConfig {
 		option(config)
 	}
 
-	// Set default logger if none provided
-	if config.Logger == nil {
-		config.Logger = log.NewLogger().Named("shell-operator")
-	}
-
-	// Use provided metric storage or create default
-	if config.MetricStorage == nil {
-		config.MetricStorage = metricsstorage.NewMetricStorage(
-			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
-			metricsstorage.WithLogger(config.Logger.Named("metric-storage")),
-		)
-	}
-
-	// Use provided hook metric storage or create default
-	if config.HookMetricStorage == nil {
-		config.HookMetricStorage = metricsstorage.NewMetricStorage(
-			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
-			metricsstorage.WithNewRegistry(),
-			metricsstorage.WithLogger(config.Logger.Named("hook-metric-storage")),
-		)
-	}
-
 	return config
 }
 
 // Validate validates the configuration and returns an error if invalid
 func (cfg *ShellOperatorConfig) Validate() error {
-	if cfg.Logger == nil {
-		return fmt.Errorf("logger is required")
-	}
 	if cfg.ListenAddress == "" {
 		return fmt.Errorf("listen address cannot be empty")
 	}
@@ -98,6 +73,7 @@ func (cfg *ShellOperatorConfig) Validate() error {
 	if cfg.TempDir == "" {
 		return fmt.Errorf("temp directory cannot be empty")
 	}
+
 	return nil
 }
 
