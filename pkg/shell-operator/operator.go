@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
@@ -89,6 +90,18 @@ func WithLogger(logger *log.Logger) Option {
 	}
 }
 
+func WithMetricStorage(storage metricsstorage.Storage) Option {
+	return func(operator *ShellOperator) {
+		operator.MetricStorage = storage
+	}
+}
+
+func WithHookMetricStorage(storage metricsstorage.Storage) Option {
+	return func(operator *ShellOperator) {
+		operator.HookMetricStorage = storage
+	}
+}
+
 func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 	cctx, cancel := context.WithCancel(ctx)
 
@@ -103,6 +116,23 @@ func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 
 	if so.logger == nil {
 		so.logger = log.NewLogger().Named("shell-operator")
+	}
+
+	// Use provided metric storage or create default
+	if so.MetricStorage == nil {
+		so.MetricStorage = metricsstorage.NewMetricStorage(
+			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
+			metricsstorage.WithLogger(so.logger.Named("metric-storage")),
+		)
+	}
+
+	// Use provided hook metric storage or create default
+	if so.HookMetricStorage == nil {
+		so.HookMetricStorage = metricsstorage.NewMetricStorage(
+			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
+			metricsstorage.WithNewRegistry(),
+			metricsstorage.WithLogger(so.logger.Named("hook-metric-storage")),
+		)
 	}
 
 	return so

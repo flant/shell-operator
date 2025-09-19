@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
@@ -47,7 +46,12 @@ func NewShellOperatorWithConfig(ctx context.Context, cfg *operatorconfig.ShellOp
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	op := NewShellOperator(ctx, WithLogger(cfg.Logger))
+	op := NewShellOperator(
+		ctx,
+		WithLogger(cfg.Logger),
+		WithMetricStorage(cfg.MetricStorage),
+		WithHookMetricStorage(cfg.HookMetricStorage),
+	)
 
 	// Initialize runtime configuration and logging
 	runtimeConfig := config.NewConfig(op.logger)
@@ -67,27 +71,6 @@ func NewShellOperatorWithConfig(ctx context.Context, cfg *operatorconfig.ShellOp
 	tempDir, err := utils.EnsureTempDirectory(cfg.TempDir)
 	if err != nil {
 		return nil, fmt.Errorf("temp directory setup failed: %w", err)
-	}
-
-	// Create the operator instance
-	op.MetricStorage = cfg.MetricStorage
-	op.HookMetricStorage = cfg.HookMetricStorage
-
-	// Use provided metric storage or create default
-	if op.MetricStorage == nil {
-		op.MetricStorage = metricsstorage.NewMetricStorage(
-			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
-			metricsstorage.WithLogger(op.logger.Named("metric-storage")),
-		)
-	}
-
-	// Use provided hook metric storage or create default
-	if op.HookMetricStorage == nil {
-		op.HookMetricStorage = metricsstorage.NewMetricStorage(
-			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
-			metricsstorage.WithNewRegistry(),
-			metricsstorage.WithLogger(op.logger.Named("hook-metric-storage")),
-		)
 	}
 
 	// Start debug server
