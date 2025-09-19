@@ -10,42 +10,45 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 )
 
-// setupMetricStorage creates and initializes metrics storage for built-in operator metrics
-func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels []string) error {
-	metricStorage := metricsstorage.NewMetricStorage(
-		metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
-		metricsstorage.WithLogger(op.logger.Named("metric-storage")),
-	)
+// setupMetricStorage creates and initializes metrics storage for built-in operator metrics.
+// If MetricStorage is already set via options, it uses that; otherwise creates a new one.
+func (op *ShellOperator) setupMetricStorage() error {
+	// Use provided metric storage or create default
+	if op.MetricStorage == nil {
+		op.MetricStorage = metricsstorage.NewMetricStorage(
+			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
+			metricsstorage.WithLogger(op.logger.Named("metric-storage")),
+		)
+	}
 
-	if err := metrics.RegisterCommonMetrics(metricStorage); err != nil {
+	if err := metrics.RegisterCommonMetrics(op.MetricStorage); err != nil {
 		return fmt.Errorf("register common metrics: %w", err)
 	}
 
-	if err := metrics.RegisterTaskQueueMetrics(metricStorage); err != nil {
+	if err := metrics.RegisterTaskQueueMetrics(op.MetricStorage); err != nil {
 		return fmt.Errorf("register task queue metrics: %w", err)
 	}
 
-	if err := metrics.RegisterKubeEventsManagerMetrics(metricStorage, kubeEventsManagerLabels); err != nil {
+	if err := metrics.RegisterKubeEventsManagerMetrics(op.MetricStorage, []string{"hook", "binding", "queue"}); err != nil {
 		return fmt.Errorf("register kube events manager metrics: %w", err)
 	}
 
-	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", metricStorage.Handler().ServeHTTP)
-	// create new metric storage for hooks
-	// register scrape handler
-	op.MetricStorage = metricStorage
+	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", op.MetricStorage.Handler().ServeHTTP)
+
 	return nil
 }
 
-// setupHookMetricStorage creates and initializes metrics storage for built-in hooks metrics
+// setupHookMetricStorage creates and initializes metrics storage for hook metrics.
+// If HookMetricStorage is already set via options, it uses that; otherwise creates a new one.
 func (op *ShellOperator) setupHookMetricStorage() {
-	metricStorage := metricsstorage.NewMetricStorage(
-		metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
-		metricsstorage.WithNewRegistry(),
-		metricsstorage.WithLogger(op.logger.Named("metric-storage")),
-	)
+	// Use provided hook metric storage or create default
+	if op.HookMetricStorage == nil {
+		op.HookMetricStorage = metricsstorage.NewMetricStorage(
+			metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
+			metricsstorage.WithNewRegistry(),
+			metricsstorage.WithLogger(op.logger.Named("hook-metric-storage")),
+		)
+	}
 
-	op.APIServer.RegisterRoute(http.MethodGet, "/metrics/hooks", metricStorage.Handler().ServeHTTP)
-	// create new metric storage for hooks
-	// register scrape handler
-	op.HookMetricStorage = metricStorage
+	op.APIServer.RegisterRoute(http.MethodGet, "/metrics/hooks", op.HookMetricStorage.Handler().ServeHTTP)
 }

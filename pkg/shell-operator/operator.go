@@ -67,11 +67,27 @@ type ShellOperator struct {
 	ConversionWebhookManager *conversion.WebhookManager
 }
 
+// Option defines configuration options for ShellOperator
 type Option func(operator *ShellOperator)
 
+// WithLogger sets the logger for the operator
 func WithLogger(logger *log.Logger) Option {
 	return func(operator *ShellOperator) {
 		operator.logger = logger
+	}
+}
+
+// WithMetricStorage sets the main metric storage for built-in operator metrics
+func WithMetricStorage(storage metricsstorage.Storage) Option {
+	return func(operator *ShellOperator) {
+		operator.MetricStorage = storage
+	}
+}
+
+// WithHookMetricStorage sets the metric storage for user hook metrics
+func WithHookMetricStorage(storage metricsstorage.Storage) Option {
+	return func(operator *ShellOperator) {
+		operator.HookMetricStorage = storage
 	}
 }
 
