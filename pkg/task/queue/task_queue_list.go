@@ -292,6 +292,12 @@ func (q *TaskQueue) GetHandler() func(ctx context.Context, t task.Task) task.Tas
 	return q.handler
 }
 
+func (q *TaskQueue) SetHandler(handler func(ctx context.Context, t task.Task) task.TaskResult) {
+	q.m.RLock()
+	defer q.m.RUnlock()
+	q.handler = handler
+}
+
 func (q *TaskQueue) IsEmpty() bool {
 	defer q.MeasureActionTime("IsEmpty")()
 	q.m.RLock()
