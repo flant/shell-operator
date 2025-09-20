@@ -280,14 +280,17 @@ func (q *TaskQueue) SetStatus(status string) {
 	q.m.Unlock()
 }
 
+// non thread safe method
 func (q *TaskQueue) GetName() string {
 	return q.name
 }
 
+// non thread safe method. for tests only
 func (q *TaskQueue) GetHandler() func(ctx context.Context, t task.Task) task.Result {
 	return q.handler
 }
 
+// non thread safe method. for tests only
 func (q *TaskQueue) SetHandler(handler func(ctx context.Context, t task.Task) task.Result) {
 	q.handler = handler
 }
