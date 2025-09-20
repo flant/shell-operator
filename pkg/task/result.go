@@ -4,17 +4,17 @@ import (
 	"time"
 )
 
-type TaskStatus string
+type Status string
 
 const (
-	Success TaskStatus = "Success"
-	Fail    TaskStatus = "Fail"
-	Repeat  TaskStatus = "Repeat"
-	Keep    TaskStatus = "Keep"
+	Success Status = "Success"
+	Fail    Status = "Fail"
+	Repeat  Status = "Repeat"
+	Keep    Status = "Keep"
 )
 
-type TaskResult struct {
-	Status     TaskStatus
+type Result struct {
+	Status     Status
 	headTasks  []Task
 	tailTasks  []Task
 	afterTasks []Task
@@ -24,19 +24,19 @@ type TaskResult struct {
 	AfterHandle func()
 }
 
-func (res *TaskResult) GetHeadTasks() []Task {
+func (res *Result) GetHeadTasks() []Task {
 	return res.headTasks
 }
 
-func (res *TaskResult) GetTailTasks() []Task {
+func (res *Result) GetTailTasks() []Task {
 	return res.tailTasks
 }
 
-func (res *TaskResult) GetAfterTasks() []Task {
+func (res *Result) GetAfterTasks() []Task {
 	return res.afterTasks
 }
 
-func (res *TaskResult) AddHeadTasks(t ...Task) {
+func (res *Result) AddHeadTasks(t ...Task) {
 	if res.headTasks == nil {
 		res.headTasks = make([]Task, 0, len(t))
 	}
@@ -44,7 +44,7 @@ func (res *TaskResult) AddHeadTasks(t ...Task) {
 	res.headTasks = append(res.headTasks, t...)
 }
 
-func (res *TaskResult) AddTailTasks(t ...Task) {
+func (res *Result) AddTailTasks(t ...Task) {
 	if res.tailTasks == nil {
 		res.tailTasks = make([]Task, 0, len(t))
 	}
@@ -52,7 +52,7 @@ func (res *TaskResult) AddTailTasks(t ...Task) {
 	res.tailTasks = append(res.tailTasks, t...)
 }
 
-func (res *TaskResult) AddAfterTasks(t ...Task) {
+func (res *Result) AddAfterTasks(t ...Task) {
 	if res.afterTasks == nil {
 		res.afterTasks = make([]Task, 0, len(t))
 	}

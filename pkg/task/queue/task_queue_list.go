@@ -107,7 +107,7 @@ type TaskQueue struct {
 	started bool // a flag to ignore multiple starts
 
 	name    string
-	handler func(ctx context.Context, t task.Task) task.TaskResult
+	handler func(ctx context.Context, t task.Task) task.Result
 	status  string
 
 	measureActionFn     func()
@@ -150,7 +150,7 @@ func WithName(name string) TaskQueueOption {
 }
 
 // WithHandler sets the task handler for the TaskQueue
-func WithHandler(fn func(ctx context.Context, t task.Task) task.TaskResult) TaskQueueOption {
+func WithHandler(fn func(ctx context.Context, t task.Task) task.Result) TaskQueueOption {
 	return func(q *TaskQueue) {
 		q.handler = fn
 	}
@@ -286,13 +286,13 @@ func (q *TaskQueue) GetName() string {
 	return q.name
 }
 
-func (q *TaskQueue) GetHandler() func(ctx context.Context, t task.Task) task.TaskResult {
+func (q *TaskQueue) GetHandler() func(ctx context.Context, t task.Task) task.Result {
 	q.m.RLock()
 	defer q.m.RUnlock()
 	return q.handler
 }
 
-func (q *TaskQueue) SetHandler(handler func(ctx context.Context, t task.Task) task.TaskResult) {
+func (q *TaskQueue) SetHandler(handler func(ctx context.Context, t task.Task) task.Result) {
 	q.m.RLock()
 	defer q.m.RUnlock()
 	q.handler = handler

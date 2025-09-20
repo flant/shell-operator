@@ -54,7 +54,7 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 	q.DelayOnRepeat = 5 * time.Millisecond
 
 	// Define the handler for tasks
-	q.handler = func(_ context.Context, tsk task.Task) task.TaskResult {
+	q.handler = func(_ context.Context, tsk task.Task) task.Result {
 		mu.Lock()
 		executionOrder = append(executionOrder, tsk.GetId())
 		mu.Unlock()
@@ -62,7 +62,7 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 		if tsk.GetId() == "RequeueTask" {
 			// If there are other tasks in the queue, move this task to the end.
 			if q.Length() > 1 {
-				res := task.TaskResult{Status: task.Success}
+				res := task.Result{Status: task.Success}
 				res.AddTailTasks(tsk)
 
 				return res
@@ -71,11 +71,11 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 			// If no other tasks, wait for the signal to finish.
 			<-requeueTaskCanFinish
 			close(requeueTaskFinished)
-			return task.TaskResult{Status: task.Success}
+			return task.Result{Status: task.Success}
 		}
 
 		// For simple tasks, just succeed.
-		return task.TaskResult{Status: task.Success}
+		return task.Result{Status: task.Success}
 	}
 
 	// Add the "requeue" task first.

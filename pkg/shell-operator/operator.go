@@ -463,10 +463,10 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 }
 
 // taskHandler
-func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) task.TaskResult {
+func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) task.Result {
 	logEntry := op.logger.With("operator.component", "taskRunner")
 	hookMeta := task_metadata.HookMetadataAccessor(t)
-	var res task.TaskResult
+	var res task.Result
 
 	switch t.GetType() {
 	case task_metadata.HookRun:
@@ -494,7 +494,7 @@ func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) task.Task
 }
 
 // taskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
-func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context, t task.Task) task.TaskResult {
+func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context, t task.Task) task.Result {
 	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleEnableKubernetesBindings")
 	defer span.End()
 
@@ -507,7 +507,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 		op.MetricStorage.GaugeSet(metrics.HookEnableKubernetesBindingsSeconds, d.Seconds(), metricLabels)
 	})()
 
-	var res task.TaskResult
+	var res task.Result
 	hookLogLabels := map[string]string{}
 	hookLogLabels["hook"] = hookMeta.HookName
 	hookLogLabels["binding"] = ""
@@ -570,7 +570,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 }
 
 // TODO use Context to pass labels and a queue name
-func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) task.TaskResult {
+func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) task.Result {
 	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleHookRun")
 	defer span.End()
 
@@ -580,7 +580,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) tas
 	err := taskHook.RateLimitWait(context.Background())
 	if err != nil {
 		// This could happen when the Context is canceled, so just repeat the task until the queue is stopped.
-		return task.TaskResult{
+		return task.Result{
 			Status: "Repeat",
 		}
 	}
@@ -641,7 +641,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) tas
 		}
 	}
 
-	var res task.TaskResult
+	var res task.Result
 	// Default when shouldRunHook is false.
 	res.Status = "Success"
 
