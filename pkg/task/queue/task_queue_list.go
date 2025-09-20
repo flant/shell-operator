@@ -281,20 +281,14 @@ func (q *TaskQueue) SetStatus(status string) {
 }
 
 func (q *TaskQueue) GetName() string {
-	q.m.RLock()
-	defer q.m.RUnlock()
 	return q.name
 }
 
 func (q *TaskQueue) GetHandler() func(ctx context.Context, t task.Task) task.Result {
-	q.m.RLock()
-	defer q.m.RUnlock()
 	return q.handler
 }
 
 func (q *TaskQueue) SetHandler(handler func(ctx context.Context, t task.Task) task.Result) {
-	q.m.RLock()
-	defer q.m.RUnlock()
 	q.handler = handler
 }
 
