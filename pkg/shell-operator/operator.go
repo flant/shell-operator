@@ -151,8 +151,7 @@ func (op *ShellOperator) Start() {
 	op.initAndStartHookQueues()
 
 	// Start emit "live" metrics
-	metrics.StartLiveTicksUpdater(op.MetricStorage)
-	metrics.StartTasksQueueLengthUpdater(op.MetricStorage, op.TaskQueues)
+	op.runMetrics()
 
 	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
 	// Start it before start all informers to catch all kubernetes events (#42)
@@ -945,6 +944,31 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 				slog.String("hook", hookName))
 		}
 	}
+}
+
+func (op *ShellOperator) runMetrics() {
+	if op.MetricStorage == nil {
+		return
+	}
+
+	// live ticks.
+	go func() {
+		for {
+			op.MetricStorage.CounterAdd("{PREFIX}live_ticks", 1.0, map[string]string{})
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
+	// task queue length
+	go func() {
+		for {
+			op.TaskQueues.Iterate(func(queue task.TaskQueue) {
+				queueLen := float64(queue.Length())
+				op.MetricStorage.GaugeSet("{PREFIX}tasks_queue_length", queueLen, map[string]string{"queue": queue.GetName()})
+			})
+			time.Sleep(5 * time.Second)
+		}
+	}()
 }
 
 // initAndStartHookQueues create all queues defined in hooks
