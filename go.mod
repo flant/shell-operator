@@ -37,6 +37,7 @@ require (
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.12-flant.0
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/deckhouse/module-sdk v0.3.7
 	github.com/gojuno/minimock/v3 v3.4.5
 	github.com/itchyny/gojq v0.12.17
