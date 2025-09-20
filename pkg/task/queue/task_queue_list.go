@@ -34,6 +34,8 @@ config parameter.
 This implementation uses container/list for O(1) queue operations and a map for O(1) task lookup by ID.
 */
 
+const compactionThreshold = 100
+
 var (
 	DefaultWaitLoopCheckInterval    = 125 * time.Millisecond
 	DefaultDelayOnQueueIsEmpty      = 250 * time.Millisecond
@@ -104,9 +106,9 @@ type TaskQueue struct {
 
 	started bool // a flag to ignore multiple starts
 
-	Name    string
-	Handler func(ctx context.Context, t task.Task) TaskResult
-	Status  string
+	name    string
+	handler func(ctx context.Context, t task.Task) task.TaskResult
+	status  string
 
 	measureActionFn     func()
 	measureActionFnOnce sync.Once
@@ -143,14 +145,14 @@ func WithContext(ctx context.Context) TaskQueueOption {
 // WithName sets the name for the TaskQueue
 func WithName(name string) TaskQueueOption {
 	return func(q *TaskQueue) {
-		q.Name = name
+		q.name = name
 	}
 }
 
 // WithHandler sets the task handler for the TaskQueue
-func WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) TaskQueueOption {
+func WithHandler(fn func(ctx context.Context, t task.Task) task.TaskResult) TaskQueueOption {
 	return func(q *TaskQueue) {
-		q.Handler = fn
+		q.handler = fn
 	}
 }
 
@@ -201,7 +203,7 @@ func NewTasksQueue(metricStorage metricsstorage.Storage, opts ...TaskQueueOption
 		opt(q)
 	}
 
-	q.queueTasksCounter = NewTaskCounter(q.Name, q.compactableTypes, q.metricStorage)
+	q.queueTasksCounter = NewTaskCounter(q.name, q.compactableTypes, q.metricStorage)
 
 	return q
 }
@@ -257,7 +259,7 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 			q.measureActionFn = func() {}
 		} else {
 			q.measureActionFn = measure.Duration(func(d time.Duration) {
-				q.metricStorage.HistogramObserve(metrics.TasksQueueActionDurationSeconds, d.Seconds(), map[string]string{"queue_name": q.Name, "queue_action": action}, nil)
+				q.metricStorage.HistogramObserve(metrics.TasksQueueActionDurationSeconds, d.Seconds(), map[string]string{"queue_name": q.name, "queue_action": action}, nil)
 			})
 		}
 	})
@@ -269,19 +271,25 @@ func (q *TaskQueue) GetStatus() string {
 	defer q.MeasureActionTime("GetStatus")()
 	q.m.RLock()
 	defer q.m.RUnlock()
-	return q.Status
+	return q.status
+}
+
+func (q *TaskQueue) SetStatus(status string) {
+	q.m.Lock()
+	q.status = status
+	q.m.Unlock()
 }
 
 func (q *TaskQueue) GetName() string {
 	q.m.RLock()
 	defer q.m.RUnlock()
-	return q.Name
+	return q.name
 }
 
-func (q *TaskQueue) SetStatus(status string) {
-	q.m.Lock()
-	q.Status = status
-	q.m.Unlock()
+func (q *TaskQueue) GetHandler() func(ctx context.Context, t task.Task) task.TaskResult {
+	q.m.RLock()
+	defer q.m.RUnlock()
+	return q.handler
 }
 
 func (q *TaskQueue) IsEmpty() bool {
@@ -375,7 +383,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 	for _, t := range tasks {
 		q.lazydebug("adding task to queue", func() []any {
 			return []any{
-				slog.String("queue", q.Name),
+				slog.String("queue", q.name),
 				slog.String("task_id", t.GetId()),
 				slog.String("task_type", string(t.GetType())),
 				slog.String("task_description", t.GetDescription()),
@@ -384,7 +392,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 		})
 
 		if _, ok := q.idIndex[t.GetId()]; ok {
-			q.logger.Warn("task collision detected, unexpected behavior possible", slog.String("queue", q.Name), slog.String("task_id", t.GetId()))
+			q.logger.Warn("task collision detected, unexpected behavior possible", slog.String("queue", q.name), slog.String("task_id", t.GetId()))
 		}
 
 		element := q.items.PushBack(t)
@@ -397,7 +405,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 		if _, ok := q.compactableTypes[taskType]; ok {
 			q.lazydebug("task is mergeable, marking queue as dirty", func() []any {
 				return []any{
-					slog.String("queue", q.Name),
+					slog.String("queue", q.name),
 					slog.String("task_id", t.GetId()),
 					slog.String("task_type", string(taskType)),
 					slog.Int("queue_length", q.items.Len()),
@@ -409,7 +417,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 			if q.items.Len() > compactionThreshold && q.queueTasksCounter.IsAnyCapReached() {
 				q.lazydebug("triggering compaction due to queue length", func() []any {
 					return []any{
-						slog.String("queue", q.Name),
+						slog.String("queue", q.name),
 						slog.Int("queue_length", q.items.Len()),
 						slog.Int("compaction_threshold", compactionThreshold),
 					}
@@ -420,7 +428,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 
 				q.lazydebug("compaction finished", func() []any {
 					return []any{
-						slog.String("queue", q.Name),
+						slog.String("queue", q.name),
 						slog.Int("queue_length_before", currentQueue),
 						slog.Int("queue_length_after", q.items.Len()),
 					}
@@ -429,7 +437,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 		} else {
 			q.lazydebug("task is not mergeable", func() []any {
 				return []any{
-					slog.String("queue", q.Name),
+					slog.String("queue", q.name),
 					slog.String("task_id", t.GetId()),
 					slog.String("task_type", string(taskType)),
 				}
@@ -811,8 +819,8 @@ func (q *TaskQueue) Start(ctx context.Context) {
 		return
 	}
 
-	if q.Handler == nil {
-		log.Error("should set handler before start in queue", slog.String("name", q.Name))
+	if q.handler == nil {
+		log.Error("should set handler before start in queue", slog.String("name", q.name))
 		q.SetStatus("no handler set")
 		return
 	}
@@ -821,24 +829,24 @@ func (q *TaskQueue) Start(ctx context.Context) {
 		q.SetStatus("")
 		var sleepDelay time.Duration
 		for {
-			q.logger.Debug("queue: wait for task", slog.String("queue", q.Name), slog.Duration("sleep_delay", sleepDelay))
+			q.logger.Debug("queue: wait for task", slog.String("queue", q.name), slog.Duration("sleep_delay", sleepDelay))
 			t := q.waitForTask(sleepDelay)
 			if t == nil {
 				q.SetStatus("stop")
-				q.logger.Info("queue stopped", slog.String("name", q.Name))
+				q.logger.Info("queue stopped", slog.String("name", q.name))
 				return
 			}
 
 			q.withLock(func() {
 				if q.queueTasksCounter.IsAnyCapReached() {
 					q.lazydebug("triggering compaction before task processing", func() []any {
-						return []any{slog.String("queue", q.Name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.items.Len())}
+						return []any{slog.String("queue", q.name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.items.Len())}
 					})
 
 					q.compaction(q.queueTasksCounter.GetReachedCap())
 
 					q.lazydebug("compaction completed, queue no longer dirty", func() []any {
-						return []any{slog.String("queue", q.Name), slog.Int("queue_length_after", q.items.Len())}
+						return []any{slog.String("queue", q.name), slog.Int("queue_length_after", q.items.Len())}
 					})
 				}
 			})
@@ -849,38 +857,38 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			// use lazydebug because it dumps whole queue and task
 			q.lazydebug("queue tasks after wait", func() []any {
 				return []any{
-					slog.String("queue", q.Name),
+					slog.String("queue", q.name),
 					slog.String("tasks", q.String()),
 				}
 			})
 
 			q.lazydebug("queue task to handle", func() []any {
 				return []any{
-					slog.String("queue", q.Name),
+					slog.String("queue", q.name),
 					slog.String("task_type", string(t.GetType())),
 				}
 			})
 
 			var nextSleepDelay time.Duration
 			q.SetStatus("run first task")
-			taskRes := q.Handler(ctx, t)
+			taskRes := q.handler(ctx, t)
 
 			// Check Done channel after long-running operation.
 			select {
 			case <-q.ctx.Done():
-				q.logger.Info("queue stopped after task handling", slog.String("name", q.Name))
+				q.logger.Info("queue stopped after task handling", slog.String("name", q.name))
 				q.SetStatus("stop")
 				return
 			default:
 			}
 
 			switch taskRes.Status {
-			case Success, Keep:
+			case task.Success, task.Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
 					q.addAfter(t.GetId(), taskRes.GetAfterTasks()...)
 
-					if taskRes.Status == Success {
+					if taskRes.Status == task.Success {
 						q.remove(t.GetId())
 					}
 					t.SetProcessing(false) // release processing flag
@@ -894,7 +902,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					q.addLast(taskRes.GetTailTasks()...)
 				})
 				q.SetStatus("")
-			case Fail:
+			case task.Fail:
 				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
 					q.logger.Warn("result is fail, cannot process tasks in result",
 						slog.Int("after_task_count", len(taskRes.GetAfterTasks())),
@@ -907,7 +915,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
 				t.IncrementFailureCount()
 				q.SetStatus(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
-			case Repeat:
+			case task.Repeat:
 				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
 					q.logger.Warn("result is repeat, cannot process tasks in result",
 						slog.Int("after_task_count", len(taskRes.GetAfterTasks())),
@@ -933,7 +941,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			}
 			// use lazydebug because it dumps whole queue
 			q.lazydebug("queue: tasks after handle", func() []any {
-				return []any{slog.String("queue", q.Name), slog.String("tasks", q.String())}
+				return []any{slog.String("queue", q.name), slog.String("tasks", q.String())}
 			})
 		}
 	}()

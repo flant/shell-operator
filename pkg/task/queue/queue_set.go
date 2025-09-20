@@ -75,7 +75,7 @@ func (tqs *TaskQueueSet) Add(queue task.TaskQueue) {
 	tqs.m.Unlock()
 }
 
-func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, opts ...TaskQueueOption) {
+func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) task.TaskResult, opts ...TaskQueueOption) {
 	q := NewTasksQueue(
 		tqs.metricStorage,
 		WithName(name),

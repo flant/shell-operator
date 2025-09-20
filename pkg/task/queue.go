@@ -10,6 +10,7 @@ type TaskQueue interface {
 	GetStatus() string
 	SetStatus(status string)
 	GetName() string
+	GetHandler() func(ctx context.Context, t Task) TaskResult
 	Start(ctx context.Context)
 	Stop()
 

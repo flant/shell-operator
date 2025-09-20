@@ -23,6 +23,7 @@ import (
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/deckhouse/deckhouse/pkg/metrics-storage/options"
+
 	"github.com/flant/shell-operator/pkg/task"
 )
 
