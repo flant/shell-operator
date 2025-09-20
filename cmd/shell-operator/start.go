@@ -16,6 +16,7 @@ import (
 
 	"github.com/flant/shell-operator/pkg/app"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
+	operatorconfig "github.com/flant/shell-operator/pkg/shell-operator/config"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
 
@@ -30,7 +31,7 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 		ctx := context.Background()
 		telemetryShutdown := registerTelemetry(ctx)
 		// Init logging and initialize a ShellOperator instance.
-		operator, err := shell_operator.Init(logger.Named("shell-operator"))
+		operator, err := shell_operator.NewShellOperatorWithOptions(context.TODO(), operatorconfig.WithLogger(logger))
 		if err != nil {
 			return fmt.Errorf("init failed: %w", err)
 		}

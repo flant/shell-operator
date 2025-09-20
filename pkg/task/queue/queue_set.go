@@ -23,12 +23,12 @@ type TaskQueueSet struct {
 	cancel context.CancelFunc
 
 	m      sync.RWMutex
-	Queues map[string]*TaskQueue
+	Queues map[string]task.TaskQueue
 }
 
 func NewTaskQueueSet() *TaskQueueSet {
 	return &TaskQueueSet{
-		Queues:   make(map[string]*TaskQueue),
+		Queues:   make(map[string]task.TaskQueue),
 		MainName: MainQueueName,
 	}
 }
@@ -69,13 +69,13 @@ func (tqs *TaskQueueSet) Start(ctx context.Context) {
 	tqs.m.RUnlock()
 }
 
-func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
+func (tqs *TaskQueueSet) Add(queue task.TaskQueue) {
 	tqs.m.Lock()
-	tqs.Queues[queue.Name] = queue
+	tqs.Queues[queue.GetName()] = queue
 	tqs.m.Unlock()
 }
 
-func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, opts ...TaskQueueOption) {
+func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) task.Result, opts ...TaskQueueOption) {
 	q := NewTasksQueue(
 		tqs.metricStorage,
 		WithName(name),
@@ -96,7 +96,7 @@ func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Con
 	tqs.m.Unlock()
 }
 
-func (tqs *TaskQueueSet) GetByName(name string) *TaskQueue {
+func (tqs *TaskQueueSet) GetByName(name string) task.TaskQueue {
 	tqs.m.RLock()
 	defer tqs.m.RUnlock()
 	ts, exists := tqs.Queues[name]
@@ -106,7 +106,7 @@ func (tqs *TaskQueueSet) GetByName(name string) *TaskQueue {
 	return nil
 }
 
-func (tqs *TaskQueueSet) GetMain() *TaskQueue {
+func (tqs *TaskQueueSet) GetMain() task.TaskQueue {
 	return tqs.GetByName(tqs.MainName)
 }
 
@@ -115,7 +115,7 @@ func (tqs *TaskQueueSet) GetMain() *TaskQueue {
 	   tqs.GetMain().Pop()
 	})
 */
-func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
+func (tqs *TaskQueueSet) DoWithLock(fn func(tqs task.TaskQueueSet)) {
 	tqs.m.Lock()
 	defer tqs.m.Unlock()
 	if fn != nil {
@@ -124,7 +124,7 @@ func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
 }
 
 // Iterate run doFn for every task.
-func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
+func (tqs *TaskQueueSet) Iterate(doFn func(queue task.TaskQueue)) {
 	if doFn == nil {
 		return
 	}
@@ -142,7 +142,7 @@ func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
 	// TODO sort names
 
 	for _, q := range tqs.Queues {
-		if q.Name != tqs.MainName {
+		if q.GetName() != tqs.MainName {
 			doFn(q)
 		}
 	}
@@ -171,7 +171,7 @@ func (tqs *TaskQueueSet) WaitStopWithTimeout(timeout time.Duration) {
 			stopped := true
 			tqs.m.RLock()
 			for _, q := range tqs.Queues {
-				if q.Status != "stop" {
+				if q.GetStatus() != "stop" {
 					stopped = false
 					break
 				}

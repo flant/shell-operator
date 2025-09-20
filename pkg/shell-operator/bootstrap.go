@@ -1,3 +1,21 @@
+// Copyright 2025 Flant JSC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package shell_operator provides bootstrap functionality for creating and initializing ShellOperator instances.
+//
+// This file contains the initialization and assembly logic for ShellOperator.
+// Configuration is handled via the ShellOperatorConfig struct and related functions defined in config/config.go.
 package shell_operator
 
 import (
@@ -12,73 +30,94 @@ import (
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	"github.com/flant/shell-operator/pkg/hook"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/metrics"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
+	operatorconfig "github.com/flant/shell-operator/pkg/shell-operator/config"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
-// Init initialize logging, ensures directories and creates
-// a ShellOperator instance with all dependencies.
-func Init(logger *log.Logger) (*ShellOperator, error) {
-	runtimeConfig := config.NewConfig(logger)
-	// Init logging subsystem.
-	app.SetupLogging(runtimeConfig, logger)
+// NewShellOperatorWithConfig creates a fully configured ShellOperator instance with all dependencies.
+// This replaces the old Init function with a more flexible constructor approach.
+func NewShellOperatorWithConfig(ctx context.Context, cfg *operatorconfig.ShellOperatorConfig) (*ShellOperator, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
 
-	// Log version and jq filtering implementation.
-	logger.Info(app.AppStartMessage)
+	op := NewShellOperator(
+		ctx,
+		WithLogger(cfg.Logger),
+		WithMetricStorage(cfg.MetricStorage),
+		WithHookMetricStorage(cfg.HookMetricStorage),
+	)
+
+	// Initialize runtime configuration and logging
+	runtimeConfig := config.NewConfig(op.logger)
+	app.SetupLogging(runtimeConfig, op.logger)
+
+	// Log version and jq filtering implementation
+	op.logger.Info(app.AppStartMessage)
 	fl := jq.NewFilter()
-	logger.Debug(fl.FilterInfo())
+	op.logger.Debug(fl.FilterInfo())
 
-	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
+	// Validate and prepare directories
+	hooksDir, err := utils.RequireExistingDirectory(cfg.HooksDir)
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "hooks directory is required", log.Err(err))
-		return nil, err
+		return nil, fmt.Errorf("hooks directory validation failed: %w", err)
 	}
 
-	tempDir, err := utils.EnsureTempDirectory(app.TempDir)
+	tempDir, err := utils.EnsureTempDirectory(cfg.TempDir)
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "temp directory", log.Err(err))
-		return nil, err
+		return nil, fmt.Errorf("temp directory setup failed: %w", err)
 	}
 
-	op := NewShellOperator(context.TODO(), WithLogger(logger))
-
-	// Debug server.
-	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
+	// Start debug server
+	debugServer, err := RunDefaultDebugServer(cfg.DebugUnixSocket, cfg.DebugHttpServerAddr,
+		op.logger.Named("debug-server"))
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "start Debug server", log.Err(err))
-		return nil, err
+		return nil, fmt.Errorf("failed to start debug server: %w", err)
 	}
 
-	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, []string{
-		"hook",
-		"binding",
-		"queue",
-	})
+	err = metrics.RegisterOperatorMetrics(op.MetricStorage, []string{"hook", "binding", "queue"})
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble common operator", log.Err(err))
-		return nil, err
+		return nil, fmt.Errorf("failed to register operator metrics: %w", err)
 	}
 
-	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
-	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble shell operator", log.Err(err))
-		return nil, err
+	// Assemble common components
+	if err := op.AssembleCommonOperator(cfg.ListenAddress, cfg.ListenPort); err != nil {
+		return nil, fmt.Errorf("failed to assemble common operator: %w", err)
+	}
+
+	// Assemble shell-operator specific components
+	if err := op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig); err != nil {
+		return nil, fmt.Errorf("failed to assemble shell operator: %w", err)
 	}
 
 	return op, nil
 }
 
+// NewShellOperatorWithOptions creates a ShellOperator instance using functional options.
+func NewShellOperatorWithOptions(ctx context.Context, options ...operatorconfig.ConfigOption) (*ShellOperator, error) {
+	cfg := operatorconfig.NewShellOperatorConfig(options...)
+	return NewShellOperatorWithConfig(ctx, cfg)
+}
+
+// Init provides backward compatibility with the old initialization function.
+// Deprecated: Use NewShellOperatorWithOptions for more flexibility.
+func Init(logger *log.Logger) (*ShellOperator, error) {
+	return NewShellOperatorWithOptions(context.TODO(), operatorconfig.WithLogger(logger))
+}
+
 // AssembleCommonOperator instantiate common dependencies. These dependencies
 // may be used for shell-operator derivatives, like addon-operator.
 // requires listenAddress, listenPort to run http server for operator APIs
-func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string) error {
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string) error {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
-	op.setupMetricStorage(kubeEventsManagerLabels)
+	op.setupMetricStorage()
 
 	// metrics from user's hooks
 	op.setupHookMetricStorage()
@@ -116,7 +155,9 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) error {
 	registerRootRoute(op)
 	// for shell-operator only
-	registerHookMetrics(op.HookMetricStorage)
+	if err := metrics.RegisterHookMetrics(op.HookMetricStorage); err != nil {
+		return fmt.Errorf("register hook metrics: %w", err)
+	}
 
 	op.RegisterDebugQueueRoutes(debugServer)
 	op.RegisterDebugHookRoutes(debugServer)

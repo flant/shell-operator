@@ -27,7 +27,7 @@ const TestQueueName string = "test-queue"
 // with tasks.
 type ContextCombiner struct {
 	op *shell_operator.ShellOperator
-	q  *queue.TaskQueue
+	q  task.TaskQueue
 }
 
 func NewContextCombiner() *ContextCombiner {

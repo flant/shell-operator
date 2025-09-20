@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/yaml"
 
-	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -55,11 +55,11 @@ func Test_Sort_ByNamespaceAndName(t *testing.T) {
 	}
 }
 
-func fillQueue(q *queue.TaskQueue, n int) {
+func fillQueue(q task.TaskQueue, n int) {
 	for i := 0; i < n; i++ {
-		t := &task.BaseTask{Id: fmt.Sprintf("test_task_%s_%04d", q.Name, i)}
+		t := &task.BaseTask{Id: fmt.Sprintf("test_task_%s_%04d", q.GetName(), i)}
 		t.WithMetadata(task_metadata.HookMetadata{
-			HookName: fmt.Sprintf("test_task_%s_%04d", q.Name, i),
+			HookName: fmt.Sprintf("test_task_%s_%04d", q.GetName(), i),
 		})
 		q.AddFirst(t)
 	}

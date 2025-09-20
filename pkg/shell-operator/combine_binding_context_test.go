@@ -1,3 +1,17 @@
+// Copyright 2025 Flant JSC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package shell_operator
 
 import (
@@ -8,12 +22,12 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/flant/shell-operator/internal/metrics"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -37,8 +51,8 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
 	TaskQueues.NewNamedQueue("test_multiple_hooks",
-		func(_ context.Context, _ task.Task) queue.TaskResult {
-			return queue.TaskResult{
+		func(_ context.Context, _ task.Task) task.Result {
+			return task.Result{
 				Status: "Success",
 			}
 		},
@@ -147,8 +161,8 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
 	TaskQueues.NewNamedQueue("test_no_combine",
-		func(_ context.Context, _ task.Task) queue.TaskResult {
-			return queue.TaskResult{
+		func(_ context.Context, _ task.Task) task.Result {
+			return task.Result{
 				Status: "Success",
 			}
 		},
@@ -222,8 +236,8 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
 	TaskQueues.NewNamedQueue("test_multiple_hooks",
-		func(_ context.Context, _ task.Task) queue.TaskResult {
-			return queue.TaskResult{
+		func(_ context.Context, _ task.Task) task.Result {
+			return task.Result{
 				Status: "Success",
 			}
 		},
@@ -340,8 +354,8 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	TaskQueues.WithContext(context.Background())
 	TaskQueues.NewNamedQueue("test_multiple_hooks",
-		func(_ context.Context, _ task.Task) queue.TaskResult {
-			return queue.TaskResult{
+		func(_ context.Context, _ task.Task) task.Result {
+			return task.Result{
 				Status: "Success",
 			}
 		},
