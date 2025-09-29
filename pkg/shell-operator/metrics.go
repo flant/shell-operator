@@ -15,6 +15,7 @@
 package shell_operator
 
 import (
+	"fmt"
 	"net/http"
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
@@ -25,18 +26,23 @@ import (
 
 // setupMetricStorage creates and initializes metrics storage for built-in operator metrics.
 // If MetricStorage is already set via options, it uses that; otherwise creates a new one.
-func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels []string) {
+func (op *ShellOperator) setupMetricStorage(kubeEventsManagerLabels []string) error {
 	metricStorage := metricsstorage.NewMetricStorage(
 		metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
 		metricsstorage.WithLogger(op.logger.Named("metric-storage")),
 	)
 
-	metrics.RegisterOperatorMetrics(metricStorage, kubeEventsManagerLabels)
+	err := metrics.RegisterOperatorMetrics(metricStorage, kubeEventsManagerLabels)
+	if err != nil {
+		return fmt.Errorf("register operator metrics: %w", err)
+	}
 
 	op.APIServer.RegisterRoute(http.MethodGet, "/metrics", metricStorage.Handler().ServeHTTP)
 	// create new metric storage for hooks
 	// register scrape handler
 	op.MetricStorage = metricStorage
+
+	return nil
 }
 
 // setupHookMetricStorage creates and initializes metrics storage for hook metrics.
