@@ -12,6 +12,7 @@ import (
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	"github.com/flant/shell-operator/pkg/hook"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/metrics"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
@@ -78,12 +79,14 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
-	op.setupMetricStorage(kubeEventsManagerLabels)
+	err := op.setupMetricStorage(kubeEventsManagerLabels)
+	if err != nil {
+		return fmt.Errorf("setup metric storage: %w", err)
+	}
 
 	// metrics from user's hooks
 	op.setupHookMetricStorage()
 
-	var err error
 	// 'main' Kubernetes client.
 	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage, op.logger)
 	if err != nil {
@@ -116,7 +119,10 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) error {
 	registerRootRoute(op)
 	// for shell-operator only
-	registerHookMetrics(op.HookMetricStorage)
+	err := metrics.RegisterHookMetrics(op.HookMetricStorage)
+	if err != nil {
+		return fmt.Errorf("register hook metrics: %w", err)
+	}
 
 	op.RegisterDebugQueueRoutes(debugServer)
 	op.RegisterDebugHookRoutes(debugServer)
@@ -126,7 +132,7 @@ func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, 
 	op.setupHookManagers(hooksDir, tempDir)
 
 	// Search and configure all hooks.
-	err := op.initHookManager()
+	err = op.initHookManager()
 	if err != nil {
 		return fmt.Errorf("initialize HookManager fail: %w", err)
 	}
