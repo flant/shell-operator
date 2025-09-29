@@ -13,9 +13,9 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
-	"github.com/flant/shell-operator/internal/metrics"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
 	"github.com/flant/shell-operator/pkg/utils/list"
@@ -33,6 +33,8 @@ config parameter.
 
 This implementation uses container/list for O(1) queue operations and a map for O(1) task lookup by ID.
 */
+
+const compactionThreshold = 100
 
 var (
 	DefaultWaitLoopCheckInterval    = 125 * time.Millisecond

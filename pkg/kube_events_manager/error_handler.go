@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/flant/shell-operator/pkg/metrics"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -63,7 +64,7 @@ func (weh *WatchErrorHandler) handler(_ *cache.Reflector, err error) {
 	}
 
 	if weh.metricStorage != nil {
-		weh.metricStorage.CounterAdd("{PREFIX}kubernetes_client_watch_errors_total", 1.0, map[string]string{"error_type": errorType})
+		weh.metricStorage.CounterAdd(metrics.KubernetesClientWatchErrorsTotal, 1.0, map[string]string{"error_type": errorType})
 	}
 }
 

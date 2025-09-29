@@ -1,3 +1,17 @@
+// Copyright 2025 Flant JSC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package shell_operator
 
 import (
@@ -21,6 +35,7 @@ import (
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemTypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metrics"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
@@ -458,7 +473,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 		"hook": hookMeta.HookName,
 	}
 	defer measure.Duration(func(d time.Duration) {
-		op.MetricStorage.GaugeSet("{PREFIX}hook_enable_kubernetes_bindings_seconds", d.Seconds(), metricLabels)
+		op.MetricStorage.GaugeSet(metrics.HookEnableKubernetesBindingsSeconds, d.Seconds(), metricLabels)
 	})()
 
 	var res queue.TaskResult
@@ -517,8 +532,8 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 		res.AddHeadTasks(hookRunTasks...)
 	}
 
-	op.MetricStorage.CounterAdd("{PREFIX}hook_enable_kubernetes_bindings_errors_total", errors, metricLabels)
-	op.MetricStorage.GaugeAdd("{PREFIX}hook_enable_kubernetes_bindings_success", success, metricLabels)
+	op.MetricStorage.CounterAdd(metrics.HookEnableKubernetesBindingsErrorsTotal, errors, metricLabels)
+	op.MetricStorage.GaugeAdd(metrics.HookEnableKubernetesBindingsSuccess, success, metricLabels)
 
 	return res
 }
@@ -545,10 +560,10 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 		"queue":   t.GetQueueName(),
 	}
 	taskWaitTime := time.Since(t.GetQueuedAt()).Seconds()
-	op.MetricStorage.CounterAdd("{PREFIX}task_wait_in_queue_seconds_total", taskWaitTime, metricLabels)
+	op.MetricStorage.CounterAdd(metrics.TaskWaitInQueueSecondsTotal, taskWaitTime, metricLabels)
 
 	defer measure.Duration(func(d time.Duration) {
-		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_seconds", d.Seconds(), metricLabels, nil)
+		op.MetricStorage.HistogramObserve(metrics.HookRunSeconds, d.Seconds(), metricLabels, nil)
 	})()
 
 	hookLogLabels := map[string]string{}
@@ -625,9 +640,9 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 			taskLogEntry.Info("Hook executed successfully")
 			res.Status = "Success"
 		}
-		op.MetricStorage.CounterAdd("{PREFIX}hook_run_allowed_errors_total", allowed, metricLabels)
-		op.MetricStorage.CounterAdd("{PREFIX}hook_run_errors_total", errors, metricLabels)
-		op.MetricStorage.CounterAdd("{PREFIX}hook_run_success_total", success, metricLabels)
+		op.MetricStorage.CounterAdd(metrics.HookRunAllowedErrorsTotal, allowed, metricLabels)
+		op.MetricStorage.CounterAdd(metrics.HookRunErrorsTotal, errors, metricLabels)
+		op.MetricStorage.CounterAdd(metrics.HookRunSuccessTotal, success, metricLabels)
 	}
 
 	// Unlock Kubernetes events for all monitors when Synchronization task is done.
@@ -667,9 +682,9 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 
 	if result.Usage != nil {
 		taskLogEntry.Debug("Usage", slog.String("value", fmt.Sprintf("%+v", result.Usage)))
-		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_sys_seconds", result.Usage.Sys.Seconds(), metricLabels, nil)
-		op.MetricStorage.HistogramObserve("{PREFIX}hook_run_user_seconds", result.Usage.User.Seconds(), metricLabels, nil)
-		op.MetricStorage.GaugeSet("{PREFIX}hook_run_max_rss_bytes", float64(result.Usage.MaxRss)*1024, metricLabels)
+		op.MetricStorage.HistogramObserve(metrics.HookRunSysCPUSeconds, result.Usage.Sys.Seconds(), metricLabels, nil)
+		op.MetricStorage.HistogramObserve(metrics.HookRunUserCPUSeconds, result.Usage.User.Seconds(), metricLabels, nil)
+		op.MetricStorage.GaugeSet(metrics.HookRunMaxRSSBytes, float64(result.Usage.MaxRss)*1024, metricLabels)
 	}
 
 	// Try to apply Kubernetes actions.
@@ -901,6 +916,31 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 	}
 }
 
+func (op *ShellOperator) runMetrics() {
+	if op.MetricStorage == nil {
+		return
+	}
+
+	// live ticks.
+	go func() {
+		for {
+			op.MetricStorage.CounterAdd(metrics.LiveTicks, 1.0, map[string]string{})
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
+	// task queue length
+	go func() {
+		for {
+			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
+				queueLen := float64(queue.Length())
+				op.MetricStorage.GaugeSet(metrics.TasksQueueLength, queueLen, map[string]string{"queue": queue.Name})
+			})
+			time.Sleep(5 * time.Second)
+		}
+	}()
+}
+
 // initAndStartHookQueues create all queues defined in hooks
 func (op *ShellOperator) initAndStartHookQueues() {
 	schHooks, _ := op.HookManager.GetHooksInOrder(types.Schedule)
@@ -932,31 +972,6 @@ func (op *ShellOperator) initAndStartHookQueues() {
 			}
 		}
 	}
-}
-
-func (op *ShellOperator) runMetrics() {
-	if op.MetricStorage == nil {
-		return
-	}
-
-	// live ticks.
-	go func() {
-		for {
-			op.MetricStorage.CounterAdd("{PREFIX}live_ticks", 1.0, map[string]string{})
-			time.Sleep(10 * time.Second)
-		}
-	}()
-
-	// task queue length
-	go func() {
-		for {
-			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
-				queueLen := float64(queue.Length())
-				op.MetricStorage.GaugeSet("{PREFIX}tasks_queue_length", queueLen, map[string]string{"queue": queue.Name})
-			})
-			time.Sleep(5 * time.Second)
-		}
-	}()
 }
 
 // Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
