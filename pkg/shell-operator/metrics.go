@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/metrics"
 )
