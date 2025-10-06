@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -97,14 +98,13 @@ type TaskQueue struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 
-	waitMu         sync.Mutex
-	waitInProgress bool
-	cancelDelay    bool
+	waitInProgress atomic.Bool
+	cancelDelay    atomic.Bool
 
 	items   *list.List[task.Task]
 	idIndex map[string]*list.Element[task.Task]
 
-	started bool // a flag to ignore multiple starts
+	started atomic.Bool // a flag to ignore multiple starts
 
 	Name    string
 	Handler func(ctx context.Context, t task.Task) TaskResult
@@ -804,7 +804,7 @@ func (q *TaskQueue) lazydebug(msg string, argsFn func() []any) {
 }
 
 func (q *TaskQueue) Start(ctx context.Context) {
-	if q.started {
+	if q.started.Load() {
 		return
 	}
 
@@ -934,7 +934,8 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			})
 		}
 	}()
-	q.started = true
+
+	q.started.Store(true)
 }
 
 // waitForTask returns a task that can be processed or a nil if context is canceled.
@@ -961,20 +962,16 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	}
 
 	checkTicker := time.NewTicker(q.WaitLoopCheckInterval)
-	q.waitMu.Lock()
-	q.waitInProgress = true
-	q.cancelDelay = false
-	q.waitMu.Unlock()
+	q.waitInProgress.Store(true)
+	q.cancelDelay.Store(false)
 
 	// Snapshot original status
 	origStatusType, origStatusText := q.status.Snapshot()
 
 	defer func() {
 		checkTicker.Stop()
-		q.waitMu.Lock()
-		q.waitInProgress = false
-		q.cancelDelay = false
-		q.waitMu.Unlock()
+		q.waitInProgress.Store(false)
+		q.cancelDelay.Store(false)
 		// Restore original status
 		q.status.Restore(origStatusType, origStatusText)
 	}()
@@ -992,12 +989,10 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			// Check and update waitUntil.
 			elapsed := time.Since(waitBegin)
 
-			q.waitMu.Lock()
-			if q.cancelDelay {
+			if q.cancelDelay.Load() {
 				// Reset waitUntil to check task immediately.
 				waitUntil = elapsed
 			}
-			q.waitMu.Unlock()
 
 			// Wait loop is done or canceled: break select to check for the head task.
 			if elapsed >= waitUntil {
@@ -1033,11 +1028,9 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 
 // CancelTaskDelay breaks wait loop. Useful to break the possible long sleep delay.
 func (q *TaskQueue) CancelTaskDelay() {
-	q.waitMu.Lock()
-	if q.waitInProgress {
-		q.cancelDelay = true
+	if q.waitInProgress.Load() {
+		q.cancelDelay.Store(true)
 	}
-	q.waitMu.Unlock()
 }
 
 // Iterate run doFn for every task.
