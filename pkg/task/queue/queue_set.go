@@ -213,7 +213,7 @@ func (tqs *TaskQueueSet) WaitStopWithTimeout(timeout time.Duration) {
 				defer tqs.m.RUnlock()
 
 				for _, q := range tqs.Queues.List() {
-					if q.Status != "stop" {
+					if q.GetStatusType() != QueueStatusStop {
 						return false
 					}
 				}
