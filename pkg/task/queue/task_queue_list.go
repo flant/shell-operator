@@ -1033,7 +1033,20 @@ func (q *TaskQueue) CancelTaskDelay() {
 	}
 }
 
-// Iterate run doFn for every task.
+// Iterate runs doFn for every task while holding a read lock.
+//
+// IMPORTANT: The callback must NOT call any queue methods (Add, Filter, Length, etc.)
+// as this may cause deadlock. The read lock is held during callback execution.
+//
+// If you need to call queue methods inside iteration, use IterateSnapshot() instead.
+//
+// Safe in callbacks:
+//   - task.GetId(), task.GetMetadata(), etc. (task methods only)
+//   - External function calls that don't access the queue
+//
+// Unsafe in callbacks:
+//   - q.Add(), q.Length(), q.Filter(), etc. (any queue methods)
+//   - Nested q.Iterate() calls on the same queue
 func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 	if doFn == nil {
 		return
@@ -1046,6 +1059,53 @@ func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 			doFn(e.Value)
 		}
 	})
+}
+
+// IterateSnapshot creates a snapshot of all tasks and iterates over the copy.
+// This is safer than Iterate() when you need to call queue methods inside the callback,
+// as no locks are held during callback execution.
+//
+// Note: The snapshot may become stale during iteration if tasks are added/removed
+// by other goroutines or by the callback itself.
+//
+// Use this method when:
+//   - You need to call queue methods inside the callback (Add, Length, Filter, etc.)
+//   - You need to process tasks asynchronously
+//   - Safety is more important than performance
+//
+// Memory overhead: O(n) where n is the number of tasks in the queue.
+func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
+	if doFn == nil {
+		return
+	}
+
+	defer q.MeasureActionTime("IterateSnapshot")()
+
+	// Create snapshot under lock
+	snapshot := q.GetSnapshot()
+
+	// Execute callbacks without holding any locks
+	for _, t := range snapshot {
+		doFn(t)
+	}
+}
+
+// GetSnapshot returns a copy of all tasks in the queue.
+// This is useful for external iteration or processing without holding locks.
+//
+// The returned slice is a snapshot at the time of the call and will not reflect
+// subsequent changes to the queue.
+func (q *TaskQueue) GetSnapshot() []task.Task {
+	var snapshot []task.Task
+
+	q.withRLock(func() {
+		snapshot = make([]task.Task, 0, q.items.Len())
+		for e := q.items.Front(); e != nil; e = e.Next() {
+			snapshot = append(snapshot, e.Value)
+		}
+	})
+
+	return snapshot
 }
 
 // Filter run filterFn on every task and remove each with false result.
