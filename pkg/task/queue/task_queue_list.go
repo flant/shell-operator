@@ -132,7 +132,6 @@ type TaskQueue struct {
 	groupBuffer     map[string]*compactionGroup
 
 	iterateStarted atomic.Bool
-	filterStarted  atomic.Bool
 }
 
 // TaskQueueOption defines a functional option for TaskQueue configuration
@@ -1120,9 +1119,6 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 		return
 	}
 
-	q.filterStarted.Store(true)
-	defer q.filterStarted.Store(false)
-
 	defer q.MeasureActionTime("Filter")()
 
 	q.withLock(func() {
@@ -1159,9 +1155,10 @@ func (q *TaskQueue) String() string {
 }
 
 func (q *TaskQueue) withLock(fn func()) {
-	if q.iterateStarted.Load() || q.filterStarted.Load() {
+	if q.iterateStarted.Load() {
 		// Prevent deadlock if called from Iterate or Filter callbacks
 		q.logger.Error("deadlock prevented: cannot call queue methods from Iterate or Filter callbacks", slog.String("queue", q.Name))
+
 		return
 	}
 
