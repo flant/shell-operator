@@ -130,6 +130,9 @@ type TaskQueue struct {
 	contextBuffer   []bindingcontext.BindingContext
 	monitorIDBuffer []string
 	groupBuffer     map[string]*compactionGroup
+
+	iterateStarted atomic.Bool
+	filterStarted  atomic.Bool
 }
 
 // TaskQueueOption defines a functional option for TaskQueue configuration
@@ -1052,6 +1055,9 @@ func (q *TaskQueue) Iterate(doFn func(task.Task)) {
 		return
 	}
 
+	q.iterateStarted.Store(true)
+	defer q.iterateStarted.Store(false)
+
 	defer q.MeasureActionTime("Iterate")()
 
 	q.withRLock(func() {
@@ -1114,6 +1120,9 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 		return
 	}
 
+	q.filterStarted.Store(true)
+	defer q.filterStarted.Store(false)
+
 	defer q.MeasureActionTime("Filter")()
 
 	q.withLock(func() {
@@ -1150,6 +1159,12 @@ func (q *TaskQueue) String() string {
 }
 
 func (q *TaskQueue) withLock(fn func()) {
+	if q.iterateStarted.Load() || q.filterStarted.Load() {
+		// Prevent deadlock if called from Iterate or Filter callbacks
+		q.logger.Error("deadlock prevented: cannot call queue methods from Iterate or Filter callbacks", slog.String("queue", q.Name))
+		return
+	}
+
 	q.m.Lock()
 	fn()
 	q.m.Unlock()
