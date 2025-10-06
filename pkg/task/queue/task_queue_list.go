@@ -298,7 +298,13 @@ func (q *TaskQueue) isEmpty() bool {
 
 func (q *TaskQueue) Length() int {
 	defer q.MeasureActionTime("Length")()
-	return q.items.Len()
+
+	var len int
+	q.withRLock(func() {
+		len = q.items.Len()
+	})
+
+	return len
 }
 
 // AddFirst adds new head element.
