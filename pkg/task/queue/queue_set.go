@@ -13,6 +13,58 @@ import (
 
 const MainQueueName = "main"
 
+// queueStorage is a thread-safe storage for task queues with basic Get/Set/Delete operations
+type queueStorage struct {
+	mu     sync.RWMutex
+	queues map[string]*TaskQueue
+}
+
+func newQueueStorage() *queueStorage {
+	return &queueStorage{
+		queues: make(map[string]*TaskQueue),
+	}
+}
+
+// Get retrieves a queue by name, returns nil if not found
+func (qs *queueStorage) Get(name string) (*TaskQueue, bool) {
+	qs.mu.RLock()
+	defer qs.mu.RUnlock()
+	queue, exists := qs.queues[name]
+	return queue, exists
+}
+
+// List retrieves all queues
+func (qs *queueStorage) List() []*TaskQueue {
+	qs.mu.RLock()
+	defer qs.mu.RUnlock()
+
+	queues := make([]*TaskQueue, 0, len(qs.queues))
+	for _, queue := range qs.queues {
+		queues = append(queues, queue)
+	}
+
+	return queues
+}
+
+// Set stores a queue with the given name
+func (qs *queueStorage) Set(name string, queue *TaskQueue) {
+	qs.mu.Lock()
+	defer qs.mu.Unlock()
+	qs.queues[name] = queue
+}
+
+// Delete removes a queue by name
+func (qs *queueStorage) Delete(name string) {
+	qs.mu.Lock()
+	defer qs.mu.Unlock()
+	delete(qs.queues, name)
+}
+
+// Len returns the number of tasks in a queue by name
+func (qs *queueStorage) Len() int {
+	return len(qs.queues)
+}
+
 // TaskQueueSet is a manager for a set of named queues
 type TaskQueueSet struct {
 	MainName string
@@ -23,12 +75,12 @@ type TaskQueueSet struct {
 	cancel context.CancelFunc
 
 	m      sync.RWMutex
-	Queues map[string]*TaskQueue
+	Queues *queueStorage
 }
 
 func NewTaskQueueSet() *TaskQueueSet {
 	return &TaskQueueSet{
-		Queues:   make(map[string]*TaskQueue),
+		Queues:   newQueueStorage(),
 		MainName: MainQueueName,
 	}
 }
@@ -61,18 +113,14 @@ func (tqs *TaskQueueSet) StartMain(ctx context.Context) {
 }
 
 func (tqs *TaskQueueSet) Start(ctx context.Context) {
-	tqs.m.RLock()
-	for _, q := range tqs.Queues {
-		q.Start(ctx)
-	}
-
-	tqs.m.RUnlock()
+	tqs.Iterate(ctx, func(ctx context.Context, queue *TaskQueue) {
+		queue.Start(ctx)
+	})
 }
 
-func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
-	tqs.m.Lock()
-	tqs.Queues[queue.Name] = queue
-	tqs.m.Unlock()
+// Add register a new queue for TaskQueueSet.
+func (tqs *TaskQueueSet) Add(name string, queue *TaskQueue) {
+	tqs.Queues.Set(queue.Name, queue)
 }
 
 func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, opts ...TaskQueueOption) {
@@ -91,92 +139,88 @@ func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Con
 		q.logger = log.NewLogger().Named("task_queue")
 	}
 
-	tqs.m.Lock()
-	tqs.Queues[name] = q
-	tqs.m.Unlock()
+	tqs.Queues.Set(q.Name, q)
 }
 
 func (tqs *TaskQueueSet) GetByName(name string) *TaskQueue {
-	tqs.m.RLock()
-	defer tqs.m.RUnlock()
-	ts, exists := tqs.Queues[name]
-	if exists {
-		return ts
+	q, ok := tqs.Queues.Get(name)
+	if !ok {
+		return nil
 	}
-	return nil
+
+	return q
 }
 
 func (tqs *TaskQueueSet) GetMain() *TaskQueue {
 	return tqs.GetByName(tqs.MainName)
 }
 
-/*
-	taskQueueSet.DoWithLock(func(tqs *TaskQueueSet){
-	   tqs.GetMain().Pop()
-	})
-*/
 func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
 	tqs.m.Lock()
 	defer tqs.m.Unlock()
+
 	if fn != nil {
 		fn(tqs)
 	}
 }
 
 // Iterate run doFn for every task.
-func (tqs *TaskQueueSet) Iterate(doFn func(queue *TaskQueue)) {
+func (tqs *TaskQueueSet) Iterate(ctx context.Context, doFn func(ctx context.Context, queue *TaskQueue)) {
 	if doFn == nil {
 		return
 	}
 
 	tqs.m.RLock()
 	defer tqs.m.RUnlock()
-	if len(tqs.Queues) == 0 {
+	if tqs.Queues.Len() == 0 {
 		return
 	}
 
 	main := tqs.GetMain()
 	if main != nil {
-		doFn(main)
+		doFn(ctx, main)
 	}
 	// TODO sort names
 
-	for _, q := range tqs.Queues {
+	for _, q := range tqs.Queues.List() {
 		if q.Name != tqs.MainName {
-			doFn(q)
+			doFn(ctx, q)
 		}
 	}
 }
 
 func (tqs *TaskQueueSet) Remove(name string) {
-	tqs.m.Lock()
-	ts, exists := tqs.Queues[name]
+	ts, exists := tqs.Queues.Get(name)
 	if exists {
 		ts.Stop()
 	}
 
-	delete(tqs.Queues, name)
-	tqs.m.Unlock()
+	tqs.Queues.Delete(name)
 }
 
 func (tqs *TaskQueueSet) WaitStopWithTimeout(timeout time.Duration) {
 	checkTick := time.NewTicker(time.Millisecond * 100)
 	defer checkTick.Stop()
+
 	timeoutTick := time.NewTicker(timeout)
 	defer timeoutTick.Stop()
 
 	for {
 		select {
 		case <-checkTick.C:
-			stopped := true
-			tqs.m.RLock()
-			for _, q := range tqs.Queues {
-				if q.Status != "stop" {
-					stopped = false
-					break
+			stopped := func() bool {
+				tqs.m.RLock()
+				defer tqs.m.RUnlock()
+
+				for _, q := range tqs.Queues.List() {
+					if q.Status != "stop" {
+						return false
+					}
 				}
-			}
-			tqs.m.RUnlock()
+
+				return true
+			}()
+
 			if stopped {
 				return
 			}
