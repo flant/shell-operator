@@ -119,7 +119,7 @@ func (tqs *TaskQueueSet) Start(ctx context.Context) {
 }
 
 // Add register a new queue for TaskQueueSet.
-func (tqs *TaskQueueSet) Add(name string, queue *TaskQueue) {
+func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
 	tqs.Queues.Set(queue.Name, queue)
 }
 
