@@ -668,6 +668,10 @@ func (q *TaskQueue) RemoveLast() task.Task {
 	defer q.MeasureActionTime("RemoveLast")()
 	var t task.Task
 
+	if q.isEmpty() {
+		return nil
+	}
+
 	q.withLock(func() {
 		t = q.removeLast()
 	})
@@ -677,10 +681,6 @@ func (q *TaskQueue) RemoveLast() task.Task {
 
 // removeLast deletes a tail element, so tail is moved.
 func (q *TaskQueue) removeLast() task.Task {
-	if q.isEmpty() {
-		return nil
-	}
-
 	element := q.items.Back()
 	t := q.items.Remove(element)
 	delete(q.idIndex, t.GetId())
