@@ -66,7 +66,7 @@ func Test_Operator_startup_tasks(t *testing.T) {
 	}
 
 	i := 0
-	op.TaskQueues.GetMain().Iterate(func(tsk task.Task) {
+	op.TaskQueues.GetMain().IterateSnapshot(func(tsk task.Task) {
 		// Stop checking if no expects left.
 		if i >= len(expectTasks) {
 			return

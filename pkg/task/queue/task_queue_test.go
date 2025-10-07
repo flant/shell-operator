@@ -21,7 +21,7 @@ import (
 func DumpTaskIds(q *TaskQueue) string {
 	var buf bytes.Buffer
 	var index int
-	q.Iterate(func(t task.Task) {
+	q.IterateSnapshot(func(t task.Task) {
 		buf.WriteString(fmt.Sprintf("%d: %s\n", index, t.GetId()))
 		index++
 	})
@@ -411,11 +411,11 @@ func Test_QueueDump_HookMetadata_Task_Description(t *testing.T) {
 
 func taskQueueToText(q *TaskQueue) string {
 	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", q.Name, q.Length(), q.Status))
+	buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", q.Name, q.Length(), q.GetStatus()))
 	buf.WriteString("\n")
 
 	index := 1
-	q.Iterate(func(task task.Task) {
+	q.IterateSnapshot(func(task task.Task) {
 		buf.WriteString(fmt.Sprintf("%2d. ", index))
 		buf.WriteString(task.GetDescription())
 		buf.WriteString("\n")

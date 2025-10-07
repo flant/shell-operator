@@ -88,7 +88,7 @@ func (m *ManagerEventsHandler) Start() {
 
 			m.taskQueues.DoWithLock(func(tqs *queue.TaskQueueSet) {
 				for _, resTask := range tailTasks {
-					if q := tqs.Queues[resTask.GetQueueName()]; q == nil {
+					if q, ok := tqs.Queues.Get(resTask.GetQueueName()); !ok {
 						log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
 							slog.String("queueName", resTask.GetQueueName()),
 							slog.String("description", resTask.GetDescription()))
