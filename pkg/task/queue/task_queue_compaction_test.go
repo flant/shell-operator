@@ -306,11 +306,12 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 			q.compaction(nil)
 			// Verify IDs and order
 			finalIDs := make([]string, 0, q.Length())
-			q.Iterate(func(t task.Task) {
+			q.IterateSnapshot(func(t task.Task) {
 				finalIDs = append(finalIDs, t.GetId())
 			})
+
 			assert.Equal(t, tt.expectedIDs, finalIDs, "Task IDs and order should match expected")
-			q.Iterate(func(task task.Task) {
+			q.IterateSnapshot(func(task task.Task) {
 				if mt, ok := task.(*mockTask); ok && mt.GetType() == task_metadata.HookRun {
 					hm := task_metadata.HookMetadataAccessor(mt)
 					require.NotNil(t, hm, "HookMetadataAccessor should not return nil for hook task")

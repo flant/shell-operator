@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -97,18 +98,17 @@ type TaskQueue struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 
-	waitMu         sync.Mutex
-	waitInProgress bool
-	cancelDelay    bool
+	waitInProgress atomic.Bool
+	cancelDelay    atomic.Bool
 
 	items   *list.List[task.Task]
 	idIndex map[string]*list.Element[task.Task]
 
-	started bool // a flag to ignore multiple starts
+	started atomic.Bool // a flag to ignore multiple starts
 
 	Name    string
 	Handler func(ctx context.Context, t task.Task) TaskResult
-	Status  string
+	status  *TaskQueueStatus
 
 	measureActionFn     func()
 	measureActionFnOnce sync.Once
@@ -196,6 +196,7 @@ func NewTasksQueue(metricStorage metricsstorage.Storage, opts ...TaskQueueOption
 		monitorIDBuffer: make([]string, 0, 128),
 		groupBuffer:     make(map[string]*compactionGroup, 32),
 		metricStorage:   metricStorage,
+		status:          NewTaskQueueStatus(),
 	}
 
 	// Apply all options
@@ -269,33 +270,39 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 
 func (q *TaskQueue) GetStatus() string {
 	defer q.MeasureActionTime("GetStatus")()
-	q.m.RLock()
-	defer q.m.RUnlock()
-	return q.Status
+	return q.status.Get()
 }
 
-func (q *TaskQueue) SetStatus(status string) {
-	q.m.Lock()
-	q.Status = status
-	q.m.Unlock()
+func (q *TaskQueue) GetStatusType() QueueStatusType {
+	return q.status.GetType()
+}
+
+func (q *TaskQueue) SetStatus(statusType QueueStatusType) {
+	q.status.Set(statusType)
+}
+
+func (q *TaskQueue) SetStatusText(text string) {
+	q.status.SetText(text)
 }
 
 func (q *TaskQueue) IsEmpty() bool {
 	defer q.MeasureActionTime("IsEmpty")()
-	q.m.RLock()
-	defer q.m.RUnlock()
 	return q.isEmpty()
 }
 
 func (q *TaskQueue) isEmpty() bool {
-	return q.items.Len() == 0
+	return q.Length() == 0
 }
 
 func (q *TaskQueue) Length() int {
 	defer q.MeasureActionTime("Length")()
-	q.m.RLock()
-	defer q.m.RUnlock()
-	return q.items.Len()
+
+	var length int
+	q.withRLock(func() {
+		length = q.items.Len()
+	})
+
+	return length
 }
 
 // AddFirst adds new head element.
@@ -803,24 +810,24 @@ func (q *TaskQueue) lazydebug(msg string, argsFn func() []any) {
 }
 
 func (q *TaskQueue) Start(ctx context.Context) {
-	if q.started {
+	if q.started.Load() {
 		return
 	}
 
 	if q.Handler == nil {
 		log.Error("should set handler before start in queue", slog.String("name", q.Name))
-		q.SetStatus("no handler set")
+		q.SetStatus(QueueStatusNoHandlerSet)
 		return
 	}
 
 	go func() {
-		q.SetStatus("")
+		q.SetStatus(QueueStatusIdle)
 		var sleepDelay time.Duration
 		for {
 			q.logger.Debug("queue: wait for task", slog.String("queue", q.Name), slog.Duration("sleep_delay", sleepDelay))
 			t := q.waitForTask(sleepDelay)
 			if t == nil {
-				q.SetStatus("stop")
+				q.SetStatus(QueueStatusStop)
 				q.logger.Info("queue stopped", slog.String("name", q.Name))
 				return
 			}
@@ -858,14 +865,14 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			})
 
 			var nextSleepDelay time.Duration
-			q.SetStatus("run first task")
+			q.SetStatus(QueueStatusRunningTask)
 			taskRes := q.Handler(ctx, t)
 
 			// Check Done channel after long-running operation.
 			select {
 			case <-q.ctx.Done():
 				q.logger.Info("queue stopped after task handling", slog.String("name", q.Name))
-				q.SetStatus("stop")
+				q.SetStatus(QueueStatusStop)
 				return
 			default:
 			}
@@ -889,7 +896,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 					// Add tasks to the end of the queue
 					q.addLast(taskRes.GetTailTasks()...)
 				})
-				q.SetStatus("")
+				q.SetStatus(QueueStatusIdle)
 			case Fail:
 				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
 					q.logger.Warn("result is fail, cannot process tasks in result",
@@ -902,7 +909,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				// Exponential backoff delay before retry.
 				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
 				t.IncrementFailureCount()
-				q.SetStatus(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
+				q.SetStatusText(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
 			case Repeat:
 				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
 					q.logger.Warn("result is repeat, cannot process tasks in result",
@@ -914,12 +921,12 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				// repeat a current task after a small delay
 				t.SetProcessing(false)
 				nextSleepDelay = q.DelayOnRepeat
-				q.SetStatus("repeat head task")
+				q.SetStatus(QueueStatusRepeatTask)
 			}
 
 			if taskRes.DelayBeforeNextTask != 0 {
 				nextSleepDelay = taskRes.DelayBeforeNextTask
-				q.SetStatus(fmt.Sprintf("sleep for %s", nextSleepDelay.String()))
+				q.SetStatusText(fmt.Sprintf("sleep for %s", nextSleepDelay.String()))
 			}
 
 			sleepDelay = nextSleepDelay
@@ -933,7 +940,8 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			})
 		}
 	}()
-	q.started = true
+
+	q.started.Store(true)
 }
 
 // waitForTask returns a task that can be processed or a nil if context is canceled.
@@ -960,20 +968,18 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	}
 
 	checkTicker := time.NewTicker(q.WaitLoopCheckInterval)
-	q.waitMu.Lock()
-	q.waitInProgress = true
-	q.cancelDelay = false
-	q.waitMu.Unlock()
+	q.waitInProgress.Store(true)
+	q.cancelDelay.Store(false)
 
-	origStatus := q.GetStatus()
+	// Snapshot original status
+	origStatusType, origStatusText := q.status.Snapshot()
 
 	defer func() {
 		checkTicker.Stop()
-		q.waitMu.Lock()
-		q.waitInProgress = false
-		q.cancelDelay = false
-		q.waitMu.Unlock()
-		q.SetStatus(origStatus)
+		q.waitInProgress.Store(false)
+		q.cancelDelay.Store(false)
+		// Restore original status
+		q.status.Restore(origStatusType, origStatusText)
 	}()
 
 	// Wait for the queued task with some delay.
@@ -989,12 +995,10 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 			// Check and update waitUntil.
 			elapsed := time.Since(waitBegin)
 
-			q.waitMu.Lock()
-			if q.cancelDelay {
+			if q.cancelDelay.Load() {
 				// Reset waitUntil to check task immediately.
 				waitUntil = elapsed
 			}
-			q.waitMu.Unlock()
 
 			// Wait loop is done or canceled: break select to check for the head task.
 			if elapsed >= waitUntil {
@@ -1016,41 +1020,75 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 		// Wait loop still in progress: update queue status.
 		waitTime := time.Since(waitBegin).Truncate(time.Second)
 		if sleepDelay == 0 {
-			q.SetStatus(fmt.Sprintf("waiting for task %s", waitTime.String()))
+			q.SetStatusText(fmt.Sprintf("waiting for task %s", waitTime.String()))
 		} else {
 			delay := sleepDelay.Truncate(time.Second)
-			q.SetStatus(fmt.Sprintf("%s (%s left of %s delay)", origStatus, (delay - waitTime).String(), delay.String()))
+			origStatusStr := origStatusText
+			if origStatusStr == "" {
+				origStatusStr = origStatusType.String()
+			}
+			q.SetStatusText(fmt.Sprintf("%s (%s left of %s delay)", origStatusStr, (delay - waitTime).String(), delay.String()))
 		}
 	}
 }
 
 // CancelTaskDelay breaks wait loop. Useful to break the possible long sleep delay.
 func (q *TaskQueue) CancelTaskDelay() {
-	q.waitMu.Lock()
-	if q.waitInProgress {
-		q.cancelDelay = true
+	if q.waitInProgress.Load() {
+		q.cancelDelay.Store(true)
 	}
-	q.waitMu.Unlock()
 }
 
-// Iterate run doFn for every task.
-func (q *TaskQueue) Iterate(doFn func(task.Task)) {
+// IterateSnapshot creates a snapshot of all tasks and iterates over the copy.
+// This is safer than Iterate() when you need to call queue methods inside the callback,
+// as no locks are held during callback execution.
+//
+// Note: The snapshot may become stale during iteration if tasks are added/removed
+// by other goroutines or by the callback itself.
+//
+// Use this method when:
+//   - You need to call queue methods inside the callback (Add, Length, Filter, etc.)
+//   - You need to process tasks asynchronously
+//   - Safety is more important than performance
+//
+// Memory overhead: O(n) where n is the number of tasks in the queue.
+func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
 	if doFn == nil {
 		return
 	}
 
-	defer q.MeasureActionTime("Iterate")()
+	defer q.MeasureActionTime("IterateSnapshot")()
 
-	q.withRLock(func() {
-		for e := q.items.Front(); e != nil; e = e.Next() {
-			doFn(e.Value)
-		}
-	})
+	// Create snapshot under lock
+	snapshot := q.GetSnapshot()
+
+	// Execute callbacks without holding any locks
+	for _, t := range snapshot {
+		doFn(t)
+	}
 }
 
-// Filter run filterFn on every task and remove each with false result.
-func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
-	if filterFn == nil {
+// GetSnapshot returns a copy of all tasks in the queue.
+// This is useful for external iteration or processing without holding locks.
+//
+// The returned slice is a snapshot at the time of the call and will not reflect
+// subsequent changes to the queue.
+func (q *TaskQueue) GetSnapshot() []task.Task {
+	var snapshot []task.Task
+
+	q.withRLock(func() {
+		snapshot = make([]task.Task, 0, q.items.Len())
+		for e := q.items.Front(); e != nil; e = e.Next() {
+			snapshot = append(snapshot, e.Value)
+		}
+	})
+
+	return snapshot
+}
+
+// DeleteFunc runs fn on every task and removes each task for which fn returns false.
+func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
+	if fn == nil {
 		return
 	}
 
@@ -1061,7 +1099,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 			current := e
 			e = e.Next()
 			t := current.Value
-			if !filterFn(t) {
+			if !fn(t) {
 				q.items.Remove(current)
 				delete(q.idIndex, t.GetId())
 				q.queueTasksCounter.Remove(t)
@@ -1077,7 +1115,7 @@ func (q *TaskQueue) String() string {
 	var buf strings.Builder
 	var index int
 	qLen := q.Length()
-	q.Iterate(func(t task.Task) {
+	q.IterateSnapshot(func(t task.Task) {
 		buf.WriteString(fmt.Sprintf("[%s,id=%10.10s]", t.GetDescription(), t.GetId()))
 		index++
 		if index == qLen {

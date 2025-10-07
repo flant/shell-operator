@@ -747,7 +747,7 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 
 	otherTasks := make([]task.Task, 0)
 	stopIterate := false
-	q.Iterate(func(tsk task.Task) {
+	q.IterateSnapshot(func(tsk task.Task) {
 		if stopIterate {
 			return
 		}
@@ -798,7 +798,7 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	}
 
 	// Delete tasks with false in tasksFilter map
-	op.TaskQueues.GetByName(t.GetQueueName()).Filter(func(tsk task.Task) bool {
+	op.TaskQueues.GetByName(t.GetQueueName()).DeleteFunc(func(tsk task.Task) bool {
 		if v, ok := tasksFilter[tsk.GetId()]; ok {
 			return v
 		}
@@ -932,10 +932,11 @@ func (op *ShellOperator) runMetrics() {
 	// task queue length
 	go func() {
 		for {
-			op.TaskQueues.Iterate(func(queue *queue.TaskQueue) {
+			op.TaskQueues.Iterate(context.TODO(), func(_ context.Context, queue *queue.TaskQueue) {
 				queueLen := float64(queue.Length())
 				op.MetricStorage.GaugeSet(metrics.TasksQueueLength, queueLen, map[string]string{"queue": queue.Name})
 			})
+
 			time.Sleep(5 * time.Second)
 		}
 	}()

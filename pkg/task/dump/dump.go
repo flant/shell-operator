@@ -1,6 +1,7 @@
 package dump
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -78,7 +79,7 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 	tasksCount := 0
 	mainTasksCount := 0
 
-	tqs.Iterate(func(queue *queue.TaskQueue) {
+	tqs.Iterate(context.TODO(), func(_ context.Context, queue *queue.TaskQueue) {
 		if queue == nil {
 			return
 		}
@@ -160,7 +161,7 @@ func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
 	tasks := make([]dumpTask, 0, q.Length())
 
 	index := 1
-	q.Iterate(func(task task.Task) {
+	q.IterateSnapshot(func(task task.Task) {
 		tasks = append(tasks, dumpTask{
 			Index:       index,
 			Description: task.GetDescription(),
