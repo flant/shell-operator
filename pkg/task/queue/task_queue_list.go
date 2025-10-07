@@ -329,6 +329,10 @@ func (q *TaskQueue) RemoveFirst() task.Task {
 	defer q.MeasureActionTime("RemoveFirst")()
 	var t task.Task
 
+	if q.isEmpty() {
+		return nil
+	}
+
 	q.withLock(func() {
 		t = q.removeFirst()
 	})
@@ -338,10 +342,6 @@ func (q *TaskQueue) RemoveFirst() task.Task {
 
 // removeFirst deletes a head element, so head is moved.
 func (q *TaskQueue) removeFirst() task.Task {
-	if q.isEmpty() {
-		return nil
-	}
-
 	element := q.items.Front()
 	t := q.items.Remove(element)
 	delete(q.idIndex, t.GetId())
@@ -359,6 +359,7 @@ func (q *TaskQueue) GetFirst() task.Task {
 	if q.isEmpty() {
 		return nil
 	}
+
 	return q.items.Front().Value
 }
 
