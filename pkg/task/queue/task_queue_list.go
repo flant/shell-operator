@@ -1086,7 +1086,7 @@ func (q *TaskQueue) GetSnapshot() []task.Task {
 	return snapshot
 }
 
-// DeleteFunc run fn on every task and remove each with false result.
+// DeleteFunc runs fn on every task and removes each task for which fn returns false.
 func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 	if fn == nil {
 		return
