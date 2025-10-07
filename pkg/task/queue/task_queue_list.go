@@ -1041,37 +1041,6 @@ func (q *TaskQueue) CancelTaskDelay() {
 	}
 }
 
-// Iterate runs doFn for every task while holding a read lock.
-//
-// IMPORTANT: The callback must NOT call any queue methods (Add, Filter, Length, etc.)
-// as this may cause deadlock. The read lock is held during callback execution.
-//
-// If you need to call queue methods inside iteration, use IterateSnapshot() instead.
-//
-// Safe in callbacks:
-//   - task.GetId(), task.GetMetadata(), etc. (task methods only)
-//   - External function calls that don't access the queue
-//
-// Unsafe in callbacks:
-//   - q.Add(), q.Length(), q.Filter(), etc. (any queue methods)
-//   - Nested q.Iterate() calls on the same queue
-func (q *TaskQueue) Iterate(doFn func(task.Task)) {
-	if doFn == nil {
-		return
-	}
-
-	q.iterateStarted.Store(true)
-	defer q.iterateStarted.Store(false)
-
-	defer q.MeasureActionTime("Iterate")()
-
-	q.withRLock(func() {
-		for e := q.items.Front(); e != nil; e = e.Next() {
-			doFn(e.Value)
-		}
-	})
-}
-
 // IterateSnapshot creates a snapshot of all tasks and iterates over the copy.
 // This is safer than Iterate() when you need to call queue methods inside the callback,
 // as no locks are held during callback execution.
@@ -1119,9 +1088,9 @@ func (q *TaskQueue) GetSnapshot() []task.Task {
 	return snapshot
 }
 
-// Filter run filterFn on every task and remove each with false result.
-func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
-	if filterFn == nil {
+// DeleteFunc run fn on every task and remove each with false result.
+func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
+	if fn == nil {
 		return
 	}
 
@@ -1132,7 +1101,7 @@ func (q *TaskQueue) Filter(filterFn func(task.Task) bool) {
 			current := e
 			e = e.Next()
 			t := current.Value
-			if !filterFn(t) {
+			if !fn(t) {
 				q.items.Remove(current)
 				delete(q.idIndex, t.GetId())
 				q.queueTasksCounter.Remove(t)
@@ -1148,7 +1117,7 @@ func (q *TaskQueue) String() string {
 	var buf strings.Builder
 	var index int
 	qLen := q.Length()
-	q.Iterate(func(t task.Task) {
+	q.IterateSnapshot(func(t task.Task) {
 		buf.WriteString(fmt.Sprintf("[%s,id=%10.10s]", t.GetDescription(), t.GetId()))
 		index++
 		if index == qLen {

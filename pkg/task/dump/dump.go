@@ -161,7 +161,7 @@ func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
 	tasks := make([]dumpTask, 0, q.Length())
 
 	index := 1
-	q.Iterate(func(task task.Task) {
+	q.IterateSnapshot(func(task task.Task) {
 		tasks = append(tasks, dumpTask{
 			Index:       index,
 			Description: task.GetDescription(),
