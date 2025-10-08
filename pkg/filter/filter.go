@@ -9,11 +9,11 @@ import (
 	"runtime"
 	"runtime/trace"
 
+	"github.com/itchyny/gojq"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
-	"github.com/itchyny/gojq"
 )
 
 type FilterFn func(obj *unstructured.Unstructured) (result interface{}, err error)

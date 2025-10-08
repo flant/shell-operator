@@ -48,7 +48,7 @@ func TestRun(t *testing.T) {
 		obj := newTestObject(map[string]interface{}{"foo": "bar"})
 		expectedErr := errors.New("filter failed")
 
-		filterFn := func(o *unstructured.Unstructured) (interface{}, error) {
+		filterFn := func(_ *unstructured.Unstructured) (interface{}, error) {
 			return nil, expectedErr
 		}
 
@@ -63,7 +63,7 @@ func TestRun(t *testing.T) {
 		obj := newTestObject(map[string]interface{}{"foo": "bar"})
 
 		// Return something that can't be marshaled to JSON
-		filterFn := func(o *unstructured.Unstructured) (interface{}, error) {
+		filterFn := func(_ *unstructured.Unstructured) (interface{}, error) {
 			return make(chan int), nil // channels can't be marshaled
 		}
 
