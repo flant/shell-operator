@@ -132,11 +132,13 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) error {
 		monitor.WithNamespaceSelector((*kemtypes.NamespaceSelector)(kubeCfg.Namespace))
 		monitor.WithLabelSelector(kubeCfg.LabelSelector)
 
-		filter, err := filter.CompileExpression(kubeCfg.JqFilter)
-		if err != nil {
-			return fmt.Errorf("invalid jqFilter: %w", err)
+		if kubeCfg.JqFilter != "" {
+			filter, err := filter.CompileExpression(kubeCfg.JqFilter)
+			if err != nil {
+				return fmt.Errorf("invalid jqFilter: %w", err)
+			}
+			monitor.JqFilter = filter
 		}
-		monitor.JqFilter = filter
 
 		// executeHookOnEvent is a priority
 		if kubeCfg.ExecuteHookOnEvents != nil {
