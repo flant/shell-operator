@@ -23,33 +23,44 @@ type Expression struct {
 	Query string
 }
 
-// applyFilter filters object with custom function or jq expression, calculates checksum
-// over the result and returns ObjectAndFilterResult. If no filter is provided,
-// checksum is calculated over the full JSON representation of the object.
+// Run filters an object with a custom function or jq expression, calculates checksum
+// over the result and returns ObjectAndFilterResult.
+//
+// Filter precedence (highest to lowest):
+// 1. Custom filter function (filterFn) - if provided, takes precedence over jq expression
+// 2. JQ expression (expression) - used when filterFn is nil but expression is provided
+// 3. No filter - when both filterFn and expression are nil, uses raw object JSON
+//
+// The function calculates a checksum over the filtered result (or full object if no filter)
+// and populates metadata including resource ID and jq filter query (if applicable).
 func Run(expression *Expression, filterFn FilterFn, obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
 	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
 
+	// Initialize result with object and resource ID
 	result := &kemtypes.ObjectAndFilterResult{
 		Object: obj,
 	}
 	result.Metadata.ResourceId = fmt.Sprintf("%s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 
+	// Set JQ filter in metadata if expression is provided (even if custom filter takes precedence)
 	if expression != nil {
 		result.Metadata.JqFilter = expression.Query
 	}
 
-	// Apply custom filter function
-	if filterFn != nil {
+	// Apply filters based on precedence: custom filter > jq expression > no filter
+	switch {
+	case filterFn != nil:
+		// Custom filter function takes highest precedence
 		return applyCustomFilter(filterFn, result, obj)
-	}
 
-	// No filter - use raw object JSON
-	if expression == nil {
+	case expression != nil:
+		// JQ expression filter when no custom filter is provided
+		return applyJQFilter(expression, result, obj)
+
+	default:
+		// No filter - use raw object JSON when both filterFn and expression are nil
 		return applyNoFilter(result, obj)
 	}
-
-	// Apply jq expression filter
-	return applyJQFilter(expression, result, obj)
 }
 
 func applyCustomFilter(filterFn FilterFn, result *kemtypes.ObjectAndFilterResult, obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {

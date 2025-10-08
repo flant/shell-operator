@@ -126,7 +126,7 @@ func (dop *PatchCollector) PatchWithMutatingFunc(
 //   - IgnoreMissingObject — do not return error if the specified object is missing.
 //   - IgnoreHookError — allows applying patches for a Status subresource even if the hook fails
 func (dop *PatchCollector) JQFilter(
-	jqfilter string, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorOption,
+	jqfilter, apiVersion, kind, namespace, name string, opts ...sdkpkg.PatchCollectorOption,
 ) {
 	dop.add(NewPatchWithJQOperation(jqfilter, apiVersion, kind, namespace, name, opts...))
 }

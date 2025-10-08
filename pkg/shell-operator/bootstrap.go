@@ -9,6 +9,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
+	"github.com/flant/shell-operator/pkg/filter"
 	"github.com/flant/shell-operator/pkg/hook"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/metrics"
@@ -26,8 +27,9 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 	// Init logging subsystem.
 	app.SetupLogging(runtimeConfig, logger)
 
-	// Log version
+	// Log version and filter implementation
 	logger.Info(app.AppStartMessage)
+	logger.Debug(filter.Info())
 
 	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
 	if err != nil {
