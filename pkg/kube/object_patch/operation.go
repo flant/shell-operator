@@ -6,11 +6,12 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	sdkpkg "github.com/deckhouse/module-sdk/pkg"
-	"github.com/flant/shell-operator/pkg/jq"
 	"github.com/hashicorp/go-multierror"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/flant/shell-operator/pkg/jq"
 )
 
 // OperationSpec a JSON and YAML representation of the operation for shell hooks

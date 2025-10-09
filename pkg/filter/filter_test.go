@@ -4,10 +4,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flant/shell-operator/pkg/jq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/flant/shell-operator/pkg/jq"
 )
 
 // Helper function to create test objects
