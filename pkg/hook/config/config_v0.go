@@ -6,8 +6,8 @@ import (
 	"gopkg.in/robfig/cron.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/flant/shell-operator/pkg/filter"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/jq"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
@@ -110,7 +110,7 @@ func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) error {
 		monitor.WithLabelSelector(kubeCfg.Selector)
 
 		if kubeCfg.JqFilter != "" {
-			filter, err := filter.CompileExpression(kubeCfg.JqFilter)
+			filter, err := jq.CompileExpression(kubeCfg.JqFilter)
 			if err != nil {
 				return fmt.Errorf("invalid jqFilter: %w", err)
 			}

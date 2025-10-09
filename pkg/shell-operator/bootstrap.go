@@ -9,8 +9,8 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
 	"github.com/flant/shell-operator/pkg/debug"
-	"github.com/flant/shell-operator/pkg/filter"
 	"github.com/flant/shell-operator/pkg/hook"
+	"github.com/flant/shell-operator/pkg/jq"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/metrics"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
@@ -29,7 +29,7 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 
 	// Log version and filter implementation
 	logger.Info(app.AppStartMessage)
-	logger.Debug(filter.Info())
+	logger.Debug(jq.Info())
 
 	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
 	if err != nil {

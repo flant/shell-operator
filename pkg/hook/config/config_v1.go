@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/filter"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/jq"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
@@ -133,7 +133,7 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) error {
 		monitor.WithLabelSelector(kubeCfg.LabelSelector)
 
 		if kubeCfg.JqFilter != "" {
-			filter, err := filter.CompileExpression(kubeCfg.JqFilter)
+			filter, err := jq.CompileExpression(kubeCfg.JqFilter)
 			if err != nil {
 				return fmt.Errorf("invalid jqFilter: %w", err)
 			}

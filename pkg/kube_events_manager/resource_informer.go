@@ -221,15 +221,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		// copy loop var to avoid duplication of pointer in filteredObjects
 		obj := item
 
-		var objFilterRes *kemtypes.ObjectAndFilterResult
-		var err error
-		func() {
-			defer measure.Duration(func(d time.Duration) {
-				ei.metricStorage.HistogramObserve(metrics.KubeJqFilterDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
-			})()
-			objFilterRes, err = filter.Run(ei.Monitor.JqFilter, ei.Monitor.FilterFunc, &obj)
-		}()
-
+		objFilterRes, err := ei.transformObject(&obj)
 		if err != nil {
 			return err
 		}
@@ -300,14 +292,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 
 	// Always calculate checksum and update cache, because we need an actual state in ei.cachedObjects.
 
-	var objFilterRes *kemtypes.ObjectAndFilterResult
-	var err error
-	func() {
-		defer measure.Duration(func(d time.Duration) {
-			ei.metricStorage.HistogramObserve(metrics.KubeJqFilterDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
-		})()
-		objFilterRes, err = filter.Run(ei.Monitor.JqFilter, ei.Monitor.FilterFunc, obj)
-	}()
+	objFilterRes, err := ei.transformObject(obj)
 	if err != nil {
 		log.Error("handleWatchEvent: applyFilter error",
 			slog.String("debugName", ei.Monitor.Metadata.DebugName),
@@ -487,4 +472,25 @@ func (ei *resourceInformer) getCachedObjectsInfoIncrement() CachedObjectsInfo {
 	info := *ei.cachedObjectsIncrement
 	ei.cachedObjectsIncrement = &CachedObjectsInfo{}
 	return info
+}
+
+func (ei *resourceInformer) transformObject(obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+	recordDuration := measure.Duration(func(d time.Duration) {
+		ei.metricStorage.HistogramObserve(
+			metrics.KubeJqFilterDurationSeconds,
+			d.Seconds(),
+			ei.Monitor.Metadata.MetricLabels,
+			nil,
+		)
+	})
+	defer recordDuration()
+
+	if ei.Monitor.JqFilter != nil {
+		return filter.RunExpression(ei.Monitor.JqFilter, obj)
+	}
+	if ei.Monitor.FilterFunc != nil {
+		return filter.RunFn(ei.Monitor.FilterFunc, obj)
+	}
+
+	return filter.RunPlain(obj)
 }

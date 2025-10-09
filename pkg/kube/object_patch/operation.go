@@ -6,12 +6,11 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	sdkpkg "github.com/deckhouse/module-sdk/pkg"
+	"github.com/flant/shell-operator/pkg/jq"
 	"github.com/hashicorp/go-multierror"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/flant/shell-operator/pkg/filter"
 )
 
 // OperationSpec a JSON and YAML representation of the operation for shell hooks
@@ -288,7 +287,7 @@ func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, n
 
 func NewPatchWithJQOperation(jqQuery string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newFilterOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-		expression, err := filter.CompileExpression(jqQuery)
+		expression, err := jq.CompileExpression(jqQuery)
 		if err != nil {
 			return nil, err
 		}

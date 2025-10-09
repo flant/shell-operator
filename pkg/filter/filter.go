@@ -1,158 +1,96 @@
+/*
+Package filter provides functionality for transforming and filtering objects
+from plain kubernetes unstructured objects to structured objects, that shell-operator can work with.
+  - Supports JQ Expressions
+  - Supports Custom Filter Functions
+  - Supports Plain Filter Functions
+
+Enriches objects with metadata and calculates a checksum.
+*/
 package filter
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
 	"runtime/trace"
 
-	"github.com/itchyny/gojq"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/flant/shell-operator/pkg/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 )
 
 type FilterFn func(obj *unstructured.Unstructured) (result interface{}, err error)
 
-type Expression struct {
-	*gojq.Code
-	Query string
-}
+// RunFn runs a filter function on an object and returns an ObjectAndFilterResult.
+func RunFn(filterFn FilterFn, obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+	defer trace.StartRegion(context.Background(), "FilterRunFn").End()
 
-// Run filters an object with a custom function or jq expression, calculates checksum
-// over the result and returns ObjectAndFilterResult.
-//
-// Filter precedence (highest to lowest):
-// 1. Custom filter function (filterFn) - if provided, takes precedence over jq expression
-// 2. JQ expression (expression) - used when filterFn is nil but expression is provided
-// 3. No filter - when both filterFn and expression are nil, uses raw object JSON
-//
-// The function calculates a checksum over the filtered result (or full object if no filter)
-// and populates metadata including resource ID and jq filter query (if applicable).
-func Run(expression *Expression, filterFn FilterFn, obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
-	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
-
-	// Initialize result with object and resource ID
-	result := &kemtypes.ObjectAndFilterResult{
-		Object: obj,
-	}
-	result.Metadata.ResourceId = fmt.Sprintf("%s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
-
-	// Set JQ filter in metadata if expression is provided (even if custom filter takes precedence)
-	if expression != nil {
-		result.Metadata.JqFilter = expression.Query
-	}
-
-	// Apply filters based on precedence: custom filter > jq expression > no filter
-	switch {
-	case filterFn != nil:
-		// Custom filter function takes highest precedence
-		return applyCustomFilter(filterFn, result, obj)
-
-	case expression != nil:
-		// JQ expression filter when no custom filter is provided
-		return applyJQFilter(expression, result, obj)
-
-	default:
-		// No filter - use raw object JSON when both filterFn and expression are nil
-		return applyNoFilter(result, obj)
-	}
-}
-
-func applyCustomFilter(filterFn FilterFn, result *kemtypes.ObjectAndFilterResult, obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
-	filteredObj, err := filterFn(obj)
+	filtered, err := filterFn(obj)
 	if err != nil {
-		funcName := runtime.FuncForPC(reflect.ValueOf(filterFn).Pointer()).Name()
-		return nil, fmt.Errorf("filterFn (%s) contains an error: %v", funcName, err)
+		return nil, fmt.Errorf("filter function (%s) execution error: %v", funcName(filterFn), err)
 	}
 
-	filteredBytes, err := json.Marshal(filteredObj)
+	filteredBytes, err := json.Marshal(filtered)
 	if err != nil {
 		return nil, err
 	}
 
-	result.FilterResult = filteredObj
-	result.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filteredBytes))
-	return result, nil
+	return &kemtypes.ObjectAndFilterResult{
+		Object: obj,
+		Metadata: kemtypes.ObjectAndFilterResultMetadata{
+			ResourceId: resourceID(obj),
+			Checksum:   utils_checksum.CalculateChecksum(string(filteredBytes)),
+		},
+		FilterResult: filtered,
+	}, nil
 }
 
-func applyNoFilter(result *kemtypes.ObjectAndFilterResult, obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+// RunExpression runs a jq expression on an object and returns an ObjectAndFilterResult.
+func RunExpression(expression *jq.Expression, obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+	defer trace.StartRegion(context.Background(), "FilterRunExpression").End()
+
+	filtered, err := jq.ExecuteJQ(expression, obj)
+	if err != nil {
+		return nil, fmt.Errorf("jq expression execution error: %v", err)
+	}
+
+	return &kemtypes.ObjectAndFilterResult{
+		Object: obj,
+		Metadata: kemtypes.ObjectAndFilterResultMetadata{
+			ResourceId: resourceID(obj),
+			Checksum:   utils_checksum.CalculateChecksum(string(filtered)),
+			JqFilter:   expression.Query(),
+		},
+		FilterResult: filtered,
+	}, nil
+}
+
+// RunPlain runs NO filter function on an object and returns an ObjectAndFilterResult.
+func RunPlain(obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+	// TODO: json operation could be avoided, we can caclculate checksum from the object itself
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	result.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))
-	return result, nil
-}
-
-func applyJQFilter(expression *Expression, result *kemtypes.ObjectAndFilterResult, obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
-	filtered, err := RunJQ(expression, obj.DeepCopy())
-	if err != nil {
-		return nil, fmt.Errorf("jqFilter: %v", err)
-	}
-
-	filteredStr := string(filtered)
-	result.FilterResult = filteredStr
-	result.Metadata.Checksum = utils_checksum.CalculateChecksum(filteredStr)
-	return result, nil
-}
-
-func RunJQ(expression *Expression, obj *unstructured.Unstructured) ([]byte, error) {
-	// Execute jq expression and collect results
-	iter := expression.Run(obj.UnstructuredContent())
-	var results []any
-
-	for {
-		v, ok := iter.Next()
-		if !ok {
-			break
-		}
-
-		// Handle errors from jq execution
-		if err, ok := v.(error); ok {
-			// HaltError with nil value means graceful termination
-			var haltErr *gojq.HaltError
-			if errors.As(err, &haltErr) && haltErr.Value() == nil {
-				break
-			}
-			return nil, err
-		}
-
-		results = append(results, v)
-	}
-
-	// Marshal results based on count
-	switch len(results) {
-	case 0:
-		return []byte("null"), nil
-	case 1:
-		return json.Marshal(results[0])
-	default:
-		return json.Marshal(results)
-	}
-}
-
-func CompileExpression(expression string) (*Expression, error) {
-	parsedQuery, err := gojq.Parse(expression)
-	if err != nil {
-		return nil, err
-	}
-	compiledQuery, err := gojq.Compile(parsedQuery)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Expression{
-		Code:  compiledQuery,
-		Query: expression,
+	return &kemtypes.ObjectAndFilterResult{
+		Object: obj,
+		Metadata: kemtypes.ObjectAndFilterResultMetadata{
+			ResourceId: resourceID(obj),
+			Checksum:   utils_checksum.CalculateChecksum(string(data)),
+		},
 	}, nil
 }
 
-func Info() string {
-	return "Filter implementation: using itchyny/gojq"
+func resourceID(obj *unstructured.Unstructured) string {
+	return fmt.Sprintf("%s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
+}
+
+func funcName(fn FilterFn) string {
+	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/flant/kube-client/klogtolog"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
-	"github.com/flant/shell-operator/pkg/filter"
+	"github.com/flant/shell-operator/pkg/jq"
 )
 
 func main() {
@@ -30,8 +30,7 @@ func main() {
 
 	// print version
 	kpApp.Command("version", "Show version.").Action(func(_ *kingpin.ParseContext) error {
-		fmt.Printf("%s %s\n", app.AppName, app.Version)
-		fmt.Println(filter.Info())
+		fmt.Printf("%s %s\n%s\n", app.AppName, app.Version, jq.Info())
 		return nil
 	})
 
