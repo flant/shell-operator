@@ -1,5 +1,6 @@
 # Publish flant/shell-operator image on hub.docker.com.
-# Build 'latest' tag when release is published.
+# Build 'latest' tag if started manually on default branch.
+# Build 'v*.*.*' and 'latest' tags when release is published.
 name: Publish release image
 
 on:
@@ -18,7 +19,6 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     outputs:
-      run_publish: ${{ steps.check.outputs.run_publish }}
       image_tag: ${{ steps.check.outputs.image_tag }}
       additional_tag: ${{ steps.check.outputs.additional_tag }}
     steps:
@@ -26,10 +26,8 @@ jobs:
         id: check
         with:
           script: |
-            const SKIP_LATEST_LABEL_NAME = 'skip/image/latest';
             const event = context.payload;
             const eventName = context.eventName;
-            let runPublish = false;
             let imageTag = '';
             let additionalTag = ''; // Also push additional tag when building a released tag.
 
@@ -39,40 +37,16 @@ jobs:
                 return core.setFailed(`Detect manual execution for '${event.ref}'. Use only default branch. Skip 'publish latest image'.`);
               }
               console.log(`Detect manual execution for default branch. Run 'publish latest image'.`);
-              runPublish = true;
               imageTag = 'latest';
             }
 
-            // Check for 'skip' label on pull request merge.
-            if (eventName == 'pull_request' && event.action == 'closed') {
-              if (!event.pull_request.merged) {
-                return console.log(`PR ${event.number} not merged. Skip 'publish latest image'.`);
-              }
-              const hasSkipLabel = event.pull_request.labels.some(l => l.name === SKIP_LATEST_LABEL_NAME);
-              if (hasSkipLabel) {
-                return console.log(`Detect skip label '${SKIP_LATEST_LABEL_NAME}' on merged PR ${event.number}. Skip 'publish latest image'.`);
-              }
-              console.log(`No skip labels on merged PR ${event.number}. Run 'publish latest image'.`);
-              runPublish = true;
-              imageTag = 'latest';
-            }
-
-            // Check if tag is pushed.
-            if (eventName == 'push') {
-              if (!event.ref.startsWith('refs/tags/')) {
-                return console.log(`Detect non-release ref: ${event.ref}. Skip 'publish latest image'.`);
-              }
-              runPublish = true;
-              imageTag = context.ref.replace('refs/tags/', '');
+            if (eventName === 'release' && event.action === 'published') {
+              console.log(`Detected release publication: ${event.release.tag_name}. Run 'publish latest image'.`);
+              imageTag = event.release.tag_name;
               additionalTag = 'latest';
             }
 
-            console.log(`Outputs: run_publish=${runPublish} image_tag=${imageTag} additional_tag=${additionalTag}`);
-            if (!runPublish) {
-              console.log(`DEBUG: eventName=${eventName} action=${event.action} ref=${event.ref} merged=${event.pull_request && event.pull_request.merged} prLabels=${JSON.stringify(event.pull_request && event.pull_request.labels)}`)
-              return console.log(`Skip 'publish latest image'.`);
-            }
-            core.setOutput('run_publish', runPublish.toString());
+            console.log(`Outputs: image_tag=${imageTag} additional_tag=${additionalTag}`);
             core.setOutput('image_tag', imageTag);
             core.setOutput('additional_tag', additionalTag);
 
@@ -81,7 +55,7 @@ jobs:
     runs-on: [ubuntu-latest]
     needs:
       - check
-    if: needs.check.outputs.run_publish == 'true'
+    if: ${{ needs.check.outputs.image_tag != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -166,7 +140,7 @@ jobs:
               echo "Ignore image for non-runnable platform ${platform}"
               echo "  ${image}"
               echo "====================================="
-              continue          
+              continue
             fi
             image=${GHCR_IO_IMAGE_NAME}@${digest}
             echo "====================================="
