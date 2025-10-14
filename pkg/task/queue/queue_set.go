@@ -146,8 +146,8 @@ func (tqs *TaskQueueSet) Add(queue *TaskQueue) {
 
 func (tqs *TaskQueueSet) NewNamedQueue(name string, handler func(ctx context.Context, t task.Task) TaskResult, opts ...TaskQueueOption) {
 	q := NewTasksQueue(
+		name,
 		tqs.metricStorage,
-		WithName(name),
 		WithHandler(handler),
 		WithContext(tqs.ctx),
 	)

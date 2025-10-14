@@ -142,13 +142,6 @@ func WithContext(ctx context.Context) TaskQueueOption {
 	}
 }
 
-// WithName sets the name for the TaskQueue
-func WithName(name string) TaskQueueOption {
-	return func(q *TaskQueue) {
-		q.Name = name
-	}
-}
-
 // WithHandler sets the task handler for the TaskQueue
 func WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) TaskQueueOption {
 	return func(q *TaskQueue) {
@@ -175,12 +168,14 @@ func WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask
 func WithLogger(logger *log.Logger) TaskQueueOption {
 	return func(q *TaskQueue) {
 		q.logger = logger
+		q.logger = q.logger.Named(q.Name)
 	}
 }
 
 // NewTasksQueue creates a new TaskQueue with the provided options
-func NewTasksQueue(metricStorage metricsstorage.Storage, opts ...TaskQueueOption) *TaskQueue {
+func NewTasksQueue(name string, metricStorage metricsstorage.Storage, opts ...TaskQueueOption) *TaskQueue {
 	q := &TaskQueue{
+		Name:    name,
 		items:   list.New[task.Task](),
 		idIndex: make(map[string]*list.Element[task.Task]),
 		// Default timings
@@ -190,7 +185,7 @@ func NewTasksQueue(metricStorage metricsstorage.Storage, opts ...TaskQueueOption
 		ExponentialBackoffFn: func(failureCount int) time.Duration {
 			return exponential_backoff.CalculateDelay(DefaultInitialDelayOnFailedTask, failureCount)
 		},
-		logger: log.NewNop(),
+		logger: log.NewLogger().Named("task_queue").Named(name),
 		// Pre-allocate buffers
 		contextBuffer:   make([]bindingcontext.BindingContext, 0, 128),
 		monitorIDBuffer: make([]string, 0, 128),
@@ -245,6 +240,7 @@ func (q *TaskQueue) putHookGroupsMap(m map[string]*compactionGroup) {
 	for k := range m {
 		delete(m, k)
 	}
+
 	hookGroupsMapPool.Put(m)
 }
 
@@ -270,6 +266,7 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 
 func (q *TaskQueue) GetStatus() string {
 	defer q.MeasureActionTime("GetStatus")()
+
 	return q.status.Get()
 }
 
@@ -287,6 +284,7 @@ func (q *TaskQueue) SetStatusText(text string) {
 
 func (q *TaskQueue) IsEmpty() bool {
 	defer q.MeasureActionTime("IsEmpty")()
+
 	return q.isEmpty()
 }
 
@@ -308,6 +306,7 @@ func (q *TaskQueue) Length() int {
 // AddFirst adds new head element.
 func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
+
 	q.withLock(func() {
 		q.addFirst(tasks...)
 	})
@@ -694,6 +693,7 @@ func (q *TaskQueue) removeLast() task.Task {
 func (q *TaskQueue) GetLast() task.Task {
 	defer q.MeasureActionTime("GetLast")()
 	var t task.Task
+
 	q.withRLock(func() {
 		t = q.getLast()
 	})
@@ -734,6 +734,7 @@ func (q *TaskQueue) get(id string) task.Task {
 // AddAfter inserts a task after the task with specified id.
 func (q *TaskQueue) AddAfter(id string, tasks ...task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
+
 	q.withLock(func() {
 		q.addAfter(id, tasks...)
 	})
@@ -755,6 +756,7 @@ func (q *TaskQueue) addAfter(id string, tasks ...task.Task) {
 // AddBefore inserts a task before the task with specified id.
 func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddBefore")()
+
 	q.withLock(func() {
 		q.addBefore(id, newTask)
 	})

@@ -11,6 +11,7 @@ import (
 
 func TestConcurrentOperations(t *testing.T) {
 	queue := NewTasksQueue(
+		"test",
 		metricsstorage.NewMetricStorage(metricsstorage.WithNewRegistry()),
 		WithContext(context.Background()),
 	)
