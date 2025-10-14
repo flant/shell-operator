@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -39,7 +40,7 @@ type TaskQueueSlice struct {
 	waitInProgress bool
 	cancelDelay    bool
 
-	isCompactable    bool
+	isCompactable    atomic.Bool
 	CompactableTypes map[task.TaskType]struct{}
 
 	items   []task.Task
@@ -234,18 +235,18 @@ func (q *TaskQueueSlice) addLast(tasks ...task.Task) {
 		q.items = append(q.items, t)
 		taskType := t.GetType()
 
-		if q.isCompactable {
+		if q.isCompactable.Load() {
 			continue
 		}
 
 		if _, ok := q.CompactableTypes[taskType]; ok {
-			q.isCompactable = true
+			q.isCompactable.Store(true)
 		}
 	}
 
-	if q.isCompactable && len(q.items) > 100 {
+	if q.isCompactable.Load() && len(q.items) > 100 {
 		q.compaction()
-		q.isCompactable = false
+		q.isCompactable.Store(false)
 	}
 }
 
@@ -256,7 +257,7 @@ func (q *TaskQueueSlice) compaction() {
 		return
 	}
 
-	// Предварительно выделяем память для результата
+	// Pre-allocate memory for the result
 	result := make([]task.Task, 0, len(q.items))
 
 	hookGroups := make(map[string][]int, 10) // hookName -> []indices
@@ -269,7 +270,7 @@ func (q *TaskQueueSlice) compaction() {
 		}
 		hm := task.GetMetadata()
 		if isNil(hm) || task.IsProcessing() {
-			result = append(result, task) // Nil metadata и processing задачи сразу в результат
+			result = append(result, task) // Nil metadata and processing tasks go directly to result
 			continue
 		}
 
@@ -286,17 +287,17 @@ func (q *TaskQueueSlice) compaction() {
 		hookGroups[hookName] = append(hookGroups[hookName], i)
 	}
 
-	// Обрабатываем группы хуков - O(N) в худшем случае
+	// Process hook groups - O(N) in worst case
 	for _, hookName := range hookOrder {
 		indices := hookGroups[hookName]
 
 		if len(indices) == 1 {
-			// Только одна задача - добавляем как есть
+			// Only one task - add as is
 			result = append(result, q.items[indices[0]])
 			continue
 		}
 
-		// Находим задачу с минимальным индексом как целевую
+		// Find the task with minimal index as target
 		minIndex := indices[0]
 		for _, idx := range indices {
 			if idx < minIndex {
@@ -327,13 +328,13 @@ func (q *TaskQueueSlice) compaction() {
 
 		contexts := bindingContextAccessor.GetBindingContext()
 		monitorIDs := monitorIDAccessor.GetMonitorIDs()
-		// Предварительно вычисляем общий размер
+		// Pre-calculate total size
 		totalContexts := len(contexts)
 		totalMonitorIDs := len(monitorIDs)
 
 		for _, idx := range indices {
 			if idx == minIndex {
-				continue // Пропускаем целевую задачу
+				continue // Skip the target task
 			}
 			existingHm := q.items[idx].GetMetadata()
 			if existingHm != nil {
@@ -346,7 +347,7 @@ func (q *TaskQueueSlice) compaction() {
 			}
 		}
 
-		// Создаем новые слайсы с правильным размером
+		// Create new slices with correct size
 		// Safety check to ensure we don't create negative-sized slices
 		if totalContexts < 0 {
 			totalContexts = 0
@@ -357,7 +358,7 @@ func (q *TaskQueueSlice) compaction() {
 		newContexts := make([]bindingcontext.BindingContext, totalContexts)
 		newMonitorIDs := make([]string, totalMonitorIDs)
 
-		// Копируем контексты целевой задачи
+		// Copy contexts of the target task
 		if len(contexts) > 0 && len(newContexts) > 0 {
 			copySize := len(contexts)
 			if copySize > len(newContexts) {
@@ -373,7 +374,7 @@ func (q *TaskQueueSlice) compaction() {
 			copy(newMonitorIDs[:copySize], monitorIDs[:copySize])
 		}
 
-		// Копируем контексты от остальных задач
+		// Copy contexts from other tasks
 		contextIndex := len(contexts)
 		monitorIndex := len(monitorIDs)
 
@@ -430,7 +431,7 @@ func (q *TaskQueueSlice) compaction() {
 			monitorIndex += len(existingMonitorIDs)
 		}
 
-		// Обновляем метаданные
+		// Update metadata
 		bindingContextSetter, ok := targetHm.(task_metadata.BindingContextSetter)
 		if !ok {
 			continue
@@ -444,7 +445,7 @@ func (q *TaskQueueSlice) compaction() {
 		withContext = monitorIDSetter.SetMonitorIDs(newMonitorIDs)
 		targetTask.UpdateMetadata(withContext)
 
-		// Просто добавляем в конец, потом отсортируем
+		// Just add to the end, then sort
 		result = append(result, targetTask)
 
 		// Call compaction callback if set
@@ -472,7 +473,7 @@ func (q *TaskQueueSlice) compaction() {
 
 	q.items = result
 	// reset dirty flag
-	q.isCompactable = false
+	q.isCompactable.Store(false)
 }
 
 // RemoveLast deletes a tail element, so tail is moved.
@@ -608,7 +609,7 @@ func (q *TaskQueueSlice) addBefore(id string, newTask task.Task) {
 				newItems[i+1] = t
 			}
 		} else {
-			// when id is found, copy other taskы to i+1 position
+			// when id is found, copy other tasks to i+1 position
 			newItems[i+1] = t
 		}
 	}
@@ -690,13 +691,14 @@ func (q *TaskQueueSlice) Start(ctx context.Context) {
 			q.debugf("queue %s: tasks after wait %s", q.Name, q.String())
 			q.debugf("queue %s: task to handle '%s'", q.Name, t.GetType())
 
-			// compact queue if it's dirty
-			q.withLock(func() {
-				if q.isCompactable {
+			if q.isCompactable.Load() {
+				// compact queue if it's dirty
+				q.withLock(func() {
 					q.compaction()
-					q.isCompactable = false
-				}
-			})
+				})
+
+				q.isCompactable.Store(false)
+			}
 
 			// set that current task is being processed, so we don't merge it with other tasks
 			t.SetProcessing(true)
