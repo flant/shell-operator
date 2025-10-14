@@ -270,7 +270,7 @@ func (q *TaskQueueSlice) compaction() {
 		}
 		hm := task.GetMetadata()
 		if isNil(hm) || task.IsProcessing() {
-			result = append(result, task) // Nil metadata and processing tasks go directly to result
+			result = append(result, task) // Nil metadata и processing задачи сразу в результат
 			continue
 		}
 
@@ -292,12 +292,12 @@ func (q *TaskQueueSlice) compaction() {
 		indices := hookGroups[hookName]
 
 		if len(indices) == 1 {
-			// Only one task - add as is
+			// Только одна задача - добавляем как есть
 			result = append(result, q.items[indices[0]])
 			continue
 		}
 
-		// Find the task with minimal index as target
+		// Находим задачу с минимальным индексом как целевую
 		minIndex := indices[0]
 		for _, idx := range indices {
 			if idx < minIndex {
@@ -328,13 +328,13 @@ func (q *TaskQueueSlice) compaction() {
 
 		contexts := bindingContextAccessor.GetBindingContext()
 		monitorIDs := monitorIDAccessor.GetMonitorIDs()
-		// Pre-calculate total size
+		// Предварительно вычисляем общий размер
 		totalContexts := len(contexts)
 		totalMonitorIDs := len(monitorIDs)
 
 		for _, idx := range indices {
 			if idx == minIndex {
-				continue // Skip the target task
+				continue // Пропускаем целевую задачу
 			}
 			existingHm := q.items[idx].GetMetadata()
 			if existingHm != nil {
@@ -347,7 +347,7 @@ func (q *TaskQueueSlice) compaction() {
 			}
 		}
 
-		// Create new slices with correct size
+		// Создаем новые слайсы с правильным размером
 		// Safety check to ensure we don't create negative-sized slices
 		if totalContexts < 0 {
 			totalContexts = 0
@@ -358,7 +358,7 @@ func (q *TaskQueueSlice) compaction() {
 		newContexts := make([]bindingcontext.BindingContext, totalContexts)
 		newMonitorIDs := make([]string, totalMonitorIDs)
 
-		// Copy contexts of the target task
+		// Копируем контексты целевой задачи
 		if len(contexts) > 0 && len(newContexts) > 0 {
 			copySize := len(contexts)
 			if copySize > len(newContexts) {
@@ -374,7 +374,7 @@ func (q *TaskQueueSlice) compaction() {
 			copy(newMonitorIDs[:copySize], monitorIDs[:copySize])
 		}
 
-		// Copy contexts from other tasks
+		// Копируем контексты от остальных задач
 		contextIndex := len(contexts)
 		monitorIndex := len(monitorIDs)
 
@@ -431,7 +431,7 @@ func (q *TaskQueueSlice) compaction() {
 			monitorIndex += len(existingMonitorIDs)
 		}
 
-		// Update metadata
+		// Обновляем метаданные
 		bindingContextSetter, ok := targetHm.(task_metadata.BindingContextSetter)
 		if !ok {
 			continue
@@ -445,7 +445,7 @@ func (q *TaskQueueSlice) compaction() {
 		withContext = monitorIDSetter.SetMonitorIDs(newMonitorIDs)
 		targetTask.UpdateMetadata(withContext)
 
-		// Just add to the end, then sort
+		// Просто добавляем в конец, потом отсортируем
 		result = append(result, targetTask)
 
 		// Call compaction callback if set
@@ -609,7 +609,7 @@ func (q *TaskQueueSlice) addBefore(id string, newTask task.Task) {
 				newItems[i+1] = t
 			}
 		} else {
-			// when id is found, copy other tasks to i+1 position
+			// when id is found, copy other taskы to i+1 position
 			newItems[i+1] = t
 		}
 	}
