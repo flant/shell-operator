@@ -88,7 +88,7 @@ func TestConcurrentOperations(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		go func() {
 			for j := 0; j < 1000; j++ {
-				queue.String()
+				_ = queue.String()
 			}
 		}()
 	}

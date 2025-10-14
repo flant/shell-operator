@@ -932,7 +932,7 @@ func (op *ShellOperator) runMetrics() {
 	// task queue length
 	go func() {
 		for {
-			op.TaskQueues.Iterate(context.TODO(), func(_ context.Context, queue *queue.TaskQueue) {
+			op.TaskQueues.IterateSnapshot(context.TODO(), func(_ context.Context, queue *queue.TaskQueue) {
 				queueLen := float64(queue.Length())
 				op.MetricStorage.GaugeSet(metrics.TasksQueueLength, queueLen, map[string]string{"queue": queue.Name})
 			})

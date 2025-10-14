@@ -30,7 +30,9 @@ func newQueueStorage() *queueStorage {
 func (qs *queueStorage) Get(name string) (*TaskQueue, bool) {
 	qs.mu.RLock()
 	defer qs.mu.RUnlock()
+
 	queue, exists := qs.queues[name]
+
 	return queue, exists
 }
 
@@ -51,6 +53,7 @@ func (qs *queueStorage) List() []*TaskQueue {
 func (qs *queueStorage) Set(name string, queue *TaskQueue) {
 	qs.mu.Lock()
 	defer qs.mu.Unlock()
+
 	qs.queues[name] = queue
 }
 
@@ -58,6 +61,7 @@ func (qs *queueStorage) Set(name string, queue *TaskQueue) {
 func (qs *queueStorage) Delete(name string) {
 	qs.mu.Lock()
 	defer qs.mu.Unlock()
+
 	delete(qs.queues, name)
 }
 
@@ -124,7 +128,13 @@ func (tqs *TaskQueueSet) StartMain(ctx context.Context) {
 }
 
 func (tqs *TaskQueueSet) Start(ctx context.Context) {
-	tqs.Iterate(ctx, func(ctx context.Context, queue *TaskQueue) {
+	tqs.IterateSnapshot(ctx, func(ctx context.Context, queue *TaskQueue) {
+		defer func() {
+			if r := recover(); r != nil {
+				tqs.logger.Warn("panic recovered in Start", slog.Any("error", r))
+			}
+		}()
+
 		queue.Start(ctx)
 	})
 }
@@ -181,34 +191,64 @@ func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
 	}
 }
 
-// Iterate run doFn for every task.
-func (tqs *TaskQueueSet) Iterate(ctx context.Context, doFn func(ctx context.Context, queue *TaskQueue)) {
+// GetSnapshot returns a snapshot of all queues at the time of the call.
+// This is useful for iteration when you need to call methods on the queues
+// that might acquire locks, preventing deadlocks.
+//
+// The returned slice is a snapshot and will not reflect subsequent changes.
+// The main queue (tqs.MainName) is always placed first in the list.
+func (tqs *TaskQueueSet) GetSnapshot() []*TaskQueue {
+	tqs.m.RLock()
+	defer tqs.m.RUnlock()
+
+	allQueues := tqs.Queues.List()
+	queues := make([]*TaskQueue, 0, len(allQueues))
+
+	// First, add the main queue if it exists
+	if mainQueue := tqs.GetMain(); mainQueue != nil {
+		queues = append(queues, mainQueue)
+	}
+
+	// Then add all other queues
+	for _, queue := range allQueues {
+		if queue.Name != tqs.MainName {
+			queues = append(queues, queue)
+		}
+	}
+
+	return queues
+}
+
+// IterateSnapshot creates a snapshot of all queues and iterates over the copy.
+// This is safer than Iterate() when you need to call queue methods inside the callback,
+// as no locks are held during callback execution.
+//
+// Note: The snapshot may become stale during iteration if queues are added/removed
+// by other goroutines or by the callback itself.
+//
+// Use this method when:
+//   - You need to call queue methods inside the callback (Start, Stop, etc.)
+//   - You need to process queues asynchronously
+//   - Safety is more important than performance
+//
+// Memory overhead: O(n) where n is the number of queues.
+func (tqs *TaskQueueSet) IterateSnapshot(ctx context.Context, doFn func(ctx context.Context, queue *TaskQueue)) {
 	if doFn == nil {
 		return
 	}
 
-	tqs.m.RLock()
-	defer tqs.m.RUnlock()
-	if tqs.Queues.Len() == 0 {
-		return
-	}
+	// Create snapshot under lock (main queue is already first)
+	snapshot := tqs.GetSnapshot()
 
-	main := tqs.GetMain()
-	if main != nil {
-		doFn(ctx, main)
-	}
-	// TODO sort names
-
+	// Execute callbacks without holding any locks
 	defer func() {
 		if r := recover(); r != nil {
 			tqs.logger.Warn("panic recovered in IterateSnapshot", slog.Any("error", r))
 		}
 	}()
 
-	for _, q := range tqs.Queues.List() {
-		if q.Name != tqs.MainName {
-			doFn(ctx, q)
-		}
+	for _, q := range snapshot {
+		doFn(ctx, q)
 	}
 }
 
