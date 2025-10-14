@@ -2,7 +2,6 @@ package shell_operator
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -86,17 +85,7 @@ func (m *ManagerEventsHandler) Start() {
 				return
 			}
 
-			m.taskQueues.DoWithLock(func(tqs *queue.TaskQueueSet) {
-				for _, resTask := range tailTasks {
-					if q, ok := tqs.Queues.Get(resTask.GetQueueName()); !ok {
-						log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
-							slog.String("queueName", resTask.GetQueueName()),
-							slog.String("description", resTask.GetDescription()))
-					} else {
-						q.AddLast(resTask)
-					}
-				}
-			})
+			m.taskQueues.AddTailTasks(tailTasks...)
 		}
 	}()
 }

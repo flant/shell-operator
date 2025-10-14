@@ -357,15 +357,18 @@ func (q *TaskQueue) GetFirst() task.Task {
 	defer q.MeasureActionTime("GetFirst")()
 	q.m.RLock()
 	defer q.m.RUnlock()
+
 	if q.isEmpty() {
 		return nil
 	}
+
 	return q.items.Front().Value
 }
 
 // AddLast adds new tail element.
 func (q *TaskQueue) AddLast(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddLast")()
+
 	q.withLock(func() {
 		q.addLast(tasks...)
 	})

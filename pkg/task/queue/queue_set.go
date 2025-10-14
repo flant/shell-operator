@@ -3,7 +3,6 @@ package queue
 import (
 	"context"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -14,62 +13,6 @@ import (
 
 const MainQueueName = "main"
 
-// queueStorage is a thread-safe storage for task queues with basic Get/Set/Delete operations
-type queueStorage struct {
-	mu     sync.RWMutex
-	queues map[string]*TaskQueue
-}
-
-func newQueueStorage() *queueStorage {
-	return &queueStorage{
-		queues: make(map[string]*TaskQueue),
-	}
-}
-
-// Get retrieves a queue by name, returns nil if not found
-func (qs *queueStorage) Get(name string) (*TaskQueue, bool) {
-	qs.mu.RLock()
-	defer qs.mu.RUnlock()
-
-	queue, exists := qs.queues[name]
-
-	return queue, exists
-}
-
-// List retrieves all queues
-func (qs *queueStorage) List() []*TaskQueue {
-	qs.mu.RLock()
-	defer qs.mu.RUnlock()
-
-	queues := make([]*TaskQueue, 0, len(qs.queues))
-	for _, queue := range qs.queues {
-		queues = append(queues, queue)
-	}
-
-	return queues
-}
-
-// Set stores a queue with the given name
-func (qs *queueStorage) Set(name string, queue *TaskQueue) {
-	qs.mu.Lock()
-	defer qs.mu.Unlock()
-
-	qs.queues[name] = queue
-}
-
-// Delete removes a queue by name
-func (qs *queueStorage) Delete(name string) {
-	qs.mu.Lock()
-	defer qs.mu.Unlock()
-
-	delete(qs.queues, name)
-}
-
-// Len returns the number of tasks in a queue by name
-func (qs *queueStorage) Len() int {
-	return len(qs.queues)
-}
-
 // TaskQueueSet is a manager for a set of named queues
 type TaskQueueSet struct {
 	MainName string
@@ -79,7 +22,6 @@ type TaskQueueSet struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	m      sync.RWMutex
 	Queues *queueStorage
 
 	logger *log.Logger
@@ -115,9 +57,6 @@ func (tqs *TaskQueueSet) WithLogger(logger *log.Logger) *TaskQueueSet {
 }
 
 func (tqs *TaskQueueSet) Stop() {
-	tqs.m.RLock()
-	defer tqs.m.RUnlock()
-
 	if tqs.cancel != nil {
 		tqs.cancel()
 	}
@@ -176,19 +115,26 @@ func (tqs *TaskQueueSet) GetMain() *TaskQueue {
 	return tqs.GetByName(tqs.MainName)
 }
 
-func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
-	tqs.m.Lock()
-	defer tqs.m.Unlock()
+func (tqs *TaskQueueSet) AddTailTasks(tasks ...task.Task) {
+	tqs.logger.Debug("AddTailTasks: adding tasks to queues", slog.Int("tasksCount", len(tasks)))
 
-	if fn != nil {
-		defer func() {
-			if r := recover(); r != nil {
-				tqs.logger.Warn("panic recovered in DoWithLock", slog.Any("error", r))
-			}
-		}()
+	for _, resTask := range tasks {
+		q, ok := tqs.Queues.Get(resTask.GetQueueName())
+		if ok {
+			tqs.logger.Debug("AddTailTasks: adding task to queue",
+				slog.String("queueName", resTask.GetQueueName()),
+				slog.String("description", resTask.GetDescription()))
+			q.AddLast(resTask)
 
-		fn(tqs)
+			continue
+		}
+
+		log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
+			slog.String("queueName", resTask.GetQueueName()),
+			slog.String("description", resTask.GetDescription()))
 	}
+
+	tqs.logger.Debug("AddTailTasks: adding tasks to queues done")
 }
 
 // GetSnapshot returns a snapshot of all queues at the time of the call.
@@ -198,8 +144,7 @@ func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
 // The returned slice is a snapshot and will not reflect subsequent changes.
 // The main queue (tqs.MainName) is always placed first in the list.
 func (tqs *TaskQueueSet) GetSnapshot() []*TaskQueue {
-	tqs.m.RLock()
-	defer tqs.m.RUnlock()
+	tqs.logger.Debug("GetSnapshot: creating snapshot of queues")
 
 	allQueues := tqs.Queues.List()
 	queues := make([]*TaskQueue, 0, len(allQueues))
@@ -215,6 +160,8 @@ func (tqs *TaskQueueSet) GetSnapshot() []*TaskQueue {
 			queues = append(queues, queue)
 		}
 	}
+
+	tqs.logger.Debug("GetSnapshot: creating snapshot of queues done")
 
 	return queues
 }
@@ -238,7 +185,9 @@ func (tqs *TaskQueueSet) IterateSnapshot(ctx context.Context, doFn func(ctx cont
 	}
 
 	// Create snapshot under lock (main queue is already first)
+	tqs.logger.Debug("IterateSnapshot: creating snapshot of queues")
 	snapshot := tqs.GetSnapshot()
+	tqs.logger.Debug("IterateSnapshot: creating snapshot of queues done")
 
 	// Execute callbacks without holding any locks
 	defer func() {
@@ -272,9 +221,6 @@ func (tqs *TaskQueueSet) WaitStopWithTimeout(timeout time.Duration) {
 		select {
 		case <-checkTick.C:
 			stopped := func() bool {
-				tqs.m.RLock()
-				defer tqs.m.RUnlock()
-
 				for _, q := range tqs.Queues.List() {
 					if q.GetStatusType() != QueueStatusStop {
 						return false
