@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -130,6 +132,21 @@ type TaskQueue struct {
 	contextBuffer   []bindingcontext.BindingContext
 	monitorIDBuffer []string
 	groupBuffer     map[string]*compactionGroup
+
+	// Lock ownership tracking for recursive lock detection
+	writeLockOwner int64    // goroutine ID of write lock owner
+	readLockOwners sync.Map // map[goroutineID]bool for read lock owners
+
+	// Method call tracking for debugging
+	addFirstCalled    atomic.Bool
+	removeFirstCalled atomic.Bool
+	addLastCalled     atomic.Bool
+	removeLastCalled  atomic.Bool
+	addAfterCalled    atomic.Bool
+	addBeforeCalled   atomic.Bool
+	removeCalled      atomic.Bool
+	deleteFuncCalled  atomic.Bool
+	startCalled       atomic.Bool
 }
 
 // TaskQueueOption defines a functional option for TaskQueue configuration
@@ -314,6 +331,9 @@ func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 
 // addFirst adds new head element.
 func (q *TaskQueue) addFirst(tasks ...task.Task) {
+	q.addFirstCalled.Store(true)
+	defer q.addFirstCalled.Store(false)
+
 	// Also, add tasks in reverse order
 	// at the start of the queue. The first task in HeadTasks
 	// become the new first task in the queue.
@@ -339,6 +359,9 @@ func (q *TaskQueue) RemoveFirst() task.Task {
 
 // removeFirst deletes a head element, so head is moved.
 func (q *TaskQueue) removeFirst() task.Task {
+	q.removeFirstCalled.Store(true)
+	defer q.removeFirstCalled.Store(false)
+
 	if q.isEmpty() {
 		return nil
 	}
@@ -377,6 +400,9 @@ func (q *TaskQueue) AddLast(tasks ...task.Task) {
 // addLast adds a new tail element.
 // It implements the merging logic for HookRun tasks by scanning the whole queue.
 func (q *TaskQueue) addLast(tasks ...task.Task) {
+	q.addLastCalled.Store(true)
+	defer q.addLastCalled.Store(false)
+
 	for _, t := range tasks {
 		q.lazydebug("adding task to queue", func() []any {
 			return []any{
@@ -683,6 +709,9 @@ func (q *TaskQueue) RemoveLast() task.Task {
 
 // removeLast deletes a tail element, so tail is moved.
 func (q *TaskQueue) removeLast() task.Task {
+	q.removeLastCalled.Store(true)
+	defer q.removeLastCalled.Store(false)
+
 	element := q.items.Back()
 	t := q.items.Remove(element)
 	delete(q.idIndex, t.GetId())
@@ -745,6 +774,9 @@ func (q *TaskQueue) AddAfter(id string, tasks ...task.Task) {
 
 // addAfter inserts a task after the task with specified id.
 func (q *TaskQueue) addAfter(id string, tasks ...task.Task) {
+	q.addAfterCalled.Store(true)
+	defer q.addAfterCalled.Store(false)
+
 	if element, ok := q.idIndex[id]; ok {
 		// Insert new tasks right after the id task in reverse order.
 		for i := len(tasks) - 1; i >= 0; i-- {
@@ -767,6 +799,9 @@ func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 
 // addBefore inserts a task before the task with specified id.
 func (q *TaskQueue) addBefore(id string, newTask task.Task) {
+	q.addBeforeCalled.Store(true)
+	defer q.addBeforeCalled.Store(false)
+
 	if element, ok := q.idIndex[id]; ok {
 		newElement := q.items.InsertBefore(newTask, element)
 		q.idIndex[newTask.GetId()] = newElement
@@ -788,6 +823,9 @@ func (q *TaskQueue) Remove(id string) task.Task {
 }
 
 func (q *TaskQueue) remove(id string) task.Task {
+	q.removeCalled.Store(true)
+	defer q.removeCalled.Store(false)
+
 	if element, ok := q.idIndex[id]; ok {
 		t := q.items.Remove(element)
 		delete(q.idIndex, id)
@@ -838,6 +876,9 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			}
 
 			q.withLock(func() {
+				q.startCalled.Store(true)
+				defer q.startCalled.Store(false)
+
 				if q.queueTasksCounter.IsAnyCapReached() {
 					q.lazydebug("triggering compaction before task processing", func() []any {
 						return []any{slog.String("queue", q.Name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.items.Len())}
@@ -892,6 +933,9 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
+					q.startCalled.Store(true)
+					defer q.startCalled.Store(false)
+
 					q.addAfter(t.GetId(), taskRes.GetAfterTasks()...)
 
 					if taskRes.Status == Success {
@@ -1070,8 +1114,22 @@ func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
 
 	defer q.MeasureActionTime("IterateSnapshot")()
 
+	// Log all method call tracking bools in one warn log
+	q.logger.Warn("GetSnapshot method call tracking",
+		slog.Bool("addFirstCalled", q.addFirstCalled.Load()),
+		slog.Bool("removeFirstCalled", q.removeFirstCalled.Load()),
+		slog.Bool("addLastCalled", q.addLastCalled.Load()),
+		slog.Bool("removeLastCalled", q.removeLastCalled.Load()),
+		slog.Bool("addAfterCalled", q.addAfterCalled.Load()),
+		slog.Bool("addBeforeCalled", q.addBeforeCalled.Load()),
+		slog.Bool("removeCalled", q.removeCalled.Load()),
+		slog.Bool("deleteFuncCalled", q.deleteFuncCalled.Load()),
+		slog.Bool("startCalled", q.startCalled.Load()),
+	)
+
 	// Create snapshot under lock
 	snapshot := q.GetSnapshot()
+	q.logger.Warn("GetSnapshot done")
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -1112,6 +1170,9 @@ func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 	defer q.MeasureActionTime("Filter")()
 
 	q.withLock(func() {
+		q.deleteFuncCalled.Store(true)
+		defer q.deleteFuncCalled.Store(false)
+
 		for e := q.items.Front(); e != nil; {
 			current := e
 			e = e.Next()
@@ -1156,11 +1217,49 @@ func (q *TaskQueue) String() string {
 	return buf.String()
 }
 
+// getGoroutineID returns the current goroutine ID as an int64
+func getGoroutineID() int64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	// Parse the goroutine ID from the stack trace
+	// Format: "goroutine 123 [running]:"
+	stack := string(buf[:n])
+	if idx := strings.Index(stack, "goroutine "); idx >= 0 {
+		start := idx + len("goroutine ")
+		end := strings.Index(stack[start:], " ")
+		if end > 0 {
+			if id, err := strconv.ParseInt(stack[start:start+end], 10, 64); err == nil {
+				return id
+			}
+		}
+	}
+	return 0 // fallback
+}
+
 func (q *TaskQueue) withLock(fn func()) {
+	currentGID := getGoroutineID()
+
+	// Check for recursive write lock
+	if atomic.LoadInt64(&q.writeLockOwner) == currentGID {
+		q.logger.Warn("recursive write lock detected",
+			slog.Int64("goroutine_id", currentGID),
+			slog.String("queue", q.Name))
+	}
+
+	// Check if this goroutine already holds a read lock
+	if _, hasReadLock := q.readLockOwners.Load(currentGID); hasReadLock {
+		q.logger.Warn("write lock acquired while holding read lock (lock promotion not allowed)",
+			slog.Int64("goroutine_id", currentGID),
+			slog.String("queue", q.Name))
+	}
+
 	q.m.Lock()
-	defer q.m.Unlock()
+	atomic.StoreInt64(&q.writeLockOwner, currentGID)
 
 	defer func() {
+		atomic.StoreInt64(&q.writeLockOwner, 0)
+		q.m.Unlock()
+
 		if r := recover(); r != nil {
 			q.logger.Warn("panic recovered in withLock", slog.Any("error", r))
 		}
@@ -1170,10 +1269,29 @@ func (q *TaskQueue) withLock(fn func()) {
 }
 
 func (q *TaskQueue) withRLock(fn func()) {
+	currentGID := getGoroutineID()
+
+	// Check for recursive read lock
+	if _, hasReadLock := q.readLockOwners.Load(currentGID); hasReadLock {
+		q.logger.Warn("recursive read lock detected",
+			slog.Int64("goroutine_id", currentGID),
+			slog.String("queue", q.Name))
+	}
+
+	// Check if this goroutine already holds the write lock
+	if atomic.LoadInt64(&q.writeLockOwner) == currentGID {
+		q.logger.Warn("read lock acquired while holding write lock",
+			slog.Int64("goroutine_id", currentGID),
+			slog.String("queue", q.Name))
+	}
+
 	q.m.RLock()
-	defer q.m.RUnlock()
+	q.readLockOwners.Store(currentGID, true)
 
 	defer func() {
+		q.readLockOwners.Delete(currentGID)
+		q.m.RUnlock()
+
 		if r := recover(); r != nil {
 			q.logger.Warn("panic recovered in withRLock", slog.Any("error", r))
 		}
