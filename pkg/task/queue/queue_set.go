@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -76,17 +77,21 @@ type TaskQueueSet struct {
 
 	m      sync.RWMutex
 	Queues *queueStorage
+
+	logger *log.Logger
 }
 
 func NewTaskQueueSet() *TaskQueueSet {
 	return &TaskQueueSet{
 		Queues:   newQueueStorage(),
 		MainName: MainQueueName,
+		logger:   log.NewLogger().Named("task_queue_set"),
 	}
 }
 
 func (tqs *TaskQueueSet) WithMainName(name string) {
 	tqs.MainName = name
+	tqs.logger = tqs.logger.Named(name)
 }
 
 func (tqs *TaskQueueSet) WithContext(ctx context.Context) {
@@ -99,13 +104,19 @@ func (tqs *TaskQueueSet) WithMetricStorage(mstor metricsstorage.Storage) *TaskQu
 	return tqs
 }
 
+func (tqs *TaskQueueSet) WithLogger(logger *log.Logger) *TaskQueueSet {
+	tqs.logger = logger
+
+	return tqs
+}
+
 func (tqs *TaskQueueSet) Stop() {
 	tqs.m.RLock()
+	defer tqs.m.RUnlock()
+
 	if tqs.cancel != nil {
 		tqs.cancel()
 	}
-
-	tqs.m.RUnlock()
 }
 
 func (tqs *TaskQueueSet) StartMain(ctx context.Context) {
@@ -160,6 +171,12 @@ func (tqs *TaskQueueSet) DoWithLock(fn func(tqs *TaskQueueSet)) {
 	defer tqs.m.Unlock()
 
 	if fn != nil {
+		defer func() {
+			if r := recover(); r != nil {
+				tqs.logger.Warn("panic recovered in DoWithLock", slog.Any("error", r))
+			}
+		}()
+
 		fn(tqs)
 	}
 }
@@ -181,6 +198,12 @@ func (tqs *TaskQueueSet) Iterate(ctx context.Context, doFn func(ctx context.Cont
 		doFn(ctx, main)
 	}
 	// TODO sort names
+
+	defer func() {
+		if r := recover(); r != nil {
+			tqs.logger.Warn("panic recovered in IterateSnapshot", slog.Any("error", r))
+		}
+	}()
 
 	for _, q := range tqs.Queues.List() {
 		if q.Name != tqs.MainName {

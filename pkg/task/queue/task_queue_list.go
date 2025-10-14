@@ -866,6 +866,12 @@ func (q *TaskQueue) Start(ctx context.Context) {
 
 			var nextSleepDelay time.Duration
 			q.SetStatus(QueueStatusRunningTask)
+
+			defer func() {
+				if r := recover(); r != nil {
+					q.logger.Warn("panic recovered in Start", slog.Any("error", r))
+				}
+			}()
 			taskRes := q.Handler(ctx, t)
 
 			// Check Done channel after long-running operation.
@@ -1062,6 +1068,12 @@ func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
 	// Create snapshot under lock
 	snapshot := q.GetSnapshot()
 
+	defer func() {
+		if r := recover(); r != nil {
+			q.logger.Warn("panic recovered in IterateSnapshot", slog.Any("error", r))
+		}
+	}()
+
 	// Execute callbacks without holding any locks
 	for _, t := range snapshot {
 		doFn(t)
@@ -1099,6 +1111,13 @@ func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 			current := e
 			e = e.Next()
 			t := current.Value
+
+			defer func() {
+				if r := recover(); r != nil {
+					q.logger.Warn("panic recovered in DeleteFunc", slog.Any("error", r))
+				}
+			}()
+
 			if !fn(t) {
 				q.items.Remove(current)
 				delete(q.idIndex, t.GetId())
@@ -1114,13 +1133,16 @@ func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 func (q *TaskQueue) String() string {
 	var buf strings.Builder
 	var index int
+
 	qLen := q.Length()
+
 	q.IterateSnapshot(func(t task.Task) {
 		buf.WriteString(fmt.Sprintf("[%s,id=%10.10s]", t.GetDescription(), t.GetId()))
 		index++
 		if index == qLen {
 			return
 		}
+
 		buf.WriteString(", ")
 	})
 
@@ -1129,14 +1151,28 @@ func (q *TaskQueue) String() string {
 
 func (q *TaskQueue) withLock(fn func()) {
 	q.m.Lock()
+	defer q.m.Unlock()
+
+	defer func() {
+		if r := recover(); r != nil {
+			q.logger.Warn("panic recovered in withLock", slog.Any("error", r))
+		}
+	}()
+
 	fn()
-	q.m.Unlock()
 }
 
 func (q *TaskQueue) withRLock(fn func()) {
 	q.m.RLock()
+	defer q.m.RUnlock()
+
+	defer func() {
+		if r := recover(); r != nil {
+			q.logger.Warn("panic recovered in withRLock", slog.Any("error", r))
+		}
+	}()
+
 	fn()
-	q.m.RUnlock()
 }
 
 func isNil(v interface{}) bool {
