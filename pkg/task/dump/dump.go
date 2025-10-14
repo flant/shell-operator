@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -84,46 +85,60 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 			return
 		}
 
+		log.Warn("Get tasks for Queue", "name", queue.Name)
+		tasks := getTasksForQueue(queue)
+		log.Warn("Get len", "name", queue.Name)
+		length := queue.Length()
+		log.Warn("Get status", "name", queue.Name)
+		status := queue.GetStatus()
+		log.Warn("Finally", "name", queue.Name)
+		isEmpty := length == 0
+
 		if queue.Name == tqs.MainName {
-			mainTasksCount = queue.Length()
-			if queue.IsEmpty() {
+			mainTasksCount = length
+			if isEmpty {
 				mainQueue := dumpQueue{
 					Name:       queue.Name,
-					TasksCount: queue.Length(),
+					TasksCount: length,
 				}
+
 				result.Empty = append(result.Empty, mainQueue)
 				result.MainQueue = &mainQueue
-			} else {
-				tasks := getTasksForQueue(queue)
-				mainQueue := dumpQueue{
-					Name:       queue.Name,
-					TasksCount: queue.Length(),
-					Status:     queue.GetStatus(),
-					Tasks:      tasks,
-				}
-				result.Active = append(result.Active, mainQueue)
-				result.MainQueue = &mainQueue
+
+				return
 			}
+
+			mainQueue := dumpQueue{
+				Name:       queue.Name,
+				TasksCount: length,
+				Status:     status,
+				Tasks:      tasks,
+			}
+
+			result.Active = append(result.Active, mainQueue)
+			result.MainQueue = &mainQueue
+
 			return
 		}
 
 		otherQueuesCount++
-		if queue.IsEmpty() {
+		if isEmpty {
 			emptyQueues++
 			result.Empty = append(result.Empty, dumpQueue{
 				Name: queue.Name,
 			})
-		} else {
-			activeQueues++
-			tasksCount += queue.Length()
-			tasks := getTasksForQueue(queue)
-			result.Active = append(result.Active, dumpQueue{
-				Name:       queue.Name,
-				TasksCount: queue.Length(),
-				Status:     queue.GetStatus(),
-				Tasks:      tasks,
-			})
+
+			return
 		}
+
+		activeQueues++
+		tasksCount += length
+		result.Active = append(result.Active, dumpQueue{
+			Name:       queue.Name,
+			TasksCount: length,
+			Status:     status,
+			Tasks:      tasks,
+		})
 	})
 
 	result.SortByName()

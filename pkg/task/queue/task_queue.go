@@ -1117,17 +1117,19 @@ func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 			e = e.Next()
 			t := current.Value
 
-			defer func() {
-				if r := recover(); r != nil {
-					q.logger.Warn("panic recovered in DeleteFunc", slog.Any("error", r))
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						q.logger.Warn("panic recovered in DeleteFunc", slog.Any("error", r))
+					}
+				}()
+
+				if !fn(t) {
+					q.items.Remove(current)
+					delete(q.idIndex, t.GetId())
+					q.queueTasksCounter.Remove(t)
 				}
 			}()
-
-			if !fn(t) {
-				q.items.Remove(current)
-				delete(q.idIndex, t.GetId())
-				q.queueTasksCounter.Remove(t)
-			}
 		}
 	})
 }

@@ -185,9 +185,9 @@ func (tqs *TaskQueueSet) IterateSnapshot(ctx context.Context, doFn func(ctx cont
 	}
 
 	// Create snapshot under lock (main queue is already first)
-	tqs.logger.Debug("IterateSnapshot: creating snapshot of queues")
+	tqs.logger.Warn("IterateSnapshot: creating snapshot of queues")
 	snapshot := tqs.GetSnapshot()
-	tqs.logger.Debug("IterateSnapshot: creating snapshot of queues done")
+	tqs.logger.Warn("IterateSnapshot: creating snapshot of queues done")
 
 	// Execute callbacks without holding any locks
 	defer func() {
@@ -196,6 +196,7 @@ func (tqs *TaskQueueSet) IterateSnapshot(ctx context.Context, doFn func(ctx cont
 		}
 	}()
 
+	tqs.logger.Warn("Start iterating snapshot of queues")
 	for _, q := range snapshot {
 		doFn(ctx, q)
 	}
