@@ -1094,6 +1094,21 @@ func (q *TaskQueue) CancelTaskDelay() {
 	}
 }
 
+func (q *TaskQueue) LogTracking() {
+	// Log all method call tracking bools in one warn log
+	q.logger.Warn("LogTracking method call tracking",
+		slog.Bool("addFirstCalled", q.addFirstCalled.Load()),
+		slog.Bool("removeFirstCalled", q.removeFirstCalled.Load()),
+		slog.Bool("addLastCalled", q.addLastCalled.Load()),
+		slog.Bool("removeLastCalled", q.removeLastCalled.Load()),
+		slog.Bool("addAfterCalled", q.addAfterCalled.Load()),
+		slog.Bool("addBeforeCalled", q.addBeforeCalled.Load()),
+		slog.Bool("removeCalled", q.removeCalled.Load()),
+		slog.Bool("deleteFuncCalled", q.deleteFuncCalled.Load()),
+		slog.Bool("startCalled", q.startCalled.Load()),
+	)
+}
+
 // IterateSnapshot creates a snapshot of all tasks and iterates over the copy.
 // This is safer than Iterate() when you need to call queue methods inside the callback,
 // as no locks are held during callback execution.
@@ -1113,19 +1128,6 @@ func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
 	}
 
 	defer q.MeasureActionTime("IterateSnapshot")()
-
-	// Log all method call tracking bools in one warn log
-	q.logger.Warn("GetSnapshot method call tracking",
-		slog.Bool("addFirstCalled", q.addFirstCalled.Load()),
-		slog.Bool("removeFirstCalled", q.removeFirstCalled.Load()),
-		slog.Bool("addLastCalled", q.addLastCalled.Load()),
-		slog.Bool("removeLastCalled", q.removeLastCalled.Load()),
-		slog.Bool("addAfterCalled", q.addAfterCalled.Load()),
-		slog.Bool("addBeforeCalled", q.addBeforeCalled.Load()),
-		slog.Bool("removeCalled", q.removeCalled.Load()),
-		slog.Bool("deleteFuncCalled", q.deleteFuncCalled.Load()),
-		slog.Bool("startCalled", q.startCalled.Load()),
-	)
 
 	// Create snapshot under lock
 	snapshot := q.GetSnapshot()

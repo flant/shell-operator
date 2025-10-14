@@ -173,6 +173,8 @@ func pluralize(n int, zero, one, many string) string {
 }
 
 func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
+	q.LogTracking()
+
 	tasks := make([]dumpTask, 0, q.Length())
 
 	index := 1
