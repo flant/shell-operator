@@ -6,6 +6,7 @@ import (
 	"time"
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
 	"github.com/flant/shell-operator/pkg/task"
 )
 
