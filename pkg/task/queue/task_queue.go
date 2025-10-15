@@ -777,14 +777,12 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			var nextSleepDelay time.Duration
 			q.SetStatus(QueueStatusRunningTask)
 
-			taskRes := func() *TaskResult {
-				defer func() {
-					if r := recover(); r != nil {
-						q.logger.Warn("panic recovered in Start", slog.Any("error", r))
-					}
-				}()
-				return q.Handler(ctx, t)
+			defer func() {
+				if r := recover(); r != nil {
+					q.logger.Warn("panic recovered in Start", slog.Any("error", r))
+				}
 			}()
+			taskRes := q.Handler(ctx, t)
 
 			// Check Done channel after long-running operation.
 			select {
@@ -951,21 +949,6 @@ func (q *TaskQueue) CancelTaskDelay() {
 	}
 }
 
-func (q *TaskQueue) LogTracking() {
-	// Log all method call tracking bools in one warn log
-	q.logger.Warn("LogTracking method call tracking",
-		slog.Bool("addFirstCalled", q.addFirstCalled.Load()),
-		slog.Bool("removeFirstCalled", q.removeFirstCalled.Load()),
-		slog.Bool("addLastCalled", q.addLastCalled.Load()),
-		slog.Bool("removeLastCalled", q.removeLastCalled.Load()),
-		slog.Bool("addAfterCalled", q.addAfterCalled.Load()),
-		slog.Bool("addBeforeCalled", q.addBeforeCalled.Load()),
-		slog.Bool("removeCalled", q.removeCalled.Load()),
-		slog.Bool("deleteFuncCalled", q.deleteFuncCalled.Load()),
-		slog.Bool("startCalled", q.startCalled.Load()),
-	)
-}
-
 // IterateSnapshot creates a snapshot of all tasks and iterates over the copy.
 // This is safer than Iterate() when you need to call queue methods inside the callback,
 // as no locks are held during callback execution.
@@ -988,7 +971,6 @@ func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
 
 	// Create snapshot under lock
 	snapshot := q.GetSnapshot()
-	q.logger.Warn("GetSnapshot done")
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -1057,10 +1039,11 @@ func (q *TaskQueue) String() string {
 func (q *TaskQueue) withLock(fn func()) {
 	q.m.Lock()
 	defer func() {
+		q.m.Unlock()
+
 		if r := recover(); r != nil {
 			q.logger.Warn("panic recovered in withLock", slog.Any("error", r))
 		}
-		q.m.Unlock()
 	}()
 
 	fn()

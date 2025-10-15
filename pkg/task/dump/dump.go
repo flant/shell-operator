@@ -7,8 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/deckhouse/deckhouse/pkg/log"
-
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -86,13 +84,9 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 			return
 		}
 
-		log.Warn("Get tasks for Queue", "name", queue.Name)
 		tasks := getTasksForQueue(queue)
-		log.Warn("Get len", "name", queue.Name)
 		length := queue.Length()
-		log.Warn("Get status", "name", queue.Name)
 		status := queue.GetStatus()
-		log.Warn("Finally", "name", queue.Name)
 		isEmpty := length == 0
 
 		if queue.Name == tqs.MainName {
@@ -174,8 +168,6 @@ func pluralize(n int, zero, one, many string) string {
 }
 
 func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
-	q.LogTracking()
-
 	tasks := make([]dumpTask, 0, q.Length())
 
 	index := 1
