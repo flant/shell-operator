@@ -344,7 +344,9 @@ func ConvertKubeEventToBindingContext(kubeEvent kemtypes.KubeEvent, link *Kubern
 			Type:    kubeEvent.Type,
 			Objects: kubeEvent.Objects,
 		}
-		bc.Metadata.JqFilter = link.BindingConfig.Monitor.JqFilter
+		if link.BindingConfig.Monitor.JqFilter != nil {
+			bc.Metadata.JqFilter = link.BindingConfig.Monitor.JqFilter.Query()
+		}
 		bc.Metadata.BindingType = htypes.OnKubernetesEvent
 		bc.Metadata.IncludeSnapshots = link.BindingConfig.IncludeSnapshotsFrom
 		bc.Metadata.Group = link.BindingConfig.Group
@@ -359,7 +361,9 @@ func ConvertKubeEventToBindingContext(kubeEvent kemtypes.KubeEvent, link *Kubern
 				WatchEvent: kEvent,
 				Objects:    kubeEvent.Objects,
 			}
-			bc.Metadata.JqFilter = link.BindingConfig.Monitor.JqFilter
+			if link.BindingConfig.Monitor.JqFilter != nil {
+				bc.Metadata.JqFilter = link.BindingConfig.Monitor.JqFilter.Query()
+			}
 			bc.Metadata.BindingType = htypes.OnKubernetesEvent
 			bc.Metadata.IncludeSnapshots = link.BindingConfig.IncludeSnapshotsFrom
 			bc.Metadata.Group = link.BindingConfig.Group

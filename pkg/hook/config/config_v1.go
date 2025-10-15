@@ -13,6 +13,7 @@ import (
 
 	"github.com/flant/shell-operator/pkg/app"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/jq"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
@@ -130,7 +131,15 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) error {
 		monitor.WithFieldSelector((*kemtypes.FieldSelector)(kubeCfg.FieldSelector))
 		monitor.WithNamespaceSelector((*kemtypes.NamespaceSelector)(kubeCfg.Namespace))
 		monitor.WithLabelSelector(kubeCfg.LabelSelector)
-		monitor.JqFilter = kubeCfg.JqFilter
+
+		if kubeCfg.JqFilter != "" {
+			filter, err := jq.CompileExpression(kubeCfg.JqFilter)
+			if err != nil {
+				return fmt.Errorf("invalid jqFilter: %w", err)
+			}
+			monitor.JqFilter = filter
+		}
+
 		// executeHookOnEvent is a priority
 		if kubeCfg.ExecuteHookOnEvents != nil {
 			monitor.WithEventTypes(kubeCfg.ExecuteHookOnEvents)

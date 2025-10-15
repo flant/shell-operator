@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/flant/shell-operator/pkg/filter/jq"
+	"github.com/flant/shell-operator/pkg/jq"
 )
 
 // OperationSpec a JSON and YAML representation of the operation for shell hooks
@@ -288,8 +288,12 @@ func newPatchOperation(patchType types.PatchType, patch any, apiVersion, kind, n
 
 func NewPatchWithJQOperation(jqQuery string, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) sdkpkg.PatchCollectorOperation {
 	return newFilterOperation(func(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-		filter := jq.NewFilter()
-		return applyJQPatch(jqQuery, filter, u)
+		expression, err := jq.CompileExpression(jqQuery)
+		if err != nil {
+			return nil, err
+		}
+
+		return applyJQPatch(expression, u)
 	}, apiVersion, kind, namespace, name, opts...)
 }
 
