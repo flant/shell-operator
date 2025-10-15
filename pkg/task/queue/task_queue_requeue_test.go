@@ -44,8 +44,8 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 
 	// Create a new task queue
 	q := NewTasksQueue(
+		"requeue-test-queue",
 		metricStorage,
-		WithName("requeue-test-queue"),
 		WithContext(context.Background()),
 	)
 
