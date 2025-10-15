@@ -129,17 +129,6 @@ type TaskQueue struct {
 	contextBuffer   []bindingcontext.BindingContext
 	monitorIDBuffer []string
 	groupBuffer     map[string]*compactionGroup
-
-	// Method call tracking for debugging
-	addFirstCalled    atomic.Bool
-	removeFirstCalled atomic.Bool
-	addLastCalled     atomic.Bool
-	removeLastCalled  atomic.Bool
-	addAfterCalled    atomic.Bool
-	addBeforeCalled   atomic.Bool
-	removeCalled      atomic.Bool
-	deleteFuncCalled  atomic.Bool
-	startCalled       atomic.Bool
 }
 
 // TaskQueueOption defines a functional option for TaskQueue configuration
@@ -301,9 +290,6 @@ func (q *TaskQueue) Length() int {
 func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
 
-	q.addFirstCalled.Store(true)
-	defer q.addFirstCalled.Store(false)
-
 	q.storage.AddFirst(tasks...)
 
 	// Update queueTasksCounter for each added task
@@ -315,9 +301,6 @@ func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 // RemoveFirst deletes a head element, so head is moved.
 func (q *TaskQueue) RemoveFirst() task.Task {
 	defer q.MeasureActionTime("RemoveFirst")()
-
-	q.removeFirstCalled.Store(true)
-	defer q.removeFirstCalled.Store(false)
 
 	t := q.storage.RemoveFirst()
 	if t != nil {
@@ -338,9 +321,6 @@ func (q *TaskQueue) GetFirst() task.Task {
 // It implements the merging logic for HookRun tasks by scanning the whole queue.
 func (q *TaskQueue) AddLast(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddLast")()
-
-	q.addLastCalled.Store(true)
-	defer q.addLastCalled.Store(false)
 
 	for _, t := range tasks {
 		q.lazydebug("adding task to queue", func() []any {
@@ -632,9 +612,6 @@ func compactBindingContexts(combinedContext []bindingcontext.BindingContext) []b
 func (q *TaskQueue) RemoveLast() task.Task {
 	defer q.MeasureActionTime("RemoveLast")()
 
-	q.removeLastCalled.Store(true)
-	defer q.removeLastCalled.Store(false)
-
 	// is empty, nothing to do
 	if q.Length() == 0 {
 		return nil
@@ -664,9 +641,6 @@ func (q *TaskQueue) Get(id string) task.Task {
 func (q *TaskQueue) AddAfter(id string, tasks ...task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
 
-	q.addAfterCalled.Store(true)
-	defer q.addAfterCalled.Store(false)
-
 	q.storage.AddAfter(id, tasks...)
 
 	// Update queueTasksCounter for each added task
@@ -679,9 +653,6 @@ func (q *TaskQueue) AddAfter(id string, tasks ...task.Task) {
 func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddBefore")()
 
-	q.addBeforeCalled.Store(true)
-	defer q.addBeforeCalled.Store(false)
-
 	q.storage.AddBefore(id, newTask)
 	q.queueTasksCounter.Add(newTask)
 }
@@ -689,9 +660,6 @@ func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 // Remove finds element by id and deletes it.
 func (q *TaskQueue) Remove(id string) task.Task {
 	defer q.MeasureActionTime("Remove")()
-
-	q.removeCalled.Store(true)
-	defer q.removeCalled.Store(false)
 
 	t := q.storage.Remove(id)
 	if t != nil {
@@ -740,9 +708,6 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			}
 
 			q.withLock(func() {
-				q.startCalled.Store(true)
-				defer q.startCalled.Store(false)
-
 				if q.queueTasksCounter.IsAnyCapReached() {
 					q.lazydebug("triggering compaction before task processing", func() []any {
 						return []any{slog.String("queue", q.Name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.storage.Length())}
@@ -797,9 +762,6 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
-					q.startCalled.Store(true)
-					defer q.startCalled.Store(false)
-
 					q.storage.ProcessResult(taskRes, t)
 
 					t.SetProcessing(false) // release processing flag
@@ -1000,9 +962,6 @@ func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 	}
 
 	defer q.MeasureActionTime("DeleteFunc")()
-
-	q.deleteFuncCalled.Store(true)
-	defer q.deleteFuncCalled.Store(false)
 
 	q.storage.DeleteFunc(func(t task.Task) bool {
 		if !fn(t) {
