@@ -1057,11 +1057,10 @@ func (q *TaskQueue) String() string {
 func (q *TaskQueue) withLock(fn func()) {
 	q.m.Lock()
 	defer func() {
-		q.m.Unlock()
-
 		if r := recover(); r != nil {
 			q.logger.Warn("panic recovered in withLock", slog.Any("error", r))
 		}
+		q.m.Unlock()
 	}()
 
 	fn()
