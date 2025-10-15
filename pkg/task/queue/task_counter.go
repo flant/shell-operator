@@ -3,8 +3,8 @@ package queue
 import (
 	"sync"
 
+	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/metric"
-	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -16,7 +16,7 @@ type TaskCounter struct {
 	queueName      string
 	counter        map[string]uint
 	reachedCap     map[string]struct{}
-	metricStorage  metrics.Storage
+	metricStorage  metric.Storage
 	countableTypes map[task.TaskType]struct{}
 }
 

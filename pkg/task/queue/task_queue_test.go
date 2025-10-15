@@ -44,7 +44,7 @@ func Test_TasksQueue_Remove(t *testing.T) {
 	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
-	q := NewTasksQueue(metricStorage)
+	q := NewTasksQueue("", metricStorage)
 
 	// Remove just one element
 	Task := &task.BaseTask{Id: "First one"}
@@ -111,7 +111,7 @@ func Test_TasksQueue_RemoveFirst(t *testing.T) {
 	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
-	q := NewTasksQueue(metricStorage)
+	q := NewTasksQueue("", metricStorage)
 
 	// Remove just one element
 	Task := &task.BaseTask{Id: "First one"}
@@ -178,7 +178,7 @@ func Test_ExponentialBackoff(t *testing.T) {
 	})
 
 	// Init and prefill queue.
-	q := NewTasksQueue(metricStorage, WithContext(context.TODO()), WithName("test-queue"))
+	q := NewTasksQueue("test-queue", metricStorage, WithContext(context.TODO()))
 	// Since we don't want the test to run for too long, we don't
 	// want to use lengthy times.
 	q.WaitLoopCheckInterval = 5 * time.Millisecond // default is 125ms
@@ -275,7 +275,7 @@ func Test_CancelDelay(t *testing.T) {
 	})
 
 	// Init and prefill queue.
-	q := NewTasksQueue(metricStorage, WithContext(context.TODO()), WithName("test-queue"))
+	q := NewTasksQueue("test-queue", metricStorage, WithContext(context.TODO()))
 	// Since we don't want the test to run for too long, we don't
 	// want to use lengthy times.
 	q.WaitLoopCheckInterval = 5 * time.Millisecond // default is 125ms
@@ -372,7 +372,7 @@ func Test_QueueDump_HookMetadata_Task_Description(t *testing.T) {
 	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
-	q := NewTasksQueue(metricStorage)
+	q := NewTasksQueue("", metricStorage)
 
 	q.AddLast(task.NewTask(task_metadata.EnableKubernetesBindings).
 		WithMetadata(task_metadata.HookMetadata{

@@ -170,11 +170,7 @@ func WithLogger(logger *log.Logger) TaskQueueOption {
 }
 
 // NewTasksQueue creates a new TaskQueue with the provided options
-<<<<<<<< HEAD:pkg/task/queue/task_queue_list.go
-func NewTasksQueue(metricStorage metric.Storage, opts ...TaskQueueOption) *TaskQueue {
-========
-func NewTasksQueue(name string, metricStorage metricsstorage.Storage, opts ...TaskQueueOption) *TaskQueue {
->>>>>>>> f92d51e ([shell-operator] fix/add recovery to possibly deadlock (#822)):pkg/task/queue/task_queue.go
+func NewTasksQueue(name string, metricStorage metric.Storage, opts ...TaskQueueOption) *TaskQueue {
 	q := &TaskQueue{
 		Name:    name,
 		storage: newTaskStorage(),
@@ -304,50 +300,17 @@ func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 func (q *TaskQueue) RemoveFirst() task.Task {
 	defer q.MeasureActionTime("RemoveFirst")()
 
-<<<<<<<< HEAD:pkg/task/queue/task_queue_list.go
-	if q.isEmpty() {
-		return nil
-	}
-
-	q.withLock(func() {
-		t = q.removeFirst()
-	})
-
-	return t
-}
-
-// removeFirst deletes a head element, so head is moved.
-func (q *TaskQueue) removeFirst() task.Task {
-	element := q.items.Front()
-	t := q.items.Remove(element)
-	delete(q.idIndex, t.GetId())
-
-	q.queueTasksCounter.Remove(t)
-
-========
 	t := q.storage.RemoveFirst()
 	if t != nil {
 		q.queueTasksCounter.Remove(t)
 	}
 
->>>>>>>> f92d51e ([shell-operator] fix/add recovery to possibly deadlock (#822)):pkg/task/queue/task_queue.go
 	return t
 }
 
 // GetFirst returns a head element.
 func (q *TaskQueue) GetFirst() task.Task {
 	defer q.MeasureActionTime("GetFirst")()
-<<<<<<<< HEAD:pkg/task/queue/task_queue_list.go
-	q.m.RLock()
-	defer q.m.RUnlock()
-	if q.isEmpty() {
-		return nil
-	}
-
-	return q.items.Front().Value
-}
-========
->>>>>>>> f92d51e ([shell-operator] fix/add recovery to possibly deadlock (#822)):pkg/task/queue/task_queue.go
 
 	return q.storage.GetFirst()
 }
@@ -647,26 +610,6 @@ func compactBindingContexts(combinedContext []bindingcontext.BindingContext) []b
 func (q *TaskQueue) RemoveLast() task.Task {
 	defer q.MeasureActionTime("RemoveLast")()
 
-<<<<<<<< HEAD:pkg/task/queue/task_queue_list.go
-	q.withLock(func() {
-		t = q.removeLast()
-	})
-
-	return t
-}
-
-// removeLast deletes a tail element, so tail is moved.
-func (q *TaskQueue) removeLast() task.Task {
-	if q.isEmpty() {
-		return nil
-	}
-
-	element := q.items.Back()
-	t := q.items.Remove(element)
-	delete(q.idIndex, t.GetId())
-
-	q.queueTasksCounter.Remove(t)
-========
 	// is empty, nothing to do
 	if q.Length() == 0 {
 		return nil
@@ -676,7 +619,6 @@ func (q *TaskQueue) removeLast() task.Task {
 	if t != nil {
 		q.queueTasksCounter.Remove(t)
 	}
->>>>>>>> f92d51e ([shell-operator] fix/add recovery to possibly deadlock (#822)):pkg/task/queue/task_queue.go
 
 	return t
 }

@@ -5,15 +5,22 @@ import (
 	"sync"
 	"testing"
 
-	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
-
+	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
 func TestConcurrentOperations(t *testing.T) {
+	mockStorage := metric.NewStorageMock(t)
+	mockStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+		// Accept any gauge set calls
+	})
+	mockStorage.HistogramObserveMock.Set(func(_ string, _ float64, _ map[string]string, _ []float64) {
+		// Accept any histogram observe calls
+	})
+
 	queue := NewTasksQueue(
 		"test",
-		metricsstorage.NewMetricStorage(metricsstorage.WithNewRegistry()),
+		mockStorage,
 		WithContext(context.Background()),
 	)
 

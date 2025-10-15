@@ -145,6 +145,8 @@ func Test_TaskQueue_Requeue(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
+	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
 
 	// A channel to control when RequeueTask can finish.
 	requeueTaskCanFinish := make(chan struct{})
@@ -157,17 +159,10 @@ func Test_TaskQueue_Requeue(t *testing.T) {
 	mu := &sync.Mutex{}
 
 	// Create a new task queue
-	q := NewTasksQueueSlice()
-	q.WithMetricStorage(metricStorage)
-	q.WithName("requeue-test-queue")
-	q.WithContext(context.Background())
-
-	q.WaitLoopCheckInterval = 5 * time.Millisecond
-	q.DelayOnQueueIsEmpty = 5 * time.Millisecond
-	q.DelayOnRepeat = 5 * time.Millisecond
+	q := NewTasksQueue("requeue-test-queue", metricStorage, WithContext(context.Background()))
 
 	// Define the handler for tasks
-	q.WithHandler(func(_ context.Context, tsk task.Task) TaskResult {
+	q.Handler = func(_ context.Context, tsk task.Task) TaskResult {
 		mu.Lock()
 		executionOrder = append(executionOrder, tsk.GetId())
 		mu.Unlock()
@@ -186,7 +181,7 @@ func Test_TaskQueue_Requeue(t *testing.T) {
 
 		// For simple tasks, just succeed.
 		return TaskResult{Status: Success}
-	})
+	}
 
 	// Add the "requeue" task first.
 	requeueTask := task.BaseTask{Id: "RequeueTask", Type: task_metadata.HookRun}
