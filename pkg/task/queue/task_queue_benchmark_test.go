@@ -140,46 +140,7 @@ func benchmarkGetByID(b *testing.B, queue Queue, size int) {
 	}
 }
 
-/* Old code */
-func BenchmarkTaskQueueSlice_AddLast_100(b *testing.B) {
-	benchmarkAddLast(b, NewTasksQueueSlice(), 100)
-}
-
-func BenchmarkTaskQueueSlice_AddLast_1000(b *testing.B) {
-	benchmarkAddLast(b, NewTasksQueueSlice(), 1000)
-}
-
-func BenchmarkTaskQueueSlice_AddFirst_100(b *testing.B) {
-	benchmarkAddFirst(b, NewTasksQueueSlice(), 100)
-}
-
-func BenchmarkTaskQueueSlice_AddFirst_1000(b *testing.B) {
-	benchmarkAddFirst(b, NewTasksQueueSlice(), 1000)
-}
-
-func BenchmarkTaskQueueSlice_RemoveFirst_100(b *testing.B) {
-	benchmarkRemoveFirst(b, NewTasksQueueSlice(), 100)
-}
-
-func BenchmarkTaskQueueSlice_RemoveFirst_1000(b *testing.B) {
-	benchmarkRemoveFirst(b, NewTasksQueueSlice(), 1000)
-}
-
-func BenchmarkTaskQueueSlice_GetFirst_100(b *testing.B) {
-	benchmarkGetFirst(b, NewTasksQueueSlice(), 100)
-}
-
-func BenchmarkTaskQueueSlice_GetFirst_1000(b *testing.B) {
-	benchmarkGetFirst(b, NewTasksQueueSlice(), 1000)
-}
-
-func BenchmarkTaskQueueSlice_GetByID_100(b *testing.B) {
-	benchmarkGetByID(b, NewTasksQueueSlice(), 100)
-}
-
-func BenchmarkTaskQueueSlice_GetByID_1000(b *testing.B) {
-	benchmarkGetByID(b, NewTasksQueueSlice(), 1000)
-}
+/* Old code - removed as NewTasksQueueSlice no longer exists */
 
 /* New code */
 
@@ -191,7 +152,7 @@ func newBenchmarkTasksQueue(b *testing.B) *TaskQueue {
 	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
-	return NewTasksQueue(metricStorage)
+	return NewTasksQueue("test", metricStorage)
 }
 
 func BenchmarkTaskQueue_AddLast_100(b *testing.B) {
@@ -282,11 +243,11 @@ func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 		metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 		})
 
-		q := NewTasksQueue(metricStorage, WithCompactableTypes(task_metadata.HookRun))
+		q := NewTasksQueue("test", metricStorage, WithCompactableTypes(task_metadata.HookRun))
 		tasks := createCompactionBenchmarkData(b, size)
 		// Setup queue without triggering compaction
 		for _, t := range tasks {
-			q.items.PushBack(t)
+			q.storage.AddLast(t)
 		}
 
 		b.StartTimer()
@@ -294,36 +255,9 @@ func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 	}
 }
 
-func benchmarkTaskQueueSliceCompaction(b *testing.B, size int) {
-	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		q := NewTasksQueueSlice()
-		q.WithCompactableTypes([]task.TaskType{task_metadata.HookRun})
-		tasks := createCompactionBenchmarkData(b, size)
-		// Setup queue without triggering compaction
-		q.items = append(q.items, tasks...)
+/* Old code - removed as NewTasksQueueSlice no longer exists */
 
-		b.StartTimer()
-		q.compaction()
-	}
-}
-
-/* Old code */
-func BenchmarkTaskQueueSlice_Compaction_10(b *testing.B) {
-	benchmarkTaskQueueSliceCompaction(b, 10)
-}
-
-func BenchmarkTaskQueueSlice_Compaction_100(b *testing.B) {
-	benchmarkTaskQueueSliceCompaction(b, 100)
-}
-
-func BenchmarkTaskQueueSlice_Compaction_500(b *testing.B) {
-	benchmarkTaskQueueSliceCompaction(b, 500)
-}
-
-func BenchmarkTaskQueueSlice_Compaction_1000(b *testing.B) {
-	benchmarkTaskQueueSliceCompaction(b, 1000)
-}
+/* Old code - removed as NewTasksQueueSlice no longer exists */
 
 /* New code */
 func BenchmarkTaskQueue_Compaction_10(b *testing.B) {

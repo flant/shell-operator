@@ -1,6 +1,8 @@
 package queue
 
 import (
+	"sync"
+
 	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/task"
@@ -9,6 +11,8 @@ import (
 const taskCap = 100
 
 type TaskCounter struct {
+	mu sync.RWMutex
+
 	queueName      string
 	counter        map[string]uint
 	reachedCap     map[string]struct{}
@@ -31,6 +35,9 @@ func NewTaskCounter(name string, countableTypes map[task.TaskType]struct{}, metr
 }
 
 func (tc *TaskCounter) Add(task task.Task) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
 	if len(tc.countableTypes) > 0 {
 		if _, ok := tc.countableTypes[task.GetType()]; !ok {
 			return
@@ -64,6 +71,9 @@ func (tc *TaskCounter) Add(task task.Task) {
 }
 
 func (tc *TaskCounter) Remove(task task.Task) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
 	if len(tc.countableTypes) > 0 {
 		if _, ok := tc.countableTypes[task.GetType()]; !ok {
 			return
@@ -90,14 +100,23 @@ func (tc *TaskCounter) Remove(task task.Task) {
 }
 
 func (tc *TaskCounter) GetReachedCap() map[string]struct{} {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
 	return tc.reachedCap
 }
 
 func (tc *TaskCounter) IsAnyCapReached() bool {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
 	return len(tc.reachedCap) > 0
 }
 
 func (tc *TaskCounter) ResetReachedCap() {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
 	for id := range tc.reachedCap {
 		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 0, map[string]string{
 			"queue_name": tc.queueName,
