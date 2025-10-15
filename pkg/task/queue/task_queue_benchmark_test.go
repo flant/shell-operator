@@ -245,7 +245,7 @@ func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 		tasks := createCompactionBenchmarkData(b, size)
 		// Setup queue without triggering compaction
 		for _, t := range tasks {
-			q.items.PushBack(t)
+			q.storage.AddLast(t)
 		}
 
 		b.StartTimer()

@@ -298,10 +298,10 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 			q := NewTasksQueue("test", metricStorage, WithCompactableTypes(task_metadata.HookRun))
 
 			for _, task := range tt.initialQueue {
-				q.addLast(task)
+				q.AddLast(task)
 			}
 
-			q.addLast(tt.taskToAdd)
+			q.AddLast(tt.taskToAdd)
 
 			q.compaction(nil)
 			// Verify IDs and order
