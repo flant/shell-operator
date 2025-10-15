@@ -101,8 +101,7 @@ type TaskQueue struct {
 	waitInProgress atomic.Bool
 	cancelDelay    atomic.Bool
 
-	items   *list.List[task.Task]
-	idIndex map[string]*list.Element[task.Task]
+	storage *TaskStorage
 
 	started atomic.Bool // a flag to ignore multiple starts
 
@@ -142,13 +141,6 @@ func WithContext(ctx context.Context) TaskQueueOption {
 	}
 }
 
-// WithName sets the name for the TaskQueue
-func WithName(name string) TaskQueueOption {
-	return func(q *TaskQueue) {
-		q.Name = name
-	}
-}
-
 // WithHandler sets the task handler for the TaskQueue
 func WithHandler(fn func(ctx context.Context, t task.Task) TaskResult) TaskQueueOption {
 	return func(q *TaskQueue) {
@@ -175,14 +167,15 @@ func WithCompactionCallback(callback func(compactedTasks []task.Task, targetTask
 func WithLogger(logger *log.Logger) TaskQueueOption {
 	return func(q *TaskQueue) {
 		q.logger = logger
+		q.logger = q.logger.Named(q.Name)
 	}
 }
 
 // NewTasksQueue creates a new TaskQueue with the provided options
-func NewTasksQueue(metricStorage metricsstorage.Storage, opts ...TaskQueueOption) *TaskQueue {
+func NewTasksQueue(name string, metricStorage metricsstorage.Storage, opts ...TaskQueueOption) *TaskQueue {
 	q := &TaskQueue{
-		items:   list.New[task.Task](),
-		idIndex: make(map[string]*list.Element[task.Task]),
+		Name:    name,
+		storage: newTaskStorage(),
 		// Default timings
 		WaitLoopCheckInterval: DefaultWaitLoopCheckInterval,
 		DelayOnQueueIsEmpty:   DefaultDelayOnQueueIsEmpty,
@@ -190,7 +183,7 @@ func NewTasksQueue(metricStorage metricsstorage.Storage, opts ...TaskQueueOption
 		ExponentialBackoffFn: func(failureCount int) time.Duration {
 			return exponential_backoff.CalculateDelay(DefaultInitialDelayOnFailedTask, failureCount)
 		},
-		logger: log.NewNop(),
+		logger: log.NewLogger().Named("task_queue").Named(name),
 		// Pre-allocate buffers
 		contextBuffer:   make([]bindingcontext.BindingContext, 0, 128),
 		monitorIDBuffer: make([]string, 0, 128),
@@ -245,6 +238,7 @@ func (q *TaskQueue) putHookGroupsMap(m map[string]*compactionGroup) {
 	for k := range m {
 		delete(m, k)
 	}
+
 	hookGroupsMapPool.Put(m)
 }
 
@@ -270,6 +264,7 @@ func (q *TaskQueue) MeasureActionTime(action string) func() {
 
 func (q *TaskQueue) GetStatus() string {
 	defer q.MeasureActionTime("GetStatus")()
+
 	return q.status.Get()
 }
 
@@ -285,70 +280,32 @@ func (q *TaskQueue) SetStatusText(text string) {
 	q.status.SetText(text)
 }
 
-func (q *TaskQueue) IsEmpty() bool {
-	defer q.MeasureActionTime("IsEmpty")()
-	return q.isEmpty()
-}
-
-func (q *TaskQueue) isEmpty() bool {
-	return q.Length() == 0
-}
-
 func (q *TaskQueue) Length() int {
 	defer q.MeasureActionTime("Length")()
 
-	var length int
-	q.withRLock(func() {
-		length = q.items.Len()
-	})
-
-	return length
+	return q.storage.Length()
 }
 
 // AddFirst adds new head element.
 func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 	defer q.MeasureActionTime("AddFirst")()
-	q.withLock(func() {
-		q.addFirst(tasks...)
-	})
-}
 
-// addFirst adds new head element.
-func (q *TaskQueue) addFirst(tasks ...task.Task) {
-	// Also, add tasks in reverse order
-	// at the start of the queue. The first task in HeadTasks
-	// become the new first task in the queue.
-	for i := len(tasks) - 1; i >= 0; i-- {
-		element := q.items.PushFront(tasks[i])
-		q.idIndex[tasks[i].GetId()] = element
+	q.storage.AddFirst(tasks...)
 
-		q.queueTasksCounter.Add(tasks[i])
+	// Update queueTasksCounter for each added task
+	for _, t := range tasks {
+		q.queueTasksCounter.Add(t)
 	}
 }
 
 // RemoveFirst deletes a head element, so head is moved.
 func (q *TaskQueue) RemoveFirst() task.Task {
 	defer q.MeasureActionTime("RemoveFirst")()
-	var t task.Task
 
-	q.withLock(func() {
-		t = q.removeFirst()
-	})
-
-	return t
-}
-
-// removeFirst deletes a head element, so head is moved.
-func (q *TaskQueue) removeFirst() task.Task {
-	if q.isEmpty() {
-		return nil
+	t := q.storage.RemoveFirst()
+	if t != nil {
+		q.queueTasksCounter.Remove(t)
 	}
-
-	element := q.items.Front()
-	t := q.items.Remove(element)
-	delete(q.idIndex, t.GetId())
-
-	q.queueTasksCounter.Remove(t)
 
 	return t
 }
@@ -356,25 +313,15 @@ func (q *TaskQueue) removeFirst() task.Task {
 // GetFirst returns a head element.
 func (q *TaskQueue) GetFirst() task.Task {
 	defer q.MeasureActionTime("GetFirst")()
-	q.m.RLock()
-	defer q.m.RUnlock()
-	if q.isEmpty() {
-		return nil
-	}
-	return q.items.Front().Value
-}
 
-// AddLast adds new tail element.
-func (q *TaskQueue) AddLast(tasks ...task.Task) {
-	defer q.MeasureActionTime("AddLast")()
-	q.withLock(func() {
-		q.addLast(tasks...)
-	})
+	return q.storage.GetFirst()
 }
 
 // addLast adds a new tail element.
 // It implements the merging logic for HookRun tasks by scanning the whole queue.
-func (q *TaskQueue) addLast(tasks ...task.Task) {
+func (q *TaskQueue) AddLast(tasks ...task.Task) {
+	defer q.MeasureActionTime("AddLast")()
+
 	for _, t := range tasks {
 		q.lazydebug("adding task to queue", func() []any {
 			return []any{
@@ -382,16 +329,15 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 				slog.String("task_id", t.GetId()),
 				slog.String("task_type", string(t.GetType())),
 				slog.String("task_description", t.GetDescription()),
-				slog.Int("queue_length_before", q.items.Len()),
+				slog.Int("queue_length_before", q.storage.Length()),
 			}
 		})
 
-		if _, ok := q.idIndex[t.GetId()]; ok {
+		if q.storage.Get(t.GetId()) != nil {
 			q.logger.Warn("task collision detected, unexpected behavior possible", slog.String("queue", q.Name), slog.String("task_id", t.GetId()))
 		}
 
-		element := q.items.PushBack(t)
-		q.idIndex[t.GetId()] = element
+		q.storage.AddLast(t)
 		q.queueTasksCounter.Add(t)
 
 		// TODO: skip compactable check if is already compactable
@@ -403,29 +349,29 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 					slog.String("queue", q.Name),
 					slog.String("task_id", t.GetId()),
 					slog.String("task_type", string(taskType)),
-					slog.Int("queue_length", q.items.Len()),
+					slog.Int("queue_length", q.storage.Length()),
 					slog.Bool("queue_is_dirty", q.queueTasksCounter.IsAnyCapReached()),
 				}
 			})
 
 			// Only trigger compaction if queue is getting long and we have mergeable tasks
-			if q.items.Len() > compactionThreshold && q.queueTasksCounter.IsAnyCapReached() {
+			if q.storage.Length() > compactionThreshold && q.queueTasksCounter.IsAnyCapReached() {
 				q.lazydebug("triggering compaction due to queue length", func() []any {
 					return []any{
 						slog.String("queue", q.Name),
-						slog.Int("queue_length", q.items.Len()),
+						slog.Int("queue_length", q.storage.Length()),
 						slog.Int("compaction_threshold", compactionThreshold),
 					}
 				})
 
-				currentQueue := q.items.Len()
+				currentQueue := q.storage.Length()
 				q.compaction(q.queueTasksCounter.GetReachedCap())
 
 				q.lazydebug("compaction finished", func() []any {
 					return []any{
 						slog.String("queue", q.Name),
 						slog.Int("queue_length_before", currentQueue),
-						slog.Int("queue_length_after", q.items.Len()),
+						slog.Int("queue_length_after", q.storage.Length()),
 					}
 				})
 			}
@@ -446,7 +392,7 @@ func (q *TaskQueue) addLast(tasks ...task.Task) {
 // DEV WARNING! Do not use HookMetadataAccessor here. Use only *Accessor interfaces because this method is used from addon-operator.
 // TODO: consider compaction only for tasks with one compaction ID (to not affect good tasks)
 func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
-	if q.items.Len() < 2 {
+	if q.storage.Length() < 2 {
 		return
 	}
 
@@ -461,36 +407,36 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 	}()
 
 	// First pass: identify groups and calculate sizes
-	for e := q.items.Front(); e != nil; e = e.Next() {
+	q.storage.Iterate(func(e *list.Element[task.Task]) {
 		t := e.Value
 		taskType := t.GetType()
 
 		if _, ok := q.compactableTypes[taskType]; !ok {
-			continue
+			return
 		}
 
 		if len(compactionIDs) > 0 {
 			if _, ok := compactionIDs[t.GetCompactionID()]; !ok {
-				continue
+				return
 			}
 		}
 
 		metadata := t.GetMetadata()
 		if isNil(metadata) || t.IsProcessing() {
-			continue
+			return
 		}
 
 		hookNameAcessor, ok := metadata.(task_metadata.HookNameAccessor)
 		if !ok {
-			continue
+			return
 		}
 		bindingContextAcessor, ok := metadata.(task_metadata.BindingContextAccessor)
 		if !ok {
-			continue
+			return
 		}
 		monitorIDsAcessor, ok := metadata.(task_metadata.MonitorIDAccessor)
 		if !ok {
-			continue
+			return
 		}
 
 		hookName := hookNameAcessor.GetHookName()
@@ -510,7 +456,7 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 			group.totalMonitorIDs = len(monitorIDs)
 			hookGroups[hookName] = group
 		}
-	}
+	})
 
 	// Second pass: merge with pooled slices
 	for _, group := range hookGroups {
@@ -569,8 +515,7 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 			newContexts = append(newContexts, mergeContexts...)
 			newMonitorIDs = append(newMonitorIDs, mergeMonitorIDs...)
 
-			q.items.Remove(elementToMerge)
-			delete(q.idIndex, taskToMerge.GetId())
+			q.storage.RemoveElement(elementToMerge)
 			q.queueTasksCounter.Remove(taskToMerge)
 		}
 
@@ -666,26 +611,16 @@ func compactBindingContexts(combinedContext []bindingcontext.BindingContext) []b
 // RemoveLast deletes a tail element, so tail is moved.
 func (q *TaskQueue) RemoveLast() task.Task {
 	defer q.MeasureActionTime("RemoveLast")()
-	var t task.Task
 
-	if q.isEmpty() {
+	// is empty, nothing to do
+	if q.Length() == 0 {
 		return nil
 	}
 
-	q.withLock(func() {
-		t = q.removeLast()
-	})
-
-	return t
-}
-
-// removeLast deletes a tail element, so tail is moved.
-func (q *TaskQueue) removeLast() task.Task {
-	element := q.items.Back()
-	t := q.items.Remove(element)
-	delete(q.idIndex, t.GetId())
-
-	q.queueTasksCounter.Remove(t)
+	t := q.storage.RemoveLast()
+	if t != nil {
+		q.queueTasksCounter.Remove(t)
+	}
 
 	return t
 }
@@ -693,105 +628,45 @@ func (q *TaskQueue) removeLast() task.Task {
 // GetLast returns a tail element.
 func (q *TaskQueue) GetLast() task.Task {
 	defer q.MeasureActionTime("GetLast")()
-	var t task.Task
-	q.withRLock(func() {
-		t = q.getLast()
-	})
-
-	return t
-}
-
-// getLast returns a tail element.
-func (q *TaskQueue) getLast() task.Task {
-	if q.isEmpty() {
-		return nil
-	}
-
-	return q.items.Back().Value
+	return q.storage.GetLast()
 }
 
 // Get returns a task by id.
 func (q *TaskQueue) Get(id string) task.Task {
 	defer q.MeasureActionTime("Get")()
-	var t task.Task
-
-	q.withRLock(func() {
-		t = q.get(id)
-	})
-
-	return t
-}
-
-// get returns a task by id.
-func (q *TaskQueue) get(id string) task.Task {
-	if element, ok := q.idIndex[id]; ok {
-		return element.Value
-	}
-
-	return nil
+	return q.storage.Get(id)
 }
 
 // AddAfter inserts a task after the task with specified id.
 func (q *TaskQueue) AddAfter(id string, tasks ...task.Task) {
 	defer q.MeasureActionTime("AddAfter")()
-	q.withLock(func() {
-		q.addAfter(id, tasks...)
-	})
-}
 
-// addAfter inserts a task after the task with specified id.
-func (q *TaskQueue) addAfter(id string, tasks ...task.Task) {
-	if element, ok := q.idIndex[id]; ok {
-		// Insert new tasks right after the id task in reverse order.
-		for i := len(tasks) - 1; i >= 0; i-- {
-			newElement := q.items.InsertAfter(tasks[i], element)
-			q.idIndex[tasks[i].GetId()] = newElement
+	q.storage.AddAfter(id, tasks...)
 
-			q.queueTasksCounter.Add(tasks[i])
-		}
+	// Update queueTasksCounter for each added task
+	for _, t := range tasks {
+		q.queueTasksCounter.Add(t)
 	}
 }
 
 // AddBefore inserts a task before the task with specified id.
 func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 	defer q.MeasureActionTime("AddBefore")()
-	q.withLock(func() {
-		q.addBefore(id, newTask)
-	})
-}
 
-// addBefore inserts a task before the task with specified id.
-func (q *TaskQueue) addBefore(id string, newTask task.Task) {
-	if element, ok := q.idIndex[id]; ok {
-		newElement := q.items.InsertBefore(newTask, element)
-		q.idIndex[newTask.GetId()] = newElement
-
-		q.queueTasksCounter.Add(newTask)
-	}
+	q.storage.AddBefore(id, newTask)
+	q.queueTasksCounter.Add(newTask)
 }
 
 // Remove finds element by id and deletes it.
 func (q *TaskQueue) Remove(id string) task.Task {
 	defer q.MeasureActionTime("Remove")()
-	var t task.Task
 
-	q.withLock(func() {
-		t = q.remove(id)
-	})
+	t := q.storage.Remove(id)
+	if t != nil {
+		q.queueTasksCounter.Remove(t)
+	}
 
 	return t
-}
-
-func (q *TaskQueue) remove(id string) task.Task {
-	if element, ok := q.idIndex[id]; ok {
-		t := q.items.Remove(element)
-		delete(q.idIndex, id)
-
-		q.queueTasksCounter.Remove(t)
-
-		return t
-	}
-	return nil
 }
 
 func (q *TaskQueue) Stop() {
@@ -835,13 +710,13 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			q.withLock(func() {
 				if q.queueTasksCounter.IsAnyCapReached() {
 					q.lazydebug("triggering compaction before task processing", func() []any {
-						return []any{slog.String("queue", q.Name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.items.Len())}
+						return []any{slog.String("queue", q.Name), slog.String("task_id", t.GetId()), slog.String("task_type", string(t.GetType())), slog.Int("queue_length", q.storage.Length())}
 					})
 
 					q.compaction(q.queueTasksCounter.GetReachedCap())
 
 					q.lazydebug("compaction completed, queue no longer dirty", func() []any {
-						return []any{slog.String("queue", q.Name), slog.Int("queue_length_after", q.items.Len())}
+						return []any{slog.String("queue", q.Name), slog.Int("queue_length_after", q.storage.Length())}
 					})
 				}
 			})
@@ -866,6 +741,12 @@ func (q *TaskQueue) Start(ctx context.Context) {
 
 			var nextSleepDelay time.Duration
 			q.SetStatus(QueueStatusRunningTask)
+
+			defer func() {
+				if r := recover(); r != nil {
+					q.logger.Warn("panic recovered in Start", slog.Any("error", r))
+				}
+			}()
 			taskRes := q.Handler(ctx, t)
 
 			// Check Done channel after long-running operation.
@@ -881,21 +762,11 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			case Success, Keep:
 				// Insert new tasks right after the current task in reverse order.
 				q.withLock(func() {
-					q.addAfter(t.GetId(), taskRes.GetAfterTasks()...)
+					q.storage.ProcessResult(taskRes, t)
 
-					if taskRes.Status == Success {
-						q.remove(t.GetId())
-					}
 					t.SetProcessing(false) // release processing flag
-
-					// Also, add HeadTasks in reverse order
-					// at the start of the queue. The first task in HeadTasks
-					// become the new first task in the queue.
-					q.addFirst(taskRes.GetHeadTasks()...)
-
-					// Add tasks to the end of the queue
-					q.addLast(taskRes.GetTailTasks()...)
 				})
+
 				q.SetStatus(QueueStatusIdle)
 			case Fail:
 				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
@@ -956,7 +827,7 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 	}
 
 	// Shortcut: return the first task if the queue is not empty and delay is not required.
-	if !q.IsEmpty() && sleepDelay == 0 {
+	if q.Length() > 0 && sleepDelay == 0 {
 		return q.GetFirst()
 	}
 
@@ -1009,7 +880,8 @@ func (q *TaskQueue) waitForTask(sleepDelay time.Duration) task.Task {
 
 		// Break the for-loop to see if the head task can be returned.
 		if checkTask {
-			if q.IsEmpty() {
+			// is empty
+			if q.Length() == 0 {
 				// No task to return: increase wait time.
 				waitUntil += q.DelayOnQueueIsEmpty
 			} else {
@@ -1062,6 +934,12 @@ func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
 	// Create snapshot under lock
 	snapshot := q.GetSnapshot()
 
+	defer func() {
+		if r := recover(); r != nil {
+			q.logger.Warn("panic recovered in IterateSnapshot", slog.Any("error", r))
+		}
+	}()
+
 	// Execute callbacks without holding any locks
 	for _, t := range snapshot {
 		doFn(t)
@@ -1074,16 +952,7 @@ func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
 // The returned slice is a snapshot at the time of the call and will not reflect
 // subsequent changes to the queue.
 func (q *TaskQueue) GetSnapshot() []task.Task {
-	var snapshot []task.Task
-
-	q.withRLock(func() {
-		snapshot = make([]task.Task, 0, q.items.Len())
-		for e := q.items.Front(); e != nil; e = e.Next() {
-			snapshot = append(snapshot, e.Value)
-		}
-	})
-
-	return snapshot
+	return q.storage.GetSnapshot()
 }
 
 // DeleteFunc runs fn on every task and removes each task for which fn returns false.
@@ -1092,19 +961,15 @@ func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 		return
 	}
 
-	defer q.MeasureActionTime("Filter")()
+	defer q.MeasureActionTime("DeleteFunc")()
 
-	q.withLock(func() {
-		for e := q.items.Front(); e != nil; {
-			current := e
-			e = e.Next()
-			t := current.Value
-			if !fn(t) {
-				q.items.Remove(current)
-				delete(q.idIndex, t.GetId())
-				q.queueTasksCounter.Remove(t)
-			}
+	q.storage.DeleteFunc(func(t task.Task) bool {
+		if !fn(t) {
+			q.queueTasksCounter.Remove(t)
+			return false
 		}
+
+		return true
 	})
 }
 
@@ -1114,13 +979,16 @@ func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 func (q *TaskQueue) String() string {
 	var buf strings.Builder
 	var index int
+
 	qLen := q.Length()
+
 	q.IterateSnapshot(func(t task.Task) {
 		buf.WriteString(fmt.Sprintf("[%s,id=%10.10s]", t.GetDescription(), t.GetId()))
 		index++
 		if index == qLen {
 			return
 		}
+
 		buf.WriteString(", ")
 	})
 
@@ -1129,14 +997,15 @@ func (q *TaskQueue) String() string {
 
 func (q *TaskQueue) withLock(fn func()) {
 	q.m.Lock()
-	fn()
-	q.m.Unlock()
-}
+	defer func() {
+		q.m.Unlock()
 
-func (q *TaskQueue) withRLock(fn func()) {
-	q.m.RLock()
+		if r := recover(); r != nil {
+			q.logger.Warn("panic recovered in withLock", slog.Any("error", r))
+		}
+	}()
+
 	fn()
-	q.m.RUnlock()
 }
 
 func isNil(v interface{}) bool {

@@ -150,7 +150,7 @@ func newBenchmarkTasksQueue(b *testing.B) *TaskQueue {
 	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
-	return NewTasksQueue(metricStorage)
+	return NewTasksQueue("test", metricStorage)
 }
 
 func BenchmarkTaskQueue_AddLast_100(b *testing.B) {
@@ -241,11 +241,11 @@ func benchmarkTaskQueueCompaction(b *testing.B, size int) {
 		metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 		})
 
-		q := NewTasksQueue(metricStorage, WithCompactableTypes(task_metadata.HookRun))
+		q := NewTasksQueue("test", metricStorage, WithCompactableTypes(task_metadata.HookRun))
 		tasks := createCompactionBenchmarkData(b, size)
 		// Setup queue without triggering compaction
 		for _, t := range tasks {
-			q.items.PushBack(t)
+			q.storage.AddLast(t)
 		}
 
 		b.StartTimer()

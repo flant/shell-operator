@@ -88,7 +88,7 @@ func Test_Dump(t *testing.T) {
 				"queue_name":   "active-queue",
 			},
 			{
-				"queue_action": "IsEmpty",
+				"queue_action": "Length",
 				"queue_name":   "empty",
 			},
 		}
