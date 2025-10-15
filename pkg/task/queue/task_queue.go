@@ -777,12 +777,14 @@ func (q *TaskQueue) Start(ctx context.Context) {
 			var nextSleepDelay time.Duration
 			q.SetStatus(QueueStatusRunningTask)
 
-			defer func() {
-				if r := recover(); r != nil {
-					q.logger.Warn("panic recovered in Start", slog.Any("error", r))
-				}
+			taskRes := func() *TaskResult {
+				defer func() {
+					if r := recover(); r != nil {
+						q.logger.Warn("panic recovered in Start", slog.Any("error", r))
+					}
+				}()
+				return q.Handler(ctx, t)
 			}()
-			taskRes := q.Handler(ctx, t)
 
 			// Check Done channel after long-running operation.
 			select {
