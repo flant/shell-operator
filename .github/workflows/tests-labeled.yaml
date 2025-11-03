@@ -69,7 +69,7 @@ jobs:
           go-version: "1.23"
 
       - name: Check out shell-operator code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore Go modules
         id: go-modules-cache
