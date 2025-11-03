@@ -2,6 +2,7 @@ package admission
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -63,9 +64,13 @@ func (w *ValidatingWebhookResource) Register() error {
 			slog.String("path", *webhook.ClientConfig.Service.Path),
 			slog.String("configurationName", w.opts.ConfigurationName))
 
+		log.Debug("debug w.opts.ServiceName", slog.String("w.opts.ServiceName", w.opts.ServiceName))
+		log.Debug("debug ValidatingWebhook client", slog.String("webhook.ValidatingWebhook.ClientConfig.Service.Name", webhook.ValidatingWebhook.ClientConfig.Service.Name))
+
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.ValidatingWebhook)
 	}
 
+	fmt.Println(configuration.Webhooks)
 	return w.submit(configuration)
 }
 
