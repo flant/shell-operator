@@ -83,10 +83,34 @@ func (tc *TaskCounter) Remove(task task.Task) {
 
 	id := task.GetCompactionID()
 
-	counter, ok := tc.counter[id]
-	if ok {
-		counter--
+	labels := map[string]string{
+		"queue_name": tc.queueName,
+		"task_id":    id,
 	}
+
+	counter, ok := tc.counter[id]
+	if !ok {
+		if _, reached := tc.reachedCap[id]; reached {
+			delete(tc.reachedCap, id)
+			tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 0, labels)
+		}
+
+		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, 0, labels)
+		return
+	}
+
+	if counter == 0 {
+		delete(tc.counter, id)
+		if _, reached := tc.reachedCap[id]; reached {
+			delete(tc.reachedCap, id)
+			tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 0, labels)
+		}
+
+		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, 0, labels)
+		return
+	}
+
+	counter--
 
 	if counter == 0 {
 		delete(tc.counter, id)
@@ -94,10 +118,14 @@ func (tc *TaskCounter) Remove(task task.Task) {
 		tc.counter[id] = counter
 	}
 
-	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, float64(counter), map[string]string{
-		"queue_name": task.GetQueueName(),
-		"task_id":    id,
-	})
+	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, float64(counter), labels)
+
+	if counter < taskCap {
+		if _, reached := tc.reachedCap[id]; reached {
+			delete(tc.reachedCap, id)
+			tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 0, labels)
+		}
+	}
 }
 
 func (tc *TaskCounter) GetReachedCap() map[string]struct{} {
