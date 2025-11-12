@@ -125,6 +125,9 @@ type TaskQueue struct {
 
 	queueTasksCounter *TaskCounter
 
+	// Hook tasks counter for metrics (tracks tasks by hook name)
+	hookTasksCounter map[string]uint
+
 	// Pre-allocated buffers for compaction
 	contextBuffer   []bindingcontext.BindingContext
 	monitorIDBuffer []string
@@ -185,11 +188,12 @@ func NewTasksQueue(name string, metricStorage metricsstorage.Storage, opts ...Ta
 		},
 		logger: log.NewLogger().Named("task_queue").Named(name),
 		// Pre-allocate buffers
-		contextBuffer:   make([]bindingcontext.BindingContext, 0, 128),
-		monitorIDBuffer: make([]string, 0, 128),
-		groupBuffer:     make(map[string]*compactionGroup, 32),
-		metricStorage:   metricStorage,
-		status:          NewTaskQueueStatus(),
+		contextBuffer:    make([]bindingcontext.BindingContext, 0, 128),
+		monitorIDBuffer:  make([]string, 0, 128),
+		groupBuffer:      make(map[string]*compactionGroup, 32),
+		metricStorage:    metricStorage,
+		status:           NewTaskQueueStatus(),
+		hookTasksCounter: make(map[string]uint, 32),
 	}
 
 	// Apply all options
@@ -240,6 +244,48 @@ func (q *TaskQueue) putHookGroupsMap(m map[string]*compactionGroup) {
 	}
 
 	hookGroupsMapPool.Put(m)
+}
+
+// getHookName extracts hook name from task metadata if available
+func (q *TaskQueue) getHookName(t task.Task) string {
+	metadata := t.GetMetadata()
+	if metadata == nil {
+		return ""
+	}
+
+	hookNameAccessor, ok := metadata.(task_metadata.HookNameAccessor)
+	if !ok {
+		return ""
+	}
+
+	return hookNameAccessor.GetHookName()
+}
+
+// updateHookTasksCounter updates the hook tasks counter and metrics
+func (q *TaskQueue) updateHookTasksCounter(hookName string, delta int) {
+	if hookName == "" || q.metricStorage == nil {
+		return
+	}
+
+	q.hookTasksCounter[hookName] = uint(int(q.hookTasksCounter[hookName]) + delta)
+
+	count := q.hookTasksCounter[hookName]
+
+	labels := map[string]string{
+		"queue_name": q.Name,
+		"hook":       hookName,
+	}
+
+	// Only update metric if count > 20, or set to 0 if count <= 20
+	if count > 20 {
+		q.metricStorage.GaugeSet(metrics.TasksQueueCompactionTasksByHook, float64(count), labels)
+	} else {
+		// Set to 0 to remove from metrics when count drops below threshold
+		if count == 0 {
+			delete(q.hookTasksCounter, hookName)
+		}
+		q.metricStorage.GaugeSet(metrics.TasksQueueCompactionTasksByHook, 0, labels)
+	}
 }
 
 // MeasureActionTime is a helper to measure execution time of queue's actions
@@ -295,6 +341,12 @@ func (q *TaskQueue) AddFirst(tasks ...task.Task) {
 	// Update queueTasksCounter for each added task
 	for _, t := range tasks {
 		q.queueTasksCounter.Add(t)
+
+		// Update hook tasks counter
+		hookName := q.getHookName(t)
+		if hookName != "" {
+			q.updateHookTasksCounter(hookName, 1)
+		}
 	}
 }
 
@@ -305,6 +357,12 @@ func (q *TaskQueue) RemoveFirst() task.Task {
 	t := q.storage.RemoveFirst()
 	if t != nil {
 		q.queueTasksCounter.Remove(t)
+
+		// Update hook tasks counter
+		hookName := q.getHookName(t)
+		if hookName != "" {
+			q.updateHookTasksCounter(hookName, -1)
+		}
 	}
 
 	return t
@@ -339,6 +397,12 @@ func (q *TaskQueue) AddLast(tasks ...task.Task) {
 
 		q.storage.AddLast(t)
 		q.queueTasksCounter.Add(t)
+
+		// Update hook tasks counter
+		hookName := q.getHookName(t)
+		if hookName != "" {
+			q.updateHookTasksCounter(hookName, 1)
+		}
 
 		// TODO: skip compactable check if is already compactable
 
@@ -459,7 +523,7 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 	})
 
 	// Second pass: merge with pooled slices
-	for _, group := range hookGroups {
+	for hookName, group := range hookGroups {
 		if len(group.elementsToMerge) == 0 {
 			continue
 		}
@@ -517,6 +581,12 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 
 			q.storage.RemoveElement(elementToMerge)
 			q.queueTasksCounter.Remove(taskToMerge)
+
+			// Update hook tasks counter for removed task
+			mergeHookName := q.getHookName(taskToMerge)
+			if mergeHookName != "" {
+				q.updateHookTasksCounter(mergeHookName, -1)
+			}
 		}
 
 		// Update target task with compacted slices
@@ -537,6 +607,14 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 
 		withContext = targetMonitorIDsSetter.SetMonitorIDs(newMonitorIDs)
 		targetTask.UpdateMetadata(withContext)
+
+		// Record compaction operation metric
+		if q.metricStorage != nil && len(group.elementsToMerge) > 0 {
+			q.metricStorage.CounterAdd(metrics.TasksQueueCompactionOperationsTotal, 1, map[string]string{
+				"queue_name": q.Name,
+				"hook":       hookName,
+			})
+		}
 
 		// Call compaction callback if set
 		if q.compactionCallback != nil && len(group.elementsToMerge) > 0 {
@@ -620,6 +698,12 @@ func (q *TaskQueue) RemoveLast() task.Task {
 	t := q.storage.RemoveLast()
 	if t != nil {
 		q.queueTasksCounter.Remove(t)
+
+		// Update hook tasks counter
+		hookName := q.getHookName(t)
+		if hookName != "" {
+			q.updateHookTasksCounter(hookName, -1)
+		}
 	}
 
 	return t
@@ -646,6 +730,12 @@ func (q *TaskQueue) AddAfter(id string, tasks ...task.Task) {
 	// Update queueTasksCounter for each added task
 	for _, t := range tasks {
 		q.queueTasksCounter.Add(t)
+
+		// Update hook tasks counter
+		hookName := q.getHookName(t)
+		if hookName != "" {
+			q.updateHookTasksCounter(hookName, 1)
+		}
 	}
 }
 
@@ -655,6 +745,12 @@ func (q *TaskQueue) AddBefore(id string, newTask task.Task) {
 
 	q.storage.AddBefore(id, newTask)
 	q.queueTasksCounter.Add(newTask)
+
+	// Update hook tasks counter
+	hookName := q.getHookName(newTask)
+	if hookName != "" {
+		q.updateHookTasksCounter(hookName, 1)
+	}
 }
 
 // Remove finds element by id and deletes it.
@@ -664,6 +760,12 @@ func (q *TaskQueue) Remove(id string) task.Task {
 	t := q.storage.Remove(id)
 	if t != nil {
 		q.queueTasksCounter.Remove(t)
+
+		// Update hook tasks counter
+		hookName := q.getHookName(t)
+		if hookName != "" {
+			q.updateHookTasksCounter(hookName, -1)
+		}
 	}
 
 	return t
@@ -966,6 +1068,13 @@ func (q *TaskQueue) DeleteFunc(fn func(task.Task) bool) {
 	q.storage.DeleteFunc(func(t task.Task) bool {
 		if !fn(t) {
 			q.queueTasksCounter.Remove(t)
+
+			// Update hook tasks counter
+			hookName := q.getHookName(t)
+			if hookName != "" {
+				q.updateHookTasksCounter(hookName, -1)
+			}
+
 			return false
 		}
 

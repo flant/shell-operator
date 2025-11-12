@@ -5,7 +5,6 @@ import (
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
-	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -56,18 +55,8 @@ func (tc *TaskCounter) Add(task task.Task) {
 
 	tc.counter[id] = counter
 
-	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, float64(counter), map[string]string{
-		"queue_name": tc.queueName,
-		"task_id":    id,
-	})
-
 	if counter == taskCap {
 		tc.reachedCap[id] = struct{}{}
-
-		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 1, map[string]string{
-			"queue_name": tc.queueName,
-			"task_id":    id,
-		})
 	}
 }
 
@@ -84,9 +73,22 @@ func (tc *TaskCounter) Remove(task task.Task) {
 	id := task.GetCompactionID()
 
 	counter, ok := tc.counter[id]
-	if ok {
-		counter--
+	if !ok {
+		if _, reached := tc.reachedCap[id]; reached {
+			delete(tc.reachedCap, id)
+		}
+		return
 	}
+
+	if counter == 0 {
+		delete(tc.counter, id)
+		if _, reached := tc.reachedCap[id]; reached {
+			delete(tc.reachedCap, id)
+		}
+		return
+	}
+
+	counter--
 
 	if counter == 0 {
 		delete(tc.counter, id)
@@ -94,10 +96,11 @@ func (tc *TaskCounter) Remove(task task.Task) {
 		tc.counter[id] = counter
 	}
 
-	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, float64(counter), map[string]string{
-		"queue_name": task.GetQueueName(),
-		"task_id":    id,
-	})
+	if counter < taskCap {
+		if _, reached := tc.reachedCap[id]; reached {
+			delete(tc.reachedCap, id)
+		}
+	}
 }
 
 func (tc *TaskCounter) GetReachedCap() map[string]struct{} {
@@ -117,13 +120,6 @@ func (tc *TaskCounter) IsAnyCapReached() bool {
 func (tc *TaskCounter) ResetReachedCap() {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
-
-	for id := range tc.reachedCap {
-		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 0, map[string]string{
-			"queue_name": tc.queueName,
-			"task_id":    id,
-		})
-	}
 
 	tc.reachedCap = make(map[string]struct{}, 32)
 }
