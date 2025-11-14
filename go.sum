@@ -35,8 +35,8 @@ github.com/deckhouse/deckhouse/pkg/log v0.1.0 h1:2aPfyiHHSIJlX4x7ysyPOaIb7CLmyY+
 github.com/deckhouse/deckhouse/pkg/log v0.1.0/go.mod h1:pbAxTSDcPmwyl3wwKDcEB3qdxHnRxqTV+J0K+sha8bw=
 github.com/deckhouse/deckhouse/pkg/metrics-storage v0.2.1 h1:DhMHRzmaVNXASH+koIy9gK25GU/EaK+zC6sVpacqWRw=
 github.com/deckhouse/deckhouse/pkg/metrics-storage v0.2.1/go.mod h1:Rz++SzCLkFW03WGgftnn91TimGU2shiKb5S/YuxcBuE=
-github.com/deckhouse/module-sdk v0.4.3-0.20251114125106-f261dcc848ce h1:5q3O0rJVrXGEry2AAq376FOzYBoy5KVMm45hnVV9qkI=
-github.com/deckhouse/module-sdk v0.4.3-0.20251114125106-f261dcc848ce/go.mod h1:+EbBnP8z+poIihgL4l1oxHng5ePqDUK44c39u7sEBss=
+github.com/deckhouse/module-sdk v0.5.0 h1:b2GJUzMKQLr7oJVJy5lXHvyymNyvNiFXpBie7MwEWwE=
+github.com/deckhouse/module-sdk v0.5.0/go.mod h1:+EbBnP8z+poIihgL4l1oxHng5ePqDUK44c39u7sEBss=
 github.com/docker/go-units v0.4.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/emicklei/go-restful/v3 v3.11.0 h1:rAQeMHw1c7zTmncogyy8VvRZwtkmkZ4FxERmMY4rD+g=
 github.com/emicklei/go-restful/v3 v3.11.0/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
