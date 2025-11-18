@@ -19,14 +19,16 @@ package metrics
 
 import (
 	"fmt"
+	"strings"
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/deckhouse/deckhouse/pkg/metrics-storage/options"
 )
 
-// Metric name constants organized by functional area.
-// Each constant represents a unique metric name used throughout shell-operator.
-const (
+// Metric name variables organized by functional area.
+// Each variable represents a unique metric name used throughout shell-operator.
+// These variables are initialized with prefix replacement at startup.
+var (
 	// ============================================================================
 	// Common Metrics
 	// ============================================================================
@@ -79,6 +81,61 @@ const (
 	// KubernetesClientWatchErrorsTotal counts Kubernetes client watch errors
 	KubernetesClientWatchErrorsTotal = "{PREFIX}kubernetes_client_watch_errors_total"
 )
+
+// ReplacePrefix replaces the {PREFIX} placeholder in a metric name with the provided prefix.
+// This function is useful for testing or when you need to manually construct metric names
+// with a specific prefix instead of relying on the metrics storage's automatic replacement.
+func ReplacePrefix(metricName, prefix string) string {
+	return strings.ReplaceAll(metricName, "{PREFIX}", prefix)
+}
+
+// InitMetrics initializes all metric name variables by replacing {PREFIX} placeholders
+// with the provided prefix. This function should be called once at startup before
+// registering any metrics.
+func InitMetrics(prefix string) {
+	// ============================================================================
+	// Common Metrics
+	// ============================================================================
+	LiveTicks = ReplacePrefix(LiveTicks, prefix)
+
+	// ============================================================================
+	// Task Queue Metrics
+	// ============================================================================
+	TasksQueueActionDurationSeconds = ReplacePrefix(TasksQueueActionDurationSeconds, prefix)
+	TasksQueueLength = ReplacePrefix(TasksQueueLength, prefix)
+	TasksQueueCompactionInQueueTasks = ReplacePrefix(TasksQueueCompactionInQueueTasks, prefix)
+	TasksQueueCompactionReached = ReplacePrefix(TasksQueueCompactionReached, prefix)
+
+	// ============================================================================
+	// Hook Execution Metrics
+	// ============================================================================
+	// Kubernetes Bindings
+	HookEnableKubernetesBindingsSeconds = ReplacePrefix(HookEnableKubernetesBindingsSeconds, prefix)
+	HookEnableKubernetesBindingsErrorsTotal = ReplacePrefix(HookEnableKubernetesBindingsErrorsTotal, prefix)
+	HookEnableKubernetesBindingsSuccess = ReplacePrefix(HookEnableKubernetesBindingsSuccess, prefix)
+
+	// Hook Runtime Metrics
+	HookRunSeconds = ReplacePrefix(HookRunSeconds, prefix)
+	HookRunUserCPUSeconds = ReplacePrefix(HookRunUserCPUSeconds, prefix)
+	HookRunSysCPUSeconds = ReplacePrefix(HookRunSysCPUSeconds, prefix)
+	HookRunMaxRSSBytes = ReplacePrefix(HookRunMaxRSSBytes, prefix)
+
+	// Hook Execution Results
+	HookRunErrorsTotal = ReplacePrefix(HookRunErrorsTotal, prefix)
+	HookRunAllowedErrorsTotal = ReplacePrefix(HookRunAllowedErrorsTotal, prefix)
+	HookRunSuccessTotal = ReplacePrefix(HookRunSuccessTotal, prefix)
+
+	// Task Queue Wait Time
+	TaskWaitInQueueSecondsTotal = ReplacePrefix(TaskWaitInQueueSecondsTotal, prefix)
+
+	// ============================================================================
+	// Kubernetes Events Manager Metrics
+	// ============================================================================
+	KubeSnapshotObjects = ReplacePrefix(KubeSnapshotObjects, prefix)
+	KubeJqFilterDurationSeconds = ReplacePrefix(KubeJqFilterDurationSeconds, prefix)
+	KubeEventDurationSeconds = ReplacePrefix(KubeEventDurationSeconds, prefix)
+	KubernetesClientWatchErrorsTotal = ReplacePrefix(KubernetesClientWatchErrorsTotal, prefix)
+}
 
 // ============================================================================
 // Registration Functions
