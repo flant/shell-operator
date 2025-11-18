@@ -65,9 +65,6 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		return nil, err
 	}
 
-	// Initialize metric names with the configured prefix
-	metrics.InitMetrics(app.PrometheusMetricsPrefix)
-
 	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, []string{
 		"hook",
 		"binding",
