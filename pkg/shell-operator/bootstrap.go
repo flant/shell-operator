@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
@@ -44,7 +45,16 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		return nil, err
 	}
 
-	op := NewShellOperator(context.TODO(), WithLogger(logger))
+	ms := metricsstorage.NewMetricStorage(
+		metricsstorage.WithLogger(logger.Named("metric-storage")),
+	)
+
+	hms := metricsstorage.NewMetricStorage(
+		metricsstorage.WithNewRegistry(),
+		metricsstorage.WithLogger(logger.Named("hook-metric-storage")),
+	)
+
+	op := NewShellOperator(context.TODO(), ms, hms, WithLogger(logger))
 
 	// Debug server.
 	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))

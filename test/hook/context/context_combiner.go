@@ -33,7 +33,6 @@ type ContextCombiner struct {
 func NewContextCombiner() *ContextCombiner {
 	op := &shell_operator.ShellOperator{}
 	op.MetricStorage = metricsstorage.NewMetricStorage(
-		metricsstorage.WithPrefix("test-prefix"),
 		metricsstorage.WithLogger(log.NewNop()),
 	)
 	op.TaskQueues = queue.NewTaskQueueSet().WithMetricStorage(op.MetricStorage)
