@@ -46,12 +46,10 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 	}
 
 	ms := metricsstorage.NewMetricStorage(
-		metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
 		metricsstorage.WithLogger(logger.Named("metric-storage")),
 	)
 
 	hms := metricsstorage.NewMetricStorage(
-		metricsstorage.WithPrefix(app.PrometheusMetricsPrefix),
 		metricsstorage.WithNewRegistry(),
 		metricsstorage.WithLogger(logger.Named("hook-metric-storage")),
 	)

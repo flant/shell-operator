@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/deckhouse/deckhouse/pkg/log v0.1.0
-	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.2.1
+	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0
 	github.com/flant/kube-client v1.5.0
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/go-openapi/spec v0.19.8
