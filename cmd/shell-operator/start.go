@@ -15,6 +15,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/metrics"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
@@ -29,6 +30,10 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 		app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
 		ctx := context.Background()
 		telemetryShutdown := registerTelemetry(ctx)
+
+		// Initialize metric names with the configured prefix
+		metrics.InitMetrics(app.PrometheusMetricsPrefix)
+
 		// Init logging and initialize a ShellOperator instance.
 		operator, err := shell_operator.Init(logger.Named("shell-operator"))
 		if err != nil {
