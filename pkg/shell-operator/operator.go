@@ -89,7 +89,7 @@ func WithLogger(logger *log.Logger) Option {
 	}
 }
 
-func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
+func NewShellOperator(ctx context.Context, metricsStorage, hookMetricStorage metricsstorage.Storage, opts ...Option) *ShellOperator {
 	cctx, cancel := context.WithCancel(ctx)
 
 	so := &ShellOperator{
@@ -103,6 +103,19 @@ func NewShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 
 	if so.logger == nil {
 		so.logger = log.NewLogger().Named("shell-operator")
+	}
+
+	so.MetricStorage = metricsStorage
+	so.HookMetricStorage = hookMetricStorage
+
+	if so.MetricStorage == nil {
+		so.logger.Warn("MetricStorage is not provided, create a new default one")
+		so.MetricStorage = metricsstorage.NewMetricStorage()
+	}
+
+	if so.HookMetricStorage == nil {
+		so.logger.Warn("HookMetricStorage is not provided, create a new default one")
+		so.HookMetricStorage = metricsstorage.NewMetricStorage(metricsstorage.WithNewRegistry())
 	}
 
 	return so
