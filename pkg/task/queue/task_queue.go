@@ -267,9 +267,22 @@ func (q *TaskQueue) updateHookTasksCounter(hookName string, delta int) {
 		return
 	}
 
-	q.hookTasksCounter[hookName] = uint(int(q.hookTasksCounter[hookName]) + delta)
+	currentCount := q.hookTasksCounter[hookName]
 
-	count := q.hookTasksCounter[hookName]
+	// Calculate new count, preventing underflow
+	var newCount uint
+	if delta < 0 {
+		// Prevent underflow: if delta is negative, subtract but don't go below 0
+		if int(currentCount)+delta < 0 {
+			newCount = 0
+		} else {
+			newCount = uint(int(currentCount) + delta)
+		}
+	} else {
+		newCount = currentCount + uint(delta)
+	}
+
+	q.hookTasksCounter[hookName] = newCount
 
 	labels := map[string]string{
 		"queue_name": q.Name,
@@ -277,11 +290,11 @@ func (q *TaskQueue) updateHookTasksCounter(hookName string, delta int) {
 	}
 
 	// Only update metric if count > 20, or set to 0 if count <= 20
-	if count > 20 {
-		q.metricStorage.GaugeSet(metrics.TasksQueueCompactionTasksByHook, float64(count), labels)
+	if newCount > 20 {
+		q.metricStorage.GaugeSet(metrics.TasksQueueCompactionTasksByHook, float64(newCount), labels)
 	} else {
 		// Set to 0 to remove from metrics when count drops below threshold
-		if count == 0 {
+		if newCount == 0 {
 			delete(q.hookTasksCounter, hookName)
 		}
 		q.metricStorage.GaugeSet(metrics.TasksQueueCompactionTasksByHook, 0, labels)
