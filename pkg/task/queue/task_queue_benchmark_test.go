@@ -149,6 +149,8 @@ func newBenchmarkTasksQueue(b *testing.B) *TaskQueue {
 	})
 	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
 	})
+	metricStorage.CounterAddMock.Set(func(_ string, _ float64, _ map[string]string) {
+	})
 
 	return NewTasksQueue("test", metricStorage)
 }

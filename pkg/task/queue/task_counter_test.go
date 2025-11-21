@@ -1,98 +1,99 @@
 package queue
 
-// import (
-// 	"sync"
-// 	"testing"
+import (
+	"sync"
+	"testing"
 
-// 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 
-// 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
-// 	"github.com/flant/shell-operator/pkg/metric"
-// 	"github.com/flant/shell-operator/pkg/metrics"
-// 	"github.com/flant/shell-operator/pkg/task"
-// )
+	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
+)
 
-// func TestTaskCounterRemoveUsesQueueName(t *testing.T) {
-// 	metricStorage := metric.NewStorageMock(t)
+func TestTaskCounterUpdateHookMetricsFromSnapshot(t *testing.T) {
+	metricStorage := metric.NewStorageMock(t)
 
-// 	type gaugeCall struct {
-// 		metric string
-// 		value  float64
-// 		labels map[string]string
-// 	}
+	type gaugeCall struct {
+		metric string
+		value  float64
+		labels map[string]string
+	}
 
-// 	var (
-// 		mu    sync.Mutex
-// 		calls []gaugeCall
-// 	)
+	var (
+		mu    sync.Mutex
+		calls []gaugeCall
+	)
 
-// 	metricStorage.GaugeSetMock.Set(func(metric string, value float64, labels map[string]string) {
-// 		cloned := make(map[string]string, len(labels))
-// 		for k, v := range labels {
-// 			cloned[k] = v
-// 		}
+	metricStorage.GaugeSetMock.Set(func(metric string, value float64, labels map[string]string) {
+		cloned := make(map[string]string, len(labels))
+		for k, v := range labels {
+			cloned[k] = v
+		}
 
-// 		mu.Lock()
-// 		calls = append(calls, gaugeCall{
-// 			metric: metric,
-// 			value:  value,
-// 			labels: cloned,
-// 		})
-// 		mu.Unlock()
-// 	})
+		mu.Lock()
+		calls = append(calls, gaugeCall{
+			metric: metric,
+			value:  value,
+			labels: cloned,
+		})
+		mu.Unlock()
+	})
 
-// 	tc := NewTaskCounter("main", nil, metricStorage)
+	tc := NewTaskCounter("main", nil, metricStorage)
 
-// 	testTask := task.NewTask(task_metadata.HookRun).
-// 		WithCompactionID("test-hook")
+	// Simulate initial state with hooks above threshold by setting up a snapshot
+	initialSnapshot := map[string]uint{
+		"hook1": 26,
+		"hook2": 31,
+		"hook3": 51,
+	}
+	tc.UpdateHookMetricsFromSnapshot(initialSnapshot)
 
-// 	tc.Add(testTask)
-// 	tc.Remove(testTask)
+	mu.Lock()
+	calls = nil // Clear previous calls
+	mu.Unlock()
 
-// 	mu.Lock()
-// 	require.NotEmpty(t, calls)
-// 	lastCall := calls[len(calls)-1]
-// 	mu.Unlock()
+	// Update with new snapshot where:
+	// - hook1 still has high count (25 tasks)
+	// - hook2 dropped below threshold (15 tasks) - should not be published
+	// - hook3 is completely gone (0 tasks in new snapshot) - should not be published
+	// - hook4 is new (30 tasks)
+	newSnapshot := map[string]uint{
+		"hook1": 25,
+		"hook2": 15,
+		"hook4": 30,
+	}
 
-// 	require.Equal(t, metrics.TasksQueueCompactionInQueueTasks, lastCall.metric)
-// 	require.Equal(t, float64(0), lastCall.value)
-// 	require.Equal(t, "main", lastCall.labels["queue_name"])
-// 	require.Equal(t, "test-hook", lastCall.labels["task_id"])
-// }
+	tc.UpdateHookMetricsFromSnapshot(newSnapshot)
 
-// func TestTaskCounterRemoveClearsReachedCap(t *testing.T) {
-// 	metricStorage := metric.NewStorageMock(t)
+	mu.Lock()
+	defer mu.Unlock()
 
-// 	var (
-// 		mu            sync.Mutex
-// 		reachedValues []float64
-// 	)
+	// Verify that metrics were set correctly
+	require.NotEmpty(t, calls)
 
-// 	metricStorage.GaugeSetMock.Set(func(metric string, value float64, labels map[string]string) {
-// 		if metric == metrics.TasksQueueCompactionReached {
-// 			mu.Lock()
-// 			reachedValues = append(reachedValues, value)
-// 			mu.Unlock()
-// 		}
-// 	})
+	// Build a map of last call for each hook
+	lastCallByHook := make(map[string]gaugeCall)
+	for _, call := range calls {
+		if call.metric == metrics.TasksQueueCompactionTasksByHook {
+			hook := call.labels["hook"]
+			lastCallByHook[hook] = call
+		}
+	}
 
-// 	tc := NewTaskCounter("main", nil, metricStorage)
+	// hook1: should have value 25
+	require.Contains(t, lastCallByHook, "hook1")
+	require.Equal(t, float64(25), lastCallByHook["hook1"].value)
+	require.Equal(t, "main", lastCallByHook["hook1"].labels["queue_name"])
 
-// 	testTask := task.NewTask(task_metadata.HookRun).
-// 		WithCompactionID("test-hook")
+	// hook2: should NOT be published (below threshold)
+	require.NotContains(t, lastCallByHook, "hook2")
 
-// 	for i := 0; i < taskCap; i++ {
-// 		tc.Add(testTask)
-// 	}
+	// hook3: should NOT be published (removed from snapshot and was above threshold before)
+	require.NotContains(t, lastCallByHook, "hook3")
 
-// 	require.True(t, tc.IsAnyCapReached())
-
-// 	tc.Remove(testTask)
-
-// 	require.False(t, tc.IsAnyCapReached())
-
-// 	mu.Lock()
-// 	require.NotEmpty(t, reachedValues)
-// 	require.Equal(t, float64(0), reachedValues[len(reachedValues)-1])
-// 	mu.Unlock()
-// }
+	// hook4: should have value 30
+	require.Contains(t, lastCallByHook, "hook4")
+	require.Equal(t, float64(30), lastCallByHook["hook4"].value)
+	require.Equal(t, "main", lastCallByHook["hook4"].labels["queue_name"])
+}
