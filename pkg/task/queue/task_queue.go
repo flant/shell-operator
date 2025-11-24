@@ -35,7 +35,10 @@ config parameter.
 This implementation uses container/list for O(1) queue operations and a map for O(1) task lookup by ID.
 */
 
-const compactionThreshold = 100
+const (
+	compactionThreshold             = 100
+	metricsMonitoringUpdateInterval = 10 * time.Second
+)
 
 var (
 	DefaultWaitLoopCheckInterval    = 125 * time.Millisecond
@@ -240,21 +243,6 @@ func (q *TaskQueue) putHookGroupsMap(m map[string]*compactionGroup) {
 	}
 
 	hookGroupsMapPool.Put(m)
-}
-
-// getHookName extracts hook name from task metadata if available
-func (q *TaskQueue) getHookName(t task.Task) string {
-	metadata := t.GetMetadata()
-	if metadata == nil {
-		return ""
-	}
-
-	hookNameAccessor, ok := metadata.(task_metadata.HookNameAccessor)
-	if !ok {
-		return ""
-	}
-
-	return hookNameAccessor.GetHookName()
 }
 
 // MeasureActionTime is a helper to measure execution time of queue's actions
@@ -706,7 +694,10 @@ func (q *TaskQueue) startMetricsMonitoring() {
 	}
 
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
+		// Update metrics immediately on start
+		q.updateCompactionMetrics()
+
+		ticker := time.NewTicker(metricsMonitoringUpdateInterval)
 		defer ticker.Stop()
 
 		for {
