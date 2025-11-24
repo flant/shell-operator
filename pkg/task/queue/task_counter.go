@@ -76,17 +76,13 @@ func (tc *TaskCounter) Remove(task task.Task) {
 
 	counter, ok := tc.counter[id]
 	if !ok {
-		if _, reached := tc.reachedCap[id]; reached {
-			delete(tc.reachedCap, id)
-		}
+		delete(tc.reachedCap, id)
 		return
 	}
 
 	if counter == 0 {
 		delete(tc.counter, id)
-		if _, reached := tc.reachedCap[id]; reached {
-			delete(tc.reachedCap, id)
-		}
+		delete(tc.reachedCap, id)
 		return
 	}
 
@@ -99,9 +95,7 @@ func (tc *TaskCounter) Remove(task task.Task) {
 	}
 
 	if counter < compactionThreshold {
-		if _, reached := tc.reachedCap[id]; reached {
-			delete(tc.reachedCap, id)
-		}
+		delete(tc.reachedCap, id)
 	}
 }
 
