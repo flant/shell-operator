@@ -31,7 +31,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
-	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
@@ -141,7 +141,7 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
-	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
@@ -216,7 +216,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
-	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
@@ -334,7 +334,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
-	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	TaskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
