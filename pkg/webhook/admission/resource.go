@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg"
 )
 
 type WebhookResourceOptions struct {
@@ -102,7 +103,7 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 		return err
 	}
 	if len(list.Items) == 0 {
-		_, err = client.Create(context.TODO(), conf, metav1.CreateOptions{})
+		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
 		if err != nil {
 			log.Error("Create ValidatingWebhookConfiguration",
 				slog.String("name", conf.Name),
@@ -111,7 +112,7 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 	} else {
 		newConf := list.Items[0]
 		newConf.Webhooks = conf.Webhooks
-		_, err = client.Update(context.TODO(), &newConf, metav1.UpdateOptions{})
+		_, err = client.Update(context.TODO(), &newConf, pkg.DefaultUpdateOptions())
 		if err != nil {
 			log.Error("Replace ValidatingWebhookConfiguration",
 				slog.String("name", conf.Name),
@@ -186,7 +187,7 @@ func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) 
 		return err
 	}
 	if len(list.Items) == 0 {
-		_, err = client.Create(context.TODO(), conf, metav1.CreateOptions{})
+		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
 		if err != nil {
 			log.Error("Create MutatingWebhookConfiguration",
 				slog.String("name", conf.Name),
@@ -195,7 +196,7 @@ func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) 
 	} else {
 		newConf := list.Items[0]
 		newConf.Webhooks = conf.Webhooks
-		_, err = client.Update(context.TODO(), &newConf, metav1.UpdateOptions{})
+		_, err = client.Update(context.TODO(), &newConf, pkg.DefaultUpdateOptions())
 		if err != nil {
 			log.Error("Replace MutatingWebhookConfiguration",
 				slog.String("name", conf.Name),

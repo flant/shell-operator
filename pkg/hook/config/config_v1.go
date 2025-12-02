@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/flant/shell-operator/pkg/app"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -441,7 +440,7 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) htypes.ValidatingConfi
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
-		defaultFailurePolicy := v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
+		defaultFailurePolicy := v1.FailurePolicyType(admission.DefaultSettings.DefaultFailurePolicy)
 		webhook.FailurePolicy = &defaultFailurePolicy
 	}
 
