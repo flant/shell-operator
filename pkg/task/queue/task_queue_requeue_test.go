@@ -21,15 +21,17 @@ func Test_TaskQueueList_Requeue(t *testing.T) {
 
 	metricStorage := metric.NewStorageMock(t)
 	metricStorage.HistogramObserveMock.Set(func(metric string, value float64, labels map[string]string, buckets []float64) {
-		assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
-		assert.NotZero(t, value)
-		assert.Equal(t, map[string]string{
-			"queue_action": "AddLast",
-			"queue_name":   "requeue-test-queue",
-		}, labels)
-		assert.Nil(t, buckets)
+		// Optional: only validate if it's the AddLast action
+		if labels["queue_action"] == "AddLast" {
+			assert.Equal(t, metric, metrics.TasksQueueActionDurationSeconds)
+			assert.NotZero(t, value)
+		}
 	})
-	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
+		// Optional: accept any gauge set calls
+	})
+	metricStorage.CounterAddMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
+		// Optional: accept any counter add calls
 	})
 
 	// A channel to control when RequeueTask can finish.

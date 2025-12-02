@@ -42,10 +42,10 @@ var (
 	TasksQueueActionDurationSeconds = "{PREFIX}tasks_queue_action_duration_seconds"
 	// TasksQueueLength shows the current length of the task queue
 	TasksQueueLength = "{PREFIX}tasks_queue_length"
-	// TasksQueueCompactionInQueueTasks tracks telemetry for queue compaction
-	TasksQueueCompactionInQueueTasks = "d8_telemetry_{PREFIX}tasks_queue_compaction_in_queue_tasks"
-	// TasksQueueCompactionReached tracks when queue compaction is reached
-	TasksQueueCompactionReached = "d8_telemetry_{PREFIX}tasks_queue_compaction_reached"
+	// TasksQueueCompactionOperationsTotal counts compaction operations per hook
+	TasksQueueCompactionOperationsTotal = "d8_telemetry_{PREFIX}tasks_queue_compaction_operations_total"
+	// TasksQueueCompactionTasksByHook shows the number of tasks in queue for each hook when count exceeds 20. Updated every 10 seconds.
+	TasksQueueCompactionTasksByHook = "d8_telemetry_{PREFIX}tasks_queue_compaction_tasks_by_hook"
 
 	// ============================================================================
 	// Hook Execution Metrics
@@ -103,8 +103,8 @@ func InitMetrics(prefix string) {
 	// ============================================================================
 	TasksQueueActionDurationSeconds = ReplacePrefix(TasksQueueActionDurationSeconds, prefix)
 	TasksQueueLength = ReplacePrefix(TasksQueueLength, prefix)
-	TasksQueueCompactionInQueueTasks = ReplacePrefix(TasksQueueCompactionInQueueTasks, prefix)
-	TasksQueueCompactionReached = ReplacePrefix(TasksQueueCompactionReached, prefix)
+	TasksQueueCompactionOperationsTotal = ReplacePrefix(TasksQueueCompactionOperationsTotal, prefix)
+	TasksQueueCompactionTasksByHook = ReplacePrefix(TasksQueueCompactionTasksByHook, prefix)
 
 	// ============================================================================
 	// Hook Execution Metrics
@@ -337,6 +337,27 @@ func RegisterTaskQueueMetrics(metricStorage metricsstorage.Storage) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register %s: %w", TasksQueueLength, err)
+	}
+
+	// Compaction metrics labels
+	compactionLabels := []string{"queue_name", "hook"}
+
+	// Register compaction operations counter
+	_, err = metricStorage.RegisterCounter(
+		TasksQueueCompactionOperationsTotal, compactionLabels,
+		options.WithHelp("Counter of compaction operations per hook"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register %s: %w", TasksQueueCompactionOperationsTotal, err)
+	}
+
+	// Register compaction tasks by hook gauge
+	_, err = metricStorage.RegisterGauge(
+		TasksQueueCompactionTasksByHook, compactionLabels,
+		options.WithHelp("Gauge showing the number of tasks in queue for each hook when the count exceeds 20. Updated every 10 seconds by sampling the queue state."),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register %s: %w", TasksQueueCompactionTasksByHook, err)
 	}
 
 	return nil

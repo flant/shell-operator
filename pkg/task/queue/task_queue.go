@@ -35,7 +35,10 @@ config parameter.
 This implementation uses container/list for O(1) queue operations and a map for O(1) task lookup by ID.
 */
 
-const compactionThreshold = 100
+const (
+	compactionThreshold             = 100
+	metricsMonitoringUpdateInterval = 10 * time.Second
+)
 
 var (
 	DefaultWaitLoopCheckInterval    = 125 * time.Millisecond
@@ -459,7 +462,7 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 	})
 
 	// Second pass: merge with pooled slices
-	for _, group := range hookGroups {
+	for hookName, group := range hookGroups {
 		if len(group.elementsToMerge) == 0 {
 			continue
 		}
@@ -537,6 +540,14 @@ func (q *TaskQueue) compaction(compactionIDs map[string]struct{}) {
 
 		withContext = targetMonitorIDsSetter.SetMonitorIDs(newMonitorIDs)
 		targetTask.UpdateMetadata(withContext)
+
+		// Record compaction operation metric
+		if q.metricStorage != nil && len(group.elementsToMerge) > 0 {
+			q.metricStorage.CounterAdd(metrics.TasksQueueCompactionOperationsTotal, 1, map[string]string{
+				"queue_name": q.Name,
+				"hook":       hookName,
+			})
+		}
 
 		// Call compaction callback if set
 		if q.compactionCallback != nil && len(group.elementsToMerge) > 0 {
@@ -675,6 +686,62 @@ func (q *TaskQueue) Stop() {
 	}
 }
 
+// startMetricsMonitoring starts a goroutine that periodically updates compaction metrics
+// by taking a snapshot of the queue and counting tasks per hook.
+func (q *TaskQueue) startMetricsMonitoring() {
+	if q.metricStorage == nil || q.queueTasksCounter == nil {
+		return
+	}
+
+	go func() {
+		// Update metrics immediately on start
+		q.updateCompactionMetrics()
+
+		ticker := time.NewTicker(metricsMonitoringUpdateInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-q.ctx.Done():
+				return
+			case <-ticker.C:
+				q.updateCompactionMetrics()
+			}
+		}
+	}()
+}
+
+// updateCompactionMetrics counts tasks by hook and updates metrics
+func (q *TaskQueue) updateCompactionMetrics() {
+	hookCounts := make(map[string]uint)
+
+	// Use IterateSnapshot to avoid holding locks during iteration
+	q.IterateSnapshot(func(t task.Task) {
+		// Only count compactable task types
+		if _, ok := q.compactableTypes[t.GetType()]; !ok {
+			return
+		}
+
+		metadata := t.GetMetadata()
+		if isNil(metadata) {
+			return
+		}
+
+		hookNameAccessor, ok := metadata.(task_metadata.HookNameAccessor)
+		if !ok {
+			return
+		}
+
+		hookName := hookNameAccessor.GetHookName()
+		if hookName != "" {
+			hookCounts[hookName]++
+		}
+	})
+
+	// Update metrics based on current state
+	q.queueTasksCounter.UpdateHookMetricsFromSnapshot(hookCounts)
+}
+
 // lazydebug evaluates args only if debug log is enabled.
 // It is used to avoid unnecessary allocations when logging is disabled.
 // Queue MUST remain fast and not allocate memory when logging is disabled.
@@ -694,6 +761,9 @@ func (q *TaskQueue) Start(ctx context.Context) {
 		q.SetStatus(QueueStatusNoHandlerSet)
 		return
 	}
+
+	// Start metrics monitoring goroutine
+	q.startMetricsMonitoring()
 
 	go func() {
 		q.SetStatus(QueueStatusIdle)
