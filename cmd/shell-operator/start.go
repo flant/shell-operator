@@ -18,8 +18,6 @@ import (
 	"github.com/flant/shell-operator/pkg/metrics"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
-	"github.com/flant/shell-operator/pkg/webhook/admission"
-	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
 const (
@@ -35,28 +33,6 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 
 		// Initialize metric names with the configured prefix
 		metrics.InitMetrics(app.PrometheusMetricsPrefix)
-
-		// Update webhook settings from parsed flags
-		admission.InitFromFlags(
-			app.ValidatingWebhookConfigurationName,
-			app.ValidatingWebhookServiceName,
-			app.ValidatingWebhookServerCert,
-			app.ValidatingWebhookServerKey,
-			app.ValidatingWebhookCA,
-			app.ValidatingWebhookClientCA,
-			app.ValidatingWebhookFailurePolicy,
-			app.ValidatingWebhookListenPort,
-			app.ValidatingWebhookListenAddress,
-		)
-		conversion.InitFromFlags(
-			app.ConversionWebhookServiceName,
-			app.ConversionWebhookServerCert,
-			app.ConversionWebhookServerKey,
-			app.ConversionWebhookCA,
-			app.ConversionWebhookClientCA,
-			app.ConversionWebhookListenPort,
-			app.ConversionWebhookListenAddress,
-		)
 
 		// Init logging and initialize a ShellOperator instance.
 		operator, err := shell_operator.Init(logger.Named("shell-operator"))

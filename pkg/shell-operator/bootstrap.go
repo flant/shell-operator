@@ -24,6 +24,28 @@ import (
 // Init initialize logging, ensures directories and creates
 // a ShellOperator instance with all dependencies.
 func Init(logger *log.Logger) (*ShellOperator, error) {
+	// Update webhook settings from parsed flags
+	admission.InitFromFlags(
+		app.ValidatingWebhookConfigurationName,
+		app.ValidatingWebhookServiceName,
+		app.ValidatingWebhookServerCert,
+		app.ValidatingWebhookServerKey,
+		app.ValidatingWebhookCA,
+		app.ValidatingWebhookClientCA,
+		app.ValidatingWebhookFailurePolicy,
+		app.ValidatingWebhookListenPort,
+		app.ValidatingWebhookListenAddress,
+	)
+	conversion.InitFromFlags(
+		app.ConversionWebhookServiceName,
+		app.ConversionWebhookServerCert,
+		app.ConversionWebhookServerKey,
+		app.ConversionWebhookCA,
+		app.ConversionWebhookClientCA,
+		app.ConversionWebhookListenPort,
+		app.ConversionWebhookListenAddress,
+	)
+
 	runtimeConfig := config.NewConfig(logger)
 	// Init logging subsystem.
 	app.SetupLogging(runtimeConfig, logger)
