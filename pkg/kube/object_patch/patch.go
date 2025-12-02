@@ -9,7 +9,6 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	sdkpkg "github.com/deckhouse/module-sdk/pkg"
-	"github.com/flant/shell-operator/pkg"
 	"github.com/hashicorp/go-multierror"
 	gerror "github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -22,6 +21,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+
+	"github.com/flant/shell-operator/pkg"
 )
 
 type ObjectPatcher struct {
