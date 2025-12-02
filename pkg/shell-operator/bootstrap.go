@@ -25,6 +25,7 @@ import (
 // a ShellOperator instance with all dependencies.
 func Init(logger *log.Logger) (*ShellOperator, error) {
 	// Update webhook settings from parsed flags
+	// TODO: change this method to something else
 	admission.InitFromFlags(
 		app.ValidatingWebhookConfigurationName,
 		app.ValidatingWebhookServiceName,
