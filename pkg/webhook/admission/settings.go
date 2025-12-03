@@ -1,7 +1,7 @@
 package admission
 
 import (
-	"github.com/flant/shell-operator/pkg/webhook/defaults"
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
@@ -17,16 +17,16 @@ type WebhookSettings struct {
 // This is initialized at startup and can be modified by flag parsing
 var DefaultSettings = &WebhookSettings{
 	Settings: server.Settings{
-		ServerCertPath: defaults.ValidatingServerCertPath,
-		ServerKeyPath:  defaults.ValidatingServerKeyPath,
+		ServerCertPath: app.ValidatingServerCertPathDefault,
+		ServerKeyPath:  app.ValidatingServerKeyPathDefault,
 		ClientCAPaths:  nil,
-		ServiceName:    defaults.ValidatingServiceName,
-		ListenAddr:     defaults.ValidatingListenAddr,
-		ListenPort:     defaults.ValidatingListenPort,
+		ServiceName:    app.ValidatingServiceNameDefault,
+		ListenAddr:     app.ValidatingListenAddrDefault,
+		ListenPort:     app.ValidatingListenPortDefault,
 	},
-	CAPath:               defaults.ValidatingCAPath,
-	ConfigurationName:    defaults.ValidatingConfigurationName,
-	DefaultFailurePolicy: defaults.ValidatingFailurePolicyType,
+	CAPath:               app.ValidatingCAPathDefault,
+	ConfigurationName:    app.ValidatingConfigurationNameDefault,
+	DefaultFailurePolicy: app.ValidatingFailurePolicyTypeDefault,
 }
 
 // InitFromFlags updates DefaultSettings with values from parsed flags

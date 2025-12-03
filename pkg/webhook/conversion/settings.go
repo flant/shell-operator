@@ -1,7 +1,7 @@
 package conversion
 
 import (
-	"github.com/flant/shell-operator/pkg/webhook/defaults"
+	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
@@ -15,14 +15,14 @@ type WebhookSettings struct {
 // This is initialized at startup and can be modified by flag parsing
 var DefaultSettings = &WebhookSettings{
 	Settings: server.Settings{
-		ServerCertPath: defaults.ConversionServerCertPath,
-		ServerKeyPath:  defaults.ConversionServerKeyPath,
+		ServerCertPath: app.ConversionServerCertPathDefault,
+		ServerKeyPath:  app.ConversionServerKeyPathDefault,
 		ClientCAPaths:  nil,
-		ServiceName:    defaults.ConversionServiceName,
-		ListenAddr:     defaults.ConversionListenAddr,
-		ListenPort:     defaults.ConversionListenPort,
+		ServiceName:    app.ConversionServiceNameDefault,
+		ListenAddr:     app.ConversionListenAddrDefault,
+		ListenPort:     app.ConversionListenPortDefault,
 	},
-	CAPath: defaults.ConversionCAPath,
+	CAPath: app.ConversionCAPathDefault,
 }
 
 // InitFromFlags updates DefaultSettings with values from parsed flags
