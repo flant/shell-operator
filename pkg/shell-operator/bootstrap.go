@@ -24,6 +24,29 @@ import (
 // Init initialize logging, ensures directories and creates
 // a ShellOperator instance with all dependencies.
 func Init(logger *log.Logger) (*ShellOperator, error) {
+	// Update webhook settings from parsed flags
+	// TODO: change this method to something else
+	admission.InitFromFlags(
+		app.ValidatingWebhookConfigurationName,
+		app.ValidatingWebhookServiceName,
+		app.ValidatingWebhookServerCert,
+		app.ValidatingWebhookServerKey,
+		app.ValidatingWebhookCA,
+		app.ValidatingWebhookClientCA,
+		app.ValidatingWebhookFailurePolicy,
+		app.ValidatingWebhookListenPort,
+		app.ValidatingWebhookListenAddress,
+	)
+	conversion.InitFromFlags(
+		app.ConversionWebhookServiceName,
+		app.ConversionWebhookServerCert,
+		app.ConversionWebhookServerKey,
+		app.ConversionWebhookCA,
+		app.ConversionWebhookClientCA,
+		app.ConversionWebhookListenPort,
+		app.ConversionWebhookListenAddress,
+	)
+
 	runtimeConfig := config.NewConfig(logger)
 	// Init logging subsystem.
 	app.SetupLogging(runtimeConfig, logger)
@@ -191,13 +214,13 @@ func (op *ShellOperator) SetupEventManagers() {
 func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 	// Initialize admission webhooks manager.
 	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient)
-	op.AdmissionWebhookManager.Settings = app.ValidatingWebhookSettings
+	op.AdmissionWebhookManager.Settings = admission.DefaultSettings
 	op.AdmissionWebhookManager.Namespace = app.Namespace
 
 	// Initialize conversion webhooks manager.
 	op.ConversionWebhookManager = conversion.NewWebhookManager()
 	op.ConversionWebhookManager.KubeClient = op.KubeClient
-	op.ConversionWebhookManager.Settings = app.ConversionWebhookSettings
+	op.ConversionWebhookManager.Settings = conversion.DefaultSettings
 	op.ConversionWebhookManager.Namespace = app.Namespace
 
 	// Initialize Hook manager.

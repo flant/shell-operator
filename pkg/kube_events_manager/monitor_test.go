@@ -14,6 +14,7 @@ import (
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
+	"github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/metrics"
@@ -159,7 +160,7 @@ func createNsWithLabels(fc *fake.Cluster, name string, labels map[string]string)
 	nsObj := &corev1.Namespace{}
 	nsObj.SetName(name)
 	nsObj.SetLabels(labels)
-	_, _ = fc.Client.CoreV1().Namespaces().Create(context.TODO(), nsObj, metav1.CreateOptions{})
+	_, _ = fc.Client.CoreV1().Namespaces().Create(context.TODO(), nsObj, pkg.DefaultCreateOptions())
 }
 
 func createCM(fc *fake.Cluster, ns string, cmYAML string) {

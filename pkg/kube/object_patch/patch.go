@@ -21,6 +21,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+
+	"github.com/flant/shell-operator/pkg"
 )
 
 type ObjectPatcher struct {
@@ -106,7 +108,7 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 	_, err = o.kubeClient.Dynamic().
 		Resource(gvk).
 		Namespace(object.GetNamespace()).
-		Create(context.TODO(), object, metav1.CreateOptions{}, generateSubresources(op.subresource)...)
+		Create(context.TODO(), object, pkg.DefaultCreateOptions(), generateSubresources(op.subresource)...)
 	log.Debug("Finished Create API call")
 
 	objectExists := errors.IsAlreadyExists(err)
@@ -137,7 +139,7 @@ func (o *ObjectPatcher) executeCreateOperation(op *createOperation) error {
 			_, err = o.kubeClient.Dynamic().
 				Resource(gvk).
 				Namespace(objCopy.GetNamespace()).
-				Update(context.TODO(), objCopy, metav1.UpdateOptions{}, generateSubresources(op.subresource)...)
+				Update(context.TODO(), objCopy, pkg.DefaultUpdateOptions(), generateSubresources(op.subresource)...)
 			log.Debug("Finished Update API call")
 			return wrapErr(err)
 		})
@@ -184,7 +186,7 @@ func (o *ObjectPatcher) executePatchOperation(op *patchOperation) error {
 	_, err = o.kubeClient.Dynamic().
 		Resource(gvk).
 		Namespace(op.namespace).
-		Patch(context.TODO(), op.name, op.patchType, patchBytes, metav1.PatchOptions{}, generateSubresources(op.subresource)...)
+		Patch(context.TODO(), op.name, op.patchType, patchBytes, pkg.DefaultPatchOptions(), generateSubresources(op.subresource)...)
 	log.Debug("Finished Patch API call")
 
 	if op.ignoreMissingObject && errors.IsNotFound(err) {
@@ -247,7 +249,7 @@ func (o *ObjectPatcher) executeFilterOperation(op *patchOperation) error {
 		_, err = o.kubeClient.Dynamic().
 			Resource(gvk).
 			Namespace(op.namespace).
-			Update(context.TODO(), filteredObj, metav1.UpdateOptions{}, generateSubresources(op.subresource)...)
+			Update(context.TODO(), filteredObj, pkg.DefaultUpdateOptions(), generateSubresources(op.subresource)...)
 		log.Debug("Finished Update API call")
 		if err != nil {
 			return err

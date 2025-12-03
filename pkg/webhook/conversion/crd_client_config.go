@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg"
 )
 
 // A clientConfig for a particular CRD.
@@ -60,7 +61,7 @@ tryToGetCRD:
 	}
 	crd.Spec.Conversion.Webhook.ConversionReviewVersions = SupportedConversionReviewVersions
 
-	_, err = client.ApiExt().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
+	_, err = client.ApiExt().CustomResourceDefinitions().Update(ctx, crd, pkg.DefaultUpdateOptions())
 	if err != nil {
 		return err
 	}

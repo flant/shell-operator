@@ -8,8 +8,6 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/alecthomas/kingpin.v2"
-
-	"github.com/flant/shell-operator/pkg/config"
 )
 
 // Use info level with timestamps and a text output by default
@@ -44,8 +42,14 @@ func DefineLoggingFlags(cmd *kingpin.CmdClause) {
 		BoolVar(&LogProxyHookJSON)
 }
 
+type Registerer interface {
+	Register(key string, help string, defaultValue string,
+		setter func(key string, newValue string) error,
+		expirer func(key string, newValue string) time.Duration)
+}
+
 // SetupLogging sets logger formatter and level.
-func SetupLogging(runtimeConfig *config.Config, logger *log.Logger) {
+func SetupLogging(runtimeConfig Registerer, logger *log.Logger) {
 	// TODO: if we need formatters - add to logger
 	// jsonFormatter := log.JSONFormatter{DisableTimestamp: LogNoTime}
 	// textFormatter := log.TextFormatter{DisableTimestamp: LogNoTime, DisableColors: true}

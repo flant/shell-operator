@@ -9,7 +9,6 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
@@ -20,10 +19,10 @@ func newHookManager(t *testing.T, testdataDir string) *Manager {
 	hooksDir, _ := filepath.Abs(testdataDir)
 
 	conversionManager := conversion.NewWebhookManager()
-	conversionManager.Settings = app.ConversionWebhookSettings
+	conversionManager.Settings = conversion.DefaultSettings
 
 	admissionManager := admission.NewWebhookManager(nil)
-	admissionManager.Settings = app.ValidatingWebhookSettings
+	admissionManager.Settings = admission.DefaultSettings
 
 	cfg := &ManagerConfig{
 		WorkingDir: hooksDir,
