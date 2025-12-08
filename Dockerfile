@@ -20,7 +20,7 @@ RUN GOOS=linux \
     ./cmd/shell-operator
 
 # Final image
-FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.21
+FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.23
 ARG TARGETPLATFORM
 RUN apk --no-cache add ca-certificates bash sed tini curl && \
     kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
