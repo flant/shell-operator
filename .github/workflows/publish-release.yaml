@@ -182,15 +182,14 @@ jobs:
         run: |
           echo "Copy ${GHCR_IO_IMAGE_NAME} to ${DOCKER_HUB_IMAGE_NAME} ..."
           docker run \
+            -v $HOME/.docker/config.json:/root/.docker/config.json \
             -e "DOCKER_USER=${DOCKER_USER}" \
             -e "DOCKER_PASS=${DOCKER_PASS}" \
             -e "GHCR_IO_IMAGE_NAME=${GHCR_IO_IMAGE_NAME}" \
             -e "DOCKER_HUB_IMAGE_NAME=${DOCKER_HUB_IMAGE_NAME}" \
-            quay.io/skopeo/stable:latest \
-              copy --all \
-              --dest-creds ${DOCKER_USER}:${DOCKER_PASS} \
-              docker://${GHCR_IO_IMAGE_NAME} \
-              docker://${DOCKER_HUB_IMAGE_NAME}; \ 
+            gcr.io/go-containerregistry/crane:latest \
+              auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
+              crane copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME}; \
               echo "Done!"
 
           echo "Copy completed."
@@ -198,12 +197,11 @@ jobs:
           [ -n "$ADDITIONAL_DOCKER_HUB_IMAGE_NAME" ] && \
           echo "Copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} to ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME} ..." && \
           docker run \
+            -v $HOME/.docker/config.json:/root/.docker/config.json \
             -e "DOCKER_USER=${DOCKER_USER}" \
             -e "DOCKER_PASS=${DOCKER_PASS}" \
             -e "GHCR_IO_IMAGE_NAME=${ADDITIONAL_GHCR_IO_IMAGE_NAME}" \
             -e "DOCKER_HUB_IMAGE_NAME=${ADDITIONAL_DOCKER_HUB_IMAGE_NAME}" \
-            quay.io/skopeo/stable:latest \
-              copy --all \
-              --dest-creds ${DOCKER_USER}:${DOCKER_PASS} \
-              docker://${GHCR_IO_IMAGE_NAME} \
-              docker://${DOCKER_HUB_IMAGE_NAME}
+            gcr.io/go-containerregistry/crane:latest \
+              auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
+              crane copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME}
