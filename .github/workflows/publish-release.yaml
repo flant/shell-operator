@@ -189,7 +189,7 @@ jobs:
             -e "DOCKER_HUB_IMAGE_NAME=${DOCKER_HUB_IMAGE_NAME}" \
             gcr.io/go-containerregistry/crane:latest \
               auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
-              crane copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME}; \
+              copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME}; \
               echo "Done!"
 
           echo "Copy completed."
@@ -204,4 +204,4 @@ jobs:
             -e "DOCKER_HUB_IMAGE_NAME=${ADDITIONAL_DOCKER_HUB_IMAGE_NAME}" \
             gcr.io/go-containerregistry/crane:latest \
               auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
-              crane copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME}
+              copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME}
