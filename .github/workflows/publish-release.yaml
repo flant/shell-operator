@@ -192,6 +192,8 @@ jobs:
           echo "Extract crane tool ..."
           tar -zxvf go-containerregistry.tar.gz -C /usr/local/bin/ crane
 
+          export PATH=$PATH:/usr/local/bin
+
           echo "Copy ${GHCR_IO_IMAGE_NAME} to ${DOCKER_HUB_IMAGE_NAME} ..."
           crane auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
           crane copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME} && \
