@@ -12,7 +12,9 @@ ADD go.mod go.sum /app/
 WORKDIR /app
 RUN go mod download
 
-ADD . /app
+# Cache-friendly changes to source code.
+ADD cmd /app/cmd
+ADD pkg /app/pkg
 
 RUN GOOS=linux \
     go build -ldflags="-s -w -X 'github.com/flant/shell-operator/pkg/app.Version=$appVersion'" \
