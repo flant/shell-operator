@@ -190,7 +190,10 @@ jobs:
               copy --all \
               --dest-creds ${DOCKER_USER}:${DOCKER_PASS} \
               docker://${GHCR_IO_IMAGE_NAME} \
-              docker://${DOCKER_HUB_IMAGE_NAME}
+              docker://${DOCKER_HUB_IMAGE_NAME}; \ 
+              echo "Done!"
+
+          echo "Copy completed."
 
           [ -n "$ADDITIONAL_DOCKER_HUB_IMAGE_NAME" ] && \
           echo "Copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} to ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME} ..." && \
