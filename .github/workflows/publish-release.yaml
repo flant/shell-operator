@@ -1,5 +1,6 @@
 # Publish flant/shell-operator image on hub.docker.com.
-# Build 'latest' tag when release is published.
+# Build tag from release name when release is published.
+# Build 'latest' tag when release is published and marked as 'latest'.
 name: Publish release image
 
 on:
@@ -43,28 +44,25 @@ jobs:
               imageTag = 'latest';
             }
 
-            // Check for 'skip' label on pull request merge.
-            if (eventName == 'pull_request' && event.action == 'closed') {
-              if (!event.pull_request.merged) {
-                return console.log(`PR ${event.number} not merged. Skip 'publish latest image'.`);
-              }
-              const hasSkipLabel = event.pull_request.labels.some(l => l.name === SKIP_LATEST_LABEL_NAME);
-              if (hasSkipLabel) {
-                return console.log(`Detect skip label '${SKIP_LATEST_LABEL_NAME}' on merged PR ${event.number}. Skip 'publish latest image'.`);
-              }
-              console.log(`No skip labels on merged PR ${event.number}. Run 'publish latest image'.`);
+            // Check for release is published.
+            if (eventName === 'release' && event.action === 'published') {
               runPublish = true;
-              imageTag = 'latest';
-            }
+              imageTag = event.release.tag_name;
 
-            // Check if tag is pushed.
-            if (eventName == 'push') {
-              if (!event.ref.startsWith('refs/tags/')) {
-                return console.log(`Detect non-release ref: ${event.ref}. Skip 'publish latest image'.`);
+              // Fetch the "latest" release as defined by GitHub
+              const { data: latestRelease } = await github.rest.repos.getLatestRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+
+              let isLatest = latestRelease.tag_name === imageTag;
+              console.log(`DEBUG: latestRelease.tag_name=${latestRelease.tag_name} imageTag=${imageTag} is_latest=${isLatest}`);
+
+              // If the release is the "latest" release, build the "latest" tag.
+              if (isLatest) {
+                console.log(`Detect current release is the "latest" release. Run 'publish latest image'.`);
+                additionalTag = 'latest';
               }
-              runPublish = true;
-              imageTag = context.ref.replace('refs/tags/', '');
-              additionalTag = 'latest';
             }
 
             console.log(`Outputs: run_publish=${runPublish} image_tag=${imageTag} additional_tag=${additionalTag}`);
