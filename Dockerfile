@@ -1,6 +1,3 @@
-# Prebuilt libjq library
-FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl AS libjq
-
 # Go builder stage
 FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.25.5-alpine3.23 AS builder
 
@@ -34,7 +31,7 @@ RUN GOOS=linux \
     ./cmd/shell-operator
 
 # Final runtime image
-FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.21
+FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.23
 
 ARG TARGETPLATFORM
 
@@ -49,7 +46,7 @@ RUN apk --no-cache add \
 # Determine kubectl architecture and download
 RUN kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
     echo "Downloading kubectl for ${kubectlArch}" && \
-    wget https://dl.k8s.io/release/v1.30.12/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
+    wget https://dl.k8s.io/release/v1.32.10/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl
 
 # Create hooks directory
@@ -58,7 +55,6 @@ RUN mkdir /hooks
 # Copy necessary files
 ADD frameworks/shell /frameworks/shell
 ADD shell_lib.sh /
-COPY --from=libjq /bin/jq /usr/bin
 COPY --from=builder /app/shell-operator /
 
 # Set working directory
