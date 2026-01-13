@@ -20,8 +20,7 @@ ADD go.mod go.sum ./
 RUN go mod download
 
 # Add source code (changes here invalidate cache less frequently)
-ADD cmd ./cmd
-ADD pkg ./pkg
+ADD . /app
 
 # Build the application
 RUN GOOS=linux \
