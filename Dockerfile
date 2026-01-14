@@ -48,7 +48,7 @@ RUN apk --no-cache add \
 
 # Determine kubectl architecture and download
 RUN kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
-    echo "Downloading kubectl for ${kubectlArch}" && \
+    echo "Downloading kubectl version ${kubectlVersion} for ${kubectlArch}" && \
     wget https://dl.k8s.io/release/${kubectlVersion}/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl
 
