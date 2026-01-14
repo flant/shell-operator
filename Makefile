@@ -45,9 +45,10 @@ YQ_VERSION ?= v4.47.2
 .PHONY: update-k8s-version
 update-k8s-version: go-check
 	@kubernetesVer=$(shell $(GO) list -m k8s.io/api | cut -d' ' -f 2); \
-	echo "Updating kubectl version in Dockerfile to match k8s.io/api version: $$kubernetesVer"; \
-	sed -i "s/ARG kubectlVersion=.*/ARG kubectlVersion=$$kubernetesVer/" Dockerfile; \
-	echo "kubectl version in Dockerfile updated to: $$kubernetesVer"
+	kubectlVer=$$(echo $$kubernetesVer | sed 's/v0/v1/'); \
+	echo "Updating kubectl version in Dockerfile to match k8s.io/api version: $$kubectlVer"; \
+	sed -i "s/ARG kubectlVersion=.*/ARG kubectlVersion=$$kubectlVer/" Dockerfile; \
+	echo "kubectl version in Dockerfile updated to: $$kubectlVer"
 	
 .PHONY: update-workflows-go-version
 update-workflows-go-version: yq
