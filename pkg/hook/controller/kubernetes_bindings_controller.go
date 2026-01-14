@@ -245,7 +245,7 @@ func (c *kubernetesBindingsController) HandleEvent(_ context.Context, kubeEvent 
 }
 
 func (c *kubernetesBindingsController) BindingNames() []string {
-	names := []string{}
+	names := make([]string, 0, len(c.KubernetesBindings))
 	for _, binding := range c.KubernetesBindings {
 		names = append(names, binding.BindingName)
 	}

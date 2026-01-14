@@ -231,7 +231,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 	hookNamesV, _ := op.HookManager.GetHooksInOrder(types.KubernetesValidating)
 	hookNamesM, _ := op.HookManager.GetHooksInOrder(types.KubernetesMutating)
 
-	var hookNames []string
+	hookNames := make([]string, 0, len(hookNamesV)+len(hookNamesM))
 
 	hookNames = append(hookNames, hookNamesV...)
 	hookNames = append(hookNames, hookNamesM...)

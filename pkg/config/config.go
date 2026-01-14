@@ -79,27 +79,33 @@ func (c *Config) List() []map[string]string {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	res := make([]map[string]string, 0)
+	res := make([]map[string]string, len(c.params)) //nolint:prealloc
 	for paramName, param := range c.params {
 		paramValue := c.value(paramName)
+
 		paramInfo := map[string]string{
 			"name":        paramName,
 			"description": param.description,
 			"default":     param.defaultValue,
 			"value":       paramValue,
 		}
+
 		if tempValue, ok := c.temporalValues[paramName]; ok {
 			paramInfo["expireAt"] = tempValue.expire.Format(time.RFC3339)
 		}
+
 		lastError := c.errors[paramName]
 		if lastError != nil {
 			paramInfo["lastError"] = lastError.Error()
 		}
+
 		res = append(res, paramInfo)
 	}
+
 	sort.SliceStable(res, func(i, j int) bool {
 		return res[i]["name"] < res[j]["name"]
 	})
+
 	return res
 }
 

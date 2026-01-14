@@ -1,17 +1,11 @@
-GO=$(shell which go)
-GIT=$(shell which git)
-
-.PHONY: go-check
-go-check:
-	$(call error-if-empty,$(GO),go)
-
-.PHONY: git-check
-git-check:
-	$(call error-if-empty,$(GIT),git)
 
 .PHONY: go-module-version
 go-module-version: go-check git-check
 	@echo "go get $(shell $(GO) list ./cmd/shell-operator)@$(shell $(GIT) rev-parse HEAD)"
+
+.PHONY: lint
+lint: golangci-lint ## Run linter.
+	@$(GOLANGCI_LINT) run --fix
 
 .PHONY: test
 test: go-check
@@ -32,6 +26,8 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
+GO=$(shell which go)
+GIT=$(shell which git)
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 YQ = $(LOCALBIN)/yq
 
@@ -41,6 +37,7 @@ YQ = $(LOCALBIN)/yq
 GO_BUILDER_VERSION = 1.25.5
 GOLANGCI_LINT_VERSION = v2.8.0
 YQ_VERSION ?= v4.50.1
+
 
 .PHONY: update-k8s-version
 update-k8s-version: go-check
@@ -67,6 +64,16 @@ update-workflows-ginkgo-version: yq
 	@ginkgoVer=$(shell $(GO) list -m github.com/onsi/ginkgo/v2 | cut -d' ' -f 2); \
 	$(YQ) -i '(.jobs.integration_tests.steps[] | select(.name == "Install ginkgo") | .run) |= sub("@latest", "@$$ginkgoVer")' .github/workflows/tests-labeled.yaml; \
 	echo "Updated ginkgo version in tests-labeled.yaml to $$ginkgoVer"
+
+## Installed tools check
+
+.PHONY: go-check
+go-check:
+	$(call error-if-empty,$(GO),go)
+
+.PHONY: git-check
+git-check:
+	$(call error-if-empty,$(GIT),git)
 
 ## Tool installations
 
