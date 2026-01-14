@@ -79,7 +79,7 @@ func (c *Config) List() []map[string]string {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	res := make([]map[string]string, len(c.params)) //nolint:prealloc
+	res := make([]map[string]string, 0, len(c.params))
 	for paramName, param := range c.params {
 		paramValue := c.value(paramName)
 
