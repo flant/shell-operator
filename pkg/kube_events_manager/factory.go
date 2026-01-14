@@ -15,6 +15,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const (
+	FactoryShutdownTimeout = 30 * time.Second
+)
+
 var (
 	DefaultFactoryStore *FactoryStore
 	DefaultSyncTime     = 100 * time.Millisecond
@@ -41,16 +45,16 @@ type Factory struct {
 }
 
 type FactoryStore struct {
-	mu   sync.Mutex
-	cond *sync.Cond
-	data map[FactoryIndex]*Factory
+	mu        sync.Mutex
+	data      map[FactoryIndex]*Factory
+	stoppedCh map[FactoryIndex]chan struct{}
 }
 
 func NewFactoryStore() *FactoryStore {
 	fs := &FactoryStore{
-		data: make(map[FactoryIndex]*Factory),
+		data:      make(map[FactoryIndex]*Factory),
+		stoppedCh: make(map[FactoryIndex]chan struct{}),
 	}
-	fs.cond = sync.NewCond(&fs.mu)
 	return fs
 }
 
@@ -58,6 +62,7 @@ func (c *FactoryStore) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.data = make(map[FactoryIndex]*Factory)
+	c.stoppedCh = make(map[FactoryIndex]chan struct{})
 }
 
 func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
@@ -110,13 +115,16 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	informer := factory.shared.ForResource(index.GVR).Informer()
 	// Add error handler, ignore "already started" error.
 	_ = informer.SetWatchErrorHandler(errorHandler.handler)
+
 	registration, err := informer.AddEventHandler(handler)
 	if err != nil {
 		log.Warn("Factory store: couldn't add event handler to the factory's informer",
 			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()),
 			log.Err(err))
 	}
+
 	factory.handlerRegistrations[informerId] = registration
+
 	log.Debug("Factory store: increased usage counter of the factory",
 		slog.Int("value", len(factory.handlerRegistrations)),
 		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
@@ -124,9 +132,12 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	// Ensure informer.Run is started once and tracked
 	if factory.done == nil {
 		factory.done = make(chan struct{})
+
 		go func() {
 			informer.Run(factory.ctx.Done())
+
 			close(factory.done)
+
 			log.Debug("Factory store: informer goroutine exited",
 				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 		}()
@@ -139,8 +150,10 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 			return err
 		}
 	}
+
 	log.Debug("Factory store: started informer",
 		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+
 	return nil
 }
 
@@ -162,36 +175,62 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 		}
 
 		delete(f.handlerRegistrations, informerId)
+
 		log.Debug("Factory store: decreased usage counter of the factory",
 			slog.Int("value", len(f.handlerRegistrations)),
 			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+
 		if len(f.handlerRegistrations) == 0 {
 			log.Debug("Factory store: last handler removed, canceling shared informer",
 				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+
 			done := f.done
+
 			f.cancel()
 			c.mu.Unlock()
 			if done != nil {
 				<-done
 			}
+
 			c.mu.Lock()
 			delete(c.data, index)
+
 			log.Debug("Factory store: deleted factory",
 				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
-			c.cond.Broadcast()
+
+			if ch, ok := c.stoppedCh[index]; ok {
+				close(ch)
+				delete(c.stoppedCh, index)
+			}
 		}
 	}
 	c.mu.Unlock()
 }
 
-// WaitStopped blocks until there is no factory for the index
+// WaitStopped blocks until there is no factory for the index or timeout
 func (c *FactoryStore) WaitStopped(index FactoryIndex) {
 	c.mu.Lock()
+
+	if _, ok := c.data[index]; !ok {
+		c.mu.Unlock()
+		return
+	}
+
+	ch, ok := c.stoppedCh[index]
+	if !ok {
+		ch = make(chan struct{})
+		c.stoppedCh[index] = ch
+	}
+
+	c.mu.Unlock()
+
 	for {
-		if _, ok := c.data[index]; !ok {
-			c.mu.Unlock()
+		select {
+		case <-ch:
 			return
+		case <-time.After(FactoryShutdownTimeout):
+			log.Warn("timeout waiting for factory to stop",
+				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 		}
-		c.cond.Wait()
 	}
 }

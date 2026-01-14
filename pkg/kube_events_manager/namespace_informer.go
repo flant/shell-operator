@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/core/v1"
@@ -15,6 +16,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
+)
+
+const (
+	NamespaceInformerShutdownTimeout = 30 * time.Second
 )
 
 type namespaceInformer struct {
@@ -154,6 +159,14 @@ func (ni *namespaceInformer) start() {
 
 func (ni *namespaceInformer) wait() {
 	if ni.done != nil {
-		<-ni.done
+		for {
+			select {
+			case <-ni.done:
+				log.Debug("Namespace informer stopped", slog.String("name", ni.Monitor.Metadata.DebugName))
+				return
+			case <-time.After(NamespaceInformerShutdownTimeout):
+				log.Warn("timeout waiting for namespace informer to stop", slog.String("name", ni.Monitor.Metadata.DebugName))
+			}
+		}
 	}
 }
