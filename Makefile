@@ -50,7 +50,9 @@ update-k8s-version: go-check
 .PHONY: update-workflows-go-version
 update-workflows-go-version: yq
 	for file in $$(find .github/workflows -name "*.yaml"); do \
-		$(YQ) -i '(.jobs[]?.steps[]? | select(.uses | test("actions/setup-go")) | .with."go-version") = "$(GO_BUILDER_VERSION)"' $$file; \
+		if grep -q "actions/setup-go" $$file; then \
+			$(YQ) -i '(.jobs[]?.steps[]? | select(.uses | test("actions/setup-go")) | .with."go-version") = "$(GO_BUILDER_VERSION)"' $$file; \
+		fi; \
 	done
 	echo "Updated go-version in workflow files to $(GO_BUILDER_VERSION)"
 
