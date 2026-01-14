@@ -57,7 +57,8 @@ var _ = Describe("Binding 'kubernetes' with kind 'Pod' should emit KubeEvent obj
 
 	AfterEach(func() {
 		fmt.Fprintf(GinkgoWriter, "Starting AfterEach\n")
-		KubeEventsManager.PauseHandleEvents()
+		KubeEventsManager.Stop()
+		KubeEventsManager.Wait()
 		fmt.Fprintf(GinkgoWriter, "Finished AfterEach\n")
 	})
 

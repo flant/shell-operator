@@ -990,9 +990,18 @@ func (op *ShellOperator) initAndStartHookQueues() {
 
 // Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
 func (op *ShellOperator) Shutdown() {
+	op.logger.Info("shutdown begin", slog.String("phase", "shutdown"))
 	op.ScheduleManager.Stop()
-	op.KubeEventsManager.PauseHandleEvents()
+	op.logger.Info("schedule manager stopped", slog.String("phase", "shutdown"))
+
+	op.KubeEventsManager.Stop()
+	op.logger.Info("waiting informers", slog.String("phase", "shutdown"))
+	op.KubeEventsManager.Wait()
+	op.logger.Info("informers stopped", slog.String("phase", "shutdown"))
+
 	op.TaskQueues.Stop()
+	op.logger.Info("waiting task queues", slog.String("phase", "shutdown"))
 	// Wait for queues to stop, but no more than 10 seconds
 	op.TaskQueues.WaitStopWithTimeout(WaitQueuesTimeout)
+	op.logger.Info("task queues stopped", slog.String("phase", "shutdown"))
 }
