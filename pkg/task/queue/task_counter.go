@@ -1,22 +1,29 @@
 package queue
 
 import (
-	"github.com/flant/shell-operator/internal/metrics"
-	"github.com/flant/shell-operator/pkg/metric"
+	"sync"
+
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
-const taskCap = 100
+const (
+	compactionMetricsThreshold = 20
+)
 
 type TaskCounter struct {
+	mu sync.RWMutex
+
 	queueName      string
 	counter        map[string]uint
 	reachedCap     map[string]struct{}
-	metricStorage  metric.Storage
+	metricStorage  metricsstorage.Storage
 	countableTypes map[task.TaskType]struct{}
 }
 
-func NewTaskCounter(name string, countableTypes map[task.TaskType]struct{}, metricStorage metric.Storage) *TaskCounter {
+func NewTaskCounter(name string, countableTypes map[task.TaskType]struct{}, metricStorage metricsstorage.Storage) *TaskCounter {
 	if metricStorage == nil {
 		panic("metricStorage cannot be nil")
 	}
@@ -31,6 +38,9 @@ func NewTaskCounter(name string, countableTypes map[task.TaskType]struct{}, metr
 }
 
 func (tc *TaskCounter) Add(task task.Task) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
 	if len(tc.countableTypes) > 0 {
 		if _, ok := tc.countableTypes[task.GetType()]; !ok {
 			return
@@ -45,25 +55,17 @@ func (tc *TaskCounter) Add(task task.Task) {
 	}
 
 	counter++
-
 	tc.counter[id] = counter
 
-	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, float64(counter), map[string]string{
-		"queue_name": tc.queueName,
-		"task_id":    id,
-	})
-
-	if counter == taskCap {
+	if counter == compactionThreshold {
 		tc.reachedCap[id] = struct{}{}
-
-		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 1, map[string]string{
-			"queue_name": tc.queueName,
-			"task_id":    id,
-		})
 	}
 }
 
 func (tc *TaskCounter) Remove(task task.Task) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
 	if len(tc.countableTypes) > 0 {
 		if _, ok := tc.countableTypes[task.GetType()]; !ok {
 			return
@@ -73,9 +75,18 @@ func (tc *TaskCounter) Remove(task task.Task) {
 	id := task.GetCompactionID()
 
 	counter, ok := tc.counter[id]
-	if ok {
-		counter--
+	if !ok {
+		delete(tc.reachedCap, id)
+		return
 	}
+
+	if counter == 0 {
+		delete(tc.counter, id)
+		delete(tc.reachedCap, id)
+		return
+	}
+
+	counter--
 
 	if counter == 0 {
 		delete(tc.counter, id)
@@ -83,27 +94,47 @@ func (tc *TaskCounter) Remove(task task.Task) {
 		tc.counter[id] = counter
 	}
 
-	tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionInQueueTasks, float64(counter), map[string]string{
-		"queue_name": task.GetQueueName(),
-		"task_id":    id,
-	})
+	if counter < compactionThreshold {
+		delete(tc.reachedCap, id)
+	}
 }
 
 func (tc *TaskCounter) GetReachedCap() map[string]struct{} {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
 	return tc.reachedCap
 }
 
 func (tc *TaskCounter) IsAnyCapReached() bool {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
 	return len(tc.reachedCap) > 0
 }
 
 func (tc *TaskCounter) ResetReachedCap() {
-	for id := range tc.reachedCap {
-		tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionReached, 0, map[string]string{
-			"queue_name": tc.queueName,
-			"task_id":    id,
-		})
-	}
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
 
 	tc.reachedCap = make(map[string]struct{}, 32)
+}
+
+// UpdateHookMetricsFromSnapshot updates metrics for all hooks based on a snapshot of hook counts.
+// Only hooks with task count above the threshold are published to avoid metric cardinality explosion.
+func (tc *TaskCounter) UpdateHookMetricsFromSnapshot(hookCounts map[string]uint) {
+	if tc.metricStorage == nil {
+		return
+	}
+
+	// Update metrics only for hooks above threshold
+	for hookName, count := range hookCounts {
+		if count > compactionMetricsThreshold {
+			labels := map[string]string{
+				"queue_name": tc.queueName,
+				"hook":       hookName,
+			}
+			tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionTasksByHook, float64(count), labels)
+		}
+	}
 }

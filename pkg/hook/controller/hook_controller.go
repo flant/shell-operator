@@ -27,16 +27,16 @@ type BindingExecutionInfo struct {
 	KubernetesBinding   htypes.OnKubernetesEventConfig
 }
 
-// В каждый хук надо будет положить этот объект.
-// Предварительно позвав With*Bindings и InitBindingsControllers
+// This object needs to be placed in each hook.
+// After calling With*Bindings and InitBindingsControllers
 
-// Для kube надо будет сделать HandleEnableKubernetesBindings, чтобы получить списки существующих обхектов
-// и потом StartMonitors
+// For kube, HandleEnableKubernetesBindings needs to be called to get lists of existing objects
+// and then StartMonitors
 
-// Всё Handle* методы принимают callback, чтобы создавать задания независимо.
+// All Handle* methods accept a callback to create tasks independently.
 
-// методом KubernetesSnapshots можно достать все кубовые объекты, чтобы добавить
-// их в какой-то свой binding context
+// The KubernetesSnapshots method can be used to get all Kubernetes objects to add
+// them to some binding context
 
 func NewHookController() *HookController {
 	return &HookController{}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/deckhouse/deckhouse/pkg/metrics-storage/operation"
 	uuid "github.com/gofrs/uuid/v5"
 	"github.com/kennygrant/sanitize"
 	"go.opentelemetry.io/otel"
@@ -21,7 +22,6 @@ import (
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
-	"github.com/flant/shell-operator/pkg/metric_storage/operation"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
@@ -175,10 +175,12 @@ func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.Bin
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
 
-	result.Metrics, err = operation.MetricOperationsFromFile(metricsPath, h.Name)
+	operations, err := MetricOperationsFromFile(metricsPath, h.Name)
 	if err != nil {
 		return result, fmt.Errorf("got bad metrics: %s", err)
 	}
+
+	result.Metrics = h.remapOperationsToOperations(operations)
 
 	result.AdmissionResponse, err = admission.ResponseFromFile(admissionPath)
 	if err != nil {
@@ -361,4 +363,35 @@ func (h *Hook) prepareObjectPatchFile() (string, error) {
 	}
 
 	return objectPatchPath, nil
+}
+
+func (h *Hook) remapOperationsToOperations(ops []MetricOperation) []operation.MetricOperation {
+	result := make([]operation.MetricOperation, 0, len(ops))
+	for _, op := range ops {
+		newOp := operation.MetricOperation{
+			Name:    op.Name,
+			Value:   op.Value,
+			Buckets: op.Buckets,
+			Labels:  op.Labels,
+			Group:   op.Group,
+		}
+
+		switch op.Action {
+		case "add":
+			newOp.Action = operation.ActionCounterAdd
+		case "set":
+			newOp.Action = operation.ActionGaugeSet
+		case "observe":
+			newOp.Action = operation.ActionHistogramObserve
+		case "expire":
+			newOp.Action = operation.ActionExpireMetrics
+		default:
+			h.Logger.Warn("unknown action in shoperation.MetricOperation: " + op.Action)
+			continue
+		}
+
+		result = append(result, newOp)
+	}
+
+	return result
 }

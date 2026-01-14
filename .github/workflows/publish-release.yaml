@@ -1,5 +1,6 @@
 # Publish flant/shell-operator image on hub.docker.com.
-# Build 'latest' tag when release is published.
+# Build tag from release name when release is published.
+# Build 'latest' tag when release is published and marked as 'latest'.
 name: Publish release image
 
 on:
@@ -43,28 +44,25 @@ jobs:
               imageTag = 'latest';
             }
 
-            // Check for 'skip' label on pull request merge.
-            if (eventName == 'pull_request' && event.action == 'closed') {
-              if (!event.pull_request.merged) {
-                return console.log(`PR ${event.number} not merged. Skip 'publish latest image'.`);
-              }
-              const hasSkipLabel = event.pull_request.labels.some(l => l.name === SKIP_LATEST_LABEL_NAME);
-              if (hasSkipLabel) {
-                return console.log(`Detect skip label '${SKIP_LATEST_LABEL_NAME}' on merged PR ${event.number}. Skip 'publish latest image'.`);
-              }
-              console.log(`No skip labels on merged PR ${event.number}. Run 'publish latest image'.`);
+            // Check for release is published.
+            if (eventName === 'release' && event.action === 'published') {
               runPublish = true;
-              imageTag = 'latest';
-            }
+              imageTag = event.release.tag_name;
 
-            // Check if tag is pushed.
-            if (eventName == 'push') {
-              if (!event.ref.startsWith('refs/tags/')) {
-                return console.log(`Detect non-release ref: ${event.ref}. Skip 'publish latest image'.`);
+              // Fetch the "latest" release as defined by GitHub
+              const { data: latestRelease } = await github.rest.repos.getLatestRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+
+              let isLatest = latestRelease.tag_name === imageTag;
+              console.log(`DEBUG: latestRelease.tag_name=${latestRelease.tag_name} imageTag=${imageTag} is_latest=${isLatest}`);
+
+              // If the release is the "latest" release, build the "latest" tag.
+              if (isLatest) {
+                console.log(`Detect current release is the "latest" release. Run 'publish latest image'.`);
+                additionalTag = 'latest';
               }
-              runPublish = true;
-              imageTag = context.ref.replace('refs/tags/', '');
-              additionalTag = 'latest';
             }
 
             console.log(`Outputs: run_publish=${runPublish} image_tag=${imageTag} additional_tag=${additionalTag}`);
@@ -182,27 +180,31 @@ jobs:
           DOCKER_USER: ${{ secrets.DOCKER_USER }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         run: |
-          echo "Copy ${GHCR_IO_IMAGE_NAME} to ${DOCKER_HUB_IMAGE_NAME} ..."
-          docker run \
-            -e "DOCKER_USER=${DOCKER_USER}" \
-            -e "DOCKER_PASS=${DOCKER_PASS}" \
-            -e "GHCR_IO_IMAGE_NAME=${GHCR_IO_IMAGE_NAME}" \
-            -e "DOCKER_HUB_IMAGE_NAME=${DOCKER_HUB_IMAGE_NAME}" \
-            quay.io/skopeo/stable:latest \
-              copy --all \
-              --dest-creds ${DOCKER_USER}:${DOCKER_PASS} \
-              docker://${GHCR_IO_IMAGE_NAME} \
-              docker://${DOCKER_HUB_IMAGE_NAME}
+          echo "Download crane tool ..."
+          
+          CRANE_VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name')
+          CRANE_OS=Linux       # or Darwin, Windows
+          CRANE_ARCH=x86_64    # or arm64, x86_64, armv6, i386, s390x, riscv64
+          
+          echo "Crane version: ${CRANE_VERSION}, OS: ${CRANE_OS}, ARCH: ${CRANE_ARCH}"
+          curl -sL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_${CRANE_OS}_${CRANE_ARCH}.tar.gz" > go-containerregistry.tar.gz
+          echo "Extract crane tool ..."
+          tar -zxvf go-containerregistry.tar.gz -C /usr/local/bin/ crane
 
-          [ -n "$ADDITIONAL_DOCKER_HUB_IMAGE_NAME" ] && \
-          echo "Copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} to ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME} ..." && \
-          docker run \
-            -e "DOCKER_USER=${DOCKER_USER}" \
-            -e "DOCKER_PASS=${DOCKER_PASS}" \
-            -e "GHCR_IO_IMAGE_NAME=${ADDITIONAL_GHCR_IO_IMAGE_NAME}" \
-            -e "DOCKER_HUB_IMAGE_NAME=${ADDITIONAL_DOCKER_HUB_IMAGE_NAME}" \
-            quay.io/skopeo/stable:latest \
-              copy --all \
-              --dest-creds ${DOCKER_USER}:${DOCKER_PASS} \
-              docker://${GHCR_IO_IMAGE_NAME} \
-              docker://${DOCKER_HUB_IMAGE_NAME}
+          export PATH=$PATH:/usr/local/bin
+
+          echo "Copy ${GHCR_IO_IMAGE_NAME} to ${DOCKER_HUB_IMAGE_NAME} ..."
+
+          crane auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
+          crane copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME}
+
+          echo "Copy completed."
+
+          if [ -n "$ADDITIONAL_DOCKER_HUB_IMAGE_NAME" ] ; then
+            echo "Copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} to ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME} ..."
+
+            crane auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
+            crane copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME}
+
+            echo "Copy completed."
+          fi

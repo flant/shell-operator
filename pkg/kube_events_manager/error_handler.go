@@ -6,22 +6,23 @@ import (
 	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 type WatchErrorHandler struct {
 	description   string
 	kind          string
-	metricStorage metric.Storage
+	metricStorage metricsstorage.Storage
 
 	logger *log.Logger
 }
 
-func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage metric.Storage, logger *log.Logger) *WatchErrorHandler {
+func newWatchErrorHandler(description string, kind string, logLabels map[string]string, metricStorage metricsstorage.Storage, logger *log.Logger) *WatchErrorHandler {
 	return &WatchErrorHandler{
 		description:   description,
 		kind:          kind,
@@ -63,7 +64,7 @@ func (weh *WatchErrorHandler) handler(_ *cache.Reflector, err error) {
 	}
 
 	if weh.metricStorage != nil {
-		weh.metricStorage.CounterAdd("{PREFIX}kubernetes_client_watch_errors_total", 1.0, map[string]string{"error_type": errorType})
+		weh.metricStorage.CounterAdd(metrics.KubernetesClientWatchErrorsTotal, 1.0, map[string]string{"error_type": errorType})
 	}
 }
 

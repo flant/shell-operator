@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/yaml"
 
-	"github.com/flant/shell-operator/internal/metrics"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
 )
@@ -88,14 +88,14 @@ func Test_Dump(t *testing.T) {
 				"queue_name":   "active-queue",
 			},
 			{
-				"queue_action": "IsEmpty",
+				"queue_action": "Length",
 				"queue_name":   "empty",
 			},
 		}
 		assert.Contains(t, mapSlice, labels)
 		assert.Nil(t, buckets)
 	})
-	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
 	tqs := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)

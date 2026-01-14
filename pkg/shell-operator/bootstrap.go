@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
@@ -12,6 +13,7 @@ import (
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	"github.com/flant/shell-operator/pkg/hook"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/metrics"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
@@ -22,6 +24,29 @@ import (
 // Init initialize logging, ensures directories and creates
 // a ShellOperator instance with all dependencies.
 func Init(logger *log.Logger) (*ShellOperator, error) {
+	// Update webhook settings from parsed flags
+	// TODO: change this method to something else
+	admission.InitFromFlags(
+		app.ValidatingWebhookConfigurationName,
+		app.ValidatingWebhookServiceName,
+		app.ValidatingWebhookServerCert,
+		app.ValidatingWebhookServerKey,
+		app.ValidatingWebhookCA,
+		app.ValidatingWebhookClientCA,
+		app.ValidatingWebhookFailurePolicy,
+		app.ValidatingWebhookListenPort,
+		app.ValidatingWebhookListenAddress,
+	)
+	conversion.InitFromFlags(
+		app.ConversionWebhookServiceName,
+		app.ConversionWebhookServerCert,
+		app.ConversionWebhookServerKey,
+		app.ConversionWebhookCA,
+		app.ConversionWebhookClientCA,
+		app.ConversionWebhookListenPort,
+		app.ConversionWebhookListenAddress,
+	)
+
 	runtimeConfig := config.NewConfig(logger)
 	// Init logging subsystem.
 	app.SetupLogging(runtimeConfig, logger)
@@ -43,7 +68,16 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		return nil, err
 	}
 
-	op := NewShellOperator(context.TODO(), WithLogger(logger))
+	ms := metricsstorage.NewMetricStorage(
+		metricsstorage.WithLogger(logger.Named("metric-storage")),
+	)
+
+	hms := metricsstorage.NewMetricStorage(
+		metricsstorage.WithNewRegistry(),
+		metricsstorage.WithLogger(logger.Named("hook-metric-storage")),
+	)
+
+	op := NewShellOperator(context.TODO(), ms, hms, WithLogger(logger))
 
 	// Debug server.
 	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
@@ -52,10 +86,10 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		return nil, err
 	}
 
-	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, map[string]string{
-		"hook":    "",
-		"binding": "",
-		"queue":   "",
+	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, []string{
+		"hook",
+		"binding",
+		"queue",
 	})
 	if err != nil {
 		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble common operator", log.Err(err))
@@ -74,16 +108,18 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 // AssembleCommonOperator instantiate common dependencies. These dependencies
 // may be used for shell-operator derivatives, like addon-operator.
 // requires listenAddress, listenPort to run http server for operator APIs
-func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels map[string]string) error {
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string) error {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
-	op.setupMetricStorage(kubeEventsManagerLabels)
+	err := op.setupMetricStorage(kubeEventsManagerLabels)
+	if err != nil {
+		return fmt.Errorf("setup metric storage: %w", err)
+	}
 
 	// metrics from user's hooks
 	op.setupHookMetricStorage()
 
-	var err error
 	// 'main' Kubernetes client.
 	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage, op.logger)
 	if err != nil {
@@ -116,7 +152,10 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) error {
 	registerRootRoute(op)
 	// for shell-operator only
-	registerHookMetrics(op.HookMetricStorage)
+	err := metrics.RegisterHookMetrics(op.HookMetricStorage)
+	if err != nil {
+		return fmt.Errorf("register hook metrics: %w", err)
+	}
 
 	op.RegisterDebugQueueRoutes(debugServer)
 	op.RegisterDebugHookRoutes(debugServer)
@@ -126,7 +165,7 @@ func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, 
 	op.setupHookManagers(hooksDir, tempDir)
 
 	// Search and configure all hooks.
-	err := op.initHookManager()
+	err = op.initHookManager()
 	if err != nil {
 		return fmt.Errorf("initialize HookManager fail: %w", err)
 	}
@@ -175,13 +214,13 @@ func (op *ShellOperator) SetupEventManagers() {
 func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 	// Initialize admission webhooks manager.
 	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient)
-	op.AdmissionWebhookManager.Settings = app.ValidatingWebhookSettings
+	op.AdmissionWebhookManager.Settings = admission.DefaultSettings
 	op.AdmissionWebhookManager.Namespace = app.Namespace
 
 	// Initialize conversion webhooks manager.
 	op.ConversionWebhookManager = conversion.NewWebhookManager()
 	op.ConversionWebhookManager.KubeClient = op.KubeClient
-	op.ConversionWebhookManager.Settings = app.ConversionWebhookSettings
+	op.ConversionWebhookManager.Settings = conversion.DefaultSettings
 	op.ConversionWebhookManager.Namespace = app.Namespace
 
 	// Initialize Hook manager.

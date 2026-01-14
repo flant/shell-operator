@@ -1,6 +1,7 @@
 package dump
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -78,51 +79,61 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 	tasksCount := 0
 	mainTasksCount := 0
 
-	tqs.Iterate(func(queue *queue.TaskQueue) {
+	tqs.IterateSnapshot(context.TODO(), func(_ context.Context, queue *queue.TaskQueue) {
 		if queue == nil {
 			return
 		}
 
+		tasks := getTasksForQueue(queue)
+		length := queue.Length()
+		status := queue.GetStatus()
+		isEmpty := length == 0
+
 		if queue.Name == tqs.MainName {
-			mainTasksCount = queue.Length()
-			if queue.IsEmpty() {
+			mainTasksCount = length
+			if isEmpty {
 				mainQueue := dumpQueue{
 					Name:       queue.Name,
-					TasksCount: queue.Length(),
+					TasksCount: length,
 				}
+
 				result.Empty = append(result.Empty, mainQueue)
 				result.MainQueue = &mainQueue
-			} else {
-				tasks := getTasksForQueue(queue)
-				mainQueue := dumpQueue{
-					Name:       queue.Name,
-					TasksCount: queue.Length(),
-					Status:     queue.GetStatus(),
-					Tasks:      tasks,
-				}
-				result.Active = append(result.Active, mainQueue)
-				result.MainQueue = &mainQueue
+
+				return
 			}
+
+			mainQueue := dumpQueue{
+				Name:       queue.Name,
+				TasksCount: length,
+				Status:     status,
+				Tasks:      tasks,
+			}
+
+			result.Active = append(result.Active, mainQueue)
+			result.MainQueue = &mainQueue
+
 			return
 		}
 
 		otherQueuesCount++
-		if queue.IsEmpty() {
+		if isEmpty {
 			emptyQueues++
 			result.Empty = append(result.Empty, dumpQueue{
 				Name: queue.Name,
 			})
-		} else {
-			activeQueues++
-			tasksCount += queue.Length()
-			tasks := getTasksForQueue(queue)
-			result.Active = append(result.Active, dumpQueue{
-				Name:       queue.Name,
-				TasksCount: queue.Length(),
-				Status:     queue.GetStatus(),
-				Tasks:      tasks,
-			})
+
+			return
 		}
+
+		activeQueues++
+		tasksCount += length
+		result.Active = append(result.Active, dumpQueue{
+			Name:       queue.Name,
+			TasksCount: length,
+			Status:     status,
+			Tasks:      tasks,
+		})
 	})
 
 	result.SortByName()
@@ -160,7 +171,7 @@ func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
 	tasks := make([]dumpTask, 0, q.Length())
 
 	index := 1
-	q.Iterate(func(task task.Task) {
+	q.IterateSnapshot(func(task task.Task) {
 		tasks = append(tasks, dumpTask{
 			Index:       index,
 			Description: task.GetDescription(),

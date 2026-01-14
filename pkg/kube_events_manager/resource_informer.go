@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,7 +19,7 @@ import (
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
@@ -57,7 +58,7 @@ type resourceInformer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	metricStorage metric.Storage
+	metricStorage metricsstorage.Storage
 
 	// a flag to stop handle events after Stop()
 	stopped bool
@@ -68,7 +69,7 @@ type resourceInformer struct {
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
 	client  *klient.Client
-	mstor   metric.Storage
+	mstor   metricsstorage.Storage
 	eventCb func(kemtypes.KubeEvent)
 	monitor *MonitorConfig
 
@@ -224,7 +225,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		var err error
 		func() {
 			defer measure.Duration(func(d time.Duration) {
-				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
+				ei.metricStorage.HistogramObserve(metrics.KubeJqFilterDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 			})()
 			filter := jq.NewFilter()
 			objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, &obj)
@@ -254,7 +255,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 	}
 
 	ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
-	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+	ei.metricStorage.GaugeSet(metrics.KubeSnapshotObjects, float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 
 	return nil
 }
@@ -287,7 +288,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	}
 
 	defer measure.Duration(func(d time.Duration) {
-		ei.metricStorage.HistogramObserve("{PREFIX}kube_event_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
+		ei.metricStorage.HistogramObserve(metrics.KubeEventDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 	})()
 	defer trace.StartRegion(context.Background(), "handleWatchEvent").End()
 
@@ -304,7 +305,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	var err error
 	func() {
 		defer measure.Duration(func(d time.Duration) {
-			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
+			ei.metricStorage.HistogramObserve(metrics.KubeJqFilterDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 		})()
 		filter := jq.NewFilter()
 		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, obj)
@@ -351,7 +352,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			ei.cachedObjectsIncrement.Modified++
 		}
 		// Update metrics.
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.GaugeSet(metrics.KubeSnapshotObjects, float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 		if skipEvent {
 			return
@@ -369,7 +370,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		ei.cachedObjectsInfo.Deleted++
 		ei.cachedObjectsIncrement.Deleted++
 		// Update metrics.
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.GaugeSet(metrics.KubeSnapshotObjects, float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 	}
 

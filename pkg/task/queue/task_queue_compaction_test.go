@@ -180,34 +180,53 @@ func (t *mockTask) GetCompactionID() string {
 	return t.Id
 }
 
+// newTestMetricStorage creates a metric storage mock with all required methods stubbed
+func newTestMetricStorage(t *testing.T, expectCompaction bool) *metric.StorageMock {
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(_ string, _ float64, _ map[string]string, _ []float64) {
+	})
+	// CounterAdd is only called during actual compaction
+	if expectCompaction {
+		metricStorage.CounterAddMock.Set(func(_ string, _ float64, _ map[string]string) {
+		})
+	}
+	// Note: GaugeSet is no longer called during compaction tests since metrics
+	// are updated asynchronously in a separate goroutine that runs with Start()
+	return metricStorage
+}
+
 func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 	tests := []struct {
-		name         string
-		initialQueue []task.Task
-		taskToAdd    task.Task
-		expectedIDs  []string
-		expectedBCs  map[string]string // map[taskID] -> expected number of binding contexts
+		name             string
+		initialQueue     []task.Task
+		taskToAdd        task.Task
+		expectedIDs      []string
+		expectedBCs      map[string]string // map[taskID] -> expected number of binding contexts
+		expectCompaction bool              // whether compaction is expected to happen
 	}{
 		{
-			name:         "Simple merge into last task",
-			initialQueue: []task.Task{newHookTask("h1_A", "hook-1")},
-			taskToAdd:    newHookTask("h1_B", "hook-1"),
-			expectedIDs:  []string{"h1_A"},
-			expectedBCs:  map[string]string{"h1_A": "bc_for_h1_B"},
+			name:             "Simple merge into last task",
+			initialQueue:     []task.Task{newHookTask("h1_A", "hook-1")},
+			taskToAdd:        newHookTask("h1_B", "hook-1"),
+			expectedIDs:      []string{"h1_A"},
+			expectedBCs:      map[string]string{"h1_A": "bc_for_h1_B"},
+			expectCompaction: true,
 		},
 		{
-			name:         "No merge for different hook",
-			initialQueue: []task.Task{newHookTask("h1_A", "hook-1")},
-			taskToAdd:    newHookTask("h2_B", "hook-2"),
-			expectedIDs:  []string{"h1_A", "h2_B"},
-			expectedBCs:  map[string]string{"h1_A": "bc_for_h1_A", "h2_B": "bc_for_h2_B"},
+			name:             "No merge for different hook",
+			initialQueue:     []task.Task{newHookTask("h1_A", "hook-1")},
+			taskToAdd:        newHookTask("h2_B", "hook-2"),
+			expectedIDs:      []string{"h1_A", "h2_B"},
+			expectedBCs:      map[string]string{"h1_A": "bc_for_h1_A", "h2_B": "bc_for_h2_B"},
+			expectCompaction: false,
 		},
 		{
-			name:         "Greedy merge over a different hook task",
-			initialQueue: []task.Task{newHookTask("h1_A", "hook-1"), newHookTask("h2_B", "hook-2")},
-			taskToAdd:    newHookTask("h1_C", "hook-1"),
-			expectedIDs:  []string{"h1_A", "h2_B"},
-			expectedBCs:  map[string]string{"h1_A": "bc_for_h1_C", "h2_B": "bc_for_h2_B"},
+			name:             "Greedy merge over a different hook task",
+			initialQueue:     []task.Task{newHookTask("h1_A", "hook-1"), newHookTask("h2_B", "hook-2")},
+			taskToAdd:        newHookTask("h1_C", "hook-1"),
+			expectedIDs:      []string{"h1_A", "h2_B"},
+			expectedBCs:      map[string]string{"h1_A": "bc_for_h1_C", "h2_B": "bc_for_h2_B"},
+			expectCompaction: true,
 		},
 		{
 			name: "Do not merge into a processing task, add new",
@@ -216,9 +235,10 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 				t.SetProcessing(true)
 				return t
 			}()},
-			taskToAdd:   newHookTask("h1_B", "hook-1"),
-			expectedIDs: []string{"h1_A", "h1_B"},
-			expectedBCs: map[string]string{"h1_A": "bc_for_h1_A", "h1_B": "bc_for_h1_B"},
+			taskToAdd:        newHookTask("h1_B", "hook-1"),
+			expectedIDs:      []string{"h1_A", "h1_B"},
+			expectedBCs:      map[string]string{"h1_A": "bc_for_h1_A", "h1_B": "bc_for_h1_B"},
+			expectCompaction: false,
 		},
 		{
 			name: "Merge into the second pile, not the processing one",
@@ -230,9 +250,10 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 				}(),
 				newHookTask("h1_B", "hook-1"),
 			},
-			taskToAdd:   newHookTask("h1_C", "hook-1"),
-			expectedIDs: []string{"h1_A", "h1_B"},
-			expectedBCs: map[string]string{"h1_A": "bc_for_h1_A", "h1_B": "bc_for_h1_C"},
+			taskToAdd:        newHookTask("h1_C", "hook-1"),
+			expectedIDs:      []string{"h1_A", "h1_B"},
+			expectedBCs:      map[string]string{"h1_A": "bc_for_h1_A", "h1_B": "bc_for_h1_C"},
+			expectCompaction: true,
 		},
 		{
 			name: "Merge over a processing task of the same kind",
@@ -244,23 +265,26 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 					return t
 				}(),
 			},
-			taskToAdd:   newHookTask("h1_C", "hook-1"),
-			expectedIDs: []string{"h1_A", "h1_B"},
-			expectedBCs: map[string]string{"h1_A": "bc_for_h1_C", "h1_B": "bc_for_h1_B"},
+			taskToAdd:        newHookTask("h1_C", "hook-1"),
+			expectedIDs:      []string{"h1_A", "h1_B"},
+			expectedBCs:      map[string]string{"h1_A": "bc_for_h1_C", "h1_B": "bc_for_h1_B"},
+			expectCompaction: true,
 		},
 		{
-			name:         "Add service task, no merge",
-			initialQueue: []task.Task{newHookTask("h1_A", "hook-1")},
-			taskToAdd:    newServiceTask("service_B"),
-			expectedIDs:  []string{"h1_A", "service_B"},
-			expectedBCs:  map[string]string{"h1_A": "bc_for_h1_A"},
+			name:             "Add service task, no merge",
+			initialQueue:     []task.Task{newHookTask("h1_A", "hook-1")},
+			taskToAdd:        newServiceTask("service_B"),
+			expectedIDs:      []string{"h1_A", "service_B"},
+			expectedBCs:      map[string]string{"h1_A": "bc_for_h1_A"},
+			expectCompaction: false,
 		},
 		{
-			name:         "Merge hook task over a service task",
-			initialQueue: []task.Task{newHookTask("h1_A", "hook-1"), newServiceTask("service_B")},
-			taskToAdd:    newHookTask("h1_C", "hook-1"),
-			expectedIDs:  []string{"h1_A", "service_B"},
-			expectedBCs:  map[string]string{"h1_A": "bc_for_h1_C"},
+			name:             "Merge hook task over a service task",
+			initialQueue:     []task.Task{newHookTask("h1_A", "hook-1"), newServiceTask("service_B")},
+			taskToAdd:        newHookTask("h1_C", "hook-1"),
+			expectedIDs:      []string{"h1_A", "service_B"},
+			expectedBCs:      map[string]string{"h1_A": "bc_for_h1_C"},
+			expectCompaction: true,
 		},
 		{
 			name: "Greedy merge should compact the entire queue",
@@ -284,33 +308,31 @@ func TestTaskQueueList_AddLast_GreedyMerge(t *testing.T) {
 				"h1_B": "bc_for_h1_E", // own (dropped) + h1_C (dropped) + h1_D (dropped) + h1_E (latest kept)
 				"h2_A": "bc_for_h2_B", // own (dropped) + h2_B (latest kept)
 			},
+			expectCompaction: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metricStorage := metric.NewStorageMock(t)
-			metricStorage.HistogramObserveMock.Set(func(_ string, _ float64, _ map[string]string, _ []float64) {
-			})
-			metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
-			})
+			metricStorage := newTestMetricStorage(t, tt.expectCompaction)
 
-			q := NewTasksQueue(metricStorage, WithName("test_queue"), WithCompactableTypes(task_metadata.HookRun))
+			q := NewTasksQueue("test", metricStorage, WithCompactableTypes(task_metadata.HookRun))
 
 			for _, task := range tt.initialQueue {
-				q.addLast(task)
+				q.AddLast(task)
 			}
 
-			q.addLast(tt.taskToAdd)
+			q.AddLast(tt.taskToAdd)
 
 			q.compaction(nil)
 			// Verify IDs and order
 			finalIDs := make([]string, 0, q.Length())
-			q.Iterate(func(t task.Task) {
+			q.IterateSnapshot(func(t task.Task) {
 				finalIDs = append(finalIDs, t.GetId())
 			})
+
 			assert.Equal(t, tt.expectedIDs, finalIDs, "Task IDs and order should match expected")
-			q.Iterate(func(task task.Task) {
+			q.IterateSnapshot(func(task task.Task) {
 				if mt, ok := task.(*mockTask); ok && mt.GetType() == task_metadata.HookRun {
 					hm := task_metadata.HookMetadataAccessor(mt)
 					require.NotNil(t, hm, "HookMetadataAccessor should not return nil for hook task")

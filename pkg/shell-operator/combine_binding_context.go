@@ -38,7 +38,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 
 	otherTasks := make([]task.Task, 0)
 	stopIterate := false
-	q.Iterate(func(tsk task.Task) {
+	q.IterateSnapshot(func(tsk task.Task) {
 		if stopIterate {
 			return
 		}
@@ -91,7 +91,7 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 	}
 
 	// Delete tasks with false in tasksFilter map
-	tqs.GetByName(t.GetQueueName()).Filter(func(tsk task.Task) bool {
+	tqs.GetByName(t.GetQueueName()).DeleteFunc(func(tsk task.Task) bool {
 		if v, ok := tasksFilter[tsk.GetId()]; ok {
 			return v
 		}

@@ -8,10 +8,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/flant/shell-operator/internal/metrics"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 )
@@ -32,10 +32,10 @@ func Test_Operator_startup_tasks(t *testing.T) {
 		}, labels)
 		assert.Nil(t, buckets)
 	})
-	metricStorage.GaugeSetMock.Set(func(_ string, _ float64, _ map[string]string) {
+	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
-	op := NewShellOperator(context.Background(), WithLogger(log.NewNop()))
+	op := NewShellOperator(context.Background(), nil, nil, WithLogger(log.NewNop()))
 	op.MetricStorage = metricStorage
 
 	op.SetupEventManagers()
@@ -66,7 +66,7 @@ func Test_Operator_startup_tasks(t *testing.T) {
 	}
 
 	i := 0
-	op.TaskQueues.GetMain().Iterate(func(tsk task.Task) {
+	op.TaskQueues.GetMain().IterateSnapshot(func(tsk task.Task) {
 		// Stop checking if no expects left.
 		if i >= len(expectTasks) {
 			return
