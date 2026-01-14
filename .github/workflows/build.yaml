@@ -8,14 +8,12 @@ jobs:
     name: Build shell-operator binary
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.23
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
-
+          go-version: "1.25.5"
       - name: Check out shell-operator code
         uses: actions/checkout@v4
-
       - name: Restore Go modules
         id: go-modules-cache
         uses: actions/cache@v4.2.3
@@ -23,19 +21,16 @@ jobs:
           path: |
             ~/go/pkg/mod
           key: ${{ runner.os }}-gomod-${{ hashFiles('go.mod', 'go.sum') }}
-
       - name: Download Go modules
         if: steps.go-modules-cache.outputs.cache-hit != 'true'
         run: |
           go mod download
           echo -n "Go modules unpacked size is: " && du -sh $HOME/go/pkg/mod
-
       - name: Build binary
         run: |
           export GOOS=linux
 
           go build ./cmd/shell-operator
-
 # MacOS build works fine because jq package already has static libraries.
 # Windows build requires jq compilation, this should be done in libjq-go.
 # TODO Does cross-compile can help here?

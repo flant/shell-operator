@@ -36,7 +36,6 @@ jobs:
             } catch (e) {
               console.log(`Error occurred while remove label. Possibly label is already removed. Ignore '${typeof e}' error.`);
             }
-
   integration_tests:
     name: Integration tests
     needs:
@@ -63,14 +62,12 @@ jobs:
             cluster_name: "kube-1-32"
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.23
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
-
+          go-version: "1.25.5"
       - name: Check out shell-operator code
         uses: actions/checkout@v4
-
       - name: Restore Go modules
         id: go-modules-cache
         uses: actions/cache@v4.2.3
@@ -80,27 +77,23 @@ jobs:
           key: ${{ runner.os }}-gomod-${{ hashFiles('go.mod', 'go.sum') }}
           restore-keys: |
             ${{ runner.os }}-gomod-
-
       - name: Download Go modules
         if: steps.go-modules-cache.outputs.cache-hit != 'true'
         run: |
           go mod download
           echo -n "Go modules unpacked size is: " && du -sh $HOME/go/pkg/mod
-
       - name: Install ginkgo
         run: |
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
           echo $PATH
           ls -la $GOPATH/bin
           ginkgo version
-
       - name: Start kind cluster
         uses: engineerd/setup-kind@v0.6.2
         with:
           version: "v0.27.0"
           image: ${{ matrix.kind_node_image }}
           name: ${{ matrix.cluster_name }}
-
       - name: Run integration tests
         env:
           CLUSTER_NAME: ${{ matrix.cluster_name }}

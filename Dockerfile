@@ -5,6 +5,7 @@ FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl AS libjq
 FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.25.5-alpine3.23 AS builder
 
 ARG appVersion=latest
+ARG kubectlVersion=v0.33.5
 
 # Install build dependencies
 RUN apk --no-cache add \
@@ -48,7 +49,7 @@ RUN apk --no-cache add \
 # Determine kubectl architecture and download
 RUN kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
     echo "Downloading kubectl for ${kubectlArch}" && \
-    wget https://dl.k8s.io/release/v1.32.10/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
+    wget https://dl.k8s.io/release/${kubectlVersion}/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl
 
 # Create hooks directory
