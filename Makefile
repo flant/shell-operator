@@ -19,7 +19,7 @@ test: go-check
 
 ## Run all generate-* jobs in bulk.
 .PHONY: generate
-generate: update-k8s-version update-workflows-go-version update-workflows-golangci-lint-version
+generate: update-k8s-version update-workflows-go-version update-workflows-golangci-lint-version update-workflows-ginkgo-version
 
 
 ##@ Dependencies
@@ -60,6 +60,12 @@ update-workflows-go-version: yq
 update-workflows-golangci-lint-version: yq
 	$(YQ) -i '(.jobs.run_linter.steps[] | select(.name == "Run golangci-lint") | .run) |= sub("v\\d+\\.\\d+\\.\\d+", "$(GOLANGCI_LINT_VERSION)")' .github/workflows/lint.yaml
 	echo "Updated golangci-lint version in lint.yaml to $(GOLANGCI_LINT_VERSION)"
+
+.PHONY: update-workflows-ginkgo-version
+update-workflows-ginkgo-version: yq
+	@ginkgoVer=$(shell $(GO) list -m github.com/onsi/ginkgo/v2 | cut -d' ' -f 2); \
+	$(YQ) -i '(.jobs.integration_tests.steps[] | select(.name == "Install ginkgo") | .run) |= sub("@latest", "@$$ginkgoVer")' .github/workflows/tests-labeled.yaml; \
+	echo "Updated ginkgo version in tests-labeled.yaml to $$ginkgoVer"
 
 ## Tool installations
 

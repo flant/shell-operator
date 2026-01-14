@@ -84,7 +84,7 @@ jobs:
           echo -n "Go modules unpacked size is: " && du -sh $HOME/go/pkg/mod
       - name: Install ginkgo
         run: |
-          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+          go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.5
           echo $PATH
           ls -la $GOPATH/bin
           ginkgo version
