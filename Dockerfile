@@ -36,6 +36,7 @@ RUN GOOS=linux \
 FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.23
 
 ARG TARGETPLATFORM
+ARG kubectlVersion=v1.32.10
 
 # Install runtime dependencies
 RUN apk --no-cache add \
@@ -47,8 +48,8 @@ RUN apk --no-cache add \
 
 # Determine kubectl architecture and download
 RUN kubectlArch=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\/v7//') && \
-    echo "Downloading kubectl for ${kubectlArch}" && \
-    wget https://dl.k8s.io/release/v1.32.10/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
+    echo "Downloading kubectl version ${kubectlVersion} for ${kubectlArch}" && \
+    wget https://dl.k8s.io/release/${kubectlVersion}/bin/${kubectlArch}/kubectl -O /bin/kubectl && \
     chmod +x /bin/kubectl
 
 # Create hooks directory

@@ -155,7 +155,7 @@ func (ei *resourceInformer) createSharedInformer() error {
 // Snapshot returns all cached objects for this informer
 func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
 	ei.cacheLock.RLock()
-	res := make([]kemtypes.ObjectAndFilterResult, 0)
+	res := make([]kemtypes.ObjectAndFilterResult, 0, len(ei.cachedObjects))
 	for _, obj := range ei.cachedObjects {
 		res = append(res, *obj)
 	}

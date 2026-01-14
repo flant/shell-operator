@@ -4,20 +4,17 @@ name: Lint
 on:
   pull_request:
     types: [opened, synchronize]
-
 jobs:
   run_linter:
     name: Run linter
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.23
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
-
+          go-version: "1.25.5"
       - name: Check out shell-operator code
         uses: actions/checkout@v4
-
       - name: Restore Go modules
         id: go-modules-cache
         uses: actions/cache@v4.2.3
@@ -27,19 +24,15 @@ jobs:
           key: ${{ runner.os }}-gomod-${{ hashFiles('go.mod', 'go.sum') }}
           restore-keys: |
             ${{ runner.os }}-gomod-
-
       - name: Download Go modules
         if: steps.go-modules-cache.outputs.cache-hit != 'true'
         run: |
           go mod download
           echo -n "Go modules unpacked size is: " && du -sh $HOME/go/pkg/mod
-
       - name: Run golangci-lint
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v2.1.6
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v2.8.0
           ./golangci-lint run --build-tags integration,test
-
-
   codespell:
     name: Run codespell
     runs-on: ubuntu-latest
@@ -47,10 +40,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.8
-
       - name: Check out addon-operator code
         uses: actions/checkout@v4
-
       - name: Run codespell
         run: |
           pip install codespell==v1.17.1

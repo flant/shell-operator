@@ -2,18 +2,15 @@
 # Build tag from release name when release is published.
 # Build 'latest' tag when release is published and marked as 'latest'.
 name: Publish release image
-
 on:
   workflow_dispatch:
   release:
     types: [published]
-
 env:
   QEMU_PLATFORMS: arm64,arm
   BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/arm/v7"
   DOCKER_HUB_REPO: flant/shell-operator
   GHCR_IO_REPO: ghcr.io/flant/shell-operator
-
 jobs:
   check:
     name: Check
@@ -73,7 +70,6 @@ jobs:
             core.setOutput('run_publish', runPublish.toString());
             core.setOutput('image_tag', imageTag);
             core.setOutput('additional_tag', additionalTag);
-
   publish_image:
     name: Build and publish
     runs-on: [ubuntu-latest]
@@ -82,7 +78,6 @@ jobs:
     if: needs.check.outputs.run_publish == 'true'
     steps:
       - uses: actions/checkout@v4
-
       - name: Prepare environment
         env:
           ADDITIONAL_TAG: ${{ needs.check.outputs.additional_tag }}
@@ -116,25 +111,21 @@ jobs:
           echo "ADDITIONAL_DOCKER_HUB_IMAGE_NAME  = $ADDITIONAL_DOCKER_HUB_IMAGE_NAME" && \
           echo "ADDITIONAL_GHCR_IO_IMAGE_NAME     = $ADDITIONAL_GHCR_IO_IMAGE_NAME"
           echo "========================================="
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.6.0
         with:
           platforms: "${{ env.QEMU_PLATFORMS }}"
-
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
         with:
           version: latest
-
       - name: Login to Github Container Registry
         uses: docker/login-action@v3.4.0
         with:
           registry: ghcr.io
           username: ${{ secrets.GHCR_IO_USER }}
           password: ${{ secrets.GHCR_IO_PASS }}
-
       - name: Build and push multi-arch image
         run: |
           echo "Build and push $FINAL_IMAGE_NAME with version '$APP_VERSION'."
@@ -147,45 +138,19 @@ jobs:
             --tag $GHCR_IO_IMAGE_NAME \
             --push \
             .
-
       - name: Inspect binaries
-        run: |
-          # Image for one arhitecture has digest in config field.
-          # Image with multiple manifests has digest in each manifest.
-          manifests=$(docker buildx imagetools inspect "${GHCR_IO_IMAGE_NAME}" --raw)
-          if grep manifests <<<"${manifests}" 2>&1 >/dev/null ; then
-            jq -r '.manifests[]? | .digest + " " + .platform.os + "/" + .platform.architecture' <<<"${manifests}"
-          else
-            echo $(echo -n "${manifests}" | openssl dgst -sha256 | sed s/^.stdin.*\ //) ' linux/amd64'
-          fi \
-          | while read digest platform ; do
-            if [[ ${BUILDX_PLATFORMS} != *"${platform}"* ]] ; then
-              echo "====================================="
-              echo "Ignore image for non-runnable platform ${platform}"
-              echo "  ${image}"
-              echo "====================================="
-              continue          
-            fi
-            image=${GHCR_IO_IMAGE_NAME}@${digest}
-            echo "====================================="
-            echo "Inspect image for platform ${platform}"
-            echo "  ${image}"
-            echo "====================================="
-            docker run --rm --platform ${platform} --entrypoint sh ${image} -c \
-              'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'
-          done
-
+        run: "# Image for one arhitecture has digest in config field.\n# Image with multiple manifests has digest in each manifest.\nmanifests=$(docker buildx imagetools inspect \"${GHCR_IO_IMAGE_NAME}\" --raw)\nif grep manifests <<<\"${manifests}\" 2>&1 >/dev/null ; then\n  jq -r '.manifests[]? | .digest + \" \" + .platform.os + \"/\" + .platform.architecture' <<<\"${manifests}\"\nelse\n  echo $(echo -n \"${manifests}\" | openssl dgst -sha256 | sed s/^.stdin.*\\ //) ' linux/amd64'\nfi \\\n| while read digest platform ; do\n  if [[ ${BUILDX_PLATFORMS} != *\"${platform}\"* ]] ; then\n    echo \"=====================================\"\n    echo \"Ignore image for non-runnable platform ${platform}\"\n    echo \"  ${image}\"\n    echo \"=====================================\"\n    continue          \n  fi\n  image=${GHCR_IO_IMAGE_NAME}@${digest}\n  echo \"=====================================\"\n  echo \"Inspect image for platform ${platform}\"\n  echo \"  ${image}\"\n  echo \"=====================================\"\n  docker run --rm --platform ${platform} --entrypoint sh ${image} -c \\\n    'apk add file > /dev/null; file /bin/kubectl; file /bin/busybox; file /shell-operator'\ndone\n"
       - name: Copy image to Docker Hub
         env:
           DOCKER_USER: ${{ secrets.DOCKER_USER }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         run: |
           echo "Download crane tool ..."
-          
+
           CRANE_VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name')
           CRANE_OS=Linux       # or Darwin, Windows
           CRANE_ARCH=x86_64    # or arm64, x86_64, armv6, i386, s390x, riscv64
-          
+
           echo "Crane version: ${CRANE_VERSION}, OS: ${CRANE_OS}, ARCH: ${CRANE_ARCH}"
           curl -sL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_${CRANE_OS}_${CRANE_ARCH}.tar.gz" > go-containerregistry.tar.gz
           echo "Extract crane tool ..."
