@@ -182,25 +182,29 @@ jobs:
         run: |
           echo "Download crane tool ..."
           
-          VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name')
-          OS=Linux       # or Darwin, Windows
-          ARCH=x86_64    # or arm64, x86_64, armv6, i386, s390x, riscv64
+          CRANE_VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name')
+          CRANE_OS=Linux       # or Darwin, Windows
+          CRANE_ARCH=x86_64    # or arm64, x86_64, armv6, i386, s390x, riscv64
           
-          echo "Crane version: ${VERSION}, OS: ${OS}, ARCH: ${ARCH}"
-          curl -sL "https://github.com/google/go-containerregistry/releases/download/${VERSION}/go-containerregistry_${OS}_${ARCH}.tar.gz" > go-containerregistry.tar.gz
-
+          echo "Crane version: ${CRANE_VERSION}, OS: ${CRANE_OS}, ARCH: ${CRANE_ARCH}"
+          curl -sL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_${CRANE_OS}_${CRANE_ARCH}.tar.gz" > go-containerregistry.tar.gz
           echo "Extract crane tool ..."
           tar -zxvf go-containerregistry.tar.gz -C /usr/local/bin/ crane
 
           export PATH=$PATH:/usr/local/bin
 
           echo "Copy ${GHCR_IO_IMAGE_NAME} to ${DOCKER_HUB_IMAGE_NAME} ..."
+
           crane auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
-          crane copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME} && \
+          crane copy ${GHCR_IO_IMAGE_NAME} ${DOCKER_HUB_IMAGE_NAME}
+
           echo "Copy completed."
 
-          [ -n "$ADDITIONAL_DOCKER_HUB_IMAGE_NAME" ] && \
-          echo "Copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} to ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME} ..." && \
-          crane auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
-          crane copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME} && \
-          echo "Copy completed."
+          if [ -n "$ADDITIONAL_DOCKER_HUB_IMAGE_NAME" ] ; then
+            echo "Copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} to ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME} ..."
+
+            crane auth login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io && \
+            crane copy ${ADDITIONAL_GHCR_IO_IMAGE_NAME} ${ADDITIONAL_DOCKER_HUB_IMAGE_NAME}
+
+            echo "Copy completed."
+          fi
