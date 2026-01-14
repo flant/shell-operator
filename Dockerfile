@@ -5,7 +5,7 @@ FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl AS libjq
 FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.25.5-alpine3.23 AS builder
 
 ARG appVersion=latest
-ARG kubectlVersion=v0.33.5
+ARG kubectlVersion=v0.32.10
 
 # Install build dependencies
 RUN apk --no-cache add \

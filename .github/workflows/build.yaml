@@ -21,6 +21,11 @@ jobs:
           path: |
             ~/go/pkg/mod
           key: ${{ runner.os }}-gomod-${{ hashFiles('go.mod', 'go.sum') }}
+      - name: Check generated code is up to date
+        run: |
+          make generate
+
+          git diff --exit-code || (echo 'Regenerated code does not match source, please run "make generate"' && exit 1)
       - name: Download Go modules
         if: steps.go-modules-cache.outputs.cache-hit != 'true'
         run: |
@@ -29,10 +34,6 @@ jobs:
       - name: Build binary
         run: |
           export GOOS=linux
-
-          make generate
-
-          git diff --exit-code || (echo 'Regenerated code does not match source, please run "make generate"' && exit 1)
 
           go build ./cmd/shell-operator
 # MacOS build works fine because jq package already has static libraries.
