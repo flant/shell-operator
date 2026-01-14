@@ -65,8 +65,8 @@ func (c *FactoryStore) Reset() {
 	c.stoppedCh = make(map[FactoryIndex]chan struct{})
 }
 
-func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
-	ctx, cancel := context.WithCancel(context.Background())
+func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
+	ctx, cancel := context.WithCancel(ctx)
 	c.data[index] = &Factory{
 		shared:               f,
 		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
@@ -74,11 +74,12 @@ func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedIn
 		cancel:               cancel,
 		done:                 nil,
 	}
+
 	log.Debug("Factory store: added a new factory for index",
 		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
 }
 
-func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) *Factory {
+func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index FactoryIndex) *Factory {
 	f, ok := c.data[index]
 	if ok {
 		log.Debug("Factory store: the factory with index found",
@@ -102,7 +103,8 @@ func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) *Factor
 		client, resyncPeriod, index.Namespace, tweakListOptions)
 	factory.ForResource(index.GVR)
 
-	c.add(index, factory)
+	c.add(ctx, index, factory)
+
 	return c.data[index]
 }
 
@@ -110,7 +112,7 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	factory := c.get(client, index)
+	factory := c.get(ctx, client, index)
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
 	// Add error handler, ignore "already started" error.
@@ -204,6 +206,7 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 			}
 		}
 	}
+
 	c.mu.Unlock()
 }
 
