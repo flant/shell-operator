@@ -1,5 +1,5 @@
 # Prebuilt jq.
-FROM --platform=${TARGETPLATFORM:-linux/amd64} ghcr.io/jqlang/jq:1.8.1 AS libjq
+FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl AS libjq
 
 # Go builder stage
 FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.25.5-alpine3.23 AS builder
@@ -57,7 +57,7 @@ RUN mkdir /hooks
 # Copy necessary files
 ADD frameworks/shell /frameworks/shell
 ADD shell_lib.sh /
-COPY --from=libjq /jq /usr/bin
+COPY --from=libjq /bin/jq /usr/bin
 COPY --from=builder /app/shell-operator /
 
 # Set working directory
