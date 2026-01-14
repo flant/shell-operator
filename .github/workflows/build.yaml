@@ -30,6 +30,10 @@ jobs:
         run: |
           export GOOS=linux
 
+          make generate
+
+          git diff --exit-code || (echo 'Regenerated code does not match source, please run "make generate"' && exit 1)
+
           go build ./cmd/shell-operator
 # MacOS build works fine because jq package already has static libraries.
 # Windows build requires jq compilation, this should be done in libjq-go.
