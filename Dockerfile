@@ -2,7 +2,7 @@
 FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl AS libjq
 
 # Go builder stage
-FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.25.5-alpine3.23 AS builder
+FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.26rc2-alpine3.23 AS builder
 
 ARG appVersion=latest
 
