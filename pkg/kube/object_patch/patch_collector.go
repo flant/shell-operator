@@ -1,6 +1,8 @@
 package object_patch
 
 import (
+	"io"
+
 	sdkpkg "github.com/deckhouse/module-sdk/pkg"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -150,4 +152,9 @@ func (dop *PatchCollector) PatchWithJSON(jsonPatch any, apiVersion string, kind 
 
 func (dop *PatchCollector) PatchWithMerge(mergePatch any, apiVersion string, kind string, namespace string, name string, opts ...sdkpkg.PatchCollectorOption) {
 	dop.add(NewMergePatchOperation(mergePatch, apiVersion, kind, namespace, name, opts...))
+}
+
+func (dop *PatchCollector) WriteOutput(w io.Writer) error {
+	//TODO implement me
+	return nil
 }
