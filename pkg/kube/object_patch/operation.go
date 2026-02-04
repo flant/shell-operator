@@ -92,7 +92,43 @@ type createOperation struct {
 }
 
 func (op *createOperation) Description() string {
-	return "Create object"
+	u, err := toUnstructured(op.object)
+	if err != nil {
+		return "Create object (unknown)"
+	}
+	return fmt.Sprintf("Create object %s/%s/%s/%s", u.GetAPIVersion(), u.GetKind(), u.GetNamespace(), u.GetName())
+}
+
+func (op *createOperation) GetName() string {
+	u, err := toUnstructured(op.object)
+	if err != nil {
+		return ""
+	}
+	return u.GetName()
+}
+
+func (op *createOperation) SetName(name string) {
+	u, err := toUnstructured(op.object)
+	if err != nil {
+		return
+	}
+	u.SetName(name)
+	op.object = u
+}
+
+func (op *createOperation) SetNamePrefix(prefix string) {
+	name := op.GetName()
+	if name != "" {
+		op.SetName(prefix + name)
+	}
+}
+
+func (op *createOperation) GetNamespace() string {
+	u, err := toUnstructured(op.object)
+	if err != nil {
+		return ""
+	}
+	return u.GetNamespace()
 }
 
 func (op *createOperation) WithSubresource(subresource string) {
@@ -127,6 +163,22 @@ func (op *deleteOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
+func (op *deleteOperation) GetName() string {
+	return op.name
+}
+
+func (op *deleteOperation) SetName(name string) {
+	op.name = name
+}
+
+func (op *deleteOperation) SetNamePrefix(prefix string) {
+	op.name = prefix + op.name
+}
+
+func (op *deleteOperation) GetNamespace() string {
+	return op.namespace
+}
+
 type patchOperation struct {
 	// Object coordinates for patch and delete.
 	apiVersion  string
@@ -144,6 +196,19 @@ type patchOperation struct {
 
 	ignoreMissingObject bool
 	ignoreHookError     bool
+}
+
+func (op *patchOperation) GetName() string {
+	return op.name
+}
+func (op *patchOperation) SetName(name string) {
+	op.name = name
+}
+func (op *patchOperation) SetNamePrefix(prefix string) {
+	op.name = prefix + op.name
+}
+func (op *patchOperation) GetNamespace() string {
+	return op.namespace
 }
 
 func (op *patchOperation) Description() string {
