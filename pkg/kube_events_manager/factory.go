@@ -222,7 +222,7 @@ func (c *FactoryStore) WaitStopped(index FactoryIndex) {
 	ch, ok := c.stoppedCh[index]
 	if !ok {
 		ch = make(chan struct{})
-		c.stoppedCh[index] = ch
+		close(ch)
 	}
 
 	c.mu.Unlock()
