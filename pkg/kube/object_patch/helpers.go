@@ -12,7 +12,7 @@ import (
 	k8yaml "sigs.k8s.io/yaml"
 
 	"github.com/flant/kube-client/manifest"
-	"github.com/flant/shell-operator/pkg/filter"
+	"github.com/flant/shell-operator/pkg/jq"
 )
 
 func unmarshalFromJSONOrYAML(specs []byte) ([]OperationSpec, error) {
@@ -64,11 +64,11 @@ func unmarshalFromYaml(yamlSpecs []byte) ([]OperationSpec, error) {
 	return specSlice, nil
 }
 
-func applyJQPatch(jqFilter string, fl filter.Filter, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	filterResult, err := fl.ApplyFilter(jqFilter, obj.UnstructuredContent())
+func applyJQPatch(jqFilter *jq.Expression, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	filterResult, err := jq.ExecuteJQ(jqFilter, obj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply jqFilter:\n%sto Object:\n%s\n"+
-			"error: %s", jqFilter, obj, err)
+			"error: %s", jqFilter.Query(), obj, err)
 	}
 
 	retObj := &unstructured.Unstructured{}

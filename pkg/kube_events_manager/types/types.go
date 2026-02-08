@@ -35,14 +35,16 @@ const (
 )
 
 type ObjectAndFilterResult struct {
-	Metadata struct {
-		JqFilter     string
-		Checksum     string
-		ResourceId   string // Used for sorting
-		RemoveObject bool
-	}
+	Metadata     ObjectAndFilterResultMetadata
 	Object       *unstructured.Unstructured // here is a pointer because of MarshalJSON receiver
 	FilterResult interface{}
+}
+
+type ObjectAndFilterResultMetadata struct {
+	JqFilter     string
+	Checksum     string
+	ResourceId   string // Used for sorting
+	RemoveObject bool
 }
 
 // Map constructs a map suitable for use in binding context.

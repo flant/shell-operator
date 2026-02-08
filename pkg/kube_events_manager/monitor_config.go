@@ -5,6 +5,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/flant/shell-operator/pkg/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -24,7 +25,7 @@ type MonitorConfig struct {
 	NamespaceSelector       *kemtypes.NamespaceSelector
 	LabelSelector           *metav1.LabelSelector
 	FieldSelector           *kemtypes.FieldSelector
-	JqFilter                string
+	JqFilter                *jq.Expression
 	Logger                  *log.Logger
 	Mode                    kemtypes.KubeEventMode
 	KeepFullObjectsInMemory bool
