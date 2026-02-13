@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/deckhouse/deckhouse/pkg/log v0.1.0
 	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0
-	github.com/flant/kube-client v1.5.2-0.20260115083524-502bbfafc55f
+	github.com/flant/kube-client v1.6.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-openapi/spec v0.19.8
 	github.com/go-openapi/strfmt v0.19.5
@@ -26,10 +26,10 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.33.7
-	k8s.io/apiextensions-apiserver v0.33.7
-	k8s.io/apimachinery v0.33.7
-	k8s.io/client-go v0.33.7
+	k8s.io/api v0.33.8
+	k8s.io/apiextensions-apiserver v0.33.8
+	k8s.io/apimachinery v0.33.8
+	k8s.io/client-go v0.33.8
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -37,7 +37,7 @@ require (
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.12-flant.0
 
 require (
-	github.com/deckhouse/module-sdk v0.6.1-0.20260115083832-af477f4f6f99
+	github.com/deckhouse/module-sdk v0.9.0
 	github.com/gojuno/minimock/v3 v3.4.7
 	github.com/itchyny/gojq v0.12.17
 	github.com/muesli/termenv v0.16.0
@@ -127,7 +127,7 @@ require (
 	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/cli-runtime v0.33.7 // indirect
+	k8s.io/cli-runtime v0.33.8 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
