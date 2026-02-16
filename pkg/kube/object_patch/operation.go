@@ -201,12 +201,15 @@ type patchOperation struct {
 func (op *patchOperation) GetName() string {
 	return op.name
 }
+
 func (op *patchOperation) SetName(name string) {
 	op.name = name
 }
+
 func (op *patchOperation) SetNamePrefix(prefix string) {
 	op.name = prefix + op.name
 }
+
 func (op *patchOperation) GetNamespace() string {
 	return op.namespace
 }

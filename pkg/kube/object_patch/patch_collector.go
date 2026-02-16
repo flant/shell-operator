@@ -154,7 +154,7 @@ func (dop *PatchCollector) PatchWithMerge(mergePatch any, apiVersion string, kin
 	dop.add(NewMergePatchOperation(mergePatch, apiVersion, kind, namespace, name, opts...))
 }
 
-func (dop *PatchCollector) WriteOutput(w io.Writer) error {
-	//TODO implement me
+func (dop *PatchCollector) WriteOutput(_ io.Writer) error {
+	// TODO implement me
 	return nil
 }
