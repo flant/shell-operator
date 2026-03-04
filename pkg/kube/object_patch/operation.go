@@ -3,6 +3,7 @@ package object_patch
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	sdkpkg "github.com/deckhouse/module-sdk/pkg"
@@ -99,36 +100,20 @@ func (op *createOperation) Description() string {
 	return fmt.Sprintf("Create object %s/%s/%s/%s", u.GetAPIVersion(), u.GetKind(), u.GetNamespace(), u.GetName())
 }
 
-func (op *createOperation) GetName() string {
-	u, err := toUnstructured(op.object)
-	if err != nil {
-		return ""
-	}
-	return u.GetName()
-}
-
-func (op *createOperation) SetName(name string) {
+// SetObjectPrefix sets prefix for object name.
+func (op *createOperation) SetObjectPrefix(prefix string) {
 	u, err := toUnstructured(op.object)
 	if err != nil {
 		return
 	}
-	u.SetName(name)
+
+	name := u.GetName()
+	if strings.HasPrefix(name, prefix) {
+		return
+	}
+
+	u.SetName(fmt.Sprintf("%s-%s", prefix, name))
 	op.object = u
-}
-
-func (op *createOperation) SetNamePrefix(prefix string) {
-	name := op.GetName()
-	if name != "" {
-		op.SetName(prefix + name)
-	}
-}
-
-func (op *createOperation) GetNamespace() string {
-	u, err := toUnstructured(op.object)
-	if err != nil {
-		return ""
-	}
-	return u.GetNamespace()
 }
 
 func (op *createOperation) WithSubresource(subresource string) {
@@ -163,20 +148,13 @@ func (op *deleteOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
-func (op *deleteOperation) GetName() string {
-	return op.name
-}
+// SetObjectPrefix sets prefix for object name.
+func (op *deleteOperation) SetObjectPrefix(prefix string) {
+	if strings.HasPrefix(op.name, prefix) {
+		return
+	}
 
-func (op *deleteOperation) SetName(name string) {
-	op.name = name
-}
-
-func (op *deleteOperation) SetNamePrefix(prefix string) {
-	op.name = prefix + op.name
-}
-
-func (op *deleteOperation) GetNamespace() string {
-	return op.namespace
+	op.name = fmt.Sprintf("%s-%s", prefix, op.name)
 }
 
 type patchOperation struct {
@@ -198,24 +176,17 @@ type patchOperation struct {
 	ignoreHookError     bool
 }
 
-func (op *patchOperation) GetName() string {
-	return op.name
-}
-
-func (op *patchOperation) SetName(name string) {
-	op.name = name
-}
-
-func (op *patchOperation) SetNamePrefix(prefix string) {
-	op.name = prefix + op.name
-}
-
-func (op *patchOperation) GetNamespace() string {
-	return op.namespace
-}
-
 func (op *patchOperation) Description() string {
 	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
+}
+
+// SetObjectPrefix sets prefix for object name.
+func (op *patchOperation) SetObjectPrefix(prefix string) {
+	if strings.HasPrefix(op.name, prefix) {
+		return
+	}
+
+	op.name = fmt.Sprintf("%s-%s", prefix, op.name)
 }
 
 func (op *patchOperation) hasFilterFn() bool {

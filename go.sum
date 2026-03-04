@@ -39,6 +39,8 @@ github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0 h1:xZvbKuexrSQGEw6CB4n
 github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0/go.mod h1:Rz++SzCLkFW03WGgftnn91TimGU2shiKb5S/YuxcBuE=
 github.com/deckhouse/module-sdk v0.10.0 h1:VPhYvMVQ3pT32I2WL1ITtQyrYdpiUR0RocLw7S4TfNg=
 github.com/deckhouse/module-sdk v0.10.0/go.mod h1:Z1jfmd0fICoYww0daMijWAU+OZTxeJUXfMciKKuYAYA=
+github.com/deckhouse/module-sdk v0.10.2-0.20260304160619-6b32d3428382 h1:EjnN5+q6/FI1N+JmPpRz7vm/Vfz8nW7FOT2/TtwS07Y=
+github.com/deckhouse/module-sdk v0.10.2-0.20260304160619-6b32d3428382/go.mod h1:Z1jfmd0fICoYww0daMijWAU+OZTxeJUXfMciKKuYAYA=
 github.com/docker/go-units v0.4.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/emicklei/go-restful/v3 v3.11.0 h1:rAQeMHw1c7zTmncogyy8VvRZwtkmkZ4FxERmMY4rD+g=
 github.com/emicklei/go-restful/v3 v3.11.0/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
