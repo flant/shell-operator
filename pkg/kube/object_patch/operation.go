@@ -108,7 +108,7 @@ func (op *createOperation) SetObjectPrefix(prefix string) {
 	}
 
 	name := u.GetName()
-	if strings.HasPrefix(name, prefix) {
+	if strings.HasPrefix(name, prefix+"-") {
 		return
 	}
 
@@ -148,9 +148,12 @@ func (op *deleteOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
+// obj.name = test
+// prefix = test
+
 // SetObjectPrefix sets prefix for object name.
 func (op *deleteOperation) SetObjectPrefix(prefix string) {
-	if strings.HasPrefix(op.name, prefix) {
+	if strings.HasPrefix(op.name, prefix+"-") {
 		return
 	}
 
@@ -182,7 +185,7 @@ func (op *patchOperation) Description() string {
 
 // SetObjectPrefix sets prefix for object name.
 func (op *patchOperation) SetObjectPrefix(prefix string) {
-	if strings.HasPrefix(op.name, prefix) {
+	if strings.HasPrefix(op.name, prefix+"-") {
 		return
 	}
 
