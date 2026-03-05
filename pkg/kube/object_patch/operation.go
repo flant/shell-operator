@@ -148,9 +148,6 @@ func (op *deleteOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
-// obj.name = test
-// prefix = test
-
 // SetObjectPrefix sets prefix for object name.
 func (op *deleteOperation) SetObjectPrefix(prefix string) {
 	if strings.HasPrefix(op.name, prefix+"-") {
