@@ -3,6 +3,7 @@ package object_patch
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	sdkpkg "github.com/deckhouse/module-sdk/pkg"
@@ -92,7 +93,27 @@ type createOperation struct {
 }
 
 func (op *createOperation) Description() string {
-	return "Create object"
+	u, err := toUnstructured(op.object)
+	if err != nil {
+		return "Create object (unknown)"
+	}
+	return fmt.Sprintf("Create object %s/%s/%s/%s", u.GetAPIVersion(), u.GetKind(), u.GetNamespace(), u.GetName())
+}
+
+// SetObjectPrefix sets prefix for object name.
+func (op *createOperation) SetObjectPrefix(prefix string) {
+	u, err := toUnstructured(op.object)
+	if err != nil {
+		return
+	}
+
+	name := u.GetName()
+	if strings.HasPrefix(name, prefix+"-") {
+		return
+	}
+
+	u.SetName(fmt.Sprintf("%s-%s", prefix, name))
+	op.object = u
 }
 
 func (op *createOperation) WithSubresource(subresource string) {
@@ -127,6 +148,15 @@ func (op *deleteOperation) WithSubresource(subresource string) {
 	op.subresource = subresource
 }
 
+// SetObjectPrefix sets prefix for object name.
+func (op *deleteOperation) SetObjectPrefix(prefix string) {
+	if strings.HasPrefix(op.name, prefix+"-") {
+		return
+	}
+
+	op.name = fmt.Sprintf("%s-%s", prefix, op.name)
+}
+
 type patchOperation struct {
 	// Object coordinates for patch and delete.
 	apiVersion  string
@@ -148,6 +178,15 @@ type patchOperation struct {
 
 func (op *patchOperation) Description() string {
 	return fmt.Sprintf("Filter object %s/%s/%s/%s", op.apiVersion, op.kind, op.namespace, op.name)
+}
+
+// SetObjectPrefix sets prefix for object name.
+func (op *patchOperation) SetObjectPrefix(prefix string) {
+	if strings.HasPrefix(op.name, prefix+"-") {
+		return
+	}
+
+	op.name = fmt.Sprintf("%s-%s", prefix, op.name)
 }
 
 func (op *patchOperation) hasFilterFn() bool {
