@@ -90,13 +90,13 @@ func (hm *Manager) TempDir() string {
 
 // Init finds executables in WorkingDir, execute them with --config argument and add them into indices.
 func (hm *Manager) Init() error {
-	log.Info("Initialize hooks manager. Search for and load all hooks.")
+	hm.logger.Info("Initialize hooks manager. Search for and load all hooks.")
 
 	hm.hooksInOrder = make(map[htypes.BindingType][]*Hook)
 	hm.hooksByName = make(map[string]*Hook)
 
 	if err := utils_file.RecursiveCheckLibDirectory(hm.workingDir); err != nil {
-		log.Error("failed to check lib directory",
+		hm.logger.Error("failed to check lib directory",
 			slog.String("workingDir", hm.workingDir),
 			log.Err(err))
 	}
@@ -108,7 +108,7 @@ func (hm *Manager) Init() error {
 
 	// sort hooks by path
 	sort.Strings(hooksRelativePaths)
-	log.Debug("Search hooks in paths", slog.Any("paths", hooksRelativePaths))
+	hm.logger.Debug("Search hooks in paths", slog.Any("paths", hooksRelativePaths))
 
 	for _, hookPath := range hooksRelativePaths {
 		hook, err := hm.loadHook(hookPath)
@@ -141,9 +141,7 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 	}
 
 	hook := NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
-	hookEntry := hm.logger.With("hook", hook.Name).
-		With("phase", "config")
-
+	hookEntry := hm.logger.With(slog.String("hook", hook.Name), slog.String("phase", "config"))
 	hookEntry.Info("Load config", slog.String("path", hookPath))
 
 	envs := make([]string, 0)
@@ -230,8 +228,7 @@ func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint str
 		WithCMDStderr(nil).
 		WithLogger(hm.logger.Named("executor"))
 
-	debugEntry := hm.logger.With("hook", hookName).
-		With("cmd", strings.Join(args, " "))
+	debugEntry := hm.logger.With(slog.String("hook", hookName), slog.String("cmd", strings.Join(args, " ")))
 
 	debugEntry.Debug("Executing hook", slog.String("dir", dir))
 
@@ -250,7 +247,7 @@ func (hm *Manager) GetHook(name string) *Hook {
 	if exists {
 		return hook
 	}
-	log.Error("Possible bug!!! Hook not found in hook manager", slog.String("name", name))
+	hm.logger.Error("Possible bug!!! Hook not found in hook manager", slog.String("name", name))
 	return nil
 }
 
@@ -378,7 +375,7 @@ func (hm *Manager) DetectAdmissionEventType(event admission.Event) htypes.Bindin
 		}
 	}
 
-	log.Error("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s",
+	hm.logger.Error("Possible bug!!! No linked hook for admission event",
 		slog.String("configId", event.ConfigurationId),
 		slog.String("webhookId", event.WebhookId),
 		slog.String("kind", event.Request.Kind.String()),

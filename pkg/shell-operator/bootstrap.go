@@ -213,12 +213,12 @@ func (op *ShellOperator) SetupEventManagers() {
 // setupHookManagers instantiates different hook managers.
 func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 	// Initialize admission webhooks manager.
-	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient)
+	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient, admission.WithLogger(op.logger.Named("admission-webhook-manager")))
 	op.AdmissionWebhookManager.Settings = admission.DefaultSettings
 	op.AdmissionWebhookManager.Namespace = app.Namespace
 
 	// Initialize conversion webhooks manager.
-	op.ConversionWebhookManager = conversion.NewWebhookManager()
+	op.ConversionWebhookManager = conversion.NewWebhookManager(conversion.WithLogger(op.logger.Named("conversion-webhook-manager")))
 	op.ConversionWebhookManager.KubeClient = op.KubeClient
 	op.ConversionWebhookManager.Settings = conversion.DefaultSettings
 	op.ConversionWebhookManager.Namespace = app.Namespace

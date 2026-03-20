@@ -56,7 +56,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	var admissionReview v1.AdmissionReview
 	err := json.NewDecoder(r.Body).Decode(&admissionReview)
 	if err != nil {
-		h.Logger.Error("failed to read admission request", log.Err(err))
+		h.Logger.Error("failed to decode admission request body", log.Err(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -67,9 +67,11 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	logger := h.Logger.With(slog.String("request", string(admissionReview.Request.UID)))
+
 	admissionResponse, err := h.handleReviewRequest(ctx, r.URL.Path, admissionReview.Request)
 	if err != nil {
-		h.Logger.Error("validation failed", "request", admissionReview.Request.UID, log.Err(err))
+		logger.Error("validation failed", log.Err(err))
 		admissionReview.Response = errored(err)
 	} else {
 		admissionReview.Response = admissionResponse
@@ -82,8 +84,8 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	err = json.NewEncoder(w).Encode(admissionReview)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("Error json encoding AdmissionReview"))
-		h.Logger.Error("Error json encoding AdmissionReview", log.Err(err))
+		_, _ = w.Write([]byte("error json encoding AdmissionReview"))
+		logger.Error("error json encoding AdmissionReview", log.Err(err))
 		return
 	}
 }

@@ -56,12 +56,12 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	crdName := detectCrdName(r.URL.Path)
 
 	logger := h.Logger.With(slog.String("crd", crdName))
-	logger.Info("Got ConversionReview request for crd")
+	logger.Info("serving ConversionReview request")
 
 	var convertReview v1.ConversionReview
 	err := json.NewDecoder(r.Body).Decode(&convertReview)
 	if err != nil {
-		logger.Error("failed to read conversion request", log.Err(err))
+		logger.Error("failed to decode conversion request body", log.Err(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -76,7 +76,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 
 	conversionResponse, err := h.handleReviewRequest(ctx, crdName, convertReview.Request)
 	if err != nil {
-		logger.Error("failed to convert", log.Err(err))
+		logger.Error("conversion failed", log.Err(err))
 		convertReview.Response = errored(err)
 	} else {
 		convertReview.Response = conversionResponse
@@ -89,8 +89,8 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	err = json.NewEncoder(w).Encode(convertReview)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("Error json encoding ConversionReview"))
-		logger.Error("Error json encoding ConversionReview", log.Err(err))
+		_, _ = w.Write([]byte("error json encoding ConversionReview"))
+		logger.Error("error json encoding ConversionReview", log.Err(err))
 		return
 	}
 }

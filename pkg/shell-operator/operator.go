@@ -257,11 +257,11 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"event":    string(eventBindingType),
 		}
-		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry.Debug("Handle event",
+		logEntry := op.logger.With(
 			slog.String("type", string(eventBindingType)),
 			slog.String("configurationId", event.ConfigurationId),
 			slog.String("webhookID", event.WebhookId))
+		logEntry.Debug("Handle event")
 
 		var admissionTask task.Task
 		op.HookManager.HandleAdmissionEvent(ctx, event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
@@ -282,10 +282,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 
 		// Assert exactly one task is created.
 		if admissionTask == nil {
-			logEntry.Error("Possible bug!!! No hook found for event",
-				slog.String("type", string(types.KubernetesValidating)),
-				slog.String("configurationId", event.ConfigurationId),
-				slog.String("webhookID", event.WebhookId))
+			logEntry.Error("Possible bug!!! No hook found for event")
 			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
 		}
 
