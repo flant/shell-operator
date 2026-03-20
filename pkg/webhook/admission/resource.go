@@ -24,12 +24,15 @@ type WebhookResourceOptions struct {
 type ValidatingWebhookResource struct {
 	hooks map[string]*ValidatingWebhookConfig
 	opts  WebhookResourceOptions
+
+	logger *log.Logger
 }
 
-func NewValidatingWebhookResource(opts WebhookResourceOptions) *ValidatingWebhookResource {
+func NewValidatingWebhookResource(opts WebhookResourceOptions, logger *log.Logger) *ValidatingWebhookResource {
 	return &ValidatingWebhookResource{
-		hooks: make(map[string]*ValidatingWebhookConfig),
-		opts:  opts,
+		hooks:  make(map[string]*ValidatingWebhookConfig),
+		opts:   opts,
+		logger: logger,
 	}
 }
 
@@ -60,7 +63,7 @@ func (w *ValidatingWebhookResource) Register() error {
 			CABundle: w.opts.CABundle,
 		}
 
-		log.Info("Add path to config",
+		w.logger.Info("Add path to config",
 			slog.String("path", *webhook.ClientConfig.Service.Path),
 			slog.String("configurationName", w.opts.ConfigurationName))
 
@@ -93,6 +96,7 @@ func createWebhookPath(webhook IWebhookConfig) *string {
 }
 
 func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfiguration) error {
+	logger := w.logger.With(slog.String("name", conf.Name))
 	client := w.opts.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations()
 
 	listOpts := metav1.ListOptions{
@@ -105,18 +109,14 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 	if len(list.Items) == 0 {
 		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
 		if err != nil {
-			log.Error("Create ValidatingWebhookConfiguration",
-				slog.String("name", conf.Name),
-				log.Err(err))
+			logger.Error("Create ValidatingWebhookConfiguration", log.Err(err))
 		}
 	} else {
 		newConf := list.Items[0]
 		newConf.Webhooks = conf.Webhooks
 		_, err = client.Update(context.TODO(), &newConf, pkg.DefaultUpdateOptions())
 		if err != nil {
-			log.Error("Replace ValidatingWebhookConfiguration",
-				slog.String("name", conf.Name),
-				log.Err(err))
+			logger.Error("Replace ValidatingWebhookConfiguration", log.Err(err))
 		}
 	}
 	return nil
@@ -125,12 +125,15 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 type MutatingWebhookResource struct {
 	hooks map[string]*MutatingWebhookConfig
 	opts  WebhookResourceOptions
+
+	logger *log.Logger
 }
 
-func NewMutatingWebhookResource(opts WebhookResourceOptions) *MutatingWebhookResource {
+func NewMutatingWebhookResource(opts WebhookResourceOptions, logger *log.Logger) *MutatingWebhookResource {
 	return &MutatingWebhookResource{
-		hooks: make(map[string]*MutatingWebhookConfig),
-		opts:  opts,
+		hooks:  make(map[string]*MutatingWebhookConfig),
+		opts:   opts,
+		logger: logger,
 	}
 }
 
@@ -161,7 +164,7 @@ func (w *MutatingWebhookResource) Register() error {
 			CABundle: w.opts.CABundle,
 		}
 
-		log.Info("Add path to config",
+		w.logger.Info("Add path to config",
 			slog.String("path", *webhook.ClientConfig.Service.Path),
 			slog.String("configurationName", w.opts.ConfigurationName))
 
@@ -177,6 +180,7 @@ func (w *MutatingWebhookResource) Unregister() error {
 }
 
 func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) error {
+	logger := w.logger.With(slog.String("name", conf.Name))
 	client := w.opts.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations()
 
 	listOpts := metav1.ListOptions{
@@ -189,18 +193,14 @@ func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) 
 	if len(list.Items) == 0 {
 		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
 		if err != nil {
-			log.Error("Create MutatingWebhookConfiguration",
-				slog.String("name", conf.Name),
-				log.Err(err))
+			logger.Error("Create MutatingWebhookConfiguration", log.Err(err))
 		}
 	} else {
 		newConf := list.Items[0]
 		newConf.Webhooks = conf.Webhooks
 		_, err = client.Update(context.TODO(), &newConf, pkg.DefaultUpdateOptions())
 		if err != nil {
-			log.Error("Replace MutatingWebhookConfiguration",
-				slog.String("name", conf.Name),
-				log.Err(err))
+			logger.Error("Replace MutatingWebhookConfiguration", log.Err(err))
 		}
 	}
 	return nil

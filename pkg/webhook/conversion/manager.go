@@ -35,17 +35,34 @@ type WebhookManager struct {
 	Server        *server.WebhookServer
 	ClientConfigs map[string]*CrdClientConfig
 	Handler       *WebhookHandler
+
+	Logger *log.Logger
 }
 
-func NewWebhookManager() *WebhookManager {
-	return &WebhookManager{
-		ClientConfigs: make(map[string]*CrdClientConfig),
+type Option func(manager *WebhookManager)
+
+func WithLogger(logger *log.Logger) Option {
+	return func(manager *WebhookManager) {
+		manager.Logger = logger
 	}
+}
+
+func NewWebhookManager(opts ...Option) *WebhookManager {
+	manager := &WebhookManager{
+		ClientConfigs: make(map[string]*CrdClientConfig),
+		Logger:        log.NewLogger().Named("conversion-webhook-manager"),
+	}
+
+	for _, opt := range opts {
+		opt(manager)
+	}
+
+	return manager
 }
 
 // Init creates dependencies
 func (m *WebhookManager) Init() error {
-	log.Info("Initialize conversion webhooks manager. Load certificates.")
+	m.Logger.Info("Initialize conversion webhooks manager. Load certificates.")
 
 	// settings
 	caBundleBytes, err := os.ReadFile(m.Settings.CAPath)
@@ -54,14 +71,10 @@ func (m *WebhookManager) Init() error {
 	}
 	m.Settings.CABundle = caBundleBytes
 
-	m.Handler = NewWebhookHandler()
+	m.Handler = NewWebhookHandler(m.Logger)
 	m.Handler.Manager = m
 
-	m.Server = &server.WebhookServer{
-		Settings:  &m.Settings.Settings,
-		Namespace: m.Namespace,
-		Router:    m.Handler.Router,
-	}
+	m.Server = server.NewWebhookServer(&m.Settings.Settings, m.Namespace, m.Handler.Router, m.Logger)
 
 	return nil
 }
@@ -69,7 +82,7 @@ func (m *WebhookManager) Init() error {
 // Start webhook server and update spec.conversion in CRDs.
 func (m *WebhookManager) Start() error {
 	ctx := context.Background()
-	log.Info("Start conversion webhooks manager. Load certificates.")
+	m.Logger.Info("Start conversion webhooks manager. Load certificates.")
 
 	err := m.Server.Start()
 	if err != nil {

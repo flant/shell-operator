@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -16,10 +17,7 @@ func Test_ServerStart(t *testing.T) {
 
 	rtr := chi.NewRouter()
 
-	srv := &WebhookServer{
-		Settings: s,
-		Router:   rtr,
-	}
+	srv := NewWebhookServer(s, "", rtr, log.NewNop())
 
 	err := srv.Start()
 	if err != nil {
