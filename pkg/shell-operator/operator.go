@@ -488,21 +488,14 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 
 	var res queue.TaskResult
 
-	hookLogLabels := map[string]string{
-		"hook":    hookMeta.HookName,
-		"binding": "",
-		"task":    "EnableKubernetesBindings",
-		"queue":   "main",
-	}
+	hookLogLabels := map[string]string{}
+	hookLogLabels["hook"] = hookMeta.HookName
+	hookLogLabels["binding"] = ""
+	hookLogLabels["task"] = "EnableKubernetesBindings"
+	hookLogLabels["queue"] = "main"
 
-	logger := op.logger.With(
-		slog.String("hook", hookLogLabels["hook"]),
-		slog.String("binding", hookLogLabels["binding"]),
-		slog.String("task", hookLogLabels["task"]),
-		slog.String("queue", hookLogLabels["queue"]),
-	)
-
-	logger.Info("Enable kubernetes binding for hook")
+	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
+	taskLogEntry.Info("Enable kubernetes binding for hook")
 
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
@@ -533,13 +526,13 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 	if err != nil {
 		errors = 1.0
 		t.UpdateFailureMessage(err.Error())
-		logger.Error("Enable Kubernetes binding for hook failed. Will retry after delay.",
+		taskLogEntry.Error("Enable Kubernetes binding for hook failed. Will retry after delay.",
 			slog.Int("failedCount", t.GetFailureCount()+1),
 			log.Err(err))
 		res.Status = "Fail"
 	} else {
 		success = 1.0
-		logger.Info("Kubernetes bindings for hook are enabled successfully",
+		taskLogEntry.Info("Kubernetes bindings for hook are enabled successfully",
 			slog.Int("count", len(hookRunTasks)))
 		res.Status = "Success"
 		now := time.Now()
@@ -583,21 +576,14 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 		op.MetricStorage.HistogramObserve(metrics.HookRunSeconds, d.Seconds(), metricLabels, nil)
 	})()
 
-	hookLogLabels := map[string]string{
-		"hook":    hookMeta.HookName,
-		"binding": hookMeta.Binding,
-		"event":   string(hookMeta.BindingType),
-		"task":    "HookRun",
-		"queue":   t.GetQueueName(),
-	}
+	hookLogLabels := map[string]string{}
+	hookLogLabels["hook"] = hookMeta.HookName
+	hookLogLabels["binding"] = hookMeta.Binding
+	hookLogLabels["event"] = string(hookMeta.BindingType)
+	hookLogLabels["task"] = "HookRun"
+	hookLogLabels["queue"] = t.GetQueueName()
 
-	logger := op.logger.With(
-		slog.String("hook", hookLogLabels["hook"]),
-		slog.String("binding", hookLogLabels["binding"]),
-		slog.String("event", hookLogLabels["event"]),
-		slog.String("task", hookLogLabels["task"]),
-		slog.String("queue", hookLogLabels["queue"]),
-	)
+	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
 
 	isSynchronization := hookMeta.IsSynchronization()
 	shouldRunHook := true
@@ -639,29 +625,29 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	res.Status = "Success"
 
 	if shouldRunHook {
-		logger.Info("Execute hook")
+		taskLogEntry.Info("Execute hook")
 
 		success := 0.0
 		errors := 0.0
 		allowed := 0.0
-		err = op.handleRunHook(ctx, t, taskHook, hookMeta, logger, hookLogLabels, metricLabels)
+		err = op.handleRunHook(ctx, t, taskHook, hookMeta, taskLogEntry, hookLogLabels, metricLabels)
 		if err != nil {
 			if hookMeta.AllowFailure {
 				allowed = 1.0
-				logger.Info("Hook failed, but allowed to fail", log.Err(err))
+				taskLogEntry.Info("Hook failed, but allowed to fail", log.Err(err))
 				res.Status = "Success"
 			} else {
 				errors = 1.0
 				t.UpdateFailureMessage(err.Error())
 				t.WithQueuedAt(time.Now()) // Reset queueAt for correct results in 'task_wait_in_queue' metric.
-				logger.Error("Hook failed. Will retry after delay.",
+				taskLogEntry.Error("Hook failed. Will retry after delay.",
 					slog.Int("failedCount", t.GetFailureCount()+1),
 					log.Err(err))
 				res.Status = "Fail"
 			}
 		} else {
 			success = 1.0
-			logger.Info("Hook executed successfully")
+			taskLogEntry.Info("Hook executed successfully")
 			res.Status = "Success"
 		}
 		op.MetricStorage.CounterAdd(metrics.HookRunAllowedErrorsTotal, allowed, metricLabels)
@@ -671,7 +657,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 
 	// Unlock Kubernetes events for all monitors when Synchronization task is done.
 	if isSynchronization && res.Status == "Success" {
-		logger.Info("Unlock kubernetes.Event tasks")
+		taskLogEntry.Info("Unlock kubernetes.Event tasks")
 		for _, monitorID := range hookMeta.MonitorIDs {
 			taskHook.HookController.UnlockKubernetesEventsFor(monitorID)
 		}
