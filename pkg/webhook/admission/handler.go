@@ -57,14 +57,14 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	err := json.NewDecoder(r.Body).Decode(&admissionReview)
 	if err != nil {
 		h.Logger.Error("failed to decode AdmissionReview body to json", log.Err(err))
-		_, _ = w.Write([]byte("invalid JSON payload"))
+		_, _ = w.Write([]byte("Invalid JSON payload"))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if admissionReview.Request == nil {
 		h.Logger.Error("AdmissionReview request is nil")
-		_, _ = w.Write([]byte("missing parameters: request"))
+		_, _ = w.Write([]byte("Missing parameters: request"))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -91,7 +91,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	err = json.NewEncoder(w).Encode(admissionReview)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("error json encoding AdmissionReview"))
+		_, _ = w.Write([]byte("Error json encoding AdmissionReview"))
 		logger.Error("error json encoding AdmissionReview", log.Err(err))
 		return
 	}

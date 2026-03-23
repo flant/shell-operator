@@ -49,11 +49,14 @@ func NewWebhookManager(kubeClient *klient.Client, opts ...Option) *WebhookManage
 		ValidatingResources: make(map[string]*ValidatingWebhookResource),
 		MutatingResources:   make(map[string]*MutatingWebhookResource),
 		KubeClient:          kubeClient,
-		Logger:              log.NewLogger().Named("admission-webhook-manager"),
 	}
 
 	for _, opt := range opts {
 		opt(manager)
+	}
+
+	if manager.Logger == nil {
+		manager.Logger = log.NewLogger().Named("admission-webhook-manager")
 	}
 
 	return manager

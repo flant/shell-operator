@@ -51,11 +51,14 @@ func WithLogger(logger *log.Logger) Option {
 func NewWebhookManager(opts ...Option) *WebhookManager {
 	manager := &WebhookManager{
 		ClientConfigs: make(map[string]*CrdClientConfig),
-		Logger:        log.NewLogger().Named("conversion-webhook-manager"),
 	}
 
 	for _, opt := range opts {
 		opt(manager)
+	}
+
+	if manager.Logger == nil {
+		manager.Logger = log.NewLogger().Named("conversion-webhook-manager")
 	}
 
 	return manager

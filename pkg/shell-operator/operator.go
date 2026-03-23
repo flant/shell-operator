@@ -487,7 +487,6 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 	})()
 
 	var res queue.TaskResult
-
 	hookLogLabels := map[string]string{}
 	hookLogLabels["hook"] = hookMeta.HookName
 	hookLogLabels["binding"] = ""
@@ -495,6 +494,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 	hookLogLabels["queue"] = "main"
 
 	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
+
 	taskLogEntry.Info("Enable kubernetes binding for hook")
 
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
