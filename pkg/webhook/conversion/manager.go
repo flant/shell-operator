@@ -2,6 +2,7 @@ package conversion
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -67,7 +68,7 @@ func (m *WebhookManager) Init() error {
 	// settings
 	caBundleBytes, err := os.ReadFile(m.Settings.CAPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("read CA bundle: %w", err)
 	}
 	m.Settings.CABundle = caBundleBytes
 
@@ -86,13 +87,13 @@ func (m *WebhookManager) Start() error {
 
 	err := m.Server.Start()
 	if err != nil {
-		return err
+		return fmt.Errorf("start webhook server: %w", err)
 	}
 
 	for _, clientCfg := range m.ClientConfigs {
 		err = clientCfg.Update(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("update CRD: %w", err)
 		}
 	}
 

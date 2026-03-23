@@ -61,18 +61,22 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	var convertReview v1.ConversionReview
 	err := json.NewDecoder(r.Body).Decode(&convertReview)
 	if err != nil {
-		logger.Error("failed to decode conversion request body", log.Err(err))
+		logger.Error("failed to decode ConversionReview body to json", log.Err(err))
+		_, _ = w.Write([]byte("invalid JSON payload"))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if convertReview.Request == nil {
-		logger.Error("conversion request is nil")
+		logger.Error("ConversionReview request is nil")
+		_, _ = w.Write([]byte("missing parameters: request"))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	logger = logger.With(slog.String("request", string(convertReview.Request.UID)))
+	logger = logger.With(
+		slog.String("request", string(convertReview.Request.UID)),
+		slog.String("kind", convertReview.Kind))
 
 	conversionResponse, err := h.handleReviewRequest(ctx, crdName, convertReview.Request)
 	if err != nil {
@@ -104,7 +108,7 @@ func (h *WebhookHandler) handleReviewRequest(ctx context.Context, crdName string
 
 	conversionResponse, err := h.Manager.EventHandlerFn(ctx, crdName, request)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("handle ConversionReview: %w", err)
 	}
 
 	if conversionResponse.FailedMessage != "" {

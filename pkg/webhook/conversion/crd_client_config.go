@@ -2,6 +2,7 @@ package conversion
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -39,7 +40,7 @@ tryToGetCRD:
 			goto tryToGetCRD
 		}
 
-		return err
+		return fmt.Errorf("get CRD: %w", err)
 	}
 
 	if crd.Spec.Conversion == nil {
@@ -63,7 +64,7 @@ tryToGetCRD:
 
 	_, err = client.ApiExt().CustomResourceDefinitions().Update(ctx, crd, pkg.DefaultUpdateOptions())
 	if err != nil {
-		return err
+		return fmt.Errorf("update CRD: %w", err)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package admission
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -104,7 +105,7 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 	}
 	list, err := client.List(context.TODO(), listOpts)
 	if err != nil {
-		return err
+		return fmt.Errorf("list ValidatingWebhookConfiguration: %w", err)
 	}
 	if len(list.Items) == 0 {
 		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
@@ -188,7 +189,7 @@ func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) 
 	}
 	list, err := client.List(context.TODO(), listOpts)
 	if err != nil {
-		return err
+		return fmt.Errorf("list MutatingWebhookConfiguration: %w", err)
 	}
 	if len(list.Items) == 0 {
 		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())

@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -78,7 +79,7 @@ func (m *WebhookManager) Init() error {
 	// settings
 	caBundleBytes, err := os.ReadFile(m.Settings.CAPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("read CA bundle: %w", err)
 	}
 	m.Settings.CABundle = caBundleBytes
 
@@ -137,20 +138,20 @@ func (m *WebhookManager) AddMutatingWebhook(config *MutatingWebhookConfig) {
 func (m *WebhookManager) Start() error {
 	err := m.Server.Start()
 	if err != nil {
-		return err
+		return fmt.Errorf("start webhook server: %w", err)
 	}
 
 	for _, r := range m.ValidatingResources {
 		err = r.Register()
 		if err != nil {
-			return err
+			return fmt.Errorf("register validating webhook: %w", err)
 		}
 	}
 
 	for _, r := range m.MutatingResources {
 		err = r.Register()
 		if err != nil {
-			return err
+			return fmt.Errorf("register mutating webhook: %w", err)
 		}
 	}
 

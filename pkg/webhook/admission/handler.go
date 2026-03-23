@@ -56,18 +56,25 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	var admissionReview v1.AdmissionReview
 	err := json.NewDecoder(r.Body).Decode(&admissionReview)
 	if err != nil {
-		h.Logger.Error("failed to decode admission request body", log.Err(err))
+		h.Logger.Error("failed to decode AdmissionReview body to json", log.Err(err))
+		_, _ = w.Write([]byte("invalid JSON payload"))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if admissionReview.Request == nil {
-		h.Logger.Error("admission request is nil")
+		h.Logger.Error("AdmissionReview request is nil")
+		_, _ = w.Write([]byte("missing parameters: request"))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	logger := h.Logger.With(slog.String("request", string(admissionReview.Request.UID)))
+	logger := h.Logger.With(
+		slog.String("request", string(admissionReview.Request.UID)),
+		slog.String("name", admissionReview.Request.Name),
+		slog.String("namespace", admissionReview.Request.Namespace),
+		slog.String("kind", admissionReview.Request.Kind.Kind),
+	)
 
 	admissionResponse, err := h.handleReviewRequest(ctx, r.URL.Path, admissionReview.Request)
 	if err != nil {
@@ -94,7 +101,11 @@ func (h *WebhookHandler) handleReviewRequest(ctx context.Context, path string, r
 	configurationID, webhookID := detectConfigurationAndWebhook(path)
 	h.Logger.Info("Got AdmissionReview request",
 		slog.String("configurationID", configurationID),
-		slog.String("webhookID", webhookID))
+		slog.String("webhookID", webhookID),
+		slog.String("kind", request.Kind.Kind),
+		slog.String("name", request.Name),
+		slog.String("namespace", request.Namespace),
+	)
 
 	if h.Handler == nil {
 		return nil, fmt.Errorf("AdmissionReview handler is not defined")
@@ -108,7 +119,7 @@ func (h *WebhookHandler) handleReviewRequest(ctx context.Context, path string, r
 
 	admissionResponse, err := h.Handler(ctx, event)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("handle AdmissionReview: %w", err)
 	}
 
 	response := &v1.AdmissionResponse{
