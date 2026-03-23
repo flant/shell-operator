@@ -35,22 +35,22 @@ func NewContextCombiner() *ContextCombiner {
 		metricsstorage.WithLogger(log.NewNop()),
 	)
 
-	taskQueues := queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
-	taskQueues.WithContext(context.Background())
-	taskQueues.NewNamedQueue(TestQueueName, nil,
-		queue.WithCompactableTypes(task_metadata.HookRun),
-	)
-
-	operator := shell_operator.NewShellOperator(
+	op := shell_operator.NewShellOperator(
 		context.Background(),
 		metricStorage,
 		metricStorage,
 		shell_operator.WithLogger(log.NewNop()),
 	)
 
+	op.TaskQueues = queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
+	op.TaskQueues.WithContext(context.Background())
+	op.TaskQueues.NewNamedQueue(TestQueueName, nil,
+		queue.WithCompactableTypes(task_metadata.HookRun),
+	)
+
 	return &ContextCombiner{
-		op: operator,
-		q:  operator.TaskQueues.GetByName(TestQueueName),
+		op: op,
+		q:  op.TaskQueues.GetByName(TestQueueName),
 	}
 }
 
