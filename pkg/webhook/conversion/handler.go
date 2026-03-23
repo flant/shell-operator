@@ -62,15 +62,15 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	err := json.NewDecoder(r.Body).Decode(&convertReview)
 	if err != nil {
 		logger.Error("failed to decode ConversionReview body to json", log.Err(err))
-		_, _ = w.Write([]byte("Invalid JSON payload"))
 		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("Invalid JSON payload"))
 		return
 	}
 
 	if convertReview.Request == nil {
 		logger.Error("ConversionReview request is nil")
-		_, _ = w.Write([]byte("Missing parameters: request"))
 		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("Missing parameters: request"))
 		return
 	}
 

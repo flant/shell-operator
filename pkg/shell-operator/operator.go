@@ -257,7 +257,8 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			"event.id": uuid.Must(uuid.NewV4()).String(),
 			"event":    string(eventBindingType),
 		}
-		logEntry := op.logger.With(
+		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
+		logEntry = logEntry.With(
 			slog.String("type", string(eventBindingType)),
 			slog.String("configurationId", event.ConfigurationId),
 			slog.String("webhookID", event.WebhookId))
@@ -437,7 +438,7 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 	}
 
 	return &conversion.Response{
-		FailedMessage: fmt.Sprintf("Conversion %s to %s was not successuful", crdName, request.DesiredAPIVersion),
+		FailedMessage: fmt.Sprintf("Conversion %s to %s was not successful", crdName, request.DesiredAPIVersion),
 	}, nil
 }
 
