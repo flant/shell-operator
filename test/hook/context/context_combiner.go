@@ -31,11 +31,18 @@ type ContextCombiner struct {
 }
 
 func NewContextCombiner() *ContextCombiner {
-	op := &shell_operator.ShellOperator{}
-	op.MetricStorage = metricsstorage.NewMetricStorage(
+	metricStorage := metricsstorage.NewMetricStorage(
 		metricsstorage.WithLogger(log.NewNop()),
 	)
-	op.TaskQueues = queue.NewTaskQueueSet().WithMetricStorage(op.MetricStorage)
+
+	op := shell_operator.NewShellOperator(
+		context.Background(),
+		metricStorage,
+		metricStorage,
+		shell_operator.WithLogger(log.NewNop()),
+	)
+
+	op.TaskQueues = queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
 	op.TaskQueues.WithContext(context.Background())
 	op.TaskQueues.NewNamedQueue(TestQueueName, nil,
 		queue.WithCompactableTypes(task_metadata.HookRun),

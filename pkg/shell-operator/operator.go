@@ -123,7 +123,7 @@ func NewShellOperator(ctx context.Context, metricsStorage, hookMetricStorage met
 
 // Start run the operator
 func (op *ShellOperator) Start() {
-	log.Info("start shell-operator")
+	op.logger.Info("start shell-operator")
 
 	op.APIServer.Start(op.ctx)
 
@@ -258,10 +258,11 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 			"event":    string(eventBindingType),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry.Debug("Handle event",
+		logEntry = logEntry.With(
 			slog.String("type", string(eventBindingType)),
 			slog.String("configurationId", event.ConfigurationId),
 			slog.String("webhookID", event.WebhookId))
+		logEntry.Debug("Handle event")
 
 		var admissionTask task.Task
 		op.HookManager.HandleAdmissionEvent(ctx, event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
@@ -282,10 +283,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 
 		// Assert exactly one task is created.
 		if admissionTask == nil {
-			logEntry.Error("Possible bug!!! No hook found for event",
-				slog.String("type", string(types.KubernetesValidating)),
-				slog.String("configurationId", event.ConfigurationId),
-				slog.String("webhookID", event.WebhookId))
+			logEntry.Error("Possible bug!!! No hook found for event")
 			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
 		}
 
@@ -440,7 +438,7 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 	}
 
 	return &conversion.Response{
-		FailedMessage: fmt.Sprintf("Conversion to %s was not successuful", request.DesiredAPIVersion),
+		FailedMessage: fmt.Sprintf("Conversion %s to %s was not successful", crdName, request.DesiredAPIVersion),
 	}, nil
 }
 
@@ -841,7 +839,7 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 	} else {
 		compactMsg = fmt.Sprintf("are combined to %d contexts", len(combinedContext))
 	}
-	log.Info("Binding contexts from tasks. Tasks are dropped from queue",
+	op.logger.Info("Binding contexts from tasks. Tasks are dropped from queue",
 		slog.Int("count", len(otherTasks)+1),
 		slog.String("tasks", compactMsg),
 		slog.Int("filteredCount", len(tasksFilter)-1),

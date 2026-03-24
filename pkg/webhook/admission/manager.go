@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -31,14 +32,34 @@ type WebhookManager struct {
 	ValidatingResources map[string]*ValidatingWebhookResource
 	MutatingResources   map[string]*MutatingWebhookResource
 	Handler             *WebhookHandler
+
+	Logger *log.Logger
 }
 
-func NewWebhookManager(kubeClient *klient.Client) *WebhookManager {
-	return &WebhookManager{
+type Option func(manager *WebhookManager)
+
+func WithLogger(logger *log.Logger) Option {
+	return func(manager *WebhookManager) {
+		manager.Logger = logger
+	}
+}
+
+func NewWebhookManager(kubeClient *klient.Client, opts ...Option) *WebhookManager {
+	manager := &WebhookManager{
 		ValidatingResources: make(map[string]*ValidatingWebhookResource),
 		MutatingResources:   make(map[string]*MutatingWebhookResource),
 		KubeClient:          kubeClient,
 	}
+
+	for _, opt := range opts {
+		opt(manager)
+	}
+
+	if manager.Logger == nil {
+		manager.Logger = log.NewLogger().Named("admission-webhook-manager")
+	}
+
+	return manager
 }
 
 func (m *WebhookManager) WithAdmissionEventHandler(handler EventHandlerFn) {
@@ -53,7 +74,7 @@ func (m *WebhookManager) WithAdmissionEventHandler(handler EventHandlerFn) {
 
 // Init creates dependencies
 func (m *WebhookManager) Init() error {
-	log.Info("Initialize admission webhooks manager. Load certificates.")
+	m.Logger.Info("Initialize admission webhooks manager. Load certificates.")
 
 	if m.DefaultConfigurationId == "" {
 		m.DefaultConfigurationId = DefaultConfigurationId
@@ -61,17 +82,13 @@ func (m *WebhookManager) Init() error {
 	// settings
 	caBundleBytes, err := os.ReadFile(m.Settings.CAPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("read CA bundle: %w", err)
 	}
 	m.Settings.CABundle = caBundleBytes
 
-	m.Handler = NewWebhookHandler()
+	m.Handler = NewWebhookHandler(m.Logger)
 
-	m.Server = &server.WebhookServer{
-		Settings:  &m.Settings.Settings,
-		Namespace: m.Namespace,
-		Router:    m.Handler.Router,
-	}
+	m.Server = server.NewWebhookServer(&m.Settings.Settings, m.Namespace, m.Handler.Router, m.Logger)
 
 	return nil
 }
@@ -91,6 +108,7 @@ func (m *WebhookManager) AddValidatingWebhook(config *ValidatingWebhookConfig) {
 				m.Settings.ServiceName,
 				m.Settings.CABundle,
 			},
+			m.Logger,
 		)
 		m.ValidatingResources[confId] = r
 	}
@@ -113,6 +131,7 @@ func (m *WebhookManager) AddMutatingWebhook(config *MutatingWebhookConfig) {
 				m.Settings.ServiceName,
 				m.Settings.CABundle,
 			},
+			m.Logger,
 		)
 		m.MutatingResources[confId] = r
 	}
@@ -122,20 +141,20 @@ func (m *WebhookManager) AddMutatingWebhook(config *MutatingWebhookConfig) {
 func (m *WebhookManager) Start() error {
 	err := m.Server.Start()
 	if err != nil {
-		return err
+		return fmt.Errorf("start webhook server: %w", err)
 	}
 
 	for _, r := range m.ValidatingResources {
 		err = r.Register()
 		if err != nil {
-			return err
+			return fmt.Errorf("register validating webhook: %w", err)
 		}
 	}
 
 	for _, r := range m.MutatingResources {
 		err = r.Register()
 		if err != nil {
-			return err
+			return fmt.Errorf("register mutating webhook: %w", err)
 		}
 	}
 

@@ -2,6 +2,7 @@ package conversion
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -35,33 +36,49 @@ type WebhookManager struct {
 	Server        *server.WebhookServer
 	ClientConfigs map[string]*CrdClientConfig
 	Handler       *WebhookHandler
+
+	Logger *log.Logger
 }
 
-func NewWebhookManager() *WebhookManager {
-	return &WebhookManager{
+type Option func(manager *WebhookManager)
+
+func WithLogger(logger *log.Logger) Option {
+	return func(manager *WebhookManager) {
+		manager.Logger = logger
+	}
+}
+
+func NewWebhookManager(opts ...Option) *WebhookManager {
+	manager := &WebhookManager{
 		ClientConfigs: make(map[string]*CrdClientConfig),
 	}
+
+	for _, opt := range opts {
+		opt(manager)
+	}
+
+	if manager.Logger == nil {
+		manager.Logger = log.NewLogger().Named("conversion-webhook-manager")
+	}
+
+	return manager
 }
 
 // Init creates dependencies
 func (m *WebhookManager) Init() error {
-	log.Info("Initialize conversion webhooks manager. Load certificates.")
+	m.Logger.Info("Initialize conversion webhooks manager. Load certificates.")
 
 	// settings
 	caBundleBytes, err := os.ReadFile(m.Settings.CAPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("read CA bundle: %w", err)
 	}
 	m.Settings.CABundle = caBundleBytes
 
-	m.Handler = NewWebhookHandler()
+	m.Handler = NewWebhookHandler(m.Logger)
 	m.Handler.Manager = m
 
-	m.Server = &server.WebhookServer{
-		Settings:  &m.Settings.Settings,
-		Namespace: m.Namespace,
-		Router:    m.Handler.Router,
-	}
+	m.Server = server.NewWebhookServer(&m.Settings.Settings, m.Namespace, m.Handler.Router, m.Logger)
 
 	return nil
 }
@@ -69,17 +86,17 @@ func (m *WebhookManager) Init() error {
 // Start webhook server and update spec.conversion in CRDs.
 func (m *WebhookManager) Start() error {
 	ctx := context.Background()
-	log.Info("Start conversion webhooks manager. Load certificates.")
+	m.Logger.Info("Start conversion webhooks manager. Load certificates.")
 
 	err := m.Server.Start()
 	if err != nil {
-		return err
+		return fmt.Errorf("start webhook server: %w", err)
 	}
 
 	for _, clientCfg := range m.ClientConfigs {
 		err = clientCfg.Update(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("update CRD: %w", err)
 		}
 	}
 
