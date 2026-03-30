@@ -1053,7 +1053,7 @@ func (q *TaskQueue) String() string {
 	qLen := q.Length()
 
 	q.IterateSnapshot(func(t task.Task) {
-		buf.WriteString(fmt.Sprintf("[%s,id=%10.10s]", t.GetDescription(), t.GetId()))
+		fmt.Fprintf(&buf, "[%s,id=%10.10s]", t.GetDescription(), t.GetId())
 		index++
 		if index == qLen {
 			return
