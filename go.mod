@@ -1,6 +1,6 @@
 module github.com/flant/shell-operator
 
-go 1.24.0
+go 1.25.8
 
 require (
 	github.com/deckhouse/deckhouse/pkg/log v0.2.0
@@ -37,7 +37,7 @@ require (
 replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v0.19.12-flant.0
 
 require (
-	github.com/deckhouse/module-sdk v0.10.2
+	github.com/deckhouse/module-sdk v0.10.4
 	github.com/gojuno/minimock/v3 v3.4.7
 	github.com/itchyny/gojq v0.12.17
 	github.com/muesli/termenv v0.16.0
