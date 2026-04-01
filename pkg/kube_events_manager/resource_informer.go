@@ -232,7 +232,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		}()
 
 		if err != nil {
-			return err
+			return fmt.Errorf("apply filter for '%s/%s': %w", ei.Monitor.Metadata.DebugName, obj.GetName(), err)
 		}
 
 		if !ei.Monitor.KeepFullObjectsInMemory {
