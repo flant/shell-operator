@@ -9,8 +9,10 @@ import (
 	"github.com/flant/shell-operator/pkg/filter"
 )
 
-var _ filter.Filter = (*Filter)(nil)
-var _ filter.CompiledFilter = (*CompiledJqFilter)(nil)
+var (
+	_ filter.Filter         = (*Filter)(nil)
+	_ filter.CompiledFilter = (*CompiledJqFilter)(nil)
+)
 
 func NewFilter() *Filter {
 	return &Filter{}
