@@ -56,8 +56,8 @@ type Manager struct {
 
 // ManagerConfig sets configuration for Manager
 type ManagerConfig struct {
-	WorkingDir string
-	TempDir    string
+	WorkingDir               string
+	TempDir                  string
 	KubeEventsManager        kubeeventsmanager.KubeEventsManager
 	ScheduleManager          schedulemanager.ScheduleManager
 	AdmissionWebhookManager  *admission.WebhookManager
