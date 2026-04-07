@@ -1,10 +1,14 @@
 package kubeeventsmanager
 
 import (
+	"fmt"
+
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/flant/shell-operator/pkg/filter"
+	"github.com/flant/shell-operator/pkg/filter/jq"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -25,10 +29,29 @@ type MonitorConfig struct {
 	LabelSelector           *metav1.LabelSelector
 	FieldSelector           *kemtypes.FieldSelector
 	JqFilter                string
+	CompiledJqFilter        filter.CompiledFilter
 	Logger                  *log.Logger
 	Mode                    kemtypes.KubeEventMode
 	KeepFullObjectsInMemory bool
 	FilterFunc              func(*unstructured.Unstructured) (interface{}, error)
+}
+
+// WithJqFilter sets the JQ filter expression and compiles it for reuse on every
+// event. Returns an error if the expression cannot be parsed or compiled.
+func (c *MonitorConfig) WithJqFilter(jqFilter string) error {
+	c.JqFilter = jqFilter
+	if jqFilter == "" {
+		c.CompiledJqFilter = nil
+		return nil
+	}
+
+	compiled, err := jq.Compile(jqFilter)
+	if err != nil {
+		return fmt.Errorf("compile jqFilter: %w", err)
+	}
+
+	c.CompiledJqFilter = compiled
+	return nil
 }
 
 func (c *MonitorConfig) WithEventTypes(types []kemtypes.WatchEventType) *MonitorConfig {
