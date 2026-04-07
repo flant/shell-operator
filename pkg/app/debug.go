@@ -10,9 +10,7 @@ var DebugUnixSocket = "/var/run/shell-operator/debug.socket"
 
 var DebugHttpServerAddr = ""
 
-var (
-	DebugKeepTmpFiles = false
-)
+var DebugKeepTmpFiles = false
 
 var DebugKubernetesAPI = false
 

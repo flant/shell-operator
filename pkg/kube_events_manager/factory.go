@@ -19,9 +19,7 @@ const (
 	FactoryShutdownTimeout = 30 * time.Second
 )
 
-var (
-	DefaultSyncTime = 100 * time.Millisecond
-)
+var DefaultSyncTime = 100 * time.Millisecond
 
 type FactoryIndex struct {
 	GVR           schema.GroupVersionResource
