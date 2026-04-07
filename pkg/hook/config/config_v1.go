@@ -129,7 +129,9 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) error {
 		monitor.WithFieldSelector((*kemtypes.FieldSelector)(kubeCfg.FieldSelector))
 		monitor.WithNamespaceSelector((*kemtypes.NamespaceSelector)(kubeCfg.Namespace))
 		monitor.WithLabelSelector(kubeCfg.LabelSelector)
-		monitor.JqFilter = kubeCfg.JqFilter
+		if err := monitor.WithJqFilter(kubeCfg.JqFilter); err != nil {
+			return fmt.Errorf("invalid kubernetes config [%d] jqFilter: %w", i, err)
+		}
 		// executeHookOnEvent is a priority
 		if kubeCfg.ExecuteHookOnEvents != nil {
 			monitor.WithEventTypes(kubeCfg.ExecuteHookOnEvents)

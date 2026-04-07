@@ -107,7 +107,9 @@ func (cv0 *HookConfigV0) ConvertAndCheck(c *HookConfig) error {
 			})
 		}
 		monitor.WithLabelSelector(kubeCfg.Selector)
-		monitor.JqFilter = kubeCfg.JqFilter
+		if err := monitor.WithJqFilter(kubeCfg.JqFilter); err != nil {
+			return fmt.Errorf("kubernetes config [%s] jqFilter: %w", kubeCfg.Name, err)
+		}
 
 		kubeConfig := htypes.OnKubernetesEventConfig{}
 		kubeConfig.Monitor = monitor

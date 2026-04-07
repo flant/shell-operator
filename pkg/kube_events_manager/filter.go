@@ -15,16 +15,18 @@ import (
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
 )
 
-// applyFilter filters object json representation with jq expression, calculate checksum
-// over result and return ObjectAndFilterResult. If jqFilter is empty, no filter
-// is required and checksum is calculated over full json representation of the object.
-func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
+// applyFilter filters object json representation with a pre-compiled jq expression,
+// calculates checksum over the result and returns ObjectAndFilterResult.
+// If compiledFilter is nil, no jq filtering is applied and checksum is calculated
+// over full json representation of the object.
+// jqFilterStr is stored in result metadata for informational purposes only.
+func applyFilter(compiledFilter filter.CompiledFilter, jqFilterStr string, filterFn func(obj *unstructured.Unstructured) (result interface{}, err error), obj *unstructured.Unstructured) (*kemtypes.ObjectAndFilterResult, error) {
 	defer trace.StartRegion(context.Background(), "ApplyJqFilter").End()
 
 	res := &kemtypes.ObjectAndFilterResult{
 		Object: obj,
 	}
-	res.Metadata.JqFilter = jqFilter
+	res.Metadata.JqFilter = jqFilterStr
 	res.Metadata.ResourceId = resourceId(obj)
 
 	// If filterFn is passed, run it and return result.
@@ -46,16 +48,14 @@ func applyFilter(jqFilter string, fl filter.Filter, filterFn func(obj *unstructu
 	}
 
 	// Render obj to JSON text to apply jq filter.
-	if jqFilter == "" {
+	if compiledFilter == nil {
 		data, err := json.Marshal(obj)
 		if err != nil {
 			return nil, err
 		}
 		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))
 	} else {
-		var err error
-		var filtered []byte
-		filtered, err = fl.ApplyFilter(jqFilter, obj.UnstructuredContent())
+		filtered, err := compiledFilter.Apply(obj.UnstructuredContent())
 		if err != nil {
 			return nil, fmt.Errorf("jqFilter: %v", err)
 		}
