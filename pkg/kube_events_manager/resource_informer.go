@@ -59,6 +59,8 @@ type resourceInformer struct {
 
 	metricStorage metricsstorage.Storage
 
+	factoryStore *FactoryStore
+
 	// a flag to stop handle events after Stop()
 	stopped bool
 
@@ -67,10 +69,11 @@ type resourceInformer struct {
 
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
-	client  *klient.Client
-	mstor   metricsstorage.Storage
-	eventCb func(kemtypes.KubeEvent)
-	monitor *MonitorConfig
+	client       *klient.Client
+	mstor        metricsstorage.Storage
+	factoryStore *FactoryStore
+	eventCb      func(kemtypes.KubeEvent)
+	monitor      *MonitorConfig
 
 	logger *log.Logger
 }
@@ -80,6 +83,7 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		id:                     uuid.Must(uuid.NewV4()).String(),
 		KubeClient:             cfg.client,
 		metricStorage:          cfg.mstor,
+		factoryStore:           cfg.factoryStore,
 		Namespace:              ns,
 		Name:                   name,
 		eventCb:                cfg.eventCb,
@@ -452,13 +456,13 @@ func (ei *resourceInformer) start() {
 	go func() {
 		if ei.ctx != nil {
 			<-ei.ctx.Done()
-			DefaultFactoryStore.Stop(ei.id, ei.FactoryIndex)
+			ei.factoryStore.Stop(ei.id, ei.FactoryIndex)
 		}
 	}()
 
 	// TODO: separate handler and informer
 	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage, ei.logger.Named("watch-error-handler"))
-	err := DefaultFactoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
+	err := ei.factoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
 		ei.Monitor.Logger.Error("cache is not synced for informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
 		return
@@ -469,7 +473,7 @@ func (ei *resourceInformer) start() {
 
 // wait blocks until the underlying shared informer for this FactoryIndex is stopped
 func (ei *resourceInformer) wait() {
-	DefaultFactoryStore.WaitStopped(ei.FactoryIndex)
+	ei.factoryStore.WaitStopped(ei.FactoryIndex)
 }
 
 // CachedObjectsInfo returns info accumulated from start.

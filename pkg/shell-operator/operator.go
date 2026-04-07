@@ -445,7 +445,12 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 // taskHandler
 func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.TaskResult {
 	logEntry := op.logger.With("operator.component", "taskRunner")
-	hookMeta := task_metadata.HookMetadataAccessor(t)
+	hookMeta, ok := task_metadata.HookMetadataAccessor(t)
+	if !ok {
+		logEntry.Error("Possible Bug! cannot access hook metadata for task",
+			slog.String("type", string(t.GetType())))
+		return queue.TaskResult{Status: "Fail"}
+	}
 	var res queue.TaskResult
 
 	switch t.GetType() {
@@ -478,7 +483,12 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleEnableKubernetesBindings")
 	defer span.End()
 
-	hookMeta := task_metadata.HookMetadataAccessor(t)
+	hookMeta, ok := task_metadata.HookMetadataAccessor(t)
+	if !ok {
+		op.logger.Error("Possible Bug! cannot access hook metadata",
+			slog.String("type", string(t.GetType())))
+		return queue.TaskResult{Status: "Fail"}
+	}
 
 	metricLabels := map[string]string{
 		"hook": hookMeta.HookName,
@@ -554,7 +564,12 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleHookRun")
 	defer span.End()
 
-	hookMeta := task_metadata.HookMetadataAccessor(t)
+	hookMeta, ok := task_metadata.HookMetadataAccessor(t)
+	if !ok {
+		op.logger.Error("Possible Bug! cannot access hook metadata",
+			slog.String("type", string(t.GetType())))
+		return queue.TaskResult{Status: "Fail"}
+	}
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
 	err := taskHook.RateLimitWait(context.Background())

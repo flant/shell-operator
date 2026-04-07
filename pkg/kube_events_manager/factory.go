@@ -20,13 +20,8 @@ const (
 )
 
 var (
-	DefaultFactoryStore *FactoryStore
-	DefaultSyncTime     = 100 * time.Millisecond
+	DefaultSyncTime = 100 * time.Millisecond
 )
-
-func init() {
-	DefaultFactoryStore = NewFactoryStore()
-}
 
 type FactoryIndex struct {
 	GVR           schema.GroupVersionResource

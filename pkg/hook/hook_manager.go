@@ -14,7 +14,6 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
@@ -36,6 +35,11 @@ type Manager struct {
 	conversionWebhookManager *conversion.WebhookManager
 	admissionWebhookManager  *admission.WebhookManager
 
+	// hook execution options
+	keepTemporaryHookFiles bool
+	logProxyHookJSON       bool
+	logProxyHookJSONKey    string
+
 	// sorted hook names
 	hookNamesInOrder []string
 
@@ -54,10 +58,14 @@ type Manager struct {
 type ManagerConfig struct {
 	WorkingDir string
 	TempDir    string
-	Kmgr       kubeeventsmanager.KubeEventsManager
-	Smgr       schedulemanager.ScheduleManager
-	Wmgr       *admission.WebhookManager
-	Cmgr       *conversion.WebhookManager
+	KubeEventsManager        kubeeventsmanager.KubeEventsManager
+	ScheduleManager          schedulemanager.ScheduleManager
+	AdmissionWebhookManager  *admission.WebhookManager
+	ConversionWebhookManager *conversion.WebhookManager
+
+	KeepTemporaryHookFiles bool
+	LogProxyHookJSON       bool
+	LogProxyHookJSONKey    string
 
 	Logger *log.Logger
 }
@@ -71,10 +79,14 @@ func NewHookManager(config *ManagerConfig) *Manager {
 
 		workingDir:               config.WorkingDir,
 		tempDir:                  config.TempDir,
-		kubeEventsManager:        config.Kmgr,
-		scheduleManager:          config.Smgr,
-		admissionWebhookManager:  config.Wmgr,
-		conversionWebhookManager: config.Cmgr,
+		kubeEventsManager:        config.KubeEventsManager,
+		scheduleManager:          config.ScheduleManager,
+		admissionWebhookManager:  config.AdmissionWebhookManager,
+		conversionWebhookManager: config.ConversionWebhookManager,
+
+		keepTemporaryHookFiles: config.KeepTemporaryHookFiles,
+		logProxyHookJSON:       config.LogProxyHookJSON,
+		logProxyHookJSONKey:    config.LogProxyHookJSONKey,
 
 		logger: config.Logger,
 	}
@@ -140,7 +152,7 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 		return nil, err
 	}
 
-	hook := NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
+	hook := NewHook(hookName, hookPath, hm.keepTemporaryHookFiles, hm.logProxyHookJSON, hm.logProxyHookJSONKey, hm.logger.Named("hook"))
 	hookEntry := hm.logger.With(slog.String("hook", hook.Name), slog.String("phase", "config"))
 	hookEntry.Info("Load config", slog.String("path", hookPath))
 
@@ -222,8 +234,8 @@ func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint str
 		entrypoint,
 		args,
 		envs).
-		WithLogProxyHookJSON(app.LogProxyHookJSON).
-		WithLogProxyHookJSONKey(app.ProxyJsonLogKey).
+		WithLogProxyHookJSON(hm.logProxyHookJSON).
+		WithLogProxyHookJSONKey(hm.logProxyHookJSONKey).
 		WithCMDStdout(nil).
 		WithCMDStderr(nil).
 		WithLogger(hm.logger.Named("executor"))

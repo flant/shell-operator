@@ -58,7 +58,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	metricStorage.GaugeSetMock.When(metrics.KubeSnapshotObjects, 2, map[string]string(nil)).Then()
 	metricStorage.GaugeSetMock.When(metrics.KubeSnapshotObjects, 3, map[string]string(nil)).Then()
 
-	mon := NewMonitor(context.Background(), fc.Client, metricStorage, monitorCfg, func(ev kemtypes.KubeEvent) {
+	mon := NewMonitor(context.Background(), fc.Client, metricStorage, NewFactoryStore(), monitorCfg, func(ev kemtypes.KubeEvent) {
 		objsMutex.Lock()
 		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
 		objsMutex.Unlock()

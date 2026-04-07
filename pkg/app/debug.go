@@ -11,8 +11,7 @@ var DebugUnixSocket = "/var/run/shell-operator/debug.socket"
 var DebugHttpServerAddr = ""
 
 var (
-	DebugKeepTmpFilesVar = "no"
-	DebugKeepTmpFiles    = false
+	DebugKeepTmpFiles = false
 )
 
 var DebugKubernetesAPI = false
@@ -27,11 +26,11 @@ func DefineDebugFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause) {
 		Default(DebugHttpServerAddr).
 		StringVar(&DebugHttpServerAddr)
 
-	cmd.Flag("debug-keep-tmp-files", "set to yes to disable cleanup of temporary files").
+	cmd.Flag("debug-keep-tmp-files", "set to true to disable cleanup of temporary files").
 		Envar("DEBUG_KEEP_TMP_FILES").
 		Hidden().
-		Default(DebugKeepTmpFilesVar).
-		StringVar(&DebugKeepTmpFilesVar)
+		Default("false").
+		BoolVar(&DebugKeepTmpFiles)
 
 	cmd.Flag("debug-kubernetes-api", "enable client-go debug messages").
 		Envar("DEBUG_KUBERNETES_API").

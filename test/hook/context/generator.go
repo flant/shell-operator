@@ -11,7 +11,6 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/kube-client/fake"
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/hook"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
@@ -69,8 +68,6 @@ func NewBindingContextController(config string, logger *log.Logger, version ...f
 	b.KubeEventsManager.WithMetricStorage(metricsstorage.NewMetricStorage(
 		metricsstorage.WithLogger(log.NewNop()),
 	))
-	// Re-create factory to drop informers created using different b.fakeCluster.Client.
-	kubeeventsmanager.DefaultFactoryStore.Reset()
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager(ctx, b.logger.Named("schedule-manager"))
 
@@ -107,7 +104,7 @@ func (b *BindingContextController) Run(initialState string) (GeneratedBindingCon
 	}
 
 	if b.Hook == nil {
-		testHook := hook.NewHook("test", "test", app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, b.logger.Named("hook"))
+		testHook := hook.NewHook("test", "test", false, false, "", b.logger.Named("hook"))
 		testHook, err = testHook.LoadConfig([]byte(b.HookConfig))
 		if err != nil {
 			return GeneratedBindingContexts{}, fmt.Errorf("couldn't load or validate hook configuration: %v", err)

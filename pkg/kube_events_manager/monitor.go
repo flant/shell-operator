@@ -38,6 +38,8 @@ type monitor struct {
 	// map of dynamically starting informers
 	VaryingInformers varyingInformers
 
+	factoryStore *FactoryStore
+
 	eventCb       func(kemtypes.KubeEvent)
 	eventsEnabled bool
 	// Index of namespaces statically defined in monitor configuration
@@ -131,7 +133,7 @@ func (c *cancelForNs) Delete(key string) {
 
 var _ Monitor = (*monitor)(nil)
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor metricsstorage.Storage, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
+func NewMonitor(ctx context.Context, client *klient.Client, mstor metricsstorage.Storage, factoryStore *FactoryStore, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{
@@ -139,6 +141,7 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor metricsstorage
 		cancel:            cancel,
 		KubeClient:        client,
 		metricStorage:     mstor,
+		factoryStore:      factoryStore,
 		Config:            config,
 		eventCb:           eventCb,
 		ResourceInformers: make([]*resourceInformer, 0),
@@ -315,11 +318,12 @@ func (m *monitor) EnableKubeEventCb() {
 func (m *monitor) CreateInformersForNamespace(namespace string) ([]*resourceInformer, error) {
 	informers := make([]*resourceInformer, 0)
 	cfg := &resourceInformerConfig{
-		client:  m.KubeClient,
-		mstor:   m.metricStorage,
-		eventCb: m.eventCb,
-		monitor: m.Config,
-		logger:  m.logger.Named("resource-informer"),
+		client:       m.KubeClient,
+		mstor:        m.metricStorage,
+		factoryStore: m.factoryStore,
+		eventCb:      m.eventCb,
+		monitor:      m.Config,
+		logger:       m.logger.Named("resource-informer"),
 	}
 
 	objNames := []string{""}

@@ -416,3 +416,24 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
+
+// TestNewKubeEventsManager_IsolatedFactoryStore verifies that each KubeEventsManager
+// instance owns its own FactoryStore so parallel tests do not share informer state.
+func TestNewKubeEventsManager_IsolatedFactoryStore(t *testing.T) {
+	ctx := context.Background()
+	kubeClient := klient.NewFake(nil)
+
+	mgr1 := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
+	mgr2 := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
+
+	// Each manager must have a non-nil, distinct factory store.
+	if mgr1.factoryStore == nil {
+		t.Fatal("mgr1.factoryStore must not be nil")
+	}
+	if mgr2.factoryStore == nil {
+		t.Fatal("mgr2.factoryStore must not be nil")
+	}
+	if mgr1.factoryStore == mgr2.factoryStore {
+		t.Fatal("mgr1 and mgr2 must not share the same factoryStore")
+	}
+}
