@@ -23,7 +23,7 @@ import (
 
 // Init initialize logging, ensures directories and creates
 // a ShellOperator instance with all dependencies.
-func Init(logger *log.Logger) (*ShellOperator, error) {
+func Init(ctx context.Context, logger *log.Logger) (*ShellOperator, error) {
 	// Update webhook settings from parsed flags
 	// TODO: change this method to something else
 	admission.InitFromFlags(
@@ -58,13 +58,13 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 
 	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "hooks directory is required", log.Err(err))
+		logger.Log(ctx, log.LevelFatal.Level(), "hooks directory is required", log.Err(err))
 		return nil, err
 	}
 
 	tempDir, err := utils.EnsureTempDirectory(app.TempDir)
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "temp directory", log.Err(err))
+		logger.Log(ctx, log.LevelFatal.Level(), "temp directory", log.Err(err))
 		return nil, err
 	}
 
@@ -77,12 +77,12 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		metricsstorage.WithLogger(logger.Named("hook-metric-storage")),
 	)
 
-	op := NewShellOperator(context.TODO(), ms, hms, WithLogger(logger))
+	op := NewShellOperator(ctx, ms, hms, WithLogger(logger))
 
 	// Debug server.
 	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "start Debug server", log.Err(err))
+		logger.Log(ctx, log.LevelFatal.Level(), "start Debug server", log.Err(err))
 		return nil, err
 	}
 
@@ -92,13 +92,13 @@ func Init(logger *log.Logger) (*ShellOperator, error) {
 		"queue",
 	})
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble common operator", log.Err(err))
+		logger.Log(ctx, log.LevelFatal.Level(), "essemble common operator", log.Err(err))
 		return nil, err
 	}
 
 	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
 	if err != nil {
-		logger.Log(context.TODO(), log.LevelFatal.Level(), "essemble shell operator", log.Err(err))
+		logger.Log(ctx, log.LevelFatal.Level(), "essemble shell operator", log.Err(err))
 		return nil, err
 	}
 

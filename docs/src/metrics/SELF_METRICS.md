@@ -20,9 +20,7 @@
 
 * `shell_operator_kube_snapshot_objects{hook="", binding="", queue=""}` — a gauge with count of cached objects (the snapshot) for particular binding.
 
-* `shell_operator_kubernetes_client_request_result_total` — a counter of requests made by kubernetes/client-go library.
-
-* `shell_operator_kubernetes_client_request_latency_seconds` — a histogram with latency of requests made by kubernetes/client-go library. 
+* `shell_operator_kubernetes_client_watch_errors_total{error_type=""}` — a counter of watch errors from the Kubernetes client.
 
 * `shell_operator_tasks_queue_action_duration_seconds{queue_name="", queue_action=""}` — a histogram with measurements of low level queue operations. Use QUEUE_ACTIONS_METRICS="no" to disable this metric.
 

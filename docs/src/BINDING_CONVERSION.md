@@ -21,7 +21,7 @@ kubernetesCustomResourceConversion:
   # A CRD name.
   crdName: crontabs.stable.example.com
   # An array of conversions supported by this hook.
-  conversion:
+  conversions:
   - fromVersion: stable.example.com/v1alpha1
     toVersion: stable.example.com/v1alpha2
 ```

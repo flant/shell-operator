@@ -35,7 +35,7 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 		metrics.InitMetrics(app.PrometheusMetricsPrefix)
 
 		// Init logging and initialize a ShellOperator instance.
-		operator, err := shell_operator.Init(logger.Named("shell-operator"))
+		operator, err := shell_operator.Init(ctx, logger.Named("shell-operator"))
 		if err != nil {
 			return fmt.Errorf("init failed: %w", err)
 		}

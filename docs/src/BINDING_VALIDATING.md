@@ -104,7 +104,7 @@ See example [204-validating-webhook](./examples/204-validating-webhook).
 
 > Note that the `group` parameter is only for including snapshots. `kubernetesValidating` hook is never executed on `schedule` or `kubernetes` events with binding context with `"type":"Group"`.
 
-The hook receives a binding context and should return response in `$VALIDATING_RESPONSE_PATH`.
+The hook receives a binding context and should return response in `$VALIDATING_RESPONSE_PATH` (also available as `$ADMISSION_RESPONSE_PATH`).
 
 $BINDING_CONTEXT_PATH file example:
 
@@ -242,8 +242,17 @@ Command line options:
                                  A path to a ca certificate for ValidatingWebhookConfiguration. Can be set
                                  with $VALIDATING_WEBHOOK_CA.
   --validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
-                                 A path to a server certificate for ValidatingWebhookConfiguration. Can be
-                                 set with $VALIDATING_WEBHOOK_CLIENT_CA.
+                                 A path to a client CA certificate for ValidatingWebhookConfiguration (can
+                                 be set multiple times). Can be set with $VALIDATING_WEBHOOK_CLIENT_CA.
+  --validating-webhook-failure-policy="Fail"
+                                 Default failure policy for ValidatingWebhookConfiguration (Fail or
+                                 Ignore). Can be set with $VALIDATING_WEBHOOK_FAILURE_POLICY.
+  --validating-webhook-listen-port="9680"
+                                 Port for the validating webhook HTTPS server. Can be set with
+                                 $VALIDATING_WEBHOOK_LISTEN_PORT.
+  --validating-webhook-listen-address="0.0.0.0"
+                                 Address for the validating webhook HTTPS server. Can be set with
+                                 $VALIDATING_WEBHOOK_LISTEN_ADDRESS.
 ```
 
 [admission-request]: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#request

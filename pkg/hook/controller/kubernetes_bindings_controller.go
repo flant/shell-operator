@@ -25,7 +25,7 @@ type KubernetesBindingToMonitorLink struct {
 // KubernetesBindingsController handles kubernetes bindings for one hook.
 type KubernetesBindingsController interface {
 	WithKubernetesBindings([]htypes.OnKubernetesEventConfig)
-	WithKubeEventsManager(kubeeventsmanager.KubeEventsManager)
+	WithKubeEventsManager(kubeeventsmanager.KubeEventsSource)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
 	UpdateMonitor(monitorId string, kind, apiVersion string) error
 	UnlockEvents()
@@ -48,7 +48,7 @@ type kubernetesBindingsController struct {
 	KubernetesBindings []htypes.OnKubernetesEventConfig
 
 	// dependencies
-	kubeEventsManager kubeeventsmanager.KubeEventsManager
+	kubeEventsManager kubeeventsmanager.KubeEventsSource
 
 	logger *log.Logger
 
@@ -72,7 +72,7 @@ func (c *kubernetesBindingsController) WithKubernetesBindings(bindings []htypes.
 	c.KubernetesBindings = bindings
 }
 
-func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager kubeeventsmanager.KubeEventsManager) {
+func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager kubeeventsmanager.KubeEventsSource) {
 	c.kubeEventsManager = kubeEventsManager
 }
 
