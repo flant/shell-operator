@@ -29,10 +29,6 @@ const (
 	serviceName = "hook"
 )
 
-type CommonHook interface {
-	Name() string
-}
-
 type Result struct {
 	Usage                *executor.CmdUsage
 	Metrics              []operation.MetricOperation

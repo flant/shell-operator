@@ -24,7 +24,6 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/otel"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
@@ -76,10 +75,14 @@ type ShellOperator struct {
 
 	ManagerEventsHandler *ManagerEventsHandler
 
-	HookManager *hook.Manager
+	HookManager hook.HookManager
 
 	AdmissionWebhookManager  *admission.WebhookManager
 	ConversionWebhookManager *conversion.WebhookManager
+
+	// taskHandlerRegistry maps task types to their executor functions.
+	// Extenders (addon-operator) may register additional task types.
+	taskHandlerRegistry *TaskHandlerRegistry
 }
 
 type Option func(operator *ShellOperator)
@@ -223,49 +226,9 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 		h.HookController.EnableAdmissionBindings()
 	}
 
-	// Define handler for AdmissionEvent
-	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(ctx context.Context, event admission.Event) (*admission.Response, error) {
-		eventBindingType := op.HookManager.DetectAdmissionEventType(event)
-		logLabels := map[string]string{
-			pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
-			pkg.LogKeyEvent:   string(eventBindingType),
-		}
-		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry = logEntry.With(
-			slog.String(pkg.LogKeyType, string(eventBindingType)),
-			slog.String(pkg.LogKeyConfigurationId, event.ConfigurationId),
-			slog.String(pkg.LogKeyWebhookID, event.WebhookId))
-		logEntry.Debug("Handle event")
-
-		var admissionTask task.Task
-		op.HookManager.HandleAdmissionEvent(ctx, event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-			admissionTask = globalHookTaskFactory.NewHookRunTask(hook.Name, eventBindingType, info, logLabels)
-		})
-
-		// Assert exactly one task is created.
-		if admissionTask == nil {
-			logEntry.Error("Possible bug!!! No hook found for event")
-			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
-		}
-
-		res := op.taskHandler(ctx, admissionTask)
-
-		if res.Status == "Fail" {
-			return &admission.Response{
-				Allowed: false,
-				Message: "Hook failed",
-			}, nil
-		}
-
-		admissionProp := admissionTask.GetProp("admissionResponse")
-		admissionResponse, ok := admissionProp.(*admission.Response)
-		if !ok {
-			logEntry.Error("'admissionResponse' task prop is not of type *AdmissionResponse",
-				slog.String(pkg.LogKeyType, fmt.Sprintf("%T", admissionProp)))
-			return nil, fmt.Errorf("hook task prop error")
-		}
-		return admissionResponse, nil
-	})
+	// Define handler for AdmissionEvent using the dedicated handler type.
+	admissionHandler := NewAdmissionEventHandler(op.HookManager, op.taskHandler, op.logger)
+	op.AdmissionWebhookManager.WithAdmissionEventHandler(admissionHandler.Handle)
 
 	if err := op.AdmissionWebhookManager.Start(); err != nil {
 		return fmt.Errorf("ValidatingWebhookManager start: %w", err)
@@ -286,8 +249,9 @@ func (op *ShellOperator) initConversionWebhookManager() error {
 		return nil
 	}
 
-	// This handler is called when Kubernetes requests a conversion.
-	op.ConversionWebhookManager.EventHandlerFn = op.conversionEventHandler
+	// Assign the dedicated handler type instead of an inlined method.
+	conversionHandler := NewConversionEventHandler(op.HookManager, op.taskHandler, op.logger)
+	op.ConversionWebhookManager.EventHandlerFn = conversionHandler.Handle
 
 	err := op.ConversionWebhookManager.Init()
 	if err != nil {
@@ -306,125 +270,60 @@ func (op *ShellOperator) initConversionWebhookManager() error {
 	return nil
 }
 
-// conversionEventHandler is called when Kubernetes requests a conversion.
-func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName string, request *v1.ConversionRequest) (*conversion.Response, error) {
-	logLabels := map[string]string{
-		pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
-		pkg.LogKeyBinding: string(types.KubernetesConversion),
-	}
-	logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-
-	sourceVersions := conversion.ExtractAPIVersions(request.Objects)
-	logEntry.Info("Handle kubernetesCustomResourceConversion event for crd",
-		slog.String(pkg.LogKeyName, crdName),
-		slog.Int(pkg.LogKeyLen, len(request.Objects)),
-		slog.Any(pkg.LogKeyVersions, sourceVersions))
-
-	done := false
-	for _, srcVer := range sourceVersions {
-		rule := conversion.Rule{
-			FromVersion: srcVer,
-			ToVersion:   request.DesiredAPIVersion,
-		}
-		convPath := op.HookManager.FindConversionChain(crdName, rule)
-		if len(convPath) == 0 {
-			continue
-		}
-		logEntry.Info("Find conversion path for rule",
-			slog.String(pkg.LogKeyName, rule.String()),
-			slog.Any(pkg.LogKeyValue, convPath))
-
-		for _, convRule := range convPath {
-			var convTask task.Task
-			op.HookManager.HandleConversionEvent(ctx, crdName, request, convRule, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-				convTask = globalHookTaskFactory.NewHookRunTask(hook.Name, types.KubernetesConversion, info, logLabels)
-			})
-
-			if convTask == nil {
-				return nil, fmt.Errorf("no hook found for '%s' event for crd/%s", string(types.KubernetesConversion), crdName)
-			}
-
-			res := op.taskHandler(ctx, convTask)
-
-			if res.Status == "Fail" {
-				return &conversion.Response{
-					FailedMessage:    fmt.Sprintf("Hook failed to convert to %s", request.DesiredAPIVersion),
-					ConvertedObjects: nil,
-				}, nil
-			}
-
-			prop := convTask.GetProp("conversionResponse")
-			response, ok := prop.(*conversion.Response)
-			if !ok {
-				logEntry.Error("'conversionResponse' task prop is not of type *conversion.Response",
-					slog.String(pkg.LogKeyType, fmt.Sprintf("%T", prop)))
-				return nil, fmt.Errorf("hook task prop error")
-			}
-
-			// Set response objects as new objects for a next round.
-			request.Objects = response.ConvertedObjects
-
-			// Stop iterating if hook has converted all objects to a desiredAPIVersions.
-			newSourceVersions := conversion.ExtractAPIVersions(request.Objects)
-			// logEntry.Infof("Hook return conversion response: failMsg=%s, %d convertedObjects, versions:%v, desired: %s", response.FailedMessage, len(response.ConvertedObjects), newSourceVersions, event.Review.Request.DesiredAPIVersion)
-
-			if len(newSourceVersions) == 1 && newSourceVersions[0] == request.DesiredAPIVersion {
-				// success
-				done = true
-				break
-			}
-		}
-
-		if done {
-			break
-		}
-	}
-
-	if done {
-		return &conversion.Response{
-			ConvertedObjects: request.Objects,
-		}, nil
-	}
-
-	return &conversion.Response{
-		FailedMessage: fmt.Sprintf("Conversion %s to %s was not successful", crdName, request.DesiredAPIVersion),
-	}, nil
-}
-
-// taskHandler
+// taskHandler dispatches a task to the registered handler in taskHandlerRegistry.
+// It ensures hook metadata can be accessed before dispatching.
 func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.TaskResult {
 	logEntry := op.logger.With(pkg.LogKeyOperatorComponent, "taskRunner")
-	hookMeta, ok := task_metadata.HookMetadataAccessor(t)
+
+	_, ok := task_metadata.HookMetadataAccessor(t)
 	if !ok {
 		logEntry.Error("Possible Bug! cannot access hook metadata for task",
 			slog.String(pkg.LogKeyType, string(t.GetType())))
-		return queue.TaskResult{Status: "Fail"}
-	}
-	var res queue.TaskResult
-
-	switch t.GetType() {
-	case task_metadata.HookRun:
-		res = op.taskHandleHookRun(ctx, t)
-
-	case task_metadata.EnableKubernetesBindings:
-		res = op.taskHandleEnableKubernetesBindings(ctx, t)
-
-	case task_metadata.EnableScheduleBindings:
-		hookLogLabels := map[string]string{}
-		hookLogLabels[pkg.LogKeyHook] = hookMeta.HookName
-		hookLogLabels[pkg.LogKeyBinding] = string(types.Schedule)
-		hookLogLabels[pkg.LogKeyTask] = "EnableScheduleBindings"
-		hookLogLabels[pkg.LogKeyQueue] = "main"
-
-		taskLogEntry := utils.EnrichLoggerWithLabels(logEntry, hookLogLabels)
-
-		taskHook := op.HookManager.GetHook(hookMeta.HookName)
-		taskHook.HookController.EnableScheduleBindings()
-		taskLogEntry.Info("Schedule binding for hook enabled successfully")
-		res.Status = "Success"
+		return queue.TaskResult{Status: queue.Fail}
 	}
 
+	res, handled := op.taskHandlerRegistry.Handle(ctx, t)
+	if !handled {
+		logEntry.Error("Possible Bug! no handler registered for task type",
+			slog.String(pkg.LogKeyType, string(t.GetType())))
+		return queue.TaskResult{Status: queue.Fail}
+	}
 	return res
+}
+
+// taskHandleEnableScheduleBindings enables schedule bindings for the hook referenced by the task.
+func (op *ShellOperator) taskHandleEnableScheduleBindings(_ context.Context, t task.Task) queue.TaskResult {
+	logEntry := op.logger.With(pkg.LogKeyOperatorComponent, "taskRunner")
+	hookMeta, ok := task_metadata.HookMetadataAccessor(t)
+	if !ok {
+		logEntry.Error("Possible Bug! cannot access hook metadata",
+			slog.String(pkg.LogKeyType, string(t.GetType())))
+		return queue.TaskResult{Status: queue.Fail}
+	}
+
+	hookLogLabels := map[string]string{
+		pkg.LogKeyHook:    hookMeta.HookName,
+		pkg.LogKeyBinding: string(types.Schedule),
+		pkg.LogKeyTask:    "EnableScheduleBindings",
+		pkg.LogKeyQueue:   "main",
+	}
+	taskLogEntry := utils.EnrichLoggerWithLabels(logEntry, hookLogLabels)
+
+	taskHook := op.HookManager.GetHook(hookMeta.HookName)
+	taskHook.HookController.EnableScheduleBindings()
+	taskLogEntry.Info("Schedule binding for hook enabled successfully")
+
+	return queue.TaskResult{Status: queue.Success}
+}
+
+// RegisterBuiltinTaskHandlers populates the registry with the three core task types.
+// It must be called after HookManager is set. Extenders may call Register() afterwards
+// to add extra task types without touching this method.
+func (op *ShellOperator) RegisterBuiltinTaskHandlers() {
+	op.taskHandlerRegistry = NewTaskHandlerRegistry()
+	op.taskHandlerRegistry.Register(task_metadata.HookRun, op.taskHandleHookRun)
+	op.taskHandlerRegistry.Register(task_metadata.EnableKubernetesBindings, op.taskHandleEnableKubernetesBindings)
+	op.taskHandlerRegistry.Register(task_metadata.EnableScheduleBindings, op.taskHandleEnableScheduleBindings)
 }
 
 // taskHandleEnableKubernetesBindings creates task for each Kubernetes binding in the hook and queues them.
@@ -436,7 +335,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 	if !ok {
 		op.logger.Error("Possible Bug! cannot access hook metadata",
 			slog.String(pkg.LogKeyType, string(t.GetType())))
-		return queue.TaskResult{Status: "Fail"}
+		return queue.TaskResult{Status: queue.Fail}
 	}
 
 	metricLabels := map[string]string{
@@ -474,12 +373,12 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 		taskLogEntry.Error("Enable Kubernetes binding for hook failed. Will retry after delay.",
 			slog.Int(pkg.LogKeyFailedCount, t.GetFailureCount()+1),
 			log.Err(err))
-		res.Status = "Fail"
+		res.Status = queue.Fail
 	} else {
 		success = 1.0
 		taskLogEntry.Info("Kubernetes bindings for hook are enabled successfully",
 			slog.Int(pkg.LogKeyCount, len(hookRunTasks)))
-		res.Status = "Success"
+		res.Status = queue.Success
 		now := time.Now()
 		for _, t := range hookRunTasks {
 			t.WithQueuedAt(now)
@@ -502,7 +401,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	if !ok {
 		op.logger.Error("Possible Bug! cannot access hook metadata",
 			slog.String(pkg.LogKeyType, string(t.GetType())))
-		return queue.TaskResult{Status: "Fail"}
+		return queue.TaskResult{Status: queue.Fail}
 	}
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
@@ -510,7 +409,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	if err != nil {
 		// This could happen when the Context is canceled, so just repeat the task until the queue is stopped.
 		return queue.TaskResult{
-			Status: "Repeat",
+			Status: queue.Repeat,
 		}
 	}
 
@@ -572,7 +471,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 
 	var res queue.TaskResult
 	// Default when shouldRunHook is false.
-	res.Status = "Success"
+	res.Status = queue.Success
 
 	if shouldRunHook {
 		taskLogEntry.Info("Execute hook")
@@ -585,7 +484,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 			if hookMeta.AllowFailure {
 				allowed = 1.0
 				taskLogEntry.Info("Hook failed, but allowed to fail", log.Err(err))
-				res.Status = "Success"
+				res.Status = queue.Success
 			} else {
 				errors = 1.0
 				t.UpdateFailureMessage(err.Error())
@@ -593,12 +492,12 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 				taskLogEntry.Error("Hook failed. Will retry after delay.",
 					slog.Int(pkg.LogKeyFailedCount, t.GetFailureCount()+1),
 					log.Err(err))
-				res.Status = "Fail"
+				res.Status = queue.Fail
 			}
 		} else {
 			success = 1.0
 			taskLogEntry.Info("Hook executed successfully")
-			res.Status = "Success"
+			res.Status = queue.Success
 		}
 		op.MetricStorage.CounterAdd(metrics.HookRunAllowedErrorsTotal, allowed, metricLabels)
 		op.MetricStorage.CounterAdd(metrics.HookRunErrorsTotal, errors, metricLabels)
@@ -606,7 +505,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	}
 
 	// Unlock Kubernetes events for all monitors when Synchronization task is done.
-	if isSynchronization && res.Status == "Success" {
+	if isSynchronization && res.Status == queue.Success {
 		taskLogEntry.Info("Unlock kubernetes.Event tasks")
 		for _, monitorID := range hookMeta.MonitorIDs {
 			taskHook.HookController.UnlockKubernetesEventsFor(monitorID)

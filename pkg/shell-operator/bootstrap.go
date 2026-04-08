@@ -164,6 +164,10 @@ func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, 
 	// Create webhookManagers with dependencies.
 	op.setupHookManagers(hooksDir, tempDir)
 
+	// Register the three built-in task type handlers. Extenders may add more
+	// handlers via op.taskHandlerRegistry.Register() after this call.
+	op.RegisterBuiltinTaskHandlers()
+
 	// Search and configure all hooks.
 	err = op.initHookManager()
 	if err != nil {
