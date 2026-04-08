@@ -157,22 +157,44 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 	hookEntry := hm.logger.With(slog.String(pkg.LogKeyHook, hook.Name), slog.String(pkg.LogKeyPhase, "config"))
 	hookEntry.Info("Load config", slog.String(pkg.LogKeyPath, hookPath))
 
-	envs := make([]string, 0)
-	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hookPath, envs, []string{"--config"})
+	configOutput, err := hm.fetchHookConfig(hook)
 	if err != nil {
-		hookEntry.Error("Hook config output", slog.String(pkg.LogKeyValue, string(configOutput)))
-		var ee *exec.ExitError
-		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-			hookEntry.Error("Hook config stderr", slog.String(pkg.LogKeyValue, string(ee.Stderr)))
-		}
-		return nil, fmt.Errorf("cannot get config for hook '%s': %w", hookPath, err)
+		return nil, err
 	}
 
 	if _, err = hook.LoadConfig(configOutput); err != nil {
 		return nil, fmt.Errorf("creating hook '%s': %w", hookName, err)
 	}
 
-	// Add hook info as log labels, update MetricLabels
+	hm.enrichHookMetadata(hook)
+	hm.wireHookController(hook)
+
+	if hook.Config == nil {
+		return nil, fmt.Errorf("hook %q is marked as executable but doesn't contain config section", hook.Path)
+	}
+
+	hookEntry.Info("Loaded config", slog.String(pkg.LogKeyValue, hook.GetConfigDescription()))
+
+	return hook, nil
+}
+
+// fetchHookConfig executes the hook with --config and returns its output.
+func (hm *Manager) fetchHookConfig(hook *Hook) ([]byte, error) {
+	hookEntry := hm.logger.With(slog.String(pkg.LogKeyHook, hook.Name), slog.String(pkg.LogKeyPhase, "config"))
+	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hook.Path, nil, []string{"--config"})
+	if err != nil {
+		hookEntry.Error("Hook config output", slog.String(pkg.LogKeyValue, string(configOutput)))
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
+			hookEntry.Error("Hook config stderr", slog.String(pkg.LogKeyValue, string(ee.Stderr)))
+		}
+		return nil, fmt.Errorf("cannot get config for hook '%s': %w", hook.Path, err)
+	}
+	return configOutput, nil
+}
+
+// enrichHookMetadata injects hook name and metric labels into all binding configs.
+func (hm *Manager) enrichHookMetadata(hook *Hook) {
 	for _, kubeCfg := range hook.GetConfig().OnKubernetesEvents {
 		kubeCfg.Monitor.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
 		kubeCfg.Monitor.Metadata.MetricLabels = map[string]string{
@@ -207,25 +229,17 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 		}
 		mutatingCfg.Webhook.UpdateIds("", mutatingCfg.BindingName)
 	}
+}
 
+// wireHookController creates and attaches a HookController with all bindings initialised.
+func (hm *Manager) wireHookController(hook *Hook) {
 	hookCtrl := controller.NewHookController()
 	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager, hm.logger.Named("kubernetes-bindings"))
 	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
 	hookCtrl.InitConversionBindings(hook.GetConfig().KubernetesConversion, hm.conversionWebhookManager)
 	hookCtrl.InitAdmissionBindings(hook.GetConfig().KubernetesValidating, hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
-	// TODO
-	// hookCtrl.InitMutatingBindings(hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
-
 	hook.WithHookController(hookCtrl)
 	hook.WithTmpDir(hm.TempDir())
-
-	if hook.Config == nil {
-		return nil, fmt.Errorf("hook %q is marked as executable but doesn't contain config section", hook.Path)
-	}
-
-	hookEntry.Info("Loaded config", slog.String(pkg.LogKeyValue, hook.GetConfigDescription()))
-
-	return hook, nil
 }
 
 func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint string, envs []string, args []string) ([]byte, error) {

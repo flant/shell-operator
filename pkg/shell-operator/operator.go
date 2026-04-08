@@ -171,23 +171,9 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String(pkg.LogKeyName, kubeEvent.String()))
 
 		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
-			newTask := task.NewTask(task_metadata.HookRun).
-				WithMetadata(task_metadata.HookMetadata{
-					HookName:       hook.Name,
-					BindingType:    types.OnKubernetesEvent,
-					BindingContext: info.BindingContext,
-					AllowFailure:   info.AllowFailure,
-					Binding:        info.Binding,
-					Group:          info.Group,
-				}).
-				WithLogLabels(logLabels).
-				WithQueueName(info.QueueName).
-				WithCompactionID(hook.Name)
-
 			logEntry.With(pkg.LogKeyQueue, info.QueueName).
-				Info("queue task", slog.String(pkg.LogKeyName, newTask.GetDescription()))
-
-			return newTask.WithQueuedAt(time.Now())
+				Info("queue task", slog.String(pkg.LogKeyName, "HookRun"))
+			return newHookRunTaskNow(hook.Name, types.OnKubernetesEvent, info, logLabels)
 		})
 	})
 	op.ManagerEventsHandler.WithScheduleEventHandler(func(_ context.Context, crontab string) []task.Task {
@@ -199,23 +185,9 @@ func (op *ShellOperator) initHookManager() error {
 		logEntry.Debug("Create tasks for 'schedule' event", slog.String(pkg.LogKeyName, crontab))
 
 		return op.HookManager.HandleCreateTasksFromScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
-			newTask := task.NewTask(task_metadata.HookRun).
-				WithMetadata(task_metadata.HookMetadata{
-					HookName:       hook.Name,
-					BindingType:    types.Schedule,
-					BindingContext: info.BindingContext,
-					AllowFailure:   info.AllowFailure,
-					Binding:        info.Binding,
-					Group:          info.Group,
-				}).
-				WithLogLabels(logLabels).
-				WithQueueName(info.QueueName).
-				WithCompactionID(hook.Name)
-
 			logEntry.With(pkg.LogKeyQueue, info.QueueName).
-				Info("queue task", slog.String(pkg.LogKeyName, newTask.GetDescription()))
-
-			return newTask.WithQueuedAt(time.Now())
+				Info("queue task", slog.String(pkg.LogKeyName, "HookRun"))
+			return newHookRunTaskNow(hook.Name, types.Schedule, info, logLabels)
 		})
 	})
 
@@ -267,19 +239,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 
 		var admissionTask task.Task
 		op.HookManager.HandleAdmissionEvent(ctx, event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-			newTask := task.NewTask(task_metadata.HookRun).
-				WithMetadata(task_metadata.HookMetadata{
-					HookName:       hook.Name,
-					BindingType:    eventBindingType,
-					BindingContext: info.BindingContext,
-					AllowFailure:   info.AllowFailure,
-					Binding:        info.Binding,
-					Group:          info.Group,
-				}).
-				WithLogLabels(logLabels).
-				WithCompactionID(hook.Name)
-
-			admissionTask = newTask
+			admissionTask = globalHookTaskFactory.NewHookRunTask(hook.Name, eventBindingType, info, logLabels)
 		})
 
 		// Assert exactly one task is created.
@@ -377,19 +337,7 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 		for _, convRule := range convPath {
 			var convTask task.Task
 			op.HookManager.HandleConversionEvent(ctx, crdName, request, convRule, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-				newTask := task.NewTask(task_metadata.HookRun).
-					WithMetadata(task_metadata.HookMetadata{
-						HookName:       hook.Name,
-						BindingType:    types.KubernetesConversion,
-						BindingContext: info.BindingContext,
-						AllowFailure:   info.AllowFailure,
-						Binding:        info.Binding,
-						Group:          info.Group,
-					}).
-					WithLogLabels(logLabels).
-					WithCompactionID(hook.Name)
-
-				convTask = newTask
+				convTask = globalHookTaskFactory.NewHookRunTask(hook.Name, types.KubernetesConversion, info, logLabels)
 			})
 
 			if convTask == nil {
@@ -515,22 +463,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 
 	// Run hook for each binding with Synchronization binding context. Ignore queue name here, execute in main queue.
 	err := taskHook.HookController.HandleEnableKubernetesBindings(ctx, func(info controller.BindingExecutionInfo) {
-		newTask := task.NewTask(task_metadata.HookRun).
-			WithMetadata(task_metadata.HookMetadata{
-				HookName:                 taskHook.Name,
-				BindingType:              types.OnKubernetesEvent,
-				BindingContext:           info.BindingContext,
-				AllowFailure:             info.AllowFailure,
-				Binding:                  info.Binding,
-				Group:                    info.Group,
-				MonitorIDs:               []string{info.KubernetesBinding.Monitor.Metadata.MonitorId},
-				ExecuteOnSynchronization: info.KubernetesBinding.ExecuteHookOnSynchronization,
-			}).
-			WithLogLabels(hookLogLabels).
-			WithQueueName("main").
-			WithCompactionID(taskHook.Name)
-
-		hookRunTasks = append(hookRunTasks, newTask)
+		hookRunTasks = append(hookRunTasks, globalHookTaskFactory.NewSyncHookRunTask(taskHook, info, hookLogLabels))
 	})
 
 	success := 0.0

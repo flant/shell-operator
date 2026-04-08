@@ -5,6 +5,7 @@ import (
 
 	"gopkg.in/robfig/cron.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -156,4 +157,18 @@ func (cv0 *HookConfigV0) ConvertSchedule(schV0 ScheduleConfigV0) (htypes.Schedul
 
 func (cv0 *HookConfigV0) CheckOnKubernetesEvent(_ OnKubernetesEventConfigV0, _ string) error {
 	return nil
+}
+
+// hookConfigV0Converter is the VersionedConverter adapter for v0.
+type hookConfigV0Converter struct{}
+
+func (hookConfigV0Converter) Version() string { return "v0" }
+
+func (hookConfigV0Converter) ConvertAndCheck(data []byte, c *HookConfig) error {
+	configV0 := &HookConfigV0{}
+	if err := yaml.Unmarshal(data, configV0); err != nil {
+		return fmt.Errorf("unmarshal HookConfig version 0: %s", err)
+	}
+	c.V0 = configV0
+	return configV0.ConvertAndCheck(c)
 }

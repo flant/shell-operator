@@ -23,7 +23,7 @@ type ScheduleBindingToCrontabLink struct {
 // ScheduleBindingsController handles schedule bindings for one hook.
 type ScheduleBindingsController interface {
 	WithScheduleBindings([]htypes.ScheduleConfig)
-	WithScheduleManager(schedulemanager.ScheduleManager)
+	WithScheduleManager(schedulemanager.ScheduleRegistry)
 	EnableScheduleBindings()
 	DisableScheduleBindings()
 	CanHandleEvent(crontab string) bool
@@ -33,7 +33,7 @@ type ScheduleBindingsController interface {
 // scheduleBindingsController is a main implementation of KubernetesHooksController
 type scheduleBindingsController struct {
 	// dependencies
-	scheduleManager schedulemanager.ScheduleManager
+	scheduleManager schedulemanager.ScheduleRegistry
 
 	l sync.RWMutex
 	// All hooks with 'kubernetes' bindings
@@ -57,7 +57,7 @@ func (c *scheduleBindingsController) WithScheduleBindings(bindings []htypes.Sche
 	c.ScheduleBindings = bindings
 }
 
-func (c *scheduleBindingsController) WithScheduleManager(scheduleManager schedulemanager.ScheduleManager) {
+func (c *scheduleBindingsController) WithScheduleManager(scheduleManager schedulemanager.ScheduleRegistry) {
 	c.l.Lock()
 	c.scheduleManager = scheduleManager
 	c.l.Unlock()

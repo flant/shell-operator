@@ -56,10 +56,17 @@ type Hook struct {
 	LogProxyHookJSONKey string
 
 	Logger *log.Logger
+
+	// ioProvider prepares and cleans up temporary files for hook execution.
+	// Defaults to hookIOProvider. Tests may inject a stub.
+	ioProvider IOProvider
+	// responseParser reads output files after hook execution.
+	// Defaults to hookResponseParser. Tests may inject a stub.
+	responseParser ResponseParser
 }
 
 func NewHook(name, path string, keepTemporaryHookFiles bool, logProxyHookJSON bool, logProxyHookJSONKey string, logger *log.Logger) *Hook {
-	return &Hook{
+	h := &Hook{
 		Name:                   name,
 		Path:                   path,
 		Config:                 &config.HookConfig{},
@@ -68,6 +75,9 @@ func NewHook(name, path string, keepTemporaryHookFiles bool, logProxyHookJSON bo
 		LogProxyHookJSONKey:    logProxyHookJSONKey,
 		Logger:                 logger,
 	}
+	h.ioProvider = &hookIOProvider{hook: h}
+	h.responseParser = &hookResponseParser{hook: h}
+	return h
 }
 
 func (h *Hook) WithTmpDir(dir string) {
@@ -111,58 +121,17 @@ func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.Bin
 
 	versionedContextList := bctx.ConvertBindingContextList(h.Config.Version, freshBindingContext)
 
-	contextPath, err := h.prepareBindingContextJsonFile(versionedContextList)
+	env, err := h.ioProvider.Prepare(versionedContextList)
 	if err != nil {
 		return nil, err
 	}
-
-	metricsPath, err := h.prepareMetricsFile()
-	if err != nil {
-		return nil, err
-	}
-
-	admissionPath, err := h.prepareAdmissionResponseFile()
-	if err != nil {
-		return nil, err
-	}
-
-	conversionPath, err := h.prepareConversionResponseFile()
-	if err != nil {
-		return nil, err
-	}
-
-	kubernetesPatchPath, err := h.prepareObjectPatchFile()
-	if err != nil {
-		return nil, err
-	}
-
-	// remove tmp file on hook exit
-	defer func() {
-		if !h.KeepTemporaryHookFiles {
-			_ = os.Remove(contextPath)
-			_ = os.Remove(metricsPath)
-			_ = os.Remove(conversionPath)
-			_ = os.Remove(admissionPath)
-			_ = os.Remove(kubernetesPatchPath)
-		}
-	}()
-
-	envs := make([]string, 0)
-	envs = append(envs, os.Environ()...)
-	if contextPath != "" {
-		envs = append(envs, fmt.Sprintf("BINDING_CONTEXT_PATH=%s", contextPath))
-		envs = append(envs, fmt.Sprintf("METRICS_PATH=%s", metricsPath))
-		envs = append(envs, fmt.Sprintf("CONVERSION_RESPONSE_PATH=%s", conversionPath))
-		envs = append(envs, fmt.Sprintf("VALIDATING_RESPONSE_PATH=%s", admissionPath))
-		envs = append(envs, fmt.Sprintf("ADMISSION_RESPONSE_PATH=%s", admissionPath))
-		envs = append(envs, fmt.Sprintf("KUBERNETES_PATCH_PATH=%s", kubernetesPatchPath))
-	}
+	defer h.ioProvider.Cleanup(env)
 
 	hookCmd := executor.NewExecutor(
 		path.Dir(h.Path),
 		h.Path,
 		[]string{},
-		envs).
+		env.Envs()).
 		WithLogProxyHookJSON(h.LogProxyHookJSON).
 		WithLogProxyHookJSONKey(h.LogProxyHookJSONKey).
 		WithLogger(h.Logger.Named("executor"))
@@ -174,26 +143,8 @@ func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.Bin
 		return result, fmt.Errorf("%s FAILED: %s", h.Name, err)
 	}
 
-	operations, err := MetricOperationsFromFile(metricsPath, h.Name)
-	if err != nil {
-		return result, fmt.Errorf("got bad metrics: %s", err)
-	}
-
-	result.Metrics = h.remapOperationsToOperations(operations)
-
-	result.AdmissionResponse, err = admission.ResponseFromFile(admissionPath)
-	if err != nil {
-		return result, fmt.Errorf("got bad validating response: %s", err)
-	}
-
-	result.ConversionResponse, err = conversion.ResponseFromFile(conversionPath)
-	if err != nil {
-		return result, fmt.Errorf("got bad conversion response: %s", err)
-	}
-
-	result.KubernetesPatchBytes, err = os.ReadFile(kubernetesPatchPath)
-	if err != nil {
-		return result, fmt.Errorf("can't read object patch file: %s", err)
+	if err = h.responseParser.ParseResult(h.Name, env, result); err != nil {
+		return result, err
 	}
 
 	return result, nil

@@ -12,12 +12,24 @@ import (
 	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
-type ScheduleManager interface {
-	Stop()
-	Start()
+// ScheduleRegistry manages cron schedule entries.
+// ScheduleBindingsController only needs this subset of ScheduleManager.
+type ScheduleRegistry interface {
 	Add(entry smtypes.ScheduleEntry)
 	Remove(entry smtypes.ScheduleEntry)
+}
+
+// ScheduleEmitter emits crontab schedule events.
+// ManagerEventsHandler only needs this subset of ScheduleManager.
+type ScheduleEmitter interface {
 	Ch() chan string
+}
+
+type ScheduleManager interface {
+	ScheduleRegistry
+	ScheduleEmitter
+	Stop()
+	Start()
 }
 
 type CronEntry struct {
@@ -30,7 +42,7 @@ type scheduleManager struct {
 	cancel     context.CancelFunc
 	cron       *cron.Cron
 	ScheduleCh chan string
-	Entries    map[string]CronEntry
+	Entries    map[string]*CronEntry
 
 	logger *log.Logger
 	mu     sync.Mutex
@@ -45,7 +57,7 @@ func NewScheduleManager(ctx context.Context, logger *log.Logger) *scheduleManage
 		cancel:     cancel,
 		ScheduleCh: make(chan string, 1),
 		cron:       cron.New(),
-		Entries:    make(map[string]CronEntry),
+		Entries:    make(map[string]*CronEntry),
 
 		logger: logger,
 	}
@@ -70,7 +82,7 @@ func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	cronEntry, hasCronEntry := sm.Entries[newEntry.Crontab]
+	_, hasCronEntry := sm.Entries[newEntry.Crontab]
 
 	// If no entry, then add new scheduled function and save CronEntry.
 	if !hasCronEntry {
@@ -85,7 +97,7 @@ func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 
 		logEntry.Debug("entry added", slog.String(pkg.LogKeyCrontab, newEntry.Crontab))
 
-		sm.Entries[newEntry.Crontab] = CronEntry{
+		sm.Entries[newEntry.Crontab] = &CronEntry{
 			EntryID: entryId,
 			Ids: map[string]bool{
 				newEntry.Id: true,
@@ -94,9 +106,10 @@ func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	}
 
 	// Just add id into CronEntry.Ids
-	_, hasId := cronEntry.Ids[newEntry.Id]
-	if !hasId && hasCronEntry {
-		sm.Entries[newEntry.Crontab].Ids[newEntry.Id] = true
+	if hasCronEntry {
+		if _, hasId := sm.Entries[newEntry.Crontab].Ids[newEntry.Id]; !hasId {
+			sm.Entries[newEntry.Crontab].Ids[newEntry.Id] = true
+		}
 	}
 }
 

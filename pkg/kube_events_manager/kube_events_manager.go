@@ -15,16 +15,33 @@ import (
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
-type KubeEventsManager interface {
-	WithMetricStorage(mstor metricsstorage.Storage)
-	MetricStorage() metricsstorage.Storage
+// MonitorRegistry manages the lifecycle of kubernetes monitors.
+type MonitorRegistry interface {
 	AddMonitor(monitorConfig *MonitorConfig) error
 	HasMonitor(monitorID string) bool
 	GetMonitor(monitorID string) Monitor
 	StartMonitor(monitorID string)
 	StopMonitor(monitorID string) error
+}
 
+// KubeEventEmitter emits kubernetes events.
+// ManagerEventsHandler only needs this subset of KubeEventsManager.
+type KubeEventEmitter interface {
 	Ch() chan kemtypes.KubeEvent
+}
+
+// KubeEventsSource is the subset of KubeEventsManager consumed by
+// KubernetesBindingsController: it provides monitor CRUD and the event channel
+// needed to inject synthetic events during UpdateMonitor.
+type KubeEventsSource interface {
+	MonitorRegistry
+	KubeEventEmitter
+}
+
+type KubeEventsManager interface {
+	KubeEventsSource
+	WithMetricStorage(mstor metricsstorage.Storage)
+	MetricStorage() metricsstorage.Storage
 	Stop()
 	Wait()
 }
