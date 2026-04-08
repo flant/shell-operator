@@ -16,7 +16,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/time/rate"
 
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/executor"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/config"
@@ -139,7 +138,7 @@ func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.Bin
 
 	// remove tmp file on hook exit
 	defer func() {
-		if app.DebugKeepTmpFilesVar != "yes" {
+		if !h.KeepTemporaryHookFiles {
 			_ = os.Remove(contextPath)
 			_ = os.Remove(metricsPath)
 			_ = os.Remove(conversionPath)

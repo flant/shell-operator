@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	klient "github.com/flant/kube-client/client"
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/hook"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
@@ -163,11 +164,11 @@ func (op *ShellOperator) initHookManager() error {
 	// Define event handlers for schedule event and kubernetes event.
 	op.ManagerEventsHandler.WithKubeEventHandler(func(_ context.Context, kubeEvent kemTypes.KubeEvent) []task.Task {
 		logLabels := map[string]string{
-			"event.id": uuid.Must(uuid.NewV4()).String(),
-			"binding":  string(types.OnKubernetesEvent),
+			pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
+			pkg.LogKeyBinding: string(types.OnKubernetesEvent),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String("name", kubeEvent.String()))
+		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String(pkg.LogKeyName, kubeEvent.String()))
 
 		return op.HookManager.CreateTasksFromKubeEvent(kubeEvent, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
@@ -183,19 +184,19 @@ func (op *ShellOperator) initHookManager() error {
 				WithQueueName(info.QueueName).
 				WithCompactionID(hook.Name)
 
-			logEntry.With("queue", info.QueueName).
-				Info("queue task", slog.String("name", newTask.GetDescription()))
+			logEntry.With(pkg.LogKeyQueue, info.QueueName).
+				Info("queue task", slog.String(pkg.LogKeyName, newTask.GetDescription()))
 
 			return newTask.WithQueuedAt(time.Now())
 		})
 	})
 	op.ManagerEventsHandler.WithScheduleEventHandler(func(_ context.Context, crontab string) []task.Task {
 		logLabels := map[string]string{
-			"event.id": uuid.Must(uuid.NewV4()).String(),
-			"binding":  string(types.Schedule),
+			pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
+			pkg.LogKeyBinding: string(types.Schedule),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry.Debug("Create tasks for 'schedule' event", slog.String("name", crontab))
+		logEntry.Debug("Create tasks for 'schedule' event", slog.String(pkg.LogKeyName, crontab))
 
 		return op.HookManager.HandleCreateTasksFromScheduleEvent(crontab, func(hook *hook.Hook, info controller.BindingExecutionInfo) task.Task {
 			newTask := task.NewTask(task_metadata.HookRun).
@@ -211,8 +212,8 @@ func (op *ShellOperator) initHookManager() error {
 				WithQueueName(info.QueueName).
 				WithCompactionID(hook.Name)
 
-			logEntry.With("queue", info.QueueName).
-				Info("queue task", slog.String("name", newTask.GetDescription()))
+			logEntry.With(pkg.LogKeyQueue, info.QueueName).
+				Info("queue task", slog.String(pkg.LogKeyName, newTask.GetDescription()))
 
 			return newTask.WithQueuedAt(time.Now())
 		})
@@ -254,14 +255,14 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(ctx context.Context, event admission.Event) (*admission.Response, error) {
 		eventBindingType := op.HookManager.DetectAdmissionEventType(event)
 		logLabels := map[string]string{
-			"event.id": uuid.Must(uuid.NewV4()).String(),
-			"event":    string(eventBindingType),
+			pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
+			pkg.LogKeyEvent:   string(eventBindingType),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry = logEntry.With(
-			slog.String("type", string(eventBindingType)),
-			slog.String("configurationId", event.ConfigurationId),
-			slog.String("webhookID", event.WebhookId))
+			slog.String(pkg.LogKeyType, string(eventBindingType)),
+			slog.String(pkg.LogKeyConfigurationId, event.ConfigurationId),
+			slog.String(pkg.LogKeyWebhookID, event.WebhookId))
 		logEntry.Debug("Handle event")
 
 		var admissionTask task.Task
@@ -300,7 +301,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 		admissionResponse, ok := admissionProp.(*admission.Response)
 		if !ok {
 			logEntry.Error("'admissionResponse' task prop is not of type *AdmissionResponse",
-				slog.String("type", fmt.Sprintf("%T", admissionProp)))
+				slog.String(pkg.LogKeyType, fmt.Sprintf("%T", admissionProp)))
 			return nil, fmt.Errorf("hook task prop error")
 		}
 		return admissionResponse, nil
@@ -348,16 +349,16 @@ func (op *ShellOperator) initConversionWebhookManager() error {
 // conversionEventHandler is called when Kubernetes requests a conversion.
 func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName string, request *v1.ConversionRequest) (*conversion.Response, error) {
 	logLabels := map[string]string{
-		"event.id": uuid.Must(uuid.NewV4()).String(),
-		"binding":  string(types.KubernetesConversion),
+		pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
+		pkg.LogKeyBinding: string(types.KubernetesConversion),
 	}
 	logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 
 	sourceVersions := conversion.ExtractAPIVersions(request.Objects)
 	logEntry.Info("Handle kubernetesCustomResourceConversion event for crd",
-		slog.String("name", crdName),
-		slog.Int("len", len(request.Objects)),
-		slog.Any("versions", sourceVersions))
+		slog.String(pkg.LogKeyName, crdName),
+		slog.Int(pkg.LogKeyLen, len(request.Objects)),
+		slog.Any(pkg.LogKeyVersions, sourceVersions))
 
 	done := false
 	for _, srcVer := range sourceVersions {
@@ -370,8 +371,8 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 			continue
 		}
 		logEntry.Info("Find conversion path for rule",
-			slog.String("name", rule.String()),
-			slog.Any("value", convPath))
+			slog.String(pkg.LogKeyName, rule.String()),
+			slog.Any(pkg.LogKeyValue, convPath))
 
 		for _, convRule := range convPath {
 			var convTask task.Task
@@ -408,7 +409,7 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 			response, ok := prop.(*conversion.Response)
 			if !ok {
 				logEntry.Error("'conversionResponse' task prop is not of type *conversion.Response",
-					slog.String("type", fmt.Sprintf("%T", prop)))
+					slog.String(pkg.LogKeyType, fmt.Sprintf("%T", prop)))
 				return nil, fmt.Errorf("hook task prop error")
 			}
 
@@ -444,8 +445,13 @@ func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName str
 
 // taskHandler
 func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.TaskResult {
-	logEntry := op.logger.With("operator.component", "taskRunner")
-	hookMeta := task_metadata.HookMetadataAccessor(t)
+	logEntry := op.logger.With(pkg.LogKeyOperatorComponent, "taskRunner")
+	hookMeta, ok := task_metadata.HookMetadataAccessor(t)
+	if !ok {
+		logEntry.Error("Possible Bug! cannot access hook metadata for task",
+			slog.String(pkg.LogKeyType, string(t.GetType())))
+		return queue.TaskResult{Status: "Fail"}
+	}
 	var res queue.TaskResult
 
 	switch t.GetType() {
@@ -457,10 +463,10 @@ func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.Tas
 
 	case task_metadata.EnableScheduleBindings:
 		hookLogLabels := map[string]string{}
-		hookLogLabels["hook"] = hookMeta.HookName
-		hookLogLabels["binding"] = string(types.Schedule)
-		hookLogLabels["task"] = "EnableScheduleBindings"
-		hookLogLabels["queue"] = "main"
+		hookLogLabels[pkg.LogKeyHook] = hookMeta.HookName
+		hookLogLabels[pkg.LogKeyBinding] = string(types.Schedule)
+		hookLogLabels[pkg.LogKeyTask] = "EnableScheduleBindings"
+		hookLogLabels[pkg.LogKeyQueue] = "main"
 
 		taskLogEntry := utils.EnrichLoggerWithLabels(logEntry, hookLogLabels)
 
@@ -478,10 +484,15 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleEnableKubernetesBindings")
 	defer span.End()
 
-	hookMeta := task_metadata.HookMetadataAccessor(t)
+	hookMeta, ok := task_metadata.HookMetadataAccessor(t)
+	if !ok {
+		op.logger.Error("Possible Bug! cannot access hook metadata",
+			slog.String(pkg.LogKeyType, string(t.GetType())))
+		return queue.TaskResult{Status: "Fail"}
+	}
 
 	metricLabels := map[string]string{
-		"hook": hookMeta.HookName,
+		pkg.MetricKeyHook: hookMeta.HookName,
 	}
 	defer measure.Duration(func(d time.Duration) {
 		op.MetricStorage.GaugeSet(metrics.HookEnableKubernetesBindingsSeconds, d.Seconds(), metricLabels)
@@ -489,10 +500,10 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 
 	var res queue.TaskResult
 	hookLogLabels := map[string]string{}
-	hookLogLabels["hook"] = hookMeta.HookName
-	hookLogLabels["binding"] = ""
-	hookLogLabels["task"] = "EnableKubernetesBindings"
-	hookLogLabels["queue"] = "main"
+	hookLogLabels[pkg.LogKeyHook] = hookMeta.HookName
+	hookLogLabels[pkg.LogKeyBinding] = ""
+	hookLogLabels[pkg.LogKeyTask] = "EnableKubernetesBindings"
+	hookLogLabels[pkg.LogKeyQueue] = "main"
 
 	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
 
@@ -528,13 +539,13 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 		errors = 1.0
 		t.UpdateFailureMessage(err.Error())
 		taskLogEntry.Error("Enable Kubernetes binding for hook failed. Will retry after delay.",
-			slog.Int("failedCount", t.GetFailureCount()+1),
+			slog.Int(pkg.LogKeyFailedCount, t.GetFailureCount()+1),
 			log.Err(err))
 		res.Status = "Fail"
 	} else {
 		success = 1.0
 		taskLogEntry.Info("Kubernetes bindings for hook are enabled successfully",
-			slog.Int("count", len(hookRunTasks)))
+			slog.Int(pkg.LogKeyCount, len(hookRunTasks)))
 		res.Status = "Success"
 		now := time.Now()
 		for _, t := range hookRunTasks {
@@ -554,7 +565,12 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	ctx, span := otel.Tracer(serviceName).Start(ctx, "taskHandleHookRun")
 	defer span.End()
 
-	hookMeta := task_metadata.HookMetadataAccessor(t)
+	hookMeta, ok := task_metadata.HookMetadataAccessor(t)
+	if !ok {
+		op.logger.Error("Possible Bug! cannot access hook metadata",
+			slog.String(pkg.LogKeyType, string(t.GetType())))
+		return queue.TaskResult{Status: "Fail"}
+	}
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
 
 	err := taskHook.RateLimitWait(context.Background())
@@ -566,9 +582,9 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	}
 
 	metricLabels := map[string]string{
-		"hook":    hookMeta.HookName,
-		"binding": hookMeta.Binding,
-		"queue":   t.GetQueueName(),
+		pkg.MetricKeyHook:    hookMeta.HookName,
+		pkg.MetricKeyBinding: hookMeta.Binding,
+		pkg.MetricKeyQueue:   t.GetQueueName(),
 	}
 	taskWaitTime := time.Since(t.GetQueuedAt()).Seconds()
 	op.MetricStorage.CounterAdd(metrics.TaskWaitInQueueSecondsTotal, taskWaitTime, metricLabels)
@@ -578,11 +594,11 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	})()
 
 	hookLogLabels := map[string]string{}
-	hookLogLabels["hook"] = hookMeta.HookName
-	hookLogLabels["binding"] = hookMeta.Binding
-	hookLogLabels["event"] = string(hookMeta.BindingType)
-	hookLogLabels["task"] = "HookRun"
-	hookLogLabels["queue"] = t.GetQueueName()
+	hookLogLabels[pkg.LogKeyHook] = hookMeta.HookName
+	hookLogLabels[pkg.LogKeyBinding] = hookMeta.Binding
+	hookLogLabels[pkg.LogKeyEvent] = string(hookMeta.BindingType)
+	hookLogLabels[pkg.LogKeyTask] = "HookRun"
+	hookLogLabels[pkg.LogKeyQueue] = t.GetQueueName()
 
 	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
 
@@ -642,7 +658,7 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 				t.UpdateFailureMessage(err.Error())
 				t.WithQueuedAt(time.Now()) // Reset queueAt for correct results in 'task_wait_in_queue' metric.
 				taskLogEntry.Error("Hook failed. Will retry after delay.",
-					slog.Int("failedCount", t.GetFailureCount()+1),
+					slog.Int(pkg.LogKeyFailedCount, t.GetFailureCount()+1),
 					log.Err(err))
 				res.Status = "Fail"
 			}
@@ -672,7 +688,7 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 	defer span.End()
 
 	for _, info := range taskHook.HookController.SnapshotsInfo() {
-		taskLogEntry.Debug("snapshot info", slog.String("info", info))
+		taskLogEntry.Debug("snapshot info", slog.String(pkg.LogKeyInfo, info))
 	}
 
 	result, err := taskHook.Run(ctx, hookMeta.BindingType, hookMeta.BindingContext, hookLogLabels)
@@ -692,7 +708,7 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 	}
 
 	if result.Usage != nil {
-		taskLogEntry.Debug("Usage", slog.String("value", fmt.Sprintf("%+v", result.Usage)))
+		taskLogEntry.Debug("Usage", slog.String(pkg.LogKeyValue, fmt.Sprintf("%+v", result.Usage)))
 		op.MetricStorage.HistogramObserve(metrics.HookRunSysCPUSeconds, result.Usage.Sys.Seconds(), metricLabels, nil)
 		op.MetricStorage.HistogramObserve(metrics.HookRunUserCPUSeconds, result.Usage.User.Seconds(), metricLabels, nil)
 		op.MetricStorage.GaugeSet(metrics.HookRunMaxRSSBytes, float64(result.Usage.MaxRss)*1024, metricLabels)
@@ -712,7 +728,7 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 
 	// Try to update custom metrics
 	err = op.HookMetricStorage.ApplyBatchOperations(result.Metrics, map[string]string{
-		"hook": hookMeta.HookName,
+		pkg.MetricKeyHook: hookMeta.HookName,
 	})
 	if err != nil {
 		return err
@@ -722,14 +738,14 @@ func (op *ShellOperator) handleRunHook(ctx context.Context, t task.Task, taskHoo
 	if result.AdmissionResponse != nil {
 		t.SetProp("admissionResponse", result.AdmissionResponse)
 		taskLogEntry.Info("AdmissionResponse from hook",
-			slog.String("value", result.AdmissionResponse.Dump()))
+			slog.String(pkg.LogKeyValue, result.AdmissionResponse.Dump()))
 	}
 
 	// Save conversionResponse in task props for future use.
 	if result.ConversionResponse != nil {
 		t.SetProp("conversionResponse", result.ConversionResponse)
 		taskLogEntry.Info("ConversionResponse from hook",
-			slog.String("value", result.ConversionResponse.Dump()))
+			slog.String(pkg.LogKeyValue, result.ConversionResponse.Dump()))
 	}
 
 	return nil
@@ -840,10 +856,10 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 		compactMsg = fmt.Sprintf("are combined to %d contexts", len(combinedContext))
 	}
 	op.logger.Info("Binding contexts from tasks. Tasks are dropped from queue",
-		slog.Int("count", len(otherTasks)+1),
-		slog.String("tasks", compactMsg),
-		slog.Int("filteredCount", len(tasksFilter)-1),
-		slog.String("queueName", t.GetQueueName()))
+		slog.Int(pkg.LogKeyCount, len(otherTasks)+1),
+		slog.String(pkg.LogKeyTasks, compactMsg),
+		slog.Int(pkg.LogKeyFilteredCount, len(tasksFilter)-1),
+		slog.String(pkg.LogKeyQueueName, t.GetQueueName()))
 
 	res.BindingContexts = compactedContext
 	res.MonitorIDs = monitorIDs
@@ -853,14 +869,14 @@ func (op *ShellOperator) CombineBindingContextForHook(q *queue.TaskQueue, t task
 // bootstrapMainQueue adds tasks to run hooks with OnStartup bindings
 // and tasks to enable kubernetes bindings.
 func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
-	logEntry := op.logger.With("operator.component", "initMainQueue")
+	logEntry := op.logger.With(pkg.LogKeyOperatorComponent, "initMainQueue")
 
 	// Prepopulate main queue with 'onStartup' tasks and 'enable kubernetes bindings' tasks.
 	tqs.WithMainName("main")
 	tqs.NewNamedQueue("main",
 		op.taskHandler,
 		queue.WithCompactableTypes(task_metadata.HookRun),
-		queue.WithLogger(op.logger.With("operator.component", "mainQueue")),
+		queue.WithLogger(op.logger.With(pkg.LogKeyOperatorComponent, "mainQueue")),
 	)
 
 	mainQueue := tqs.GetMain()
@@ -889,8 +905,8 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 
 		mainQueue.AddLast(newTask)
 		logEntry.Info("queue task with hook",
-			slog.String("task", newTask.GetDescription()),
-			slog.String("hook", hookName))
+			slog.String(pkg.LogKeyTask, newTask.GetDescription()),
+			slog.String(pkg.LogKeyHook, hookName))
 	}
 
 	// Add tasks to enable kubernetes monitors and schedules for each hook
@@ -907,8 +923,8 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 				WithQueuedAt(time.Now())
 			mainQueue.AddLast(newTask)
 			logEntry.Info("queue task with hook",
-				slog.String("task", newTask.GetDescription()),
-				slog.String("hook", hookName))
+				slog.String(pkg.LogKeyTask, newTask.GetDescription()),
+				slog.String(pkg.LogKeyHook, hookName))
 		}
 
 		if h.GetConfig().HasBinding(types.Schedule) {
@@ -921,8 +937,8 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 				WithQueuedAt(time.Now())
 			mainQueue.AddLast(newTask)
 			logEntry.Info("queue task with hook",
-				slog.String("task", newTask.GetDescription()),
-				slog.String("hook", hookName))
+				slog.String(pkg.LogKeyTask, newTask.GetDescription()),
+				slog.String(pkg.LogKeyHook, hookName))
 		}
 	}
 }
@@ -945,7 +961,7 @@ func (op *ShellOperator) runMetrics() {
 		for {
 			op.TaskQueues.IterateSnapshot(context.TODO(), func(_ context.Context, queue *queue.TaskQueue) {
 				queueLen := float64(queue.Length())
-				op.MetricStorage.GaugeSet(metrics.TasksQueueLength, queueLen, map[string]string{"queue": queue.Name})
+				op.MetricStorage.GaugeSet(metrics.TasksQueueLength, queueLen, map[string]string{pkg.MetricKeyQueue: queue.Name})
 			})
 
 			time.Sleep(5 * time.Second)
@@ -963,7 +979,7 @@ func (op *ShellOperator) initAndStartHookQueues() {
 				op.TaskQueues.NewNamedQueue(hookBinding.Queue,
 					op.taskHandler,
 					queue.WithCompactableTypes(task_metadata.HookRun),
-					queue.WithLogger(op.logger.With("operator.component", "hookQueue", "hook", hookName, "queue", hookBinding.Queue)),
+					queue.WithLogger(op.logger.With(pkg.LogKeyOperatorComponent, "hookQueue", pkg.LogKeyHook, hookName, pkg.LogKeyQueue, hookBinding.Queue)),
 				)
 				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
@@ -978,7 +994,7 @@ func (op *ShellOperator) initAndStartHookQueues() {
 				op.TaskQueues.NewNamedQueue(hookBinding.Queue,
 					op.taskHandler,
 					queue.WithCompactableTypes(task_metadata.HookRun),
-					queue.WithLogger(op.logger.With("operator.component", "hookQueue", "hook", hookName, "queue", hookBinding.Queue)),
+					queue.WithLogger(op.logger.With(pkg.LogKeyOperatorComponent, "hookQueue", pkg.LogKeyHook, hookName, pkg.LogKeyQueue, hookBinding.Queue)),
 				)
 				op.TaskQueues.GetByName(hookBinding.Queue).Start(op.ctx)
 			}
@@ -988,18 +1004,18 @@ func (op *ShellOperator) initAndStartHookQueues() {
 
 // Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
 func (op *ShellOperator) Shutdown() {
-	op.logger.Info("shutdown begin", slog.String("phase", "shutdown"))
+	op.logger.Info("shutdown begin", slog.String(pkg.LogKeyPhase, "shutdown"))
 	op.ScheduleManager.Stop()
-	op.logger.Info("schedule manager stopped", slog.String("phase", "shutdown"))
+	op.logger.Info("schedule manager stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
 
 	op.KubeEventsManager.Stop()
-	op.logger.Info("waiting informers", slog.String("phase", "shutdown"))
+	op.logger.Info("waiting informers", slog.String(pkg.LogKeyPhase, "shutdown"))
 	op.KubeEventsManager.Wait()
-	op.logger.Info("informers stopped", slog.String("phase", "shutdown"))
+	op.logger.Info("informers stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
 
 	op.TaskQueues.Stop()
-	op.logger.Info("waiting task queues", slog.String("phase", "shutdown"))
+	op.logger.Info("waiting task queues", slog.String(pkg.LogKeyPhase, "shutdown"))
 	// Wait for queues to stop, but no more than 10 seconds
 	op.TaskQueues.WaitStopWithTimeout(WaitQueuesTimeout)
-	op.logger.Info("task queues stopped", slog.String("phase", "shutdown"))
+	op.logger.Info("task queues stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
 }

@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/metrics"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
@@ -42,8 +43,8 @@ func (weh *WatchErrorHandler) handler(_ *cache.Reflector, err error) {
 		// has a semantic that it returns data at least as fresh as provided RV.
 		// So first try to LIST with setting RV to resource version of last observed object.
 		weh.logger.Error("Watch closed",
-			slog.String("description", weh.description),
-			slog.String("kind", weh.kind),
+			slog.String(pkg.LogKeyDescription, weh.description),
+			slog.String(pkg.LogKeyKind, weh.kind),
 			log.Err(err))
 		errorType = "expired"
 	case err == io.EOF:
@@ -51,20 +52,20 @@ func (weh *WatchErrorHandler) handler(_ *cache.Reflector, err error) {
 		errorType = "eof"
 	case errors.Is(err, io.ErrUnexpectedEOF):
 		weh.logger.Error("Watch closed with unexpected EOF",
-			slog.String("description", weh.description),
-			slog.String("kind", weh.kind),
+			slog.String(pkg.LogKeyDescription, weh.description),
+			slog.String(pkg.LogKeyKind, weh.kind),
 			log.Err(err))
 		errorType = "unexpected-eof"
 	case err != nil:
 		weh.logger.Error("Watch Failed",
-			slog.String("description", weh.description),
-			slog.String("kind", weh.kind),
+			slog.String(pkg.LogKeyDescription, weh.description),
+			slog.String(pkg.LogKeyKind, weh.kind),
 			log.Err(err))
 		errorType = "fail"
 	}
 
 	if weh.metricStorage != nil {
-		weh.metricStorage.CounterAdd(metrics.KubernetesClientWatchErrorsTotal, 1.0, map[string]string{"error_type": errorType})
+		weh.metricStorage.CounterAdd(metrics.KubernetesClientWatchErrorsTotal, 1.0, map[string]string{pkg.MetricKeyErrorType: errorType})
 	}
 }
 

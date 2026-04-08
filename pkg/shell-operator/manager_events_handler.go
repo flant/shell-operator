@@ -5,6 +5,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
@@ -65,7 +66,7 @@ func (m *ManagerEventsHandler) Start() {
 	go func() {
 		for {
 			var tailTasks []task.Task
-			logEntry := m.logger.With("operator.component", "handleEvents")
+			logEntry := m.logger.With(pkg.LogKeyOperatorComponent, "handleEvents")
 
 			ctx := context.Background()
 

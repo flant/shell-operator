@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 const (
@@ -102,7 +103,7 @@ func (ni *namespaceInformer) OnAdd(obj interface{}, _ bool) {
 		return
 	}
 	nsObj := obj.(*v1.Namespace)
-	log.Debug("NamespaceInformer: Added ns", slog.String("name", nsObj.Name))
+	log.Debug("NamespaceInformer: Added ns", slog.String(pkg.LogKeyName, nsObj.Name))
 	if ni.addFn != nil {
 		ni.addFn(nsObj.Name)
 	}
@@ -120,17 +121,17 @@ func (ni *namespaceInformer) OnDelete(obj interface{}) {
 		obj = staleObj.Obj
 	}
 	nsObj := obj.(*v1.Namespace)
-	log.Debug("NamespaceInformer: Deleted ns", slog.String("name", nsObj.Name))
+	log.Debug("NamespaceInformer: Deleted ns", slog.String(pkg.LogKeyName, nsObj.Name))
 	if ni.delFn != nil {
 		ni.delFn(nsObj.Name)
 	}
 }
 
 func (ni *namespaceInformer) start() {
-	log.Debug("Run namespace informer", slog.String("name", ni.Monitor.Metadata.DebugName))
+	log.Debug("Run namespace informer", slog.String(pkg.LogKeyName, ni.Monitor.Metadata.DebugName))
 	if ni.SharedInformer == nil {
 		log.Error("Possible BUG!!! Start called before createSharedInformer, ShredInformer is nil",
-			slog.String("debugName", ni.Monitor.Metadata.DebugName))
+			slog.String(pkg.LogKeyDebugName, ni.Monitor.Metadata.DebugName))
 		return
 	}
 	cctx, cancel := context.WithCancel(ni.ctx)
@@ -144,17 +145,17 @@ func (ni *namespaceInformer) start() {
 	go func() {
 		ni.SharedInformer.Run(cctx.Done())
 		close(ni.done)
-		log.Debug("Namespace informer goroutine exited", slog.String("name", ni.Monitor.Metadata.DebugName))
+		log.Debug("Namespace informer goroutine exited", slog.String(pkg.LogKeyName, ni.Monitor.Metadata.DebugName))
 	}()
 
 	if err := wait.PollUntilContextCancel(cctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 		return ni.SharedInformer.HasSynced(), nil
 	}); err != nil {
 		ni.Monitor.Logger.Error("Cache is not synced for informer",
-			slog.String("debugName", ni.Monitor.Metadata.DebugName))
+			slog.String(pkg.LogKeyDebugName, ni.Monitor.Metadata.DebugName))
 	}
 
-	log.Debug("Informer is ready", slog.String("debugName", ni.Monitor.Metadata.DebugName))
+	log.Debug("Informer is ready", slog.String(pkg.LogKeyDebugName, ni.Monitor.Metadata.DebugName))
 }
 
 func (ni *namespaceInformer) wait() {
@@ -162,10 +163,10 @@ func (ni *namespaceInformer) wait() {
 		for {
 			select {
 			case <-ni.done:
-				log.Debug("Namespace informer stopped", slog.String("name", ni.Monitor.Metadata.DebugName))
+				log.Debug("Namespace informer stopped", slog.String(pkg.LogKeyName, ni.Monitor.Metadata.DebugName))
 				return
 			case <-time.After(NamespaceInformerShutdownTimeout):
-				log.Warn("timeout waiting for namespace informer to stop", slog.String("name", ni.Monitor.Metadata.DebugName))
+				log.Warn("timeout waiting for namespace informer to stop", slog.String(pkg.LogKeyName, ni.Monitor.Metadata.DebugName))
 			}
 		}
 	}

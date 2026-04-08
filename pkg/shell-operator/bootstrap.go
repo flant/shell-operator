@@ -225,13 +225,16 @@ func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
 
 	// Initialize Hook manager.
 	cfg := &hook.ManagerConfig{
-		WorkingDir: hooksDir,
-		TempDir:    tempDir,
-		Kmgr:       op.KubeEventsManager,
-		Smgr:       op.ScheduleManager,
-		Wmgr:       op.AdmissionWebhookManager,
-		Cmgr:       op.ConversionWebhookManager,
-		Logger:     op.logger.Named("hook-manager"),
+		WorkingDir:               hooksDir,
+		TempDir:                  tempDir,
+		KubeEventsManager:        op.KubeEventsManager,
+		ScheduleManager:          op.ScheduleManager,
+		AdmissionWebhookManager:  op.AdmissionWebhookManager,
+		ConversionWebhookManager: op.ConversionWebhookManager,
+		KeepTemporaryHookFiles:   app.DebugKeepTmpFiles,
+		LogProxyHookJSON:         app.LogProxyHookJSON,
+		LogProxyHookJSONKey:      app.ProxyJsonLogKey,
+		Logger:                   op.logger.Named("hook-manager"),
 	}
 	op.HookManager = hook.NewHookManager(cfg)
 }

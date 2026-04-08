@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 // FileExists returns true if path exists
@@ -52,12 +54,12 @@ func RecursiveGetExecutablePaths(dir string, excludedDirs ...string) ([]string, 
 
 		if err := checkExecutableHookFile(f); err != nil {
 			if errors.Is(err, ErrFileNoExecutablePermissions) {
-				log.Warn("file is skipped", slog.String("path", path), log.Err(err))
+				log.Warn("file is skipped", slog.String(pkg.LogKeyPath, path), log.Err(err))
 
 				return nil
 			}
 
-			log.Debug("file is skipped", slog.String("path", path), log.Err(err))
+			log.Debug("file is skipped", slog.String(pkg.LogKeyPath, path), log.Err(err))
 
 			return nil
 		}
@@ -96,7 +98,7 @@ func RecursiveCheckLibDirectory(dir string) error {
 
 		if err := checkExecutableHookFile(f); err == nil {
 			log.Warn("file has executable permissions and is located in the ignored 'lib' directory",
-				slog.String("file", strings.TrimPrefix(path, dir)))
+				slog.String(pkg.LogKeyFile, strings.TrimPrefix(path, dir)))
 		}
 
 		return nil

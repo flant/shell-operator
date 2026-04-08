@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/task"
@@ -122,10 +123,10 @@ func (op *ShellOperator) combineBindingContextForHook(tqs *queue.TaskQueueSet, q
 		compactMsg = fmt.Sprintf("are combined to %d contexts", len(combinedContext))
 	}
 	op.logger.Info("Binding contexts from are dropped from queue",
-		slog.Int("count", len(otherTasks)+1),
-		slog.String("message", compactMsg),
-		slog.Int("dropped", len(tasksFilter)-1),
-		slog.String("queue", t.GetQueueName()))
+		slog.Int(pkg.LogKeyCount, len(otherTasks)+1),
+		slog.String(pkg.LogKeyMessage, compactMsg),
+		slog.Int(pkg.LogKeyDropped, len(tasksFilter)-1),
+		slog.String(pkg.LogKeyQueue, t.GetQueueName()))
 
 	res.BindingContexts = compactedContext
 	res.MonitorIDs = monitorIDs

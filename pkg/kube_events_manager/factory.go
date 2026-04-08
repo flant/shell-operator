@@ -13,20 +13,15 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 const (
 	FactoryShutdownTimeout = 30 * time.Second
 )
 
-var (
-	DefaultFactoryStore *FactoryStore
-	DefaultSyncTime     = 100 * time.Millisecond
-)
-
-func init() {
-	DefaultFactoryStore = NewFactoryStore()
-}
+var DefaultSyncTime = 100 * time.Millisecond
 
 type FactoryIndex struct {
 	GVR           schema.GroupVersionResource
@@ -76,14 +71,14 @@ func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinf
 	}
 
 	log.Debug("Factory store: added a new factory for index",
-		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 }
 
 func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index FactoryIndex) *Factory {
 	f, ok := c.data[index]
 	if ok {
 		log.Debug("Factory store: the factory with index found",
-			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 		return f
 	}
 
@@ -121,15 +116,15 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	registration, err := informer.AddEventHandler(handler)
 	if err != nil {
 		log.Warn("Factory store: couldn't add event handler to the factory's informer",
-			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()),
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
 			log.Err(err))
 	}
 
 	factory.handlerRegistrations[informerId] = registration
 
 	log.Debug("Factory store: increased usage counter of the factory",
-		slog.Int("value", len(factory.handlerRegistrations)),
-		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+		slog.Int(pkg.LogKeyValue, len(factory.handlerRegistrations)),
+		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 
 	// Ensure informer.Run is started once and tracked
 	if factory.done == nil {
@@ -141,7 +136,7 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 			close(factory.done)
 
 			log.Debug("Factory store: informer goroutine exited",
-				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 		}()
 	}
 
@@ -154,7 +149,7 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	}
 
 	log.Debug("Factory store: started informer",
-		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 
 	return nil
 }
@@ -172,19 +167,19 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 		err := f.shared.ForResource(index.GVR).Informer().RemoveEventHandler(handlerRegistration)
 		if err != nil {
 			log.Warn("Factory store: couldn't remove event handler from the factory's informer",
-				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()),
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
 				log.Err(err))
 		}
 
 		delete(f.handlerRegistrations, informerId)
 
 		log.Debug("Factory store: decreased usage counter of the factory",
-			slog.Int("value", len(f.handlerRegistrations)),
-			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+			slog.Int(pkg.LogKeyValue, len(f.handlerRegistrations)),
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 
 		if len(f.handlerRegistrations) == 0 {
 			log.Debug("Factory store: last handler removed, canceling shared informer",
-				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 
 			done := f.done
 
@@ -198,7 +193,7 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 			delete(c.data, index)
 
 			log.Debug("Factory store: deleted factory",
-				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 
 			if ch, ok := c.stoppedCh[index]; ok {
 				close(ch)
@@ -233,7 +228,7 @@ func (c *FactoryStore) WaitStopped(index FactoryIndex) {
 			return
 		case <-time.After(FactoryShutdownTimeout):
 			log.Warn("timeout waiting for factory to stop",
-				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 		}
 	}
 }

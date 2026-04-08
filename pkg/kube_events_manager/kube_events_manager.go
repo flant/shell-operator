@@ -11,6 +11,7 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	klient "github.com/flant/kube-client/client"
+	pkg "github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -39,6 +40,8 @@ type kubeEventsManager struct {
 	cancel        context.CancelFunc
 	metricStorage metricsstorage.Storage
 
+	factoryStore *FactoryStore
+
 	m        sync.RWMutex
 	Monitors map[string]Monitor
 
@@ -52,13 +55,14 @@ var _ KubeEventsManager = (*kubeEventsManager)(nil)
 func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) *kubeEventsManager {
 	cctx, cancel := context.WithCancel(ctx)
 	em := &kubeEventsManager{
-		ctx:         cctx,
-		cancel:      cancel,
-		KubeClient:  client,
-		m:           sync.RWMutex{},
-		Monitors:    make(map[string]Monitor),
-		KubeEventCh: make(chan kemtypes.KubeEvent, 1),
-		logger:      logger,
+		ctx:          cctx,
+		cancel:       cancel,
+		KubeClient:   client,
+		factoryStore: NewFactoryStore(),
+		m:            sync.RWMutex{},
+		Monitors:     make(map[string]Monitor),
+		KubeEventCh:  make(chan kemtypes.KubeEvent, 1),
+		logger:       logger,
 	}
 	return em
 }
@@ -72,11 +76,12 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor metricsstorage.Storage) {
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	log.Debug("Add MONITOR",
-		slog.String("config", fmt.Sprintf("%+v", monitorConfig)))
+		slog.String(pkg.LogKeyConfig, fmt.Sprintf("%+v", monitorConfig)))
 	monitor := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,
 		mgr.metricStorage,
+		mgr.factoryStore,
 		monitorConfig,
 		func(ev kemtypes.KubeEvent) {
 			defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()

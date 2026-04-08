@@ -9,6 +9,8 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 type WatchEventType string
@@ -72,7 +74,7 @@ func (o ObjectAndFilterResult) Map() map[string]interface{} {
 		err := json.Unmarshal([]byte(filterResString), &filterResultValue)
 		if err != nil {
 			log.Error("Possible bug!!! Cannot unmarshal jq filter result",
-				slog.String("jqFilter", o.Metadata.JqFilter),
+				slog.String(pkg.LogKeyJqFilter, o.Metadata.JqFilter),
 				log.Err(err))
 			m["filterResult"] = nil
 			return m

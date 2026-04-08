@@ -65,8 +65,8 @@ func (w *ValidatingWebhookResource) Register() error {
 		}
 
 		w.logger.Info("Add path to config",
-			slog.String("path", *webhook.ClientConfig.Service.Path),
-			slog.String("configurationName", w.opts.ConfigurationName))
+			slog.String(pkg.LogKeyPath, *webhook.ClientConfig.Service.Path),
+			slog.String(pkg.LogKeyConfigurationName, w.opts.ConfigurationName))
 
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.ValidatingWebhook)
 	}
@@ -97,7 +97,7 @@ func createWebhookPath(webhook IWebhookConfig) *string {
 }
 
 func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfiguration) error {
-	logger := w.logger.With(slog.String("name", conf.Name))
+	logger := w.logger.With(slog.String(pkg.LogKeyName, conf.Name))
 	client := w.opts.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations()
 
 	listOpts := metav1.ListOptions{
@@ -166,8 +166,8 @@ func (w *MutatingWebhookResource) Register() error {
 		}
 
 		w.logger.Info("Add path to config",
-			slog.String("path", *webhook.ClientConfig.Service.Path),
-			slog.String("configurationName", w.opts.ConfigurationName))
+			slog.String(pkg.LogKeyPath, *webhook.ClientConfig.Service.Path),
+			slog.String(pkg.LogKeyConfigurationName, w.opts.ConfigurationName))
 
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.MutatingWebhook)
 	}
@@ -181,7 +181,7 @@ func (w *MutatingWebhookResource) Unregister() error {
 }
 
 func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) error {
-	logger := w.logger.With(slog.String("name", conf.Name))
+	logger := w.logger.With(slog.String(pkg.LogKeyName, conf.Name))
 	client := w.opts.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations()
 
 	listOpts := metav1.ListOptions{

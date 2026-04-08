@@ -73,7 +73,8 @@ func Test_Operator_startup_tasks(t *testing.T) {
 		}
 
 		expect := expectTasks[i]
-		hm := HookMetadataAccessor(tsk)
+		hm, ok := HookMetadataAccessor(tsk)
+		g.Expect(ok).To(BeTrue(), "HookMetadataAccessor should succeed for task %d", i)
 		g.Expect(tsk.GetType()).To(Equal(expect.taskType), "task type should match for task %d, got %+v %+v", i, tsk, hm)
 		g.Expect(hm.BindingType).To(Equal(expect.bindingType), "binding should match for task %d, got %+v %+v", i, tsk, hm)
 		g.Expect(hm.HookName).To(HavePrefix(expect.hookPrefix), "hook name should match for task %d, got %+v %+v", i, tsk, hm)

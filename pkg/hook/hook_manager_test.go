@@ -25,12 +25,12 @@ func newHookManager(t *testing.T, testdataDir string) *Manager {
 	admissionManager.Settings = admission.DefaultSettings
 
 	cfg := &ManagerConfig{
-		WorkingDir: hooksDir,
-		TempDir:    t.TempDir(),
-		Kmgr:       nil,
-		Smgr:       nil,
-		Wmgr:       admissionManager,
-		Cmgr:       conversionManager,
+		WorkingDir:               hooksDir,
+		TempDir:                  t.TempDir(),
+		KubeEventsManager:        nil,
+		ScheduleManager:          nil,
+		AdmissionWebhookManager:  admissionManager,
+		ConversionWebhookManager: conversionManager,
 
 		Logger: log.NewNop(),
 	}
@@ -383,5 +383,68 @@ func Test_HookManager_onstartup_order(t *testing.T) {
 		}
 		g.Expect(currOrder >= prevOrder).To(BeTrue(), "previous hook should not have greater order")
 		g.Expect(hookName).To(Equal(expectNames[i]))
+	}
+}
+
+func Test_ManagerConfig_HookOptions_PropagateToManager(t *testing.T) {
+	conversionManager := conversion.NewWebhookManager()
+	conversionManager.Settings = conversion.DefaultSettings
+
+	admissionManager := admission.NewWebhookManager(nil)
+	admissionManager.Settings = admission.DefaultSettings
+
+	cfg := &ManagerConfig{
+		WorkingDir:               t.TempDir(),
+		TempDir:                  t.TempDir(),
+		KubeEventsManager:        nil,
+		ScheduleManager:          nil,
+		AdmissionWebhookManager:  admissionManager,
+		ConversionWebhookManager: conversionManager,
+		KeepTemporaryHookFiles:   true,
+		LogProxyHookJSON:         true,
+		LogProxyHookJSONKey:      "myJsonKey",
+		Logger:                   log.NewNop(),
+	}
+
+	hm := NewHookManager(cfg)
+
+	// Verify options are stored and used when creating hooks.
+	// NewHook uses hm.keepTemporaryHookFiles / logProxyHookJSON / logProxyHookJSONKey.
+	hook := NewHook("test", "test/path",
+		hm.keepTemporaryHookFiles,
+		hm.logProxyHookJSON,
+		hm.logProxyHookJSONKey,
+		hm.logger.Named("hook"),
+	)
+
+	if hook.KeepTemporaryHookFiles != true {
+		t.Fatalf("expected KeepTemporaryHookFiles=true, got false")
+	}
+	if hook.LogProxyHookJSON != true {
+		t.Fatalf("expected LogProxyHookJSON=true, got false")
+	}
+	if hook.LogProxyHookJSONKey != "myJsonKey" {
+		t.Fatalf("expected LogProxyHookJSONKey=myJsonKey, got %q", hook.LogProxyHookJSONKey)
+	}
+}
+
+func Test_ManagerConfig_RenamedFields_CompileCheck(t *testing.T) {
+	// This test validates that the old abbreviated field names (Kmgr, Smgr, Wmgr, Cmgr)
+	// no longer exist and the self-documenting names are used. Compilation of this file
+	// itself is the key check; we also verify that zero-value construction works.
+	cfg := &ManagerConfig{
+		WorkingDir:               "",
+		TempDir:                  "",
+		KubeEventsManager:        nil,
+		ScheduleManager:          nil,
+		AdmissionWebhookManager:  nil,
+		ConversionWebhookManager: nil,
+		Logger:                   log.NewNop(),
+	}
+	if cfg.KubeEventsManager != nil {
+		t.Fatal("expected nil KubeEventsManager")
+	}
+	if cfg.ScheduleManager != nil {
+		t.Fatal("expected nil ScheduleManager")
 	}
 }

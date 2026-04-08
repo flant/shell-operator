@@ -8,6 +8,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -70,7 +71,7 @@ func (tqs *TaskQueueSet) Start(ctx context.Context) {
 	tqs.IterateSnapshot(ctx, func(ctx context.Context, queue *TaskQueue) {
 		defer func() {
 			if r := recover(); r != nil {
-				tqs.logger.Warn("panic recovered in Start", slog.Any("error", r))
+				tqs.logger.Warn("panic recovered in Start", slog.Any(pkg.LogKeyError, r))
 			}
 		}()
 
@@ -116,22 +117,22 @@ func (tqs *TaskQueueSet) GetMain() *TaskQueue {
 }
 
 func (tqs *TaskQueueSet) AddTailTasks(tasks ...task.Task) {
-	tqs.logger.Debug("AddTailTasks: adding tasks to queues", slog.Int("tasksCount", len(tasks)))
+	tqs.logger.Debug("AddTailTasks: adding tasks to queues", slog.Int(pkg.LogKeyTasksCount, len(tasks)))
 
 	for _, resTask := range tasks {
 		q, ok := tqs.Queues.Get(resTask.GetQueueName())
 		if ok {
 			tqs.logger.Debug("AddTailTasks: adding task to queue",
-				slog.String("queueName", resTask.GetQueueName()),
-				slog.String("description", resTask.GetDescription()))
+				slog.String(pkg.LogKeyQueueName, resTask.GetQueueName()),
+				slog.String(pkg.LogKeyDescription, resTask.GetDescription()))
 			q.AddLast(resTask)
 
 			continue
 		}
 
 		log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
-			slog.String("queueName", resTask.GetQueueName()),
-			slog.String("description", resTask.GetDescription()))
+			slog.String(pkg.LogKeyQueueName, resTask.GetQueueName()),
+			slog.String(pkg.LogKeyDescription, resTask.GetDescription()))
 	}
 
 	tqs.logger.Debug("AddTailTasks: adding tasks to queues done")
@@ -190,7 +191,7 @@ func (tqs *TaskQueueSet) IterateSnapshot(ctx context.Context, doFn func(ctx cont
 	// Execute callbacks without holding any locks
 	defer func() {
 		if r := recover(); r != nil {
-			tqs.logger.Warn("panic recovered in IterateSnapshot", slog.Any("error", r))
+			tqs.logger.Warn("panic recovered in IterateSnapshot", slog.Any(pkg.LogKeyError, r))
 		}
 	}()
 

@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 )
 
@@ -63,7 +64,7 @@ func GetPatchStatusOperationsOnHookError(operations []sdkpkg.PatchCollectorOpera
 }
 
 func ParseOperations(specBytes []byte) ([]sdkpkg.PatchCollectorOperation, error) {
-	log.Debug("parsing patcher operations", slog.String("value", string(specBytes)))
+	log.Debug("parsing patcher operations", slog.String(pkg.LogKeyValue, string(specBytes)))
 
 	specs, err := unmarshalFromJSONOrYAML(specBytes)
 	if err != nil {

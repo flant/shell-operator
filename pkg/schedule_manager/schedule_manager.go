@@ -8,6 +8,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
@@ -61,7 +62,7 @@ func (sm *scheduleManager) Stop() {
 // Crontab string should be validated with cron.Parse
 // function before pass to Add.
 func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
-	logEntry := sm.logger.With("operator.component", "scheduleManager")
+	logEntry := sm.logger.With(pkg.LogKeyOperatorComponent, "scheduleManager")
 	if newEntry.Crontab == "" {
 		logEntry.Error("crontab is empty")
 		return
@@ -74,15 +75,15 @@ func (sm *scheduleManager) Add(newEntry smtypes.ScheduleEntry) {
 	// If no entry, then add new scheduled function and save CronEntry.
 	if !hasCronEntry {
 		entryId, err := sm.cron.AddFunc(newEntry.Crontab, func() {
-			logEntry.Debug("fire schedule event for entry", slog.String("crontab", newEntry.Crontab))
+			logEntry.Debug("fire schedule event for entry", slog.String(pkg.LogKeyCrontab, newEntry.Crontab))
 			sm.ScheduleCh <- newEntry.Crontab
 		})
 		if err != nil {
-			logEntry.Error("invalid crontab", slog.String("crontab", newEntry.Crontab), slog.Any("error", err))
+			logEntry.Error("invalid crontab", slog.String(pkg.LogKeyCrontab, newEntry.Crontab), slog.Any(pkg.LogKeyError, err))
 			return
 		}
 
-		logEntry.Debug("entry added", slog.String("crontab", newEntry.Crontab))
+		logEntry.Debug("entry added", slog.String(pkg.LogKeyCrontab, newEntry.Crontab))
 
 		sm.Entries[newEntry.Crontab] = CronEntry{
 			EntryID: entryId,
@@ -122,8 +123,8 @@ func (sm *scheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
 	if len(sm.Entries[delEntry.Crontab].Ids) == 0 {
 		sm.cron.Remove(sm.Entries[delEntry.Crontab].EntryID)
 		delete(sm.Entries, delEntry.Crontab)
-		sm.logger.With("operator.component", "scheduleManager").
-			Debug("entry deleted", slog.String("name", delEntry.Crontab))
+		sm.logger.With(pkg.LogKeyOperatorComponent, "scheduleManager").
+			Debug("entry deleted", slog.String(pkg.LogKeyName, delEntry.Crontab))
 	}
 }
 

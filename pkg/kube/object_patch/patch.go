@@ -39,7 +39,7 @@ type KubeClient interface {
 func NewObjectPatcher(kubeClient KubeClient, logger *log.Logger) *ObjectPatcher {
 	return &ObjectPatcher{
 		kubeClient: kubeClient,
-		logger:     logger.With("operator.component", "KubernetesObjectPatcher"),
+		logger:     logger.With(pkg.LogKeyOperatorComponent, "KubernetesObjectPatcher"),
 	}
 }
 
@@ -49,7 +49,7 @@ func (o *ObjectPatcher) ExecuteOperations(ops []sdkpkg.PatchCollectorOperation) 
 
 	applyErrors := &multierror.Error{}
 	for _, op := range ops {
-		log.Debug("Applying operation", slog.String("name", op.Description()))
+		log.Debug("Applying operation", slog.String(pkg.LogKeyName, op.Description()))
 		if err := o.ExecuteOperation(op); err != nil {
 			err = gerror.WithMessage(err, op.Description())
 			applyErrors = multierror.Append(applyErrors, err)
