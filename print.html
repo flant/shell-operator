@@ -307,33 +307,41 @@ shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type co
 <table><thead><tr><th>CLI flag</th><th>Env-Variable name</th><th>Default</th><th>Description</th></tr></thead><tbody>
 <tr><td>--hooks-dir</td><td>SHELL_OPERATOR_HOOKS_DIR</td><td><code>&quot;&quot;</code></td><td>A path to a hooks file structure</td></tr>
 <tr><td>--tmp-dir</td><td>SHELL_OPERATOR_TMP_DIR</td><td><code>&quot;/tmp/shell-operator&quot;</code></td><td>A path to store temporary files with data for hooks</td></tr>
-<tr><td>--listen-address</td><td>SHELL_OPERATOR_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address to use for HTTP serving.</td></tr>
-<tr><td>--listen-port</td><td>SHELL_OPERATOR_LISTEN_PORT</td><td><code>&quot;9115&quot;</code></td><td>Port to use for HTTP serving.</td></tr>
+<tr><td>--listen-address</td><td>SHELL_OPERATOR_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address to use to serve metrics to Prometheus.</td></tr>
+<tr><td>--listen-port</td><td>SHELL_OPERATOR_LISTEN_PORT</td><td><code>&quot;9115&quot;</code></td><td>Port to use to serve metrics to Prometheus.</td></tr>
 <tr><td>--prometheus-metrics-prefix</td><td>SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX</td><td><code>&quot;shell_operator_&quot;</code></td><td>A prefix for metrics names.</td></tr>
+<tr><td>--namespace</td><td>SHELL_OPERATOR_NAMESPACE</td><td><code>&quot;&quot;</code></td><td>A namespace of a shell-operator. Used to set up validating webhooks.</td></tr>
 <tr><td>--kube-context</td><td>KUBE_CONTEXT</td><td><code>&quot;&quot;</code></td><td>The name of the kubeconfig context to use. (as a <code>--context</code> flag of kubectl)</td></tr>
 <tr><td>--kube-config</td><td>KUBE_CONFIG</td><td><code>&quot;&quot;</code></td><td>Path to the kubeconfig file. (as a <code>$KUBECONFIG</code> for kubectl)</td></tr>
-<tr><td>--kube-client-qps</td><td>KUBE_CLIENT_QPS</td><td><code>5</code></td><td>QPS for rate limiter of k8s.io/client-go</td></tr>
-<tr><td>--kube-client-burst</td><td>KUBE_CLIENT_BURST</td><td><code>10</code></td><td>burst for rate limiter of k8s.io/client-go</td></tr>
-<tr><td>--object-patcher-kube-client-timeout</td><td>OBJECT_PATCHER_KUBE_CLIENT_TIMEOUT</td><td><code>10s</code></td><td>timeout for object patcher’s requests to the Kubernetes API server</td></tr>
+<tr><td>--kube-server</td><td>KUBE_SERVER</td><td><code>&quot;&quot;</code></td><td>The address and port of the Kubernetes API server. (as a <code>--server</code> flag of kubectl)</td></tr>
+<tr><td>--kube-client-qps</td><td>KUBE_CLIENT_QPS</td><td><code>5</code></td><td>QPS for rate limiter of a Kubernetes client for hook events.</td></tr>
+<tr><td>--kube-client-burst</td><td>KUBE_CLIENT_BURST</td><td><code>10</code></td><td>Burst for rate limiter of a Kubernetes client for hook events.</td></tr>
+<tr><td>--object-patcher-kube-client-qps</td><td>OBJECT_PATCHER_KUBE_CLIENT_QPS</td><td><code>5</code></td><td>QPS for a rate limiter of a Kubernetes client for Object patcher.</td></tr>
+<tr><td>--object-patcher-kube-client-burst</td><td>OBJECT_PATCHER_KUBE_CLIENT_BURST</td><td><code>10</code></td><td>Burst for a rate limiter of a Kubernetes client for Object patcher.</td></tr>
+<tr><td>--object-patcher-kube-client-timeout</td><td>OBJECT_PATCHER_KUBE_CLIENT_TIMEOUT</td><td><code>10s</code></td><td>Timeout for object patcher’s requests to the Kubernetes API server.</td></tr>
 <tr><td>--jq-library-path</td><td>JQ_LIBRARY_PATH</td><td><code>&quot;&quot;</code></td><td>Prepend directory to the search list for jq modules (works as <code>jq -L</code>).</td></tr>
-<tr><td>n/a</td><td>JQ_EXEC</td><td><code>&quot;&quot;</code></td><td>Set to <code>yes</code> to use jq as executable — it is more for <strong>developing purposes</strong>.</td></tr>
 <tr><td>--log-level</td><td>LOG_LEVEL</td><td><code>&quot;info&quot;</code></td><td>Logging level: <code>debug</code>, <code>info</code>, <code>error</code>.</td></tr>
 <tr><td>--log-type</td><td>LOG_TYPE</td><td><code>&quot;text&quot;</code></td><td>Logging formatter type: <code>json</code>, <code>text</code> or <code>color</code>.</td></tr>
 <tr><td>--log-no-time</td><td>LOG_NO_TIME</td><td><code>false</code></td><td>Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps.</td></tr>
 <tr><td>--log-proxy-hook-json</td><td>LOG_PROXY_HOOK_JSON</td><td><code>false</code></td><td>Delegate hook stdout/ stderr JSON logging to the hooks and act as a proxy that adds some extra fields before just printing the output. <strong>NOTE: It ignores <code>LOG_TYPE</code> for the output of the hooks; expects JSON lines to stdout/ stderr from the hooks</strong></td></tr>
-<tr><td>--debug-keep-tmp-files</td><td>DEBUG_KEEP_TMP_FILES</td><td><code>&quot;no&quot;</code></td><td>Set to <code>yes</code> to keep files in $SHELL_OPERATOR_TMP_DIR for debugging purposes. Note that it can generate many files.</td></tr>
+<tr><td>--debug-keep-tmp-files</td><td>DEBUG_KEEP_TMP_FILES</td><td><code>false</code></td><td>Set to <code>true</code> to keep files in $SHELL_OPERATOR_TMP_DIR for debugging purposes. Note that it can generate many files.</td></tr>
 <tr><td>--debug-unix-socket</td><td>DEBUG_UNIX_SOCKET</td><td><code>&quot;/var/run/shell-operator/debug.socket&quot;</code></td><td>Path to the unix socket file for debugging purposes.</td></tr>
 <tr><td>--validating-webhook-configuration-name</td><td>VALIDATING_WEBHOOK_CONFIGURATION_NAME</td><td><code>&quot;shell-operator-hooks&quot;</code></td><td>A name of a ValidatingWebhookConfiguration resource.</td></tr>
 <tr><td>--validating-webhook-service-name</td><td>VALIDATING_WEBHOOK_SERVICE_NAME</td><td><code>&quot;shell-operator-validating-svc&quot;</code></td><td>A name of a service used in ValidatingWebhookConfiguration.</td></tr>
 <tr><td>--validating-webhook-server-cert</td><td>VALIDATING_WEBHOOK_SERVER_CERT</td><td><code>&quot;/validating-certs/tls.crt&quot;</code></td><td>A path to a server certificate for service used in ValidatingWebhookConfiguration.</td></tr>
 <tr><td>--validating-webhook-server-key</td><td>VALIDATING_WEBHOOK_SERVER_KEY</td><td><code>&quot;/validating-certs/tls.key&quot;</code></td><td>A path to a server private key for service used in ValidatingWebhookConfiguration.</td></tr>
 <tr><td>--validating-webhook-ca</td><td>VALIDATING_WEBHOOK_CA</td><td><code>&quot;/validating-certs/ca.crt&quot;</code></td><td>A path to a ca certificate for ValidatingWebhookConfiguration.</td></tr>
-<tr><td>--validating-webhook-client-ca</td><td>VALIDATING_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a server certificate for ValidatingWebhookConfiguration.</td></tr>
+<tr><td>--validating-webhook-client-ca</td><td>VALIDATING_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a client CA certificate for ValidatingWebhookConfiguration (can be set multiple times).</td></tr>
+<tr><td>--validating-webhook-failure-policy</td><td>VALIDATING_WEBHOOK_FAILURE_POLICY</td><td><code>&quot;Fail&quot;</code></td><td>Default failure policy for ValidatingWebhookConfiguration (<code>Fail</code> or <code>Ignore</code>).</td></tr>
+<tr><td>--validating-webhook-listen-port</td><td>VALIDATING_WEBHOOK_LISTEN_PORT</td><td><code>&quot;9680&quot;</code></td><td>Port for the validating webhook HTTPS server.</td></tr>
+<tr><td>--validating-webhook-listen-address</td><td>VALIDATING_WEBHOOK_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address for the validating webhook HTTPS server.</td></tr>
 <tr><td>--conversion-webhook-service-name</td><td>CONVERSION_WEBHOOK_SERVICE_NAME</td><td><code>&quot;shell-operator-conversion-svc&quot;</code></td><td>A name of a service for clientConfig in CRD.</td></tr>
 <tr><td>--conversion-webhook-server-cert</td><td>CONVERSION_WEBHOOK_SERVER_CERT</td><td><code>&quot;/conversion-certs/tls.crt&quot;</code></td><td>A path to a server certificate for clientConfig in CRD.</td></tr>
 <tr><td>--conversion-webhook-server-key</td><td>CONVERSION_WEBHOOK_SERVER_KEY</td><td><code>&quot;/conversion-certs/tls.key&quot;</code></td><td>A path to a server private key for clientConfig in CRD.</td></tr>
 <tr><td>--conversion-webhook-ca</td><td>CONVERSION_WEBHOOK_CA</td><td><code>&quot;/conversion-certs/ca.crt&quot;</code></td><td>A path to a ca certificate for clientConfig in CRD.</td></tr>
-<tr><td>--conversion-webhook-client-ca</td><td>CONVERSION_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a server certificate for CRD.spec.conversion.webhook.</td></tr>
+<tr><td>--conversion-webhook-client-ca</td><td>CONVERSION_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a client CA certificate for CRD.spec.conversion.webhook (can be set multiple times).</td></tr>
+<tr><td>--conversion-webhook-listen-port</td><td>CONVERSION_WEBHOOK_LISTEN_PORT</td><td><code>&quot;9681&quot;</code></td><td>Port for the conversion webhook HTTPS server.</td></tr>
+<tr><td>--conversion-webhook-listen-address</td><td>CONVERSION_WEBHOOK_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address for the conversion webhook HTTPS server.</td></tr>
 </tbody></table>
 <h3 id="notes-on-json-log-proxying"><a class="header" href="#notes-on-json-log-proxying">Notes on JSON log proxying</a></h3>
 <ul>
@@ -419,6 +427,9 @@ kubernetes:
 kubernetesValidating:
 - {VALIDATING_PARAMETERS}
 - {VALIDATING_PARAMETERS}
+kubernetesCustomResourceConversion:
+- {CONVERSION_PARAMETERS}
+- {CONVERSION_PARAMETERS}
 settings:
   SETTINGS_PARAMETERS
 </code></pre>
@@ -437,6 +448,14 @@ settings:
   &quot;kubernetesValidating&quot;: [
     {VALIDATING_PARAMETERS},
     {VALIDATING_PARAMETERS}
+  ],
+  &quot;kubernetesMutating&quot;: [
+    {MUTATING_PARAMETERS},
+    {MUTATING_PARAMETERS}
+  ],
+  &quot;kubernetesCustomResourceConversion&quot;: [
+    {CONVERSION_PARAMETERS},
+    {CONVERSION_PARAMETERS}
   ],
   &quot;settings&quot;: {SETTINGS_PARAMETERS}
 }
@@ -508,7 +527,9 @@ kubernetes:
   kind: Pod  # required
   executeHookOnEvent: [ &quot;Added&quot;, &quot;Modified&quot;, &quot;Deleted&quot; ]
   executeHookOnSynchronization: true|false # default is true
+  waitForSynchronization: true|false # default is true
   keepFullObjectsInMemory: true|false # default is true
+  resynchronizationPeriod: &quot;1h&quot;
   nameSelector:
     matchNames:
     - pod-0
@@ -611,6 +632,12 @@ If the selector is not set, then all objects of a specified kind are monitored.<
 <p><code>keepFullObjectsInMemory</code> — if not set or <code>true</code>, dumps of Kubernetes resources are cached for this binding, and the snapshot includes them as <code>object</code> fields. Set to <code>false</code> if the hook does not rely on full objects to reduce the memory footprint.</p>
 </li>
 <li>
+<p><code>waitForSynchronization</code> — if <code>false</code>, Shell-operator will not wait for a hook’s Synchronization to complete before processing further events for named queues. Default is <code>true</code>. Can only be set to <code>false</code> when <code>queue</code> is also explicitly specified.</p>
+</li>
+<li>
+<p><code>resynchronizationPeriod</code> — a period in Go duration format (e.g. <code>1h</code>, <code>30m</code>) after which a full resynchronization (re-list + re-watch) of Kubernetes objects is issued for this binding. Useful to recover from missed watch events.</p>
+</li>
+<li>
 <p><code>group</code> — a key that define a group of <code>schedule</code> and <code>kubernetes</code> bindings. See <a href="HOOKS.html#binding-context-of-grouped-bindings">grouping</a>.</p>
 </li>
 </ul>
@@ -693,7 +720,7 @@ fieldSelector:
 <h5 id="fieldselector-and-labelselector-expressions-are-anded"><a class="header" href="#fieldselector-and-labelselector-expressions-are-anded">fieldSelector and labelSelector expressions are ANDed</a></h5>
 <p>Objects should match all expressions defined in <code>fieldSelector</code> and <code>labelSelector</code>, so, for example, multiple <code>fieldSelector</code> expressions with <code>metadata.name</code> field and different values will not match any object.</p>
 <h3 id="kubernetesvalidating"><a class="header" href="#kubernetesvalidating">kubernetesValidating</a></h3>
-<p>Use a hook as handler for <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers">ValidationWebhookConfiguration</a>.</p>
+<p>Use a hook as handler for <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers">ValidatingWebhookConfiguration</a>.</p>
 <p>See syntax and parameters in <a href="BINDING_VALIDATING.html">BINDING_VALIDATING.md</a></p>
 <h3 id="kubernetescustomresourceconversion"><a class="header" href="#kubernetescustomresourceconversion">kubernetesCustomResourceConversion</a></h3>
 <p>Use a hook as handler for <a href="https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning">custom resource conversion</a>.</p>
@@ -701,7 +728,7 @@ fieldSelector:
 <h2 id="binding-context"><a class="header" href="#binding-context">Binding context</a></h2>
 <p>When an event associated with a hook is triggered, Shell-operator executes the hook without arguments. The information about the event that led to the hook execution is called the <strong>binding context</strong> and is written in JSON format to a temporary file. The path to this file is available to hook via environment variable <code>BINDING_CONTEXT_PATH</code>.</p>
 <p>Temporary files have unique names to prevent collisions between queues and are deleted after the hook run.</p>
-<p>Binging context is a JSON-array of structures with the following fields:</p>
+<p>Binding context is a JSON-array of structures with the following fields:</p>
 <ul>
 <li><code>binding</code> — a string from the <code>name</code> parameter. If this parameter has not been set in the binding configuration, then strings “schedule” or “kubernetes” are used. For a hook executed at startup, this value is always “onStartup”.</li>
 <li><code>type</code> — “Schedule” for <code>schedule</code> bindings. “Synchronization” or “Event” for <code>kubernetes</code> bindings. “Group” if <code>group</code> is defined.</li>
@@ -1408,7 +1435,7 @@ kubernetesValidating:
 <blockquote>
 <p>Note that the <code>group</code> parameter is only for including snapshots. <code>kubernetesValidating</code> hook is never executed on <code>schedule</code> or <code>kubernetes</code> events with binding context with <code>&quot;type&quot;:&quot;Group&quot;</code>.</p>
 </blockquote>
-<p>The hook receives a binding context and should return response in <code>$VALIDATING_RESPONSE_PATH</code>.</p>
+<p>The hook receives a binding context and should return response in <code>$VALIDATING_RESPONSE_PATH</code> (also available as <code>$ADMISSION_RESPONSE_PATH</code>).</p>
 <p>$BINDING_CONTEXT_PATH file example:</p>
 <pre><code class="language-yaml">[{
 # Name as defined in binding configuration.
@@ -1527,8 +1554,17 @@ EOF
                                  A path to a ca certificate for ValidatingWebhookConfiguration. Can be set
                                  with $VALIDATING_WEBHOOK_CA.
   --validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
-                                 A path to a server certificate for ValidatingWebhookConfiguration. Can be
-                                 set with $VALIDATING_WEBHOOK_CLIENT_CA.
+                                 A path to a client CA certificate for ValidatingWebhookConfiguration (can
+                                 be set multiple times). Can be set with $VALIDATING_WEBHOOK_CLIENT_CA.
+  --validating-webhook-failure-policy=&quot;Fail&quot;
+                                 Default failure policy for ValidatingWebhookConfiguration (Fail or
+                                 Ignore). Can be set with $VALIDATING_WEBHOOK_FAILURE_POLICY.
+  --validating-webhook-listen-port=&quot;9680&quot;
+                                 Port for the validating webhook HTTPS server. Can be set with
+                                 $VALIDATING_WEBHOOK_LISTEN_PORT.
+  --validating-webhook-listen-address=&quot;0.0.0.0&quot;
+                                 Address for the validating webhook HTTPS server. Can be set with
+                                 $VALIDATING_WEBHOOK_LISTEN_ADDRESS.
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="kubernetescustomresourceconversion-1"><a class="header" href="#kubernetescustomresourceconversion-1">kubernetesCustomResourceConversion</a></h1>
 <p>This binding transforms a hook into a handler for conversions defined in CustomResourceDefinition. The Shell-operator updates a CRD with .spec.conversion, starts HTTPS server, and runs hooks to handle <a href="https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#conversionreview-request-0">ConversionReview requests</a>.</p>
@@ -1550,7 +1586,7 @@ kubernetesCustomResourceConversion:
   # A CRD name.
   crdName: crontabs.stable.example.com
   # An array of conversions supported by this hook.
-  conversion:
+  conversions:
   - fromVersion: stable.example.com/v1alpha1
     toVersion: stable.example.com/v1alpha2
 </code></pre>
@@ -1748,10 +1784,7 @@ EOF
 <p><code>shell_operator_kube_snapshot_objects{hook=&quot;&quot;, binding=&quot;&quot;, queue=&quot;&quot;}</code> — a gauge with count of cached objects (the snapshot) for particular binding.</p>
 </li>
 <li>
-<p><code>shell_operator_kubernetes_client_request_result_total</code> — a counter of requests made by kubernetes/client-go library.</p>
-</li>
-<li>
-<p><code>shell_operator_kubernetes_client_request_latency_seconds</code> — a histogram with latency of requests made by kubernetes/client-go library. </p>
+<p><code>shell_operator_kubernetes_client_watch_errors_total{error_type=&quot;&quot;}</code> — a counter of watch errors from the Kubernetes client.</p>
 </li>
 <li>
 <p><code>shell_operator_tasks_queue_action_duration_seconds{queue_name=&quot;&quot;, queue_action=&quot;&quot;}</code> — a histogram with measurements of low level queue operations. Use QUEUE_ACTIONS_METRICS=”no” to disable this metric.</p>

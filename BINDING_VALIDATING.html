@@ -255,7 +255,7 @@ kubernetesValidating:
 <blockquote>
 <p>Note that the <code>group</code> parameter is only for including snapshots. <code>kubernetesValidating</code> hook is never executed on <code>schedule</code> or <code>kubernetes</code> events with binding context with <code>&quot;type&quot;:&quot;Group&quot;</code>.</p>
 </blockquote>
-<p>The hook receives a binding context and should return response in <code>$VALIDATING_RESPONSE_PATH</code>.</p>
+<p>The hook receives a binding context and should return response in <code>$VALIDATING_RESPONSE_PATH</code> (also available as <code>$ADMISSION_RESPONSE_PATH</code>).</p>
 <p>$BINDING_CONTEXT_PATH file example:</p>
 <pre><code class="language-yaml">[{
 # Name as defined in binding configuration.
@@ -374,8 +374,17 @@ EOF
                                  A path to a ca certificate for ValidatingWebhookConfiguration. Can be set
                                  with $VALIDATING_WEBHOOK_CA.
   --validating-webhook-client-ca=VALIDATING-WEBHOOK-CLIENT-CA ...
-                                 A path to a server certificate for ValidatingWebhookConfiguration. Can be
-                                 set with $VALIDATING_WEBHOOK_CLIENT_CA.
+                                 A path to a client CA certificate for ValidatingWebhookConfiguration (can
+                                 be set multiple times). Can be set with $VALIDATING_WEBHOOK_CLIENT_CA.
+  --validating-webhook-failure-policy=&quot;Fail&quot;
+                                 Default failure policy for ValidatingWebhookConfiguration (Fail or
+                                 Ignore). Can be set with $VALIDATING_WEBHOOK_FAILURE_POLICY.
+  --validating-webhook-listen-port=&quot;9680&quot;
+                                 Port for the validating webhook HTTPS server. Can be set with
+                                 $VALIDATING_WEBHOOK_LISTEN_PORT.
+  --validating-webhook-listen-address=&quot;0.0.0.0&quot;
+                                 Address for the validating webhook HTTPS server. Can be set with
+                                 $VALIDATING_WEBHOOK_LISTEN_ADDRESS.
 </code></pre>
 
                     </main>

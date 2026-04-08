@@ -174,33 +174,41 @@ shell-operator start --hooks-dir $(pwd)/hooks --tmp-dir $(pwd)/tmp --log-type co
 <table><thead><tr><th>CLI flag</th><th>Env-Variable name</th><th>Default</th><th>Description</th></tr></thead><tbody>
 <tr><td>--hooks-dir</td><td>SHELL_OPERATOR_HOOKS_DIR</td><td><code>&quot;&quot;</code></td><td>A path to a hooks file structure</td></tr>
 <tr><td>--tmp-dir</td><td>SHELL_OPERATOR_TMP_DIR</td><td><code>&quot;/tmp/shell-operator&quot;</code></td><td>A path to store temporary files with data for hooks</td></tr>
-<tr><td>--listen-address</td><td>SHELL_OPERATOR_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address to use for HTTP serving.</td></tr>
-<tr><td>--listen-port</td><td>SHELL_OPERATOR_LISTEN_PORT</td><td><code>&quot;9115&quot;</code></td><td>Port to use for HTTP serving.</td></tr>
+<tr><td>--listen-address</td><td>SHELL_OPERATOR_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address to use to serve metrics to Prometheus.</td></tr>
+<tr><td>--listen-port</td><td>SHELL_OPERATOR_LISTEN_PORT</td><td><code>&quot;9115&quot;</code></td><td>Port to use to serve metrics to Prometheus.</td></tr>
 <tr><td>--prometheus-metrics-prefix</td><td>SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX</td><td><code>&quot;shell_operator_&quot;</code></td><td>A prefix for metrics names.</td></tr>
+<tr><td>--namespace</td><td>SHELL_OPERATOR_NAMESPACE</td><td><code>&quot;&quot;</code></td><td>A namespace of a shell-operator. Used to set up validating webhooks.</td></tr>
 <tr><td>--kube-context</td><td>KUBE_CONTEXT</td><td><code>&quot;&quot;</code></td><td>The name of the kubeconfig context to use. (as a <code>--context</code> flag of kubectl)</td></tr>
 <tr><td>--kube-config</td><td>KUBE_CONFIG</td><td><code>&quot;&quot;</code></td><td>Path to the kubeconfig file. (as a <code>$KUBECONFIG</code> for kubectl)</td></tr>
-<tr><td>--kube-client-qps</td><td>KUBE_CLIENT_QPS</td><td><code>5</code></td><td>QPS for rate limiter of k8s.io/client-go</td></tr>
-<tr><td>--kube-client-burst</td><td>KUBE_CLIENT_BURST</td><td><code>10</code></td><td>burst for rate limiter of k8s.io/client-go</td></tr>
-<tr><td>--object-patcher-kube-client-timeout</td><td>OBJECT_PATCHER_KUBE_CLIENT_TIMEOUT</td><td><code>10s</code></td><td>timeout for object patcher’s requests to the Kubernetes API server</td></tr>
+<tr><td>--kube-server</td><td>KUBE_SERVER</td><td><code>&quot;&quot;</code></td><td>The address and port of the Kubernetes API server. (as a <code>--server</code> flag of kubectl)</td></tr>
+<tr><td>--kube-client-qps</td><td>KUBE_CLIENT_QPS</td><td><code>5</code></td><td>QPS for rate limiter of a Kubernetes client for hook events.</td></tr>
+<tr><td>--kube-client-burst</td><td>KUBE_CLIENT_BURST</td><td><code>10</code></td><td>Burst for rate limiter of a Kubernetes client for hook events.</td></tr>
+<tr><td>--object-patcher-kube-client-qps</td><td>OBJECT_PATCHER_KUBE_CLIENT_QPS</td><td><code>5</code></td><td>QPS for a rate limiter of a Kubernetes client for Object patcher.</td></tr>
+<tr><td>--object-patcher-kube-client-burst</td><td>OBJECT_PATCHER_KUBE_CLIENT_BURST</td><td><code>10</code></td><td>Burst for a rate limiter of a Kubernetes client for Object patcher.</td></tr>
+<tr><td>--object-patcher-kube-client-timeout</td><td>OBJECT_PATCHER_KUBE_CLIENT_TIMEOUT</td><td><code>10s</code></td><td>Timeout for object patcher’s requests to the Kubernetes API server.</td></tr>
 <tr><td>--jq-library-path</td><td>JQ_LIBRARY_PATH</td><td><code>&quot;&quot;</code></td><td>Prepend directory to the search list for jq modules (works as <code>jq -L</code>).</td></tr>
-<tr><td>n/a</td><td>JQ_EXEC</td><td><code>&quot;&quot;</code></td><td>Set to <code>yes</code> to use jq as executable — it is more for <strong>developing purposes</strong>.</td></tr>
 <tr><td>--log-level</td><td>LOG_LEVEL</td><td><code>&quot;info&quot;</code></td><td>Logging level: <code>debug</code>, <code>info</code>, <code>error</code>.</td></tr>
 <tr><td>--log-type</td><td>LOG_TYPE</td><td><code>&quot;text&quot;</code></td><td>Logging formatter type: <code>json</code>, <code>text</code> or <code>color</code>.</td></tr>
 <tr><td>--log-no-time</td><td>LOG_NO_TIME</td><td><code>false</code></td><td>Disable timestamp logging if flag is present. Useful when output is redirected to logging system that already adds timestamps.</td></tr>
 <tr><td>--log-proxy-hook-json</td><td>LOG_PROXY_HOOK_JSON</td><td><code>false</code></td><td>Delegate hook stdout/ stderr JSON logging to the hooks and act as a proxy that adds some extra fields before just printing the output. <strong>NOTE: It ignores <code>LOG_TYPE</code> for the output of the hooks; expects JSON lines to stdout/ stderr from the hooks</strong></td></tr>
-<tr><td>--debug-keep-tmp-files</td><td>DEBUG_KEEP_TMP_FILES</td><td><code>&quot;no&quot;</code></td><td>Set to <code>yes</code> to keep files in $SHELL_OPERATOR_TMP_DIR for debugging purposes. Note that it can generate many files.</td></tr>
+<tr><td>--debug-keep-tmp-files</td><td>DEBUG_KEEP_TMP_FILES</td><td><code>false</code></td><td>Set to <code>true</code> to keep files in $SHELL_OPERATOR_TMP_DIR for debugging purposes. Note that it can generate many files.</td></tr>
 <tr><td>--debug-unix-socket</td><td>DEBUG_UNIX_SOCKET</td><td><code>&quot;/var/run/shell-operator/debug.socket&quot;</code></td><td>Path to the unix socket file for debugging purposes.</td></tr>
 <tr><td>--validating-webhook-configuration-name</td><td>VALIDATING_WEBHOOK_CONFIGURATION_NAME</td><td><code>&quot;shell-operator-hooks&quot;</code></td><td>A name of a ValidatingWebhookConfiguration resource.</td></tr>
 <tr><td>--validating-webhook-service-name</td><td>VALIDATING_WEBHOOK_SERVICE_NAME</td><td><code>&quot;shell-operator-validating-svc&quot;</code></td><td>A name of a service used in ValidatingWebhookConfiguration.</td></tr>
 <tr><td>--validating-webhook-server-cert</td><td>VALIDATING_WEBHOOK_SERVER_CERT</td><td><code>&quot;/validating-certs/tls.crt&quot;</code></td><td>A path to a server certificate for service used in ValidatingWebhookConfiguration.</td></tr>
 <tr><td>--validating-webhook-server-key</td><td>VALIDATING_WEBHOOK_SERVER_KEY</td><td><code>&quot;/validating-certs/tls.key&quot;</code></td><td>A path to a server private key for service used in ValidatingWebhookConfiguration.</td></tr>
 <tr><td>--validating-webhook-ca</td><td>VALIDATING_WEBHOOK_CA</td><td><code>&quot;/validating-certs/ca.crt&quot;</code></td><td>A path to a ca certificate for ValidatingWebhookConfiguration.</td></tr>
-<tr><td>--validating-webhook-client-ca</td><td>VALIDATING_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a server certificate for ValidatingWebhookConfiguration.</td></tr>
+<tr><td>--validating-webhook-client-ca</td><td>VALIDATING_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a client CA certificate for ValidatingWebhookConfiguration (can be set multiple times).</td></tr>
+<tr><td>--validating-webhook-failure-policy</td><td>VALIDATING_WEBHOOK_FAILURE_POLICY</td><td><code>&quot;Fail&quot;</code></td><td>Default failure policy for ValidatingWebhookConfiguration (<code>Fail</code> or <code>Ignore</code>).</td></tr>
+<tr><td>--validating-webhook-listen-port</td><td>VALIDATING_WEBHOOK_LISTEN_PORT</td><td><code>&quot;9680&quot;</code></td><td>Port for the validating webhook HTTPS server.</td></tr>
+<tr><td>--validating-webhook-listen-address</td><td>VALIDATING_WEBHOOK_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address for the validating webhook HTTPS server.</td></tr>
 <tr><td>--conversion-webhook-service-name</td><td>CONVERSION_WEBHOOK_SERVICE_NAME</td><td><code>&quot;shell-operator-conversion-svc&quot;</code></td><td>A name of a service for clientConfig in CRD.</td></tr>
 <tr><td>--conversion-webhook-server-cert</td><td>CONVERSION_WEBHOOK_SERVER_CERT</td><td><code>&quot;/conversion-certs/tls.crt&quot;</code></td><td>A path to a server certificate for clientConfig in CRD.</td></tr>
 <tr><td>--conversion-webhook-server-key</td><td>CONVERSION_WEBHOOK_SERVER_KEY</td><td><code>&quot;/conversion-certs/tls.key&quot;</code></td><td>A path to a server private key for clientConfig in CRD.</td></tr>
 <tr><td>--conversion-webhook-ca</td><td>CONVERSION_WEBHOOK_CA</td><td><code>&quot;/conversion-certs/ca.crt&quot;</code></td><td>A path to a ca certificate for clientConfig in CRD.</td></tr>
-<tr><td>--conversion-webhook-client-ca</td><td>CONVERSION_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a server certificate for CRD.spec.conversion.webhook.</td></tr>
+<tr><td>--conversion-webhook-client-ca</td><td>CONVERSION_WEBHOOK_CLIENT_CA</td><td>[]</td><td>A path to a client CA certificate for CRD.spec.conversion.webhook (can be set multiple times).</td></tr>
+<tr><td>--conversion-webhook-listen-port</td><td>CONVERSION_WEBHOOK_LISTEN_PORT</td><td><code>&quot;9681&quot;</code></td><td>Port for the conversion webhook HTTPS server.</td></tr>
+<tr><td>--conversion-webhook-listen-address</td><td>CONVERSION_WEBHOOK_LISTEN_ADDRESS</td><td><code>&quot;0.0.0.0&quot;</code></td><td>Address for the conversion webhook HTTPS server.</td></tr>
 </tbody></table>
 <h3 id="notes-on-json-log-proxying"><a class="header" href="#notes-on-json-log-proxying">Notes on JSON log proxying</a></h3>
 <ul>
