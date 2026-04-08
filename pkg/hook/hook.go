@@ -116,8 +116,11 @@ func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.Bin
 		attribute.String("path", h.Path),
 	)
 
-	// Refresh snapshots
-	freshBindingContext := h.HookController.UpdateSnapshots(context)
+	// Refresh snapshots (HookController may be nil in tests without a wired controller).
+	freshBindingContext := context
+	if h.HookController != nil {
+		freshBindingContext = h.HookController.UpdateSnapshots(context)
+	}
 
 	versionedContextList := bctx.ConvertBindingContextList(h.Config.Version, freshBindingContext)
 
