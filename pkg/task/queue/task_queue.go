@@ -14,10 +14,10 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/metrics"
-	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/utils/exponential_backoff"
 	"github.com/flant/shell-operator/pkg/utils/list"
@@ -839,7 +839,7 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				})
 
 				q.SetStatus(QueueStatusIdle)
-				case Fail:
+			case Fail:
 				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
 					q.logger.Warn("result is fail, cannot process tasks in result",
 						slog.Int(pkg.LogKeyAfterTaskCount, len(taskRes.GetAfterTasks())),

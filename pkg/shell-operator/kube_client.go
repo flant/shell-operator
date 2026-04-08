@@ -8,10 +8,10 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	klient "github.com/flant/kube-client/client"
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/app"
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	"github.com/flant/shell-operator/pkg/metric"
-	pkg "github.com/flant/shell-operator/pkg"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

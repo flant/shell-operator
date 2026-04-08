@@ -16,8 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 	pkg "github.com/flant/shell-operator/pkg"
+	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type WebhookHandler struct {

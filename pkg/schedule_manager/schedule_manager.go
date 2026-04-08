@@ -8,8 +8,8 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
 
-	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 	pkg "github.com/flant/shell-operator/pkg"
+	smtypes "github.com/flant/shell-operator/pkg/schedule_manager/types"
 )
 
 type ScheduleManager interface {

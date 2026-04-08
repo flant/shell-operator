@@ -26,8 +26,8 @@ import (
 	"go.opentelemetry.io/otel"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	pkg "github.com/flant/shell-operator/pkg"
 	klient "github.com/flant/kube-client/client"
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/hook"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
@@ -165,7 +165,7 @@ func (op *ShellOperator) initHookManager() error {
 	op.ManagerEventsHandler.WithKubeEventHandler(func(_ context.Context, kubeEvent kemTypes.KubeEvent) []task.Task {
 		logLabels := map[string]string{
 			pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
-			pkg.LogKeyBinding:  string(types.OnKubernetesEvent),
+			pkg.LogKeyBinding: string(types.OnKubernetesEvent),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'kubernetes' event", slog.String(pkg.LogKeyName, kubeEvent.String()))
@@ -193,7 +193,7 @@ func (op *ShellOperator) initHookManager() error {
 	op.ManagerEventsHandler.WithScheduleEventHandler(func(_ context.Context, crontab string) []task.Task {
 		logLabels := map[string]string{
 			pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
-			pkg.LogKeyBinding:  string(types.Schedule),
+			pkg.LogKeyBinding: string(types.Schedule),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry.Debug("Create tasks for 'schedule' event", slog.String(pkg.LogKeyName, crontab))
@@ -256,7 +256,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 		eventBindingType := op.HookManager.DetectAdmissionEventType(event)
 		logLabels := map[string]string{
 			pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
-			pkg.LogKeyEvent:    string(eventBindingType),
+			pkg.LogKeyEvent:   string(eventBindingType),
 		}
 		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 		logEntry = logEntry.With(
@@ -350,7 +350,7 @@ func (op *ShellOperator) initConversionWebhookManager() error {
 func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName string, request *v1.ConversionRequest) (*conversion.Response, error) {
 	logLabels := map[string]string{
 		pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
-		pkg.LogKeyBinding:  string(types.KubernetesConversion),
+		pkg.LogKeyBinding: string(types.KubernetesConversion),
 	}
 	logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
 
@@ -463,10 +463,10 @@ func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.Tas
 
 	case task_metadata.EnableScheduleBindings:
 		hookLogLabels := map[string]string{}
-		hookLogLabels[pkg.LogKeyHook]    = hookMeta.HookName
+		hookLogLabels[pkg.LogKeyHook] = hookMeta.HookName
 		hookLogLabels[pkg.LogKeyBinding] = string(types.Schedule)
-		hookLogLabels[pkg.LogKeyTask]    = "EnableScheduleBindings"
-		hookLogLabels[pkg.LogKeyQueue]   = "main"
+		hookLogLabels[pkg.LogKeyTask] = "EnableScheduleBindings"
+		hookLogLabels[pkg.LogKeyQueue] = "main"
 
 		taskLogEntry := utils.EnrichLoggerWithLabels(logEntry, hookLogLabels)
 
@@ -500,10 +500,10 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 
 	var res queue.TaskResult
 	hookLogLabels := map[string]string{}
-	hookLogLabels[pkg.LogKeyHook]    = hookMeta.HookName
+	hookLogLabels[pkg.LogKeyHook] = hookMeta.HookName
 	hookLogLabels[pkg.LogKeyBinding] = ""
-	hookLogLabels[pkg.LogKeyTask]    = "EnableKubernetesBindings"
-	hookLogLabels[pkg.LogKeyQueue]   = "main"
+	hookLogLabels[pkg.LogKeyTask] = "EnableKubernetesBindings"
+	hookLogLabels[pkg.LogKeyQueue] = "main"
 
 	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
 
@@ -594,11 +594,11 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 	})()
 
 	hookLogLabels := map[string]string{}
-	hookLogLabels[pkg.LogKeyHook]    = hookMeta.HookName
+	hookLogLabels[pkg.LogKeyHook] = hookMeta.HookName
 	hookLogLabels[pkg.LogKeyBinding] = hookMeta.Binding
-	hookLogLabels[pkg.LogKeyEvent]   = string(hookMeta.BindingType)
-	hookLogLabels[pkg.LogKeyTask]    = "HookRun"
-	hookLogLabels[pkg.LogKeyQueue]   = t.GetQueueName()
+	hookLogLabels[pkg.LogKeyEvent] = string(hookMeta.BindingType)
+	hookLogLabels[pkg.LogKeyTask] = "HookRun"
+	hookLogLabels[pkg.LogKeyQueue] = t.GetQueueName()
 
 	taskLogEntry := utils.EnrichLoggerWithLabels(op.logger, hookLogLabels)
 

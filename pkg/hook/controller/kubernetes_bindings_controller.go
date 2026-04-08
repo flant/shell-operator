@@ -8,9 +8,9 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
-	pkg "github.com/flant/shell-operator/pkg"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"

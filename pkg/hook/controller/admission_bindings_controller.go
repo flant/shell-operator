@@ -7,9 +7,9 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admission/v1"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
-	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 )
 

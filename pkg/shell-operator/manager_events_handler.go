@@ -5,9 +5,9 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	pkg "github.com/flant/shell-operator/pkg"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"

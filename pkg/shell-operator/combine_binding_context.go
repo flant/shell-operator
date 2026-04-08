@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	pkg "github.com/flant/shell-operator/pkg"
+	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"

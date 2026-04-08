@@ -14,8 +14,8 @@ import (
 	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 	pkg "github.com/flant/shell-operator/pkg"
+	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type EventHandlerFn func(ctx context.Context, event Event) (*Response, error)

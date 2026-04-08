@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/flant/shell-operator/pkg/filter/jq"
 	pkg "github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/filter/jq"
 )
 
 // OperationSpec a JSON and YAML representation of the operation for shell hooks
