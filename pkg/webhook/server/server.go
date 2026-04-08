@@ -12,6 +12,8 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 type WebhookServer struct {
@@ -91,7 +93,7 @@ func (s *WebhookServer) Start() error {
 	}
 
 	go func() {
-		s.Logger.Info("Webhook server listens", slog.String("address", listenAddr))
+		s.Logger.Info("Webhook server listens", slog.String(pkg.LogKeyAddress, listenAddr))
 		err := srv.ServeTLS(listener, "", "")
 		if err != nil {
 			s.Logger.Error("Error starting Webhook https server", log.Err(err))

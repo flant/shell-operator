@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/flant/shell-operator/pkg/filter/jq"
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 // OperationSpec a JSON and YAML representation of the operation for shell hooks
@@ -63,7 +64,7 @@ func GetPatchStatusOperationsOnHookError(operations []sdkpkg.PatchCollectorOpera
 }
 
 func ParseOperations(specBytes []byte) ([]sdkpkg.PatchCollectorOperation, error) {
-	log.Debug("parsing patcher operations", slog.String("value", string(specBytes)))
+	log.Debug("parsing patcher operations", slog.String(pkg.LogKeyValue, string(specBytes)))
 
 	specs, err := unmarshalFromJSONOrYAML(specBytes)
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	klient "github.com/flant/kube-client/client"
+	pkg "github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
@@ -167,12 +168,12 @@ func (m *monitor) CreateInformers() error {
 
 	if m.Config.Kind == "" && m.Config.ApiVersion == "" {
 		logEntry.Debug("Create Informers for Config with empty kind and apiVersion",
-			slog.String("value", fmt.Sprintf("%+v", m.Config)))
+			slog.String(pkg.LogKeyValue, fmt.Sprintf("%+v", m.Config)))
 		return nil
 	}
 
 	logEntry.Debug("Create Informers Config: %+v",
-		slog.String("value", fmt.Sprintf("%+v", m.Config)))
+		slog.String(pkg.LogKeyValue, fmt.Sprintf("%+v", m.Config)))
 	nsNames := m.Config.namespaces()
 	if len(nsNames) > 0 {
 		logEntry.Debug("create static ResourceInformers")
@@ -206,12 +207,12 @@ func (m *monitor) CreateInformers() error {
 					return
 				}
 
-				logEntry.Info("got ns, create dynamic ResourceInformers", slog.String("name", nsName))
+				logEntry.Info("got ns, create dynamic ResourceInformers", slog.String(pkg.LogKeyName, nsName))
 
 				varyingInformers, err := m.CreateInformersForNamespace(nsName)
 				if err != nil {
 					logEntry.Error("create ResourceInformers for ns",
-						slog.String("name", nsName),
+						slog.String(pkg.LogKeyName, nsName),
 						log.Err(err))
 				}
 				m.VaryingInformers.Store(nsName, varyingInformers)
@@ -229,7 +230,7 @@ func (m *monitor) CreateInformers() error {
 			},
 			func(nsName string) {
 				// Delete event: check, stop and remove informers for Ns
-				logEntry.Info("deleted ns, stop dynamic ResourceInformers", slog.String("name", nsName))
+				logEntry.Info("deleted ns, stop dynamic ResourceInformers", slog.String(pkg.LogKeyName, nsName))
 
 				// ignore statically specified namespaces
 				if _, ok := m.staticNamespaces.Load(nsName); ok {
@@ -255,7 +256,7 @@ func (m *monitor) CreateInformers() error {
 			return fmt.Errorf("create namespace informer: %v", err)
 		}
 		for nsName := range m.NamespaceInformer.getExistedObjects() {
-			logEntry.Info("got ns, create dynamic ResourceInformers", slog.String("name", nsName))
+			logEntry.Info("got ns, create dynamic ResourceInformers", slog.String(pkg.LogKeyName, nsName))
 
 			// ignore event if namespace is already has static ResourceInformers
 			if _, ok := m.staticNamespaces.Load(nsName); ok {
@@ -265,7 +266,7 @@ func (m *monitor) CreateInformers() error {
 			varyingInformers, err := m.CreateInformersForNamespace(nsName)
 			if err != nil {
 				logEntry.Error("create ResourceInformers for ns",
-					slog.String("name", nsName),
+					slog.String(pkg.LogKeyName, nsName),
 					log.Err(err))
 			}
 			m.VaryingInformers.Store(nsName, varyingInformers)

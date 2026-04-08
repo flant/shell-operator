@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 type EventHandlerFn func(ctx context.Context, event Event) (*Response, error)
@@ -70,10 +71,10 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	logger := h.Logger.With(
-		slog.String("request", string(admissionReview.Request.UID)),
-		slog.String("name", admissionReview.Request.Name),
-		slog.String("namespace", admissionReview.Request.Namespace),
-		slog.String("kind", admissionReview.Request.Kind.Kind),
+		slog.String(pkg.LogKeyRequest, string(admissionReview.Request.UID)),
+		slog.String(pkg.LogKeyName, admissionReview.Request.Name),
+		slog.String(pkg.LogKeyNamespace, admissionReview.Request.Namespace),
+		slog.String(pkg.LogKeyKind, admissionReview.Request.Kind.Kind),
 	)
 
 	admissionResponse, err := h.handleReviewRequest(ctx, r.URL.Path, admissionReview.Request)
@@ -100,11 +101,11 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 func (h *WebhookHandler) handleReviewRequest(ctx context.Context, path string, request *v1.AdmissionRequest) (*v1.AdmissionResponse, error) {
 	configurationID, webhookID := detectConfigurationAndWebhook(path)
 	h.Logger.Info("Got AdmissionReview request",
-		slog.String("configurationID", configurationID),
-		slog.String("webhookID", webhookID),
-		slog.String("kind", request.Kind.Kind),
-		slog.String("name", request.Name),
-		slog.String("namespace", request.Namespace),
+		slog.String(pkg.LogKeyConfigurationID, configurationID),
+		slog.String(pkg.LogKeyWebhookID, webhookID),
+		slog.String(pkg.LogKeyKind, request.Kind.Kind),
+		slog.String(pkg.LogKeyName, request.Name),
+		slog.String(pkg.LogKeyNamespace, request.Namespace),
 	)
 
 	if h.Handler == nil {

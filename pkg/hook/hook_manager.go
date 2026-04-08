@@ -14,6 +14,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
@@ -109,7 +110,7 @@ func (hm *Manager) Init() error {
 
 	if err := utils_file.RecursiveCheckLibDirectory(hm.workingDir); err != nil {
 		hm.logger.Error("failed to check lib directory",
-			slog.String("workingDir", hm.workingDir),
+			slog.String(pkg.LogKeyWorkingDir, hm.workingDir),
 			log.Err(err))
 	}
 
@@ -120,7 +121,7 @@ func (hm *Manager) Init() error {
 
 	// sort hooks by path
 	sort.Strings(hooksRelativePaths)
-	hm.logger.Debug("Search hooks in paths", slog.Any("paths", hooksRelativePaths))
+	hm.logger.Debug("Search hooks in paths", slog.Any(pkg.LogKeyPaths, hooksRelativePaths))
 
 	for _, hookPath := range hooksRelativePaths {
 		hook, err := hm.loadHook(hookPath)
@@ -153,16 +154,16 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 	}
 
 	hook := NewHook(hookName, hookPath, hm.keepTemporaryHookFiles, hm.logProxyHookJSON, hm.logProxyHookJSONKey, hm.logger.Named("hook"))
-	hookEntry := hm.logger.With(slog.String("hook", hook.Name), slog.String("phase", "config"))
-	hookEntry.Info("Load config", slog.String("path", hookPath))
+	hookEntry := hm.logger.With(slog.String(pkg.LogKeyHook, hook.Name), slog.String(pkg.LogKeyPhase, "config"))
+	hookEntry.Info("Load config", slog.String(pkg.LogKeyPath, hookPath))
 
 	envs := make([]string, 0)
 	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hookPath, envs, []string{"--config"})
 	if err != nil {
-		hookEntry.Error("Hook config output", slog.String("value", string(configOutput)))
+		hookEntry.Error("Hook config output", slog.String(pkg.LogKeyValue, string(configOutput)))
 		var ee *exec.ExitError
 		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-			hookEntry.Error("Hook config stderr", slog.String("value", string(ee.Stderr)))
+			hookEntry.Error("Hook config stderr", slog.String(pkg.LogKeyValue, string(ee.Stderr)))
 		}
 		return nil, fmt.Errorf("cannot get config for hook '%s': %w", hookPath, err)
 	}
@@ -173,36 +174,36 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 
 	// Add hook info as log labels, update MetricLabels
 	for _, kubeCfg := range hook.GetConfig().OnKubernetesEvents {
-		kubeCfg.Monitor.Metadata.LogLabels["hook"] = hook.Name
+		kubeCfg.Monitor.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
 		kubeCfg.Monitor.Metadata.MetricLabels = map[string]string{
-			"hook":    hook.Name,
-			"binding": kubeCfg.BindingName,
-			"queue":   kubeCfg.Queue,
+			pkg.MetricKeyHook:    hook.Name,
+			pkg.MetricKeyBinding: kubeCfg.BindingName,
+			pkg.MetricKeyQueue:   kubeCfg.Queue,
 		}
 	}
 
 	for _, conversionCfg := range hook.GetConfig().KubernetesConversion {
-		conversionCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
+		conversionCfg.Webhook.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
 		conversionCfg.Webhook.Metadata.MetricLabels = map[string]string{
-			"hook":    hook.Name,
-			"binding": conversionCfg.BindingName,
+			pkg.MetricKeyHook:    hook.Name,
+			pkg.MetricKeyBinding: conversionCfg.BindingName,
 		}
 	}
 
 	for _, validatingCfg := range hook.GetConfig().KubernetesValidating {
-		validatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
+		validatingCfg.Webhook.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
 		validatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
-			"hook":    hook.Name,
-			"binding": validatingCfg.BindingName,
+			pkg.MetricKeyHook:    hook.Name,
+			pkg.MetricKeyBinding: validatingCfg.BindingName,
 		}
 		validatingCfg.Webhook.UpdateIds("", validatingCfg.BindingName)
 	}
 
 	for _, mutatingCfg := range hook.GetConfig().KubernetesMutating {
-		mutatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
+		mutatingCfg.Webhook.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
 		mutatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
-			"hook":    hook.Name,
-			"binding": mutatingCfg.BindingName,
+			pkg.MetricKeyHook:    hook.Name,
+			pkg.MetricKeyBinding: mutatingCfg.BindingName,
 		}
 		mutatingCfg.Webhook.UpdateIds("", mutatingCfg.BindingName)
 	}
@@ -222,7 +223,7 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 		return nil, fmt.Errorf("hook %q is marked as executable but doesn't contain config section", hook.Path)
 	}
 
-	hookEntry.Info("Loaded config", slog.String("value", hook.GetConfigDescription()))
+	hookEntry.Info("Loaded config", slog.String(pkg.LogKeyValue, hook.GetConfigDescription()))
 
 	return hook, nil
 }
@@ -240,16 +241,16 @@ func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint str
 		WithCMDStderr(nil).
 		WithLogger(hm.logger.Named("executor"))
 
-	debugEntry := hm.logger.With(slog.String("hook", hookName), slog.String("cmd", strings.Join(args, " ")))
+	debugEntry := hm.logger.With(slog.String(pkg.LogKeyHook, hookName), slog.String(pkg.LogKeyCmd, strings.Join(args, " ")))
 
-	debugEntry.Debug("Executing hook", slog.String("dir", dir))
+	debugEntry.Debug("Executing hook", slog.String(pkg.LogKeyDir, dir))
 
 	output, err := hookCmd.Output()
 	if err != nil {
 		return output, err
 	}
 
-	debugEntry.Debug("execCommandOutput", slog.String("output", string(output)))
+	debugEntry.Debug("execCommandOutput", slog.String(pkg.LogKeyOutput, string(output)))
 
 	return output, nil
 }
@@ -259,7 +260,7 @@ func (hm *Manager) GetHook(name string) *Hook {
 	if exists {
 		return hook
 	}
-	hm.logger.Error("Possible bug!!! Hook not found in hook manager", slog.String("name", name))
+	hm.logger.Error("Possible bug!!! Hook not found in hook manager", slog.String(pkg.LogKeyName, name))
 	return nil
 }
 
@@ -388,11 +389,11 @@ func (hm *Manager) DetectAdmissionEventType(event admission.Event) htypes.Bindin
 	}
 
 	hm.logger.Error("Possible bug!!! No linked hook for admission event",
-		slog.String("configId", event.ConfigurationId),
-		slog.String("webhookId", event.WebhookId),
-		slog.String("kind", event.Request.Kind.String()),
-		slog.String("name", event.Request.Name),
-		slog.String("namespace", event.Request.Namespace))
+		slog.String(pkg.LogKeyConfigId, event.ConfigurationId),
+		slog.String(pkg.LogKeyWebhookId, event.WebhookId),
+		slog.String(pkg.LogKeyKind, event.Request.Kind.String()),
+		slog.String(pkg.LogKeyName, event.Request.Name),
+		slog.String(pkg.LogKeyNamespace, event.Request.Namespace))
 	return ""
 }
 

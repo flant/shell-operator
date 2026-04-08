@@ -5,6 +5,7 @@ import (
 
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/task"
 )
@@ -131,8 +132,8 @@ func (tc *TaskCounter) UpdateHookMetricsFromSnapshot(hookCounts map[string]uint)
 	for hookName, count := range hookCounts {
 		if count > compactionMetricsThreshold {
 			labels := map[string]string{
-				"queue_name": tc.queueName,
-				"hook":       hookName,
+				pkg.MetricKeyQueueName: tc.queueName,
+				pkg.MetricKeyHook:      hookName,
 			}
 			tc.metricStorage.GaugeSet(metrics.TasksQueueCompactionTasksByHook, float64(count), labels)
 		}

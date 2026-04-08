@@ -16,6 +16,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"go.opentelemetry.io/otel"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -26,7 +27,7 @@ const (
 func Run(cmd *exec.Cmd) error {
 	// TODO context: hook name, hook phase, hook binding
 	// TODO observability
-	log.Debug("Executing command", slog.String("command", strings.Join(cmd.Args, " ")), slog.String("dir", cmd.Dir))
+	log.Debug("Executing command", slog.String(pkg.LogKeyCommand, strings.Join(cmd.Args, " ")), slog.String(pkg.LogKeyDir, cmd.Dir))
 
 	return cmd.Run()
 }
@@ -100,8 +101,8 @@ func NewExecutor(dir string, entrypoint string, args []string, envs []string) *E
 
 func (e *Executor) Output() ([]byte, error) {
 	e.logger.Debug("Executing command",
-		slog.String("command", strings.Join(e.cmd.Args, " ")),
-		slog.String("dir", e.cmd.Dir))
+		slog.String(pkg.LogKeyCommand, strings.Join(e.cmd.Args, " ")),
+		slog.String(pkg.LogKeyDir, e.cmd.Dir))
 	return e.cmd.Output()
 }
 
@@ -117,12 +118,12 @@ func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]stri
 
 	stdErr := bytes.NewBuffer(nil)
 	logEntry := utils.EnrichLoggerWithLabels(e.logger, logLabels)
-	stdoutLogEntry := logEntry.With("output", "stdout")
-	stderrLogEntry := logEntry.With("output", "stderr")
+	stdoutLogEntry := logEntry.With(pkg.LogKeyOutput, "stdout")
+	stderrLogEntry := logEntry.With(pkg.LogKeyOutput, "stderr")
 
 	log.Debug("Executing command",
-		slog.String("command", strings.Join(e.cmd.Args, " ")),
-		slog.String("dir", e.cmd.Dir))
+		slog.String(pkg.LogKeyCommand, strings.Join(e.cmd.Args, " ")),
+		slog.String(pkg.LogKeyDir, e.cmd.Dir))
 
 	plo := &proxyLogger{
 		ctx:              ctx,
@@ -208,7 +209,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 	}()
 
 	if !ok {
-		pl.logger.Debug("json log line not map[string]interface{}", slog.Any("line", line))
+		pl.logger.Debug("json log line not map[string]interface{}", slog.Any(pkg.LogKeyLine, line))
 
 		// fall back to using the logger
 		pl.logger.Info(string(p))
@@ -308,7 +309,7 @@ func (pl *proxyLogger) mergeAndLogInputLog(ctx context.Context, inputLog map[str
 	if len(logLine) > 10000 {
 		logLine = fmt.Sprintf("%s:truncated", logLine[:10000])
 
-		logger.Log(ctx, lvl.Level(), msg, slog.Any("hook", map[string]any{
+		logger.Log(ctx, lvl.Level(), msg, slog.Any(pkg.LogKeyHook, map[string]any{
 			"truncated": logLine,
 		}))
 

@@ -11,6 +11,7 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	klient "github.com/flant/kube-client/client"
+	pkg "github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -75,7 +76,7 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor metricsstorage.Storage) {
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	log.Debug("Add MONITOR",
-		slog.String("config", fmt.Sprintf("%+v", monitorConfig)))
+		slog.String(pkg.LogKeyConfig, fmt.Sprintf("%+v", monitorConfig)))
 	monitor := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,

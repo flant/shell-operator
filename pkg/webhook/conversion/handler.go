@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 type WebhookHandler struct {
@@ -55,7 +56,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 
 	crdName := detectCrdName(r.URL.Path)
 
-	logger := h.Logger.With(slog.String("crd", crdName))
+	logger := h.Logger.With(slog.String(pkg.LogKeyCRD, crdName))
 	logger.Info("serving ConversionReview request")
 
 	var convertReview v1.ConversionReview
@@ -75,8 +76,8 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	logger = logger.With(
-		slog.String("request", string(convertReview.Request.UID)),
-		slog.String("kind", convertReview.Kind))
+		slog.String(pkg.LogKeyRequest, string(convertReview.Request.UID)),
+		slog.String(pkg.LogKeyKind, convertReview.Kind))
 
 	conversionResponse, err := h.handleReviewRequest(ctx, crdName, convertReview.Request)
 	if err != nil {

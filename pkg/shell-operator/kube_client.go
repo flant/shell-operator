@@ -11,12 +11,13 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	"github.com/flant/shell-operator/pkg/metric"
+	pkg "github.com/flant/shell-operator/pkg"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
 var (
-	defaultMainKubeClientMetricLabels          = map[string]string{"component": "main"}
-	defaultObjectPatcherKubeClientMetricLabels = map[string]string{"component": "object_patcher"}
+	defaultMainKubeClientMetricLabels          = map[string]string{pkg.MetricKeyComponent: "main"}
+	defaultObjectPatcherKubeClientMetricLabels = map[string]string{pkg.MetricKeyComponent: "object_patcher"}
 )
 
 // KubeClientConfig holds explicit connection settings for a Kubernetes client,

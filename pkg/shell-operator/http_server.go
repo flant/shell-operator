@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/flant/shell-operator/pkg/app"
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 type baseHTTPServer struct {
@@ -39,8 +40,8 @@ func (bhs *baseHTTPServer) Start(ctx context.Context) {
 		}
 	}()
 	log.Info("base http server started",
-		slog.String("address", bhs.address),
-		slog.String("port", bhs.port))
+		slog.String(pkg.LogKeyAddress, bhs.address),
+		slog.String(pkg.LogKeyPort, bhs.port))
 
 	go func() {
 		<-ctx.Done()

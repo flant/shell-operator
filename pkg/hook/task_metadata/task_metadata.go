@@ -8,6 +8,7 @@ import (
 
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/types"
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/task"
 )
 
@@ -67,7 +68,7 @@ func HookMetadataAccessor(t task.Task) (HookMetadata, bool) {
 	hookMeta, ok := meta.(HookMetadata)
 	if !ok {
 		log.Error("Possible Bug! task metadata is not of type HookMetadata",
-			slog.String("type", fmt.Sprintf("%T", meta)))
+			slog.String(pkg.LogKeyType, fmt.Sprintf("%T", meta)))
 		return HookMetadata{}, false
 	}
 

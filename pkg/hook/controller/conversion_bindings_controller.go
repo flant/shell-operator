@@ -9,6 +9,7 @@ import (
 
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 )
 
@@ -64,7 +65,7 @@ func (c *ConversionBindingsController) EnableConversionBindings() {
 			}
 		}
 		log.Info("conversion binding controller: add webhook from config",
-			slog.String("name", config.Webhook.Metadata.Name))
+			slog.String(pkg.LogKeyName, config.Webhook.Metadata.Name))
 		c.webhookManager.AddWebhook(config.Webhook)
 	}
 }
@@ -85,7 +86,7 @@ func (c *ConversionBindingsController) CanHandleEvent(crdName string, _ *v1.Conv
 func (c *ConversionBindingsController) HandleEvent(_ context.Context, crdName string, request *v1.ConversionRequest, rule conversion.Rule) BindingExecutionInfo {
 	_, hasKey := c.Links[crdName]
 	if !hasKey {
-		log.Error("Possible bug!!! No binding for conversion event for crd", slog.String("crd", crdName))
+		log.Error("Possible bug!!! No binding for conversion event for crd", slog.String(pkg.LogKeyCRD, crdName))
 		return BindingExecutionInfo{
 			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
@@ -94,8 +95,8 @@ func (c *ConversionBindingsController) HandleEvent(_ context.Context, crdName st
 	link, has := c.Links[crdName][rule]
 	if !has {
 		log.Error("Possible bug!!! Event has an unknown conversion rule: no binding was registered",
-			slog.String("rule", rule.String()),
-			slog.String("crd", crdName))
+			slog.String(pkg.LogKeyRule, rule.String()),
+			slog.String(pkg.LogKeyCRD, crdName))
 		return BindingExecutionInfo{
 			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
