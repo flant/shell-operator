@@ -265,6 +265,20 @@ func (hc *HookController) UpdateMonitor(monitorId string, kind, apiVersion strin
 	return nil
 }
 
+func (hc *HookController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
+	if hc.KubernetesController != nil {
+		return hc.KubernetesController.EnableKubernetesBindings()
+	}
+
+	return nil, nil
+}
+
+func (hc *HookController) DisableKubernetesBindings() {
+	if hc.KubernetesController != nil {
+		hc.KubernetesController.DisableKubernetesBindings()
+	}
+}
+
 func (hc *HookController) EnableScheduleBindings() {
 	if hc.ScheduleController != nil {
 		hc.ScheduleController.EnableScheduleBindings()

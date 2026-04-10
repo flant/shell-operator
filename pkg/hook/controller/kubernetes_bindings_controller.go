@@ -8,7 +8,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	pkg "github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -27,6 +27,7 @@ type KubernetesBindingsController interface {
 	WithKubernetesBindings([]htypes.OnKubernetesEventConfig)
 	WithKubeEventsManager(kubeeventsmanager.KubeEventsSource)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
+	DisableKubernetesBindings()
 	UpdateMonitor(monitorId string, kind, apiVersion string) error
 	UnlockEvents()
 	UnlockEventsFor(monitorID string)
@@ -81,6 +82,12 @@ func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager k
 // Informers in each monitor are started immediately to keep up the "fresh" state of object caches.
 func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
 	res := make([]BindingExecutionInfo, 0)
+
+	c.l.Lock()
+	if len(c.BindingMonitorLinks) > 0 {
+		return res, nil
+	}
+	c.l.Unlock()
 
 	for _, config := range c.KubernetesBindings {
 		err := c.kubeEventsManager.AddMonitor(config.Monitor)
@@ -180,6 +187,16 @@ func (c *kubernetesBindingsController) StopMonitors() {
 		_ = c.kubeEventsManager.StopMonitor(monitorID)
 		return false
 	})
+}
+
+func (c *kubernetesBindingsController) DisableKubernetesBindings() {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	for _, binding := range c.BindingMonitorLinks {
+		_ = c.kubeEventsManager.StopMonitor(binding.MonitorId)
+		delete(c.BindingMonitorLinks, binding.MonitorId)
+	}
 }
 
 func (c *kubernetesBindingsController) CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool {

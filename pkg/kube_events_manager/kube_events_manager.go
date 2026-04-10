@@ -11,7 +11,7 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	klient "github.com/flant/kube-client/client"
-	pkg "github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -92,9 +92,8 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor metricsstorage.Storage) {
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
-	log.Debug("Add MONITOR",
-		slog.String(pkg.LogKeyConfig, fmt.Sprintf("%+v", monitorConfig)))
-	monitor := NewMonitor(
+	mgr.logger.Debug("add kubernetes monitor", slog.String(pkg.LogKeyConfig, fmt.Sprintf("%+v", monitorConfig)))
+	mon := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,
 		mgr.metricStorage,
@@ -107,13 +106,12 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 		mgr.logger.Named("monitor"),
 	)
 
-	err := monitor.CreateInformers()
-	if err != nil {
+	if err := mon.CreateInformers(); err != nil {
 		return err
 	}
 
 	mgr.m.Lock()
-	mgr.Monitors[monitorConfig.Metadata.MonitorId] = monitor
+	mgr.Monitors[monitorConfig.Metadata.MonitorId] = mon
 	mgr.m.Unlock()
 
 	return nil
