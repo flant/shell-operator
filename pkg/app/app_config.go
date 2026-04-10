@@ -52,7 +52,7 @@ func newKubeConfig() *kubeConfig {
 type objectPatcherConfig struct {
 	// Settings for 'object_patcher' kube client
 	KubeClientQPS     float32       `env:"KUBE_CLIENT_QPS"`
-	KubeClisntBurst   int           `env:"KUBE_CLIENT_BURST"`
+	KubeClientBurst   int           `env:"KUBE_CLIENT_BURST"`
 	KubeClientTimeout time.Duration `env:"KUBE_CLIENT_TIMEOUT"`
 }
 
@@ -174,7 +174,7 @@ func (cfg *Config) SetupGlobalVars() {
 	setIfNotEmpty(&KubeClientBurst, cfg.KubeConfig.ClientBurst)
 
 	setIfNotEmpty(&ObjectPatcherKubeClientQps, cfg.ObjectPatcherConfig.KubeClientQPS)
-	setIfNotEmpty(&ObjectPatcherKubeClientBurst, cfg.ObjectPatcherConfig.KubeClisntBurst)
+	setIfNotEmpty(&ObjectPatcherKubeClientBurst, cfg.ObjectPatcherConfig.KubeClientBurst)
 	setIfNotEmpty(&ObjectPatcherKubeClientTimeout, cfg.ObjectPatcherConfig.KubeClientTimeout)
 
 	setIfNotEmpty(&LogLevel, cfg.LogConfig.Level)
