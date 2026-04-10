@@ -8,6 +8,8 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5/middleware"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 // StructuredLogger is a simple, but powerful implementation of a custom structured
@@ -31,9 +33,9 @@ func (l *StructuredLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 
 	entry.Logger = entry.Logger.With(
 		// TODO: make snake_case
-		slog.String("operator.component", l.ComponentLabel),
-		slog.String("http_method", r.Method),
-		slog.String("uri", r.RequestURI),
+		slog.String(pkg.LogKeyOperatorComponent, l.ComponentLabel),
+		slog.String(pkg.LogKeyHTTPMethod, r.Method),
+		slog.String(pkg.LogKeyURI, r.RequestURI),
 	)
 	// entry.Logger.Info("request started")
 
@@ -46,9 +48,9 @@ type StructuredLoggerEntry struct {
 
 func (l *StructuredLoggerEntry) Write(status, bytes int, _ http.Header, elapsed time.Duration, _ interface{}) {
 	l.Logger = l.Logger.With(
-		slog.Int("resp_status", status),
-		slog.Int("resp_bytes_length", bytes),
-		slog.Float64("resp_elapsed_ms", float64(elapsed.Truncate(10*time.Microsecond))/100.0),
+		slog.Int(pkg.LogKeyRespStatus, status),
+		slog.Int(pkg.LogKeyRespBytesLength, bytes),
+		slog.Float64(pkg.LogKeyRespElapsedMs, float64(elapsed.Truncate(10*time.Microsecond))/100.0),
 	)
 
 	l.Logger.Info("complete")
@@ -57,8 +59,8 @@ func (l *StructuredLoggerEntry) Write(status, bytes int, _ http.Header, elapsed 
 // This will log panics to log
 func (l *StructuredLoggerEntry) Panic(v interface{}, stack []byte) {
 	l.Logger = l.Logger.With(
-		slog.String("stack", string(stack)),
-		slog.String("panic", fmt.Sprintf("%+v", v)),
+		slog.String(pkg.LogKeyStack, string(stack)),
+		slog.String(pkg.LogKeyPanic, fmt.Sprintf("%+v", v)),
 	)
 }
 

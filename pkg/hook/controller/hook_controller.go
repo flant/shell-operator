@@ -27,16 +27,16 @@ type BindingExecutionInfo struct {
 	KubernetesBinding   htypes.OnKubernetesEventConfig
 }
 
-// В каждый хук надо будет положить этот объект.
-// Предварительно позвав With*Bindings и InitBindingsControllers
+// This object needs to be placed in each hook.
+// After calling With*Bindings and InitBindingsControllers
 
-// Для kube надо будет сделать HandleEnableKubernetesBindings, чтобы получить списки существующих обхектов
-// и потом StartMonitors
+// For kube, HandleEnableKubernetesBindings needs to be called to get lists of existing objects
+// and then StartMonitors
 
-// Всё Handle* методы принимают callback, чтобы создавать задания независимо.
+// All Handle* methods accept a callback to create tasks independently.
 
-// методом KubernetesSnapshots можно достать все кубовые объекты, чтобы добавить
-// их в какой-то свой binding context
+// The KubernetesSnapshots method can be used to get all Kubernetes objects to add
+// them to some binding context
 
 func NewHookController() *HookController {
 	return &HookController{}
@@ -56,7 +56,7 @@ type HookController struct {
 	logger *log.Logger
 }
 
-func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesEventConfig, kubeEventMgr kubeeventsmanager.KubeEventsManager, logger *log.Logger) {
+func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesEventConfig, kubeEventMgr kubeeventsmanager.KubeEventsSource, logger *log.Logger) {
 	if len(bindings) == 0 {
 		return
 	}
@@ -69,7 +69,7 @@ func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesE
 	hc.logger = logger
 }
 
-func (hc *HookController) InitScheduleBindings(bindings []htypes.ScheduleConfig, scheduleMgr schedulemanager.ScheduleManager) {
+func (hc *HookController) InitScheduleBindings(bindings []htypes.ScheduleConfig, scheduleMgr schedulemanager.ScheduleRegistry) {
 	if len(bindings) == 0 {
 		return
 	}

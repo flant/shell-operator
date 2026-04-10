@@ -1,6 +1,7 @@
 package dump
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -49,11 +50,11 @@ func TaskMainQueue(tqs *queue.TaskQueueSet, format string) interface{} {
 
 	if format == "text" {
 		var buf strings.Builder
-		buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", dq.Name, dq.TasksCount, dq.Status))
+		fmt.Fprintf(&buf, "Queue '%s': length %d, status: '%s'\n", dq.Name, dq.TasksCount, dq.Status)
 		buf.WriteString("\n")
 
 		for _, ts := range dq.Tasks {
-			buf.WriteString(fmt.Sprintf("%2d. ", ts.Index))
+			fmt.Fprintf(&buf, "%2d. ", ts.Index)
 			buf.WriteString(ts.Description)
 			buf.WriteString("\n")
 		}
@@ -78,51 +79,61 @@ func TaskQueues(tqs *queue.TaskQueueSet, format string, showEmpty bool) interfac
 	tasksCount := 0
 	mainTasksCount := 0
 
-	tqs.Iterate(func(queue *queue.TaskQueue) {
+	tqs.IterateSnapshot(context.TODO(), func(_ context.Context, queue *queue.TaskQueue) {
 		if queue == nil {
 			return
 		}
 
+		tasks := getTasksForQueue(queue)
+		length := queue.Length()
+		status := queue.GetStatus()
+		isEmpty := length == 0
+
 		if queue.Name == tqs.MainName {
-			mainTasksCount = queue.Length()
-			if queue.IsEmpty() {
+			mainTasksCount = length
+			if isEmpty {
 				mainQueue := dumpQueue{
 					Name:       queue.Name,
-					TasksCount: queue.Length(),
+					TasksCount: length,
 				}
+
 				result.Empty = append(result.Empty, mainQueue)
 				result.MainQueue = &mainQueue
-			} else {
-				tasks := getTasksForQueue(queue)
-				mainQueue := dumpQueue{
-					Name:       queue.Name,
-					TasksCount: queue.Length(),
-					Status:     queue.GetStatus(),
-					Tasks:      tasks,
-				}
-				result.Active = append(result.Active, mainQueue)
-				result.MainQueue = &mainQueue
+
+				return
 			}
+
+			mainQueue := dumpQueue{
+				Name:       queue.Name,
+				TasksCount: length,
+				Status:     status,
+				Tasks:      tasks,
+			}
+
+			result.Active = append(result.Active, mainQueue)
+			result.MainQueue = &mainQueue
+
 			return
 		}
 
 		otherQueuesCount++
-		if queue.IsEmpty() {
+		if isEmpty {
 			emptyQueues++
 			result.Empty = append(result.Empty, dumpQueue{
 				Name: queue.Name,
 			})
-		} else {
-			activeQueues++
-			tasksCount += queue.Length()
-			tasks := getTasksForQueue(queue)
-			result.Active = append(result.Active, dumpQueue{
-				Name:       queue.Name,
-				TasksCount: queue.Length(),
-				Status:     queue.GetStatus(),
-				Tasks:      tasks,
-			})
+
+			return
 		}
+
+		activeQueues++
+		tasksCount += length
+		result.Active = append(result.Active, dumpQueue{
+			Name:       queue.Name,
+			TasksCount: length,
+			Status:     status,
+			Tasks:      tasks,
+		})
 	})
 
 	result.SortByName()
@@ -160,7 +171,7 @@ func getTasksForQueue(q *queue.TaskQueue) []dumpTask {
 	tasks := make([]dumpTask, 0, q.Length())
 
 	index := 1
-	q.Iterate(func(task task.Task) {
+	q.IterateSnapshot(func(task task.Task) {
 		tasks = append(tasks, dumpTask{
 			Index:       index,
 			Description: task.GetDescription(),
@@ -253,11 +264,11 @@ func (dtq dumpTaskQueues) asText(showEmpty bool) string {
 			buf.WriteString("\n")
 		}
 
-		buf.WriteString(fmt.Sprintf("Queue '%s': length %d, status: '%s'\n", taskQueue.Name, taskQueue.TasksCount, taskQueue.Status))
+		fmt.Fprintf(&buf, "Queue '%s': length %d, status: '%s'\n", taskQueue.Name, taskQueue.TasksCount, taskQueue.Status)
 		buf.WriteString("\n")
 
 		for _, tk := range taskQueue.Tasks {
-			buf.WriteString(fmt.Sprintf("%2d. ", tk.Index))
+			fmt.Fprintf(&buf, "%2d. ", tk.Index)
 			buf.WriteString(tk.Description)
 			buf.WriteString("\n")
 		}
@@ -265,9 +276,9 @@ func (dtq dumpTaskQueues) asText(showEmpty bool) string {
 
 	// Empty queues. Do not report single empty main queue.
 	if showEmpty {
-		buf.WriteString(fmt.Sprintf("\nEmpty queues (%d):\n", len(dtq.Empty)))
+		fmt.Fprintf(&buf, "\nEmpty queues (%d):\n", len(dtq.Empty))
 		for _, taskQueue := range dtq.Empty {
-			buf.WriteString(fmt.Sprintf("- %s\n", taskQueue.Name))
+			fmt.Fprintf(&buf, "- %s\n", taskQueue.Name)
 		}
 	}
 
@@ -289,22 +300,22 @@ func (dtq dumpTaskQueues) asText(showEmpty bool) string {
 		buf.WriteString("Summary:\n")
 		if dtq.MainQueue != nil {
 			otherQueuesCount-- // minus main queue
-			buf.WriteString(fmt.Sprintf("- '%s' queue: %s.\n",
+			fmt.Fprintf(&buf, "- '%s' queue: %s.\n",
 				dtq.MainQueue.Name,
-				pluralize(len(dtq.MainQueue.Tasks), "empty", "task", "tasks")))
+				pluralize(len(dtq.MainQueue.Tasks), "empty", "task", "tasks"))
 		}
 
 		if otherQueuesCount > 0 {
-			buf.WriteString(fmt.Sprintf("- %s (%d active, %d empty): %s.\n",
+			fmt.Fprintf(&buf, "- %s (%d active, %d empty): %s.\n",
 				pluralize(otherQueuesCount, "", "other queue", "other queues"),
 				dtq.Summary.otherQueuesActiveCount, dtq.Summary.otherQueuesEmptyCount,
-				pluralize(dtq.Summary.otherQueuesTasksCount, "", "task", "tasks")))
+				pluralize(dtq.Summary.otherQueuesTasksCount, "", "task", "tasks"))
 		}
 		if dtq.Summary.totalTasksCount == 0 {
 			buf.WriteString("- no tasks to handle.\n")
 		} else {
-			buf.WriteString(fmt.Sprintf("- total %s to handle.\n",
-				pluralize(dtq.Summary.totalTasksCount, "", "task", "tasks")))
+			fmt.Fprintf(&buf, "- total %s to handle.\n",
+				pluralize(dtq.Summary.totalTasksCount, "", "task", "tasks"))
 		}
 	}
 

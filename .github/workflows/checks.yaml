@@ -1,14 +1,11 @@
 name: PR Checks
-
 on:
   pull_request:
     types: [opened, labeled, unlabeled, synchronize]
-
 jobs:
   release-label:
     name: Release note label
     runs-on: ubuntu-latest
-
     steps:
       - name: Check minimum labels
         uses: mheap/github-action-required-labels@v5

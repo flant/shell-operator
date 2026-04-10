@@ -7,6 +7,8 @@ import (
 	"syscall"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 // WaitForProcessInterruption wait for SIGINT or SIGTERM and run a callback function.
@@ -19,7 +21,7 @@ func WaitForProcessInterruption(cb ...func()) {
 	interruptCh := make(chan os.Signal, 1)
 
 	forcedExit := func(s os.Signal) {
-		log.Info("Forced shutdown by signal", slog.String("name", s.String()))
+		log.Info("Forced shutdown by signal", slog.String(pkg.LogKeyName, s.String()))
 
 		signum := 0
 		if v, ok := s.(syscall.Signal); ok {
@@ -35,7 +37,7 @@ func WaitForProcessInterruption(cb ...func()) {
 		switch allowedCount {
 		case 0:
 			if len(cb) > 0 {
-				log.Info("Grace shutdown by signal", slog.String("name", sig.String()))
+				log.Info("Grace shutdown by signal", slog.String(pkg.LogKeyName, sig.String()))
 				cb[0]()
 			} else {
 				forcedExit(sig)

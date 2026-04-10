@@ -3,12 +3,30 @@ package config
 import (
 	"fmt"
 
-	"sigs.k8s.io/yaml"
-
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 )
 
 var validBindingTypes = []htypes.BindingType{htypes.OnStartup, htypes.Schedule, htypes.OnKubernetesEvent, htypes.KubernetesValidating, htypes.KubernetesMutating, htypes.KubernetesConversion}
+
+// VersionedConverter converts raw config bytes into a HookConfig for a specific config version.
+// Implement this interface and call RegisterVersionedConverter to add new config versions
+// without touching the ConvertAndCheck switch.
+type VersionedConverter interface {
+	Version() string
+	ConvertAndCheck(data []byte, c *HookConfig) error
+}
+
+// versionedConverters is the registry of known config version converters.
+var versionedConverters = map[string]VersionedConverter{
+	"v0": hookConfigV0Converter{},
+	"v1": hookConfigV1Converter{},
+}
+
+// RegisterVersionedConverter registers a VersionedConverter for a config version.
+// It panics if called after init (i.e. after registrations are frozen).
+func RegisterVersionedConverter(conv VersionedConverter) {
+	versionedConverters[conv.Version()] = conv
+}
 
 // HookConfig is a structure with versioned hook configuration
 type HookConfig struct {
@@ -61,34 +79,12 @@ func (c *HookConfig) LoadAndValidate(data []byte) error {
 
 // ConvertAndCheck transforms a versioned configuration to latest internal structures.
 func (c *HookConfig) ConvertAndCheck(data []byte) error {
-	switch c.Version {
-	case "v0":
-		configV0 := &HookConfigV0{}
-		err := yaml.Unmarshal(data, configV0)
-		if err != nil {
-			return fmt.Errorf("unmarshal HookConfig version 0: %s", err)
-		}
-		c.V0 = configV0
-		err = configV0.ConvertAndCheck(c)
-		if err != nil {
-			return err
-		}
-	case "v1":
-		configV1 := &HookConfigV1{}
-		err := yaml.Unmarshal(data, configV1)
-		if err != nil {
-			return fmt.Errorf("unmarshal HookConfig v1: %s", err)
-		}
-		c.V1 = configV1
-		err = configV1.ConvertAndCheck(c)
-		if err != nil {
-			return err
-		}
-	default:
+	conv, ok := versionedConverters[c.Version]
+	if !ok {
 		// NOTE: this should not happen
 		return fmt.Errorf("version '%s' is unsupported", c.Version)
 	}
-	return nil
+	return conv.ConvertAndCheck(data, c)
 }
 
 // Bindings returns a list of binding types in hook configuration.

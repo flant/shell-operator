@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 /**
@@ -52,7 +54,7 @@ func NewConfig(logger *log.Logger) *Config {
 		values:         make(map[string]string),
 		temporalValues: make(map[string]*TemporalValue),
 		errors:         make(map[string]error),
-		logger:         logger.With(slog.String("component", "runtimeConfig")),
+		logger:         logger.With(slog.String(pkg.LogKeyComponent, "runtimeConfig")),
 	}
 }
 
@@ -79,27 +81,33 @@ func (c *Config) List() []map[string]string {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	res := make([]map[string]string, 0)
+	res := make([]map[string]string, 0, len(c.params))
 	for paramName, param := range c.params {
 		paramValue := c.value(paramName)
+
 		paramInfo := map[string]string{
 			"name":        paramName,
 			"description": param.description,
 			"default":     param.defaultValue,
 			"value":       paramValue,
 		}
+
 		if tempValue, ok := c.temporalValues[paramName]; ok {
 			paramInfo["expireAt"] = tempValue.expire.Format(time.RFC3339)
 		}
+
 		lastError := c.errors[paramName]
 		if lastError != nil {
 			paramInfo["lastError"] = lastError.Error()
 		}
+
 		res = append(res, paramInfo)
 	}
+
 	sort.SliceStable(res, func(i, j int) bool {
 		return res[i]["name"] < res[j]["name"]
 	})
+
 	return res
 }
 
@@ -255,7 +263,7 @@ func (c *Config) expireOverrides() {
 
 	for _, expire := range expires {
 		name, oldValue, newValue := expire[0], expire[1], expire[2]
-		c.logger.Debug("Parameter is expired", slog.String("parameter", name))
+		c.logger.Debug("Parameter is expired", slog.String(pkg.LogKeyParameter, name))
 		c.callOnChange(name, oldValue, newValue)
 	}
 }
@@ -268,7 +276,7 @@ func (c *Config) callOnChange(name string, oldValue string, newValue string) {
 	err := c.params[name].onChange(oldValue, newValue)
 	if err != nil {
 		c.logger.Error("OnChange handler failed for parameter during value change values",
-			slog.String("parameter", name), slog.String("old_value", oldValue), slog.String("new_value", newValue), log.Err(err))
+			slog.String(pkg.LogKeyParameter, name), slog.String(pkg.LogKeyOldValue, oldValue), slog.String(pkg.LogKeyNewValue, newValue), log.Err(err))
 	}
 	c.m.Lock()
 	delete(c.errors, name)

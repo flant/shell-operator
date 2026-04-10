@@ -15,6 +15,7 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 
 	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -135,7 +136,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 			"spec": "pod-0",
 		},
 	}
-	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
+	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, pkg.DefaultCreateOptions(), []string{}...)
 
 	// Init() replacement
 	mgr := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
@@ -191,7 +192,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 						"spec": "pod-1",
 					},
 				}
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj1, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj1, pkg.DefaultCreateOptions(), []string{}...)
 				// Inject second event into the fake client.
 				obj2 := &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -204,7 +205,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 						"spec": "pod-2",
 					},
 				}
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj2, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj2, pkg.DefaultCreateOptions(), []string{}...)
 				t.Logf("DynamicClient Created pod\n")
 				state.podsCreated = true
 				break
@@ -311,7 +312,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 			"spec": "pod-0",
 		},
 	}
-	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, metav1.CreateOptions{}, []string{}...)
+	_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj, pkg.DefaultCreateOptions(), []string{}...)
 
 	//// Init() replacement
 	mgr := NewKubeEventsManager(ctx, nil, log.NewNop())
@@ -357,7 +358,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 
 				obj.Object["spec"] = "pod-0-new-spec"
 
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Update(context.TODO(), obj, metav1.UpdateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Update(context.TODO(), obj, pkg.DefaultUpdateOptions(), []string{}...)
 
 				// Inject an event into the fake client.
 				obj1 := &unstructured.Unstructured{
@@ -371,7 +372,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 						"spec": "pod-1",
 					},
 				}
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj1, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj1, pkg.DefaultCreateOptions(), []string{}...)
 				// Inject second event into the fake client.
 				obj2 := &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -384,7 +385,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 						"spec": "pod-2",
 					},
 				}
-				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj2, metav1.CreateOptions{}, []string{}...)
+				_, _ = dynClient.Resource(podGvr).Namespace("default").Create(context.TODO(), obj2, pkg.DefaultCreateOptions(), []string{}...)
 				t.Logf("DynamicClient Created pod\n")
 				state.podsCreated = true
 				break
@@ -413,5 +414,26 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// TestNewKubeEventsManager_IsolatedFactoryStore verifies that each KubeEventsManager
+// instance owns its own FactoryStore so parallel tests do not share informer state.
+func TestNewKubeEventsManager_IsolatedFactoryStore(t *testing.T) {
+	ctx := context.Background()
+	kubeClient := klient.NewFake(nil)
+
+	mgr1 := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
+	mgr2 := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
+
+	// Each manager must have a non-nil, distinct factory store.
+	if mgr1.factoryStore == nil {
+		t.Fatal("mgr1.factoryStore must not be nil")
+	}
+	if mgr2.factoryStore == nil {
+		t.Fatal("mgr2.factoryStore must not be nil")
+	}
+	if mgr1.factoryStore == mgr2.factoryStore {
+		t.Fatal("mgr1 and mgr2 must not share the same factoryStore")
 	}
 }

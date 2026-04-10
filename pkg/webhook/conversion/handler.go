@@ -16,18 +16,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
 type WebhookHandler struct {
 	Manager *WebhookManager
 	Router  chi.Router
+
+	Logger *log.Logger
 }
 
-func NewWebhookHandler() *WebhookHandler {
+func NewWebhookHandler(logger *log.Logger) *WebhookHandler {
 	rtr := chi.NewRouter()
 	h := &WebhookHandler{
 		Router: rtr,
+		Logger: logger,
 	}
 
 	rtr.Group(func(r chi.Router) {
@@ -37,7 +41,7 @@ func NewWebhookHandler() *WebhookHandler {
 	})
 
 	rtr.Group(func(r chi.Router) {
-		r.Use(structuredLogger.NewStructuredLogger(log.NewLogger().Named("conversionWebhook"), "conversionWebhook"))
+		r.Use(structuredLogger.NewStructuredLogger(logger.Named("conversionWebhook"), "conversionWebhook"))
 		r.Use(middleware.Recoverer)
 		r.Use(middleware.AllowContentType("application/json"))
 		r.Post("/*", h.serveReviewRequest)
@@ -51,26 +55,33 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 
 	crdName := detectCrdName(r.URL.Path)
-	log.Info("Got ConversionReview request for crd",
-		slog.String("name", crdName))
+
+	logger := h.Logger.With(slog.String(pkg.LogKeyCRD, crdName))
+	logger.Info("serving ConversionReview request")
 
 	var convertReview v1.ConversionReview
 	err := json.NewDecoder(r.Body).Decode(&convertReview)
 	if err != nil {
-		log.Error("failed to read conversion request", log.Err(err))
+		logger.Error("failed to decode ConversionReview body to json", log.Err(err))
 		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("Invalid JSON payload"))
 		return
 	}
 
 	if convertReview.Request == nil {
-		log.Error("conversion request is nil")
+		logger.Error("ConversionReview request is nil")
 		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("Missing parameters: request"))
 		return
 	}
 
+	logger = logger.With(
+		slog.String(pkg.LogKeyRequest, string(convertReview.Request.UID)),
+		slog.String(pkg.LogKeyKind, convertReview.Kind))
+
 	conversionResponse, err := h.handleReviewRequest(ctx, crdName, convertReview.Request)
 	if err != nil {
-		log.Error("failed to convert", "request", convertReview.Request.UID, log.Err(err))
+		logger.Error("conversion failed", log.Err(err))
 		convertReview.Response = errored(err)
 	} else {
 		convertReview.Response = conversionResponse
@@ -84,7 +95,7 @@ func (h *WebhookHandler) serveReviewRequest(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("Error json encoding ConversionReview"))
-		log.Error("Error json encoding ConversionReview", log.Err(err))
+		logger.Error("error json encoding ConversionReview", log.Err(err))
 		return
 	}
 }
@@ -98,7 +109,7 @@ func (h *WebhookHandler) handleReviewRequest(ctx context.Context, crdName string
 
 	conversionResponse, err := h.Manager.EventHandlerFn(ctx, crdName, request)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("handle ConversionReview: %w", err)
 	}
 
 	if conversionResponse.FailedMessage != "" {

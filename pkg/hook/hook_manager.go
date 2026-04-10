@@ -14,7 +14,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	"github.com/flant/shell-operator/pkg/app"
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
@@ -36,6 +36,15 @@ type Manager struct {
 	conversionWebhookManager *conversion.WebhookManager
 	admissionWebhookManager  *admission.WebhookManager
 
+	// hookDiscovery resolves the set of hook executables to load.
+	// Defaults to FileSystemHookDiscovery; tests may inject a stub.
+	hookDiscovery HookDiscovery
+
+	// hook execution options
+	keepTemporaryHookFiles bool
+	logProxyHookJSON       bool
+	logProxyHookJSONKey    string
+
 	// sorted hook names
 	hookNamesInOrder []string
 
@@ -52,17 +61,29 @@ type Manager struct {
 
 // ManagerConfig sets configuration for Manager
 type ManagerConfig struct {
-	WorkingDir string
-	TempDir    string
-	Kmgr       kubeeventsmanager.KubeEventsManager
-	Smgr       schedulemanager.ScheduleManager
-	Wmgr       *admission.WebhookManager
-	Cmgr       *conversion.WebhookManager
+	WorkingDir               string
+	TempDir                  string
+	KubeEventsManager        kubeeventsmanager.KubeEventsManager
+	ScheduleManager          schedulemanager.ScheduleManager
+	AdmissionWebhookManager  *admission.WebhookManager
+	ConversionWebhookManager *conversion.WebhookManager
+
+	// HookDiscovery overrides the default filesystem-based hook discovery.
+	// When nil, FileSystemHookDiscovery is used.
+	HookDiscovery HookDiscovery
+
+	KeepTemporaryHookFiles bool
+	LogProxyHookJSON       bool
+	LogProxyHookJSONKey    string
 
 	Logger *log.Logger
 }
 
 func NewHookManager(config *ManagerConfig) *Manager {
+	disc := config.HookDiscovery
+	if disc == nil {
+		disc = FileSystemHookDiscovery{}
+	}
 	return &Manager{
 		hooksByName:      make(map[string]*Hook),
 		hookNamesInOrder: make([]string, 0),
@@ -71,10 +92,15 @@ func NewHookManager(config *ManagerConfig) *Manager {
 
 		workingDir:               config.WorkingDir,
 		tempDir:                  config.TempDir,
-		kubeEventsManager:        config.Kmgr,
-		scheduleManager:          config.Smgr,
-		admissionWebhookManager:  config.Wmgr,
-		conversionWebhookManager: config.Cmgr,
+		kubeEventsManager:        config.KubeEventsManager,
+		scheduleManager:          config.ScheduleManager,
+		admissionWebhookManager:  config.AdmissionWebhookManager,
+		conversionWebhookManager: config.ConversionWebhookManager,
+		hookDiscovery:            disc,
+
+		keepTemporaryHookFiles: config.KeepTemporaryHookFiles,
+		logProxyHookJSON:       config.LogProxyHookJSON,
+		logProxyHookJSONKey:    config.LogProxyHookJSONKey,
 
 		logger: config.Logger,
 	}
@@ -90,27 +116,27 @@ func (hm *Manager) TempDir() string {
 
 // Init finds executables in WorkingDir, execute them with --config argument and add them into indices.
 func (hm *Manager) Init() error {
-	log.Info("Initialize hooks manager. Search for and load all hooks.")
+	hm.logger.Info("Initialize hooks manager. Search for and load all hooks.")
 
 	hm.hooksInOrder = make(map[htypes.BindingType][]*Hook)
 	hm.hooksByName = make(map[string]*Hook)
 
 	if err := utils_file.RecursiveCheckLibDirectory(hm.workingDir); err != nil {
-		log.Error("failed to check lib directory",
-			slog.String("workingDir", hm.workingDir),
+		hm.logger.Error("failed to check lib directory",
+			slog.String(pkg.LogKeyWorkingDir, hm.workingDir),
 			log.Err(err))
 	}
 
-	hooksRelativePaths, err := utils_file.RecursiveGetExecutablePaths(hm.workingDir)
+	hookPaths, err := hm.hookDiscovery.Discover(hm.workingDir)
 	if err != nil {
 		return err
 	}
 
 	// sort hooks by path
-	sort.Strings(hooksRelativePaths)
-	log.Debug("Search hooks in paths", slog.Any("paths", hooksRelativePaths))
+	sort.Strings(hookPaths)
+	hm.logger.Debug("Search hooks in paths", slog.Any(pkg.LogKeyPaths, hookPaths))
 
-	for _, hookPath := range hooksRelativePaths {
+	for _, hookPath := range hookPaths {
 		hook, err := hm.loadHook(hookPath)
 		if err != nil {
 			return err
@@ -140,81 +166,93 @@ func (hm *Manager) loadHook(hookPath string) (*Hook, error) {
 		return nil, err
 	}
 
-	hook := NewHook(hookName, hookPath, app.DebugKeepTmpFiles, app.LogProxyHookJSON, app.ProxyJsonLogKey, hm.logger.Named("hook"))
-	hookEntry := hm.logger.With("hook", hook.Name).
-		With("phase", "config")
+	hook := NewHook(hookName, hookPath, hm.keepTemporaryHookFiles, hm.logProxyHookJSON, hm.logProxyHookJSONKey, hm.logger.Named("hook"))
+	hookEntry := hm.logger.With(slog.String(pkg.LogKeyHook, hook.Name), slog.String(pkg.LogKeyPhase, "config"))
+	hookEntry.Info("Load config", slog.String(pkg.LogKeyPath, hookPath))
 
-	hookEntry.Info("Load config", slog.String("path", hookPath))
-
-	envs := make([]string, 0)
-	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hookPath, envs, []string{"--config"})
+	configOutput, err := hm.fetchHookConfig(hook)
 	if err != nil {
-		hookEntry.Error("Hook config output", slog.String("value", string(configOutput)))
-		var ee *exec.ExitError
-		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-			hookEntry.Error("Hook config stderr", slog.String("value", string(ee.Stderr)))
-		}
-		return nil, fmt.Errorf("cannot get config for hook '%s': %w", hookPath, err)
+		return nil, err
 	}
 
 	if _, err = hook.LoadConfig(configOutput); err != nil {
 		return nil, fmt.Errorf("creating hook '%s': %w", hookName, err)
 	}
 
-	// Add hook info as log labels, update MetricLabels
-	for _, kubeCfg := range hook.GetConfig().OnKubernetesEvents {
-		kubeCfg.Monitor.Metadata.LogLabels["hook"] = hook.Name
-		kubeCfg.Monitor.Metadata.MetricLabels = map[string]string{
-			"hook":    hook.Name,
-			"binding": kubeCfg.BindingName,
-			"queue":   kubeCfg.Queue,
-		}
-	}
-
-	for _, conversionCfg := range hook.GetConfig().KubernetesConversion {
-		conversionCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
-		conversionCfg.Webhook.Metadata.MetricLabels = map[string]string{
-			"hook":    hook.Name,
-			"binding": conversionCfg.BindingName,
-		}
-	}
-
-	for _, validatingCfg := range hook.GetConfig().KubernetesValidating {
-		validatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
-		validatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
-			"hook":    hook.Name,
-			"binding": validatingCfg.BindingName,
-		}
-		validatingCfg.Webhook.UpdateIds("", validatingCfg.BindingName)
-	}
-
-	for _, mutatingCfg := range hook.GetConfig().KubernetesMutating {
-		mutatingCfg.Webhook.Metadata.LogLabels["hook"] = hook.Name
-		mutatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
-			"hook":    hook.Name,
-			"binding": mutatingCfg.BindingName,
-		}
-		mutatingCfg.Webhook.UpdateIds("", mutatingCfg.BindingName)
-	}
-
-	hookCtrl := controller.NewHookController()
-	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager, hm.logger.Named("kubernetes-bindings"))
-	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
-	hookCtrl.InitConversionBindings(hook.GetConfig().KubernetesConversion, hm.conversionWebhookManager)
-	hookCtrl.InitAdmissionBindings(hook.GetConfig().KubernetesValidating, hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
-	// TODO
-	// hookCtrl.InitMutatingBindings(hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
-
-	hook.WithHookController(hookCtrl)
-	hook.WithTmpDir(hm.TempDir())
+	hm.enrichHookMetadata(hook)
+	hm.wireHookController(hook)
 
 	if hook.Config == nil {
 		return nil, fmt.Errorf("hook %q is marked as executable but doesn't contain config section", hook.Path)
 	}
 
-	hookEntry.Info("Loaded config", slog.String("value", hook.GetConfigDescription()))
+	hookEntry.Info("Loaded config", slog.String(pkg.LogKeyValue, hook.GetConfigDescription()))
 
 	return hook, nil
+}
+
+// fetchHookConfig executes the hook with --config and returns its output.
+func (hm *Manager) fetchHookConfig(hook *Hook) ([]byte, error) {
+	hookEntry := hm.logger.With(slog.String(pkg.LogKeyHook, hook.Name), slog.String(pkg.LogKeyPhase, "config"))
+	configOutput, err := hm.execCommandOutput(hook.Name, hm.workingDir, hook.Path, nil, []string{"--config"})
+	if err != nil {
+		hookEntry.Error("Hook config output", slog.String(pkg.LogKeyValue, string(configOutput)))
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
+			hookEntry.Error("Hook config stderr", slog.String(pkg.LogKeyValue, string(ee.Stderr)))
+		}
+		return nil, fmt.Errorf("cannot get config for hook '%s': %w", hook.Path, err)
+	}
+	return configOutput, nil
+}
+
+// enrichHookMetadata injects hook name and metric labels into all binding configs.
+func (hm *Manager) enrichHookMetadata(hook *Hook) {
+	for _, kubeCfg := range hook.GetConfig().OnKubernetesEvents {
+		kubeCfg.Monitor.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
+		kubeCfg.Monitor.Metadata.MetricLabels = map[string]string{
+			pkg.MetricKeyHook:    hook.Name,
+			pkg.MetricKeyBinding: kubeCfg.BindingName,
+			pkg.MetricKeyQueue:   kubeCfg.Queue,
+		}
+	}
+
+	for _, conversionCfg := range hook.GetConfig().KubernetesConversion {
+		conversionCfg.Webhook.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
+		conversionCfg.Webhook.Metadata.MetricLabels = map[string]string{
+			pkg.MetricKeyHook:    hook.Name,
+			pkg.MetricKeyBinding: conversionCfg.BindingName,
+		}
+	}
+
+	for _, validatingCfg := range hook.GetConfig().KubernetesValidating {
+		validatingCfg.Webhook.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
+		validatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
+			pkg.MetricKeyHook:    hook.Name,
+			pkg.MetricKeyBinding: validatingCfg.BindingName,
+		}
+		validatingCfg.Webhook.UpdateIds("", validatingCfg.BindingName)
+	}
+
+	for _, mutatingCfg := range hook.GetConfig().KubernetesMutating {
+		mutatingCfg.Webhook.Metadata.LogLabels[pkg.LogKeyHook] = hook.Name
+		mutatingCfg.Webhook.Metadata.MetricLabels = map[string]string{
+			pkg.MetricKeyHook:    hook.Name,
+			pkg.MetricKeyBinding: mutatingCfg.BindingName,
+		}
+		mutatingCfg.Webhook.UpdateIds("", mutatingCfg.BindingName)
+	}
+}
+
+// wireHookController creates and attaches a HookController with all bindings initialised.
+func (hm *Manager) wireHookController(hook *Hook) {
+	hookCtrl := controller.NewHookController()
+	hookCtrl.InitKubernetesBindings(hook.GetConfig().OnKubernetesEvents, hm.kubeEventsManager, hm.logger.Named("kubernetes-bindings"))
+	hookCtrl.InitScheduleBindings(hook.GetConfig().Schedules, hm.scheduleManager)
+	hookCtrl.InitConversionBindings(hook.GetConfig().KubernetesConversion, hm.conversionWebhookManager)
+	hookCtrl.InitAdmissionBindings(hook.GetConfig().KubernetesValidating, hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
+	hook.WithHookController(hookCtrl)
+	hook.WithTmpDir(hm.TempDir())
 }
 
 func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
@@ -224,23 +262,22 @@ func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint str
 		entrypoint,
 		args,
 		envs).
-		WithLogProxyHookJSON(app.LogProxyHookJSON).
-		WithLogProxyHookJSONKey(app.ProxyJsonLogKey).
+		WithLogProxyHookJSON(hm.logProxyHookJSON).
+		WithLogProxyHookJSONKey(hm.logProxyHookJSONKey).
 		WithCMDStdout(nil).
 		WithCMDStderr(nil).
 		WithLogger(hm.logger.Named("executor"))
 
-	debugEntry := hm.logger.With("hook", hookName).
-		With("cmd", strings.Join(args, " "))
+	debugEntry := hm.logger.With(slog.String(pkg.LogKeyHook, hookName), slog.String(pkg.LogKeyCmd, strings.Join(args, " ")))
 
-	debugEntry.Debug("Executing hook", slog.String("dir", dir))
+	debugEntry.Debug("Executing hook", slog.String(pkg.LogKeyDir, dir))
 
 	output, err := hookCmd.Output()
 	if err != nil {
 		return output, err
 	}
 
-	debugEntry.Debug("execCommandOutput", slog.String("output", string(output)))
+	debugEntry.Debug("execCommandOutput", slog.String(pkg.LogKeyOutput, string(output)))
 
 	return output, nil
 }
@@ -250,7 +287,7 @@ func (hm *Manager) GetHook(name string) *Hook {
 	if exists {
 		return hook
 	}
-	log.Error("Possible bug!!! Hook not found in hook manager", slog.String("name", name))
+	hm.logger.Error("Possible bug!!! Hook not found in hook manager", slog.String(pkg.LogKeyName, name))
 	return nil
 }
 
@@ -378,12 +415,12 @@ func (hm *Manager) DetectAdmissionEventType(event admission.Event) htypes.Bindin
 		}
 	}
 
-	log.Error("Possible bug!!! No linked hook for admission event %s %s kind=%s name=%s ns=%s",
-		slog.String("configId", event.ConfigurationId),
-		slog.String("webhookId", event.WebhookId),
-		slog.String("kind", event.Request.Kind.String()),
-		slog.String("name", event.Request.Name),
-		slog.String("namespace", event.Request.Namespace))
+	hm.logger.Error("Possible bug!!! No linked hook for admission event",
+		slog.String(pkg.LogKeyConfigId, event.ConfigurationId),
+		slog.String(pkg.LogKeyWebhookId, event.WebhookId),
+		slog.String(pkg.LogKeyKind, event.Request.Kind.String()),
+		slog.String(pkg.LogKeyName, event.Request.Name),
+		slog.String(pkg.LogKeyNamespace, event.Request.Namespace))
 	return ""
 }
 
@@ -425,3 +462,37 @@ func (hm *Manager) UpdateConversionChains() error {
 func (hm *Manager) FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule {
 	return hm.conversionChains.FindConversionChain(crdName, rule)
 }
+
+// HookManager is the interface for the hook manager used by the operator.
+// It allows substituting test doubles in unit tests.
+type HookManager interface {
+	Init() error
+	GetHook(name string) *Hook
+	GetHookNames() []string
+	GetHooksInOrder(bindingType htypes.BindingType) ([]string, error)
+	CreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task
+	HandleCreateTasksFromScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task
+	HandleAdmissionEvent(ctx context.Context, event admission.Event, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	DetectAdmissionEventType(event admission.Event) htypes.BindingType
+	HandleConversionEvent(ctx context.Context, crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule
+}
+
+// HookDiscovery discovers hook executables to be loaded by the Manager.
+// The default implementation scans the filesystem; tests and alternative
+// runtimes can supply their own.
+type HookDiscovery interface {
+	// Discover returns a sorted list of absolute paths to hook executables.
+	Discover(workingDir string) ([]string, error)
+}
+
+// FileSystemHookDiscovery discovers hooks by recursively scanning workingDir
+// for executable files.
+type FileSystemHookDiscovery struct{}
+
+func (FileSystemHookDiscovery) Discover(workingDir string) ([]string, error) {
+	return utils_file.RecursiveGetExecutablePaths(workingDir)
+}
+
+// compile-time assertion
+var _ HookManager = (*Manager)(nil)

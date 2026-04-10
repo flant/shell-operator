@@ -13,16 +13,15 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
-var (
-	DefaultFactoryStore *FactoryStore
-	DefaultSyncTime     = 100 * time.Millisecond
+const (
+	FactoryShutdownTimeout = 30 * time.Second
 )
 
-func init() {
-	DefaultFactoryStore = NewFactoryStore()
-}
+var DefaultSyncTime = 100 * time.Millisecond
 
 type FactoryIndex struct {
 	GVR           schema.GroupVersionResource
@@ -36,42 +35,50 @@ type Factory struct {
 	handlerRegistrations map[string]cache.ResourceEventHandlerRegistration
 	ctx                  context.Context
 	cancel               context.CancelFunc
+	// done is closed when the underlying informer.Run returns
+	done chan struct{}
 }
 
 type FactoryStore struct {
-	mu   sync.Mutex
-	data map[FactoryIndex]Factory
+	mu        sync.Mutex
+	data      map[FactoryIndex]*Factory
+	stoppedCh map[FactoryIndex]chan struct{}
 }
 
 func NewFactoryStore() *FactoryStore {
-	return &FactoryStore{
-		data: make(map[FactoryIndex]Factory),
+	fs := &FactoryStore{
+		data:      make(map[FactoryIndex]*Factory),
+		stoppedCh: make(map[FactoryIndex]chan struct{}),
 	}
+	return fs
 }
 
 func (c *FactoryStore) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.data = make(map[FactoryIndex]Factory)
+	c.data = make(map[FactoryIndex]*Factory)
+	c.stoppedCh = make(map[FactoryIndex]chan struct{})
 }
 
-func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
-	ctx, cancel := context.WithCancel(context.Background())
-	c.data[index] = Factory{
+func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
+	ctx, cancel := context.WithCancel(ctx)
+	c.data[index] = &Factory{
 		shared:               f,
 		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
 		ctx:                  ctx,
 		cancel:               cancel,
+		done:                 nil,
 	}
+
 	log.Debug("Factory store: added a new factory for index",
-		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 }
 
-func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory {
+func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index FactoryIndex) *Factory {
 	f, ok := c.data[index]
 	if ok {
 		log.Debug("Factory store: the factory with index found",
-			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 		return f
 	}
 
@@ -91,7 +98,8 @@ func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) Factory
 		client, resyncPeriod, index.Namespace, tweakListOptions)
 	factory.ForResource(index.GVR)
 
-	c.add(index, factory)
+	c.add(ctx, index, factory)
+
 	return c.data[index]
 }
 
@@ -99,43 +107,59 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	factory := c.get(client, index)
+	factory := c.get(ctx, client, index)
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
 	// Add error handler, ignore "already started" error.
 	_ = informer.SetWatchErrorHandler(errorHandler.handler)
+
 	registration, err := informer.AddEventHandler(handler)
 	if err != nil {
 		log.Warn("Factory store: couldn't add event handler to the factory's informer",
-			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()),
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
 			log.Err(err))
 	}
+
 	factory.handlerRegistrations[informerId] = registration
+
 	log.Debug("Factory store: increased usage counter of the factory",
-		slog.Int("value", len(factory.handlerRegistrations)),
-		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+		slog.Int(pkg.LogKeyValue, len(factory.handlerRegistrations)),
+		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+	// Ensure informer.Run is started once and tracked
+	if factory.done == nil {
+		factory.done = make(chan struct{})
+
+		go func() {
+			informer.Run(factory.ctx.Done())
+
+			close(factory.done)
+
+			log.Debug("Factory store: informer goroutine exited",
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+		}()
+	}
 
 	if !informer.HasSynced() {
-		go informer.Run(factory.ctx.Done())
-
 		if err := wait.PollUntilContextCancel(ctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 			return informer.HasSynced(), nil
 		}); err != nil {
 			return err
 		}
 	}
+
 	log.Debug("Factory store: started informer",
-		slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
 	return nil
 }
 
 func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	f, ok := c.data[index]
 	if !ok {
 		// already deleted
+		c.mu.Unlock()
 		return
 	}
 
@@ -143,18 +167,68 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 		err := f.shared.ForResource(index.GVR).Informer().RemoveEventHandler(handlerRegistration)
 		if err != nil {
 			log.Warn("Factory store: couldn't remove event handler from the factory's informer",
-				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()),
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
 				log.Err(err))
 		}
+
 		delete(f.handlerRegistrations, informerId)
+
 		log.Debug("Factory store: decreased usage counter of the factory",
-			slog.Int("value", len(f.handlerRegistrations)),
-			slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+			slog.Int(pkg.LogKeyValue, len(f.handlerRegistrations)),
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
 		if len(f.handlerRegistrations) == 0 {
+			log.Debug("Factory store: last handler removed, canceling shared informer",
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+			done := f.done
+
 			f.cancel()
+			c.mu.Unlock()
+			if done != nil {
+				<-done
+			}
+
+			c.mu.Lock()
 			delete(c.data, index)
+
 			log.Debug("Factory store: deleted factory",
-				slog.String("namespace", index.Namespace), slog.String("gvr", index.GVR.String()))
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+			if ch, ok := c.stoppedCh[index]; ok {
+				close(ch)
+				delete(c.stoppedCh, index)
+			}
+		}
+	}
+
+	c.mu.Unlock()
+}
+
+// WaitStopped blocks until there is no factory for the index or timeout
+func (c *FactoryStore) WaitStopped(index FactoryIndex) {
+	c.mu.Lock()
+
+	if _, ok := c.data[index]; !ok {
+		c.mu.Unlock()
+		return
+	}
+
+	ch, ok := c.stoppedCh[index]
+	if !ok {
+		ch = make(chan struct{})
+		close(ch)
+	}
+
+	c.mu.Unlock()
+
+	for {
+		select {
+		case <-ch:
+			return
+		case <-time.After(FactoryShutdownTimeout):
+			log.Warn("timeout waiting for factory to stop",
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 		}
 	}
 }

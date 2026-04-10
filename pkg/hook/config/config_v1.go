@@ -10,8 +10,8 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/yaml"
 
-	"github.com/flant/shell-operator/pkg/app"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -130,7 +130,9 @@ func (cv1 *HookConfigV1) ConvertAndCheck(c *HookConfig) error {
 		monitor.WithFieldSelector((*kemtypes.FieldSelector)(kubeCfg.FieldSelector))
 		monitor.WithNamespaceSelector((*kemtypes.NamespaceSelector)(kubeCfg.Namespace))
 		monitor.WithLabelSelector(kubeCfg.LabelSelector)
-		monitor.JqFilter = kubeCfg.JqFilter
+		if err := monitor.WithJqFilter(kubeCfg.JqFilter); err != nil {
+			return fmt.Errorf("invalid kubernetes config [%d] jqFilter: %w", i, err)
+		}
 		// executeHookOnEvent is a priority
 		if kubeCfg.ExecuteHookOnEvents != nil {
 			monitor.WithEventTypes(kubeCfg.ExecuteHookOnEvents)
@@ -441,7 +443,7 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) htypes.ValidatingConfi
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
-		defaultFailurePolicy := v1.FailurePolicyType(app.ValidatingWebhookSettings.DefaultFailurePolicy)
+		defaultFailurePolicy := v1.FailurePolicyType(admission.DefaultSettings.DefaultFailurePolicy)
 		webhook.FailurePolicy = &defaultFailurePolicy
 	}
 
@@ -577,4 +579,18 @@ func (cv1 *HookConfigV1) CheckAndConvertSettings(settings *SettingsV1) (*htypes.
 		ExecutionMinInterval: interval,
 		ExecutionBurst:       int(burst),
 	}, nil
+}
+
+// hookConfigV1Converter is the VersionedConverter adapter for v1.
+type hookConfigV1Converter struct{}
+
+func (hookConfigV1Converter) Version() string { return "v1" }
+
+func (hookConfigV1Converter) ConvertAndCheck(data []byte, c *HookConfig) error {
+	configV1 := &HookConfigV1{}
+	if err := yaml.Unmarshal(data, configV1); err != nil {
+		return fmt.Errorf("unmarshal HookConfig v1: %s", err)
+	}
+	c.V1 = configV1
+	return configV1.ConvertAndCheck(c)
 }

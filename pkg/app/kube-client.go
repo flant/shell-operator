@@ -7,25 +7,32 @@ import (
 )
 
 var (
-	KubeContext = ""
-	KubeConfig  = ""
-	KubeServer  = ""
+	KubeContext            = ""
+	KubeConfig             = ""
+	KubeServer             = ""
+	KubeClientFieldManager = ""
 )
 
 var (
-	KubeClientQpsDefault   = "5" // DefaultQPS from k8s.io/client-go/rest/config.go
-	KubeClientQps          float32
+	KubeClientQps   float32
+	KubeClientBurst int
+)
+
+const (
+	KubeClientQpsDefault   = "5"  // DefaultQPS from k8s.io/client-go/rest/config.go
 	KubeClientBurstDefault = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
-	KubeClientBurst        int
 )
 
 var (
-	ObjectPatcherKubeClientQpsDefault     = "5" // DefaultQPS from k8s.io/client-go/rest/config.go
-	ObjectPatcherKubeClientQps            float32
+	ObjectPatcherKubeClientQps     float32
+	ObjectPatcherKubeClientBurst   int
+	ObjectPatcherKubeClientTimeout time.Duration
+)
+
+const (
+	ObjectPatcherKubeClientQpsDefault     = "5"  // DefaultQPS from k8s.io/client-go/rest/config.go
 	ObjectPatcherKubeClientBurstDefault   = "10" // DefaultBurst from k8s.io/client-go/rest/config.go
-	ObjectPatcherKubeClientBurst          int
 	ObjectPatcherKubeClientTimeoutDefault = "10s"
-	ObjectPatcherKubeClientTimeout        time.Duration
 )
 
 func DefineKubeClientFlags(cmd *kingpin.CmdClause) {

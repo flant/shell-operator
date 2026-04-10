@@ -51,6 +51,9 @@ kubernetes:
 kubernetesValidating:
 - {VALIDATING_PARAMETERS}
 - {VALIDATING_PARAMETERS}
+kubernetesCustomResourceConversion:
+- {CONVERSION_PARAMETERS}
+- {CONVERSION_PARAMETERS}
 settings:
   SETTINGS_PARAMETERS
 ```
@@ -72,6 +75,14 @@ or in JSON format:
   "kubernetesValidating": [
     {VALIDATING_PARAMETERS},
     {VALIDATING_PARAMETERS}
+  ],
+  "kubernetesMutating": [
+    {MUTATING_PARAMETERS},
+    {MUTATING_PARAMETERS}
+  ],
+  "kubernetesCustomResourceConversion": [
+    {CONVERSION_PARAMETERS},
+    {CONVERSION_PARAMETERS}
   ],
   "settings": {SETTINGS_PARAMETERS}
 }
@@ -155,7 +166,9 @@ kubernetes:
   kind: Pod  # required
   executeHookOnEvent: [ "Added", "Modified", "Deleted" ]
   executeHookOnSynchronization: true|false # default is true
+  waitForSynchronization: true|false # default is true
   keepFullObjectsInMemory: true|false # default is true
+  resynchronizationPeriod: "1h"
   nameSelector:
     matchNames:
     - pod-0
@@ -243,6 +256,10 @@ kubernetes:
 - `includeSnapshotsFrom` — an array of names of `kubernetes` bindings in a hook. When specified, a list of monitored objects from that bindings will be added to the binding context in a `snapshots` field. Self-include is also possible.
 
 - `keepFullObjectsInMemory` — if not set or `true`, dumps of Kubernetes resources are cached for this binding, and the snapshot includes them as `object` fields. Set to `false` if the hook does not rely on full objects to reduce the memory footprint.
+
+- `waitForSynchronization` — if `false`, Shell-operator will not wait for a hook's Synchronization to complete before processing further events for named queues. Default is `true`. Can only be set to `false` when `queue` is also explicitly specified.
+
+- `resynchronizationPeriod` — a period in Go duration format (e.g. `1h`, `30m`) after which a full resynchronization (re-list + re-watch) of Kubernetes objects is issued for this binding. Useful to recover from missed watch events.
 
 - `group` — a key that define a group of `schedule` and `kubernetes` bindings. See [grouping](#binding-context-of-grouped-bindings).
 
@@ -353,7 +370,7 @@ Objects should match all expressions defined in `fieldSelector` and `labelSelect
 
 ### kubernetesValidating
 
-Use a hook as handler for [ValidationWebhookConfiguration][admission-controllers].
+Use a hook as handler for [ValidatingWebhookConfiguration][admission-controllers].
 
 See syntax and parameters in [BINDING_VALIDATING.md](BINDING_VALIDATING.md)
 
@@ -369,7 +386,7 @@ When an event associated with a hook is triggered, Shell-operator executes the h
 
 Temporary files have unique names to prevent collisions between queues and are deleted after the hook run.
 
-Binging context is a JSON-array of structures with the following fields:
+Binding context is a JSON-array of structures with the following fields:
 
 - `binding` — a string from the `name` parameter. If this parameter has not been set in the binding configuration, then strings "schedule" or "kubernetes" are used. For a hook executed at startup, this value is always "onStartup".
 - `type` — "Schedule" for `schedule` bindings. "Synchronization" or "Event" for `kubernetes` bindings. "Group" if `group` is defined.

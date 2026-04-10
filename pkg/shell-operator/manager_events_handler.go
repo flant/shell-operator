@@ -2,10 +2,10 @@ package shell_operator
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
@@ -15,8 +15,8 @@ import (
 
 type managerEventsHandlerConfig struct {
 	tqs  *queue.TaskQueueSet
-	mgr  kubeeventsmanager.KubeEventsManager
-	smgr schedulemanager.ScheduleManager
+	mgr  kubeeventsmanager.KubeEventEmitter
+	smgr schedulemanager.ScheduleEmitter
 
 	logger *log.Logger
 }
@@ -25,8 +25,8 @@ type ManagerEventsHandler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	kubeEventsManager kubeeventsmanager.KubeEventsManager
-	scheduleManager   schedulemanager.ScheduleManager
+	kubeEventsManager kubeeventsmanager.KubeEventEmitter
+	scheduleManager   schedulemanager.ScheduleEmitter
 
 	kubeEventCb func(ctx context.Context, kubeEvent kemtypes.KubeEvent) []task.Task
 	scheduleCb  func(ctx context.Context, crontab string) []task.Task
@@ -66,7 +66,7 @@ func (m *ManagerEventsHandler) Start() {
 	go func() {
 		for {
 			var tailTasks []task.Task
-			logEntry := m.logger.With("operator.component", "handleEvents")
+			logEntry := m.logger.With(pkg.LogKeyOperatorComponent, "handleEvents")
 
 			ctx := context.Background()
 
@@ -86,17 +86,7 @@ func (m *ManagerEventsHandler) Start() {
 				return
 			}
 
-			m.taskQueues.DoWithLock(func(tqs *queue.TaskQueueSet) {
-				for _, resTask := range tailTasks {
-					if q := tqs.Queues[resTask.GetQueueName()]; q == nil {
-						log.Error("Possible bug!!! Got task for queue but queue is not created yet.",
-							slog.String("queueName", resTask.GetQueueName()),
-							slog.String("description", resTask.GetDescription()))
-					} else {
-						q.AddLast(resTask)
-					}
-				}
-			})
+			m.taskQueues.AddTailTasks(tailTasks...)
 		}
 	}()
 }

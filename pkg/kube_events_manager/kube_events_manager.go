@@ -8,23 +8,42 @@ import (
 	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	klient "github.com/flant/kube-client/client"
+	pkg "github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric"
 )
 
-type KubeEventsManager interface {
-	WithMetricStorage(mstor metric.Storage)
-	MetricStorage() metric.Storage
+// MonitorRegistry manages the lifecycle of kubernetes monitors.
+type MonitorRegistry interface {
 	AddMonitor(monitorConfig *MonitorConfig) error
 	HasMonitor(monitorID string) bool
 	GetMonitor(monitorID string) Monitor
 	StartMonitor(monitorID string)
 	StopMonitor(monitorID string) error
+}
 
+// KubeEventEmitter emits kubernetes events.
+// ManagerEventsHandler only needs this subset of KubeEventsManager.
+type KubeEventEmitter interface {
 	Ch() chan kemtypes.KubeEvent
-	PauseHandleEvents()
+}
+
+// KubeEventsSource is the subset of KubeEventsManager consumed by
+// KubernetesBindingsController: it provides monitor CRUD and the event channel
+// needed to inject synthetic events during UpdateMonitor.
+type KubeEventsSource interface {
+	MonitorRegistry
+	KubeEventEmitter
+}
+
+type KubeEventsManager interface {
+	KubeEventsSource
+	WithMetricStorage(mstor metricsstorage.Storage)
+	MetricStorage() metricsstorage.Storage
+	Stop()
+	Wait()
 }
 
 // kubeEventsManager is a main implementation of KubeEventsManager.
@@ -36,7 +55,9 @@ type kubeEventsManager struct {
 
 	ctx           context.Context
 	cancel        context.CancelFunc
-	metricStorage metric.Storage
+	metricStorage metricsstorage.Storage
+
+	factoryStore *FactoryStore
 
 	m        sync.RWMutex
 	Monitors map[string]Monitor
@@ -51,18 +72,19 @@ var _ KubeEventsManager = (*kubeEventsManager)(nil)
 func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) *kubeEventsManager {
 	cctx, cancel := context.WithCancel(ctx)
 	em := &kubeEventsManager{
-		ctx:         cctx,
-		cancel:      cancel,
-		KubeClient:  client,
-		m:           sync.RWMutex{},
-		Monitors:    make(map[string]Monitor),
-		KubeEventCh: make(chan kemtypes.KubeEvent, 1),
-		logger:      logger,
+		ctx:          cctx,
+		cancel:       cancel,
+		KubeClient:   client,
+		factoryStore: NewFactoryStore(),
+		m:            sync.RWMutex{},
+		Monitors:     make(map[string]Monitor),
+		KubeEventCh:  make(chan kemtypes.KubeEvent, 1),
+		logger:       logger,
 	}
 	return em
 }
 
-func (mgr *kubeEventsManager) WithMetricStorage(mstor metric.Storage) {
+func (mgr *kubeEventsManager) WithMetricStorage(mstor metricsstorage.Storage) {
 	mgr.metricStorage = mstor
 }
 
@@ -71,11 +93,12 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor metric.Storage) {
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	log.Debug("Add MONITOR",
-		slog.String("config", fmt.Sprintf("%+v", monitorConfig)))
+		slog.String(pkg.LogKeyConfig, fmt.Sprintf("%+v", monitorConfig)))
 	monitor := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,
 		mgr.metricStorage,
+		mgr.factoryStore,
 		monitorConfig,
 		func(ev kemtypes.KubeEvent) {
 			defer trace.StartRegion(context.Background(), "EmitKubeEvent").End()
@@ -138,17 +161,23 @@ func (mgr *kubeEventsManager) Ch() chan kemtypes.KubeEvent {
 	return mgr.KubeEventCh
 }
 
-// PauseHandleEvents set flags for all informers to ignore incoming events.
-// Useful for shutdown without panicking.
-// Calling cancel() leads to a race and panicking, see https://github.com/kubernetes/kubernetes/issues/59822
-func (mgr *kubeEventsManager) PauseHandleEvents() {
+// Stop the kube events manager and all the informers inside monitors.
+func (mgr *kubeEventsManager) Stop() {
+	mgr.cancel()
+}
+
+func (mgr *kubeEventsManager) Wait() {
 	mgr.m.RLock()
-	defer mgr.m.RUnlock()
-	for _, monitor := range mgr.Monitors {
-		monitor.PauseHandleEvents()
+	monitors := make([]Monitor, 0, len(mgr.Monitors))
+	for _, mon := range mgr.Monitors {
+		monitors = append(monitors, mon)
+	}
+	mgr.m.RUnlock()
+	for _, mon := range monitors {
+		mon.Wait()
 	}
 }
 
-func (mgr *kubeEventsManager) MetricStorage() metric.Storage {
+func (mgr *kubeEventsManager) MetricStorage() metricsstorage.Storage {
 	return mgr.metricStorage
 }

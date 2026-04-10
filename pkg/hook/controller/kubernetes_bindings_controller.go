@@ -8,6 +8,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -24,7 +25,7 @@ type KubernetesBindingToMonitorLink struct {
 // KubernetesBindingsController handles kubernetes bindings for one hook.
 type KubernetesBindingsController interface {
 	WithKubernetesBindings([]htypes.OnKubernetesEventConfig)
-	WithKubeEventsManager(kubeeventsmanager.KubeEventsManager)
+	WithKubeEventsManager(kubeeventsmanager.KubeEventsSource)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
 	UpdateMonitor(monitorId string, kind, apiVersion string) error
 	UnlockEvents()
@@ -47,7 +48,7 @@ type kubernetesBindingsController struct {
 	KubernetesBindings []htypes.OnKubernetesEventConfig
 
 	// dependencies
-	kubeEventsManager kubeeventsmanager.KubeEventsManager
+	kubeEventsManager kubeeventsmanager.KubeEventsSource
 
 	logger *log.Logger
 
@@ -71,7 +72,7 @@ func (c *kubernetesBindingsController) WithKubernetesBindings(bindings []htypes.
 	c.KubernetesBindings = bindings
 }
 
-func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager kubeeventsmanager.KubeEventsManager) {
+func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager kubeeventsmanager.KubeEventsSource) {
 	c.kubeEventsManager = kubeEventsManager
 }
 
@@ -132,9 +133,9 @@ func (c *kubernetesBindingsController) UpdateMonitor(monitorId string, kind, api
 
 	utils.EnrichLoggerWithLabels(c.logger, link.BindingConfig.Monitor.Metadata.LogLabels).
 		Info("Monitor is recreated",
-			slog.String("bindingName", link.BindingConfig.BindingName),
-			slog.String("kind", link.BindingConfig.Monitor.Kind),
-			slog.String("apiVersion", link.BindingConfig.Monitor.ApiVersion))
+			slog.String(pkg.LogKeyBindingName, link.BindingConfig.BindingName),
+			slog.String(pkg.LogKeyKind, link.BindingConfig.Monitor.Kind),
+			slog.String(pkg.LogKeyAPIVersion, link.BindingConfig.Monitor.ApiVersion))
 
 	// Synchronization has no meaning for UpdateMonitor. Just emit Added event to handle objects of
 	// a new kind.
@@ -166,7 +167,7 @@ func (c *kubernetesBindingsController) UnlockEvents() {
 func (c *kubernetesBindingsController) UnlockEventsFor(monitorID string) {
 	m := c.kubeEventsManager.GetMonitor(monitorID)
 	if m == nil {
-		log.Warn("monitor was not found", slog.String("monitorID", monitorID))
+		log.Warn("monitor was not found", slog.String(pkg.LogKeyMonitorID, monitorID))
 		return
 	}
 	m.EnableKubeEventCb()
@@ -223,7 +224,7 @@ func (c *kubernetesBindingsController) setBindingMonitorLinks(monitorId string, 
 func (c *kubernetesBindingsController) HandleEvent(_ context.Context, kubeEvent kemtypes.KubeEvent) BindingExecutionInfo {
 	link, hasKey := c.getBindingMonitorLinksById(kubeEvent.MonitorId)
 	if !hasKey {
-		log.Error("Possible bug!!! Unknown kube event: no such monitor id registered", slog.String("monitorID", kubeEvent.MonitorId))
+		log.Error("Possible bug!!! Unknown kube event: no such monitor id registered", slog.String(pkg.LogKeyMonitorID, kubeEvent.MonitorId))
 		return BindingExecutionInfo{
 			BindingContext: []bctx.BindingContext{},
 			AllowFailure:   false,
@@ -245,7 +246,7 @@ func (c *kubernetesBindingsController) HandleEvent(_ context.Context, kubeEvent 
 }
 
 func (c *kubernetesBindingsController) BindingNames() []string {
-	names := []string{}
+	names := make([]string, 0, len(c.KubernetesBindings))
 	for _, binding := range c.KubernetesBindings {
 		names = append(names, binding.BindingName)
 	}

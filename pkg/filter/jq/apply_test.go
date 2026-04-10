@@ -200,3 +200,180 @@ func Test_deepCopyAny(t *testing.T) {
 	g.Expect(err).ShouldNot(BeNil())
 	g.Expect(copyInvalid).Should(BeNil())
 }
+
+// ---- Compile / CompiledJqFilter tests ----
+
+func Test_Compile_ValidExpression(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`.metadata.name`)
+	g.Expect(err).Should(BeNil())
+	g.Expect(cf).ShouldNot(BeNil())
+	g.Expect(cf.String()).Should(Equal(`.metadata.name`))
+}
+
+func Test_Compile_InvalidExpression(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`this is not jq`)
+	g.Expect(err).ShouldNot(BeNil())
+	g.Expect(cf).Should(BeNil())
+}
+
+func Test_Compile_EmptyExpression(t *testing.T) {
+	g := NewWithT(t)
+
+	// Empty string is not valid jq.
+	cf, err := Compile(``)
+	g.Expect(err).ShouldNot(BeNil())
+	g.Expect(cf).Should(BeNil())
+}
+
+func Test_CompiledJqFilter_Apply_SingleDocumentModification(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`. + {"status": "active"}`)
+	g.Expect(err).Should(BeNil())
+
+	result, err := cf.Apply(map[string]any{"name": "Alice", "age": 25})
+	g.Expect(err).Should(BeNil())
+
+	var got any
+	g.Expect(json.Unmarshal(result, &got)).Should(BeNil())
+	g.Expect(got).Should(Equal(map[string]any{"name": "Alice", "age": float64(25), "status": "active"}))
+}
+
+func Test_CompiledJqFilter_Apply_ExtractField(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`.metadata.labels`)
+	g.Expect(err).Should(BeNil())
+
+	input := map[string]any{
+		"metadata": map[string]any{
+			"labels": map[string]any{"app": "foo", "env": "prod"},
+		},
+	}
+	result, err := cf.Apply(input)
+	g.Expect(err).Should(BeNil())
+
+	var got any
+	g.Expect(json.Unmarshal(result, &got)).Should(BeNil())
+	g.Expect(got).Should(Equal(map[string]any{"app": "foo", "env": "prod"}))
+}
+
+func Test_CompiledJqFilter_Apply_MultipleResults(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`.users[] | .name`)
+	g.Expect(err).Should(BeNil())
+
+	input := map[string]any{
+		"users": []any{
+			map[string]any{"name": "Alice"},
+			map[string]any{"name": "Bob"},
+		},
+	}
+	result, err := cf.Apply(input)
+	g.Expect(err).Should(BeNil())
+
+	var got []any
+	g.Expect(json.Unmarshal(result, &got)).Should(BeNil())
+	g.Expect(got).Should(ConsistOf("Alice", "Bob"))
+}
+
+func Test_CompiledJqFilter_Apply_NullResult(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`.nonexistent`)
+	g.Expect(err).Should(BeNil())
+
+	result, err := cf.Apply(map[string]any{"name": "Alice"})
+	g.Expect(err).Should(BeNil())
+	g.Expect(result).Should(Equal([]byte("null")))
+}
+
+func Test_CompiledJqFilter_Apply_NilInput(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`.`)
+	g.Expect(err).Should(BeNil())
+
+	result, err := cf.Apply(nil)
+	g.Expect(err).Should(BeNil())
+	g.Expect(result).ShouldNot(BeNil())
+}
+
+func Test_CompiledJqFilter_Apply_RuntimeError(t *testing.T) {
+	g := NewWithT(t)
+
+	// .foo on a non-object (null) causes a runtime jq error.
+	cf, err := Compile(`.foo`)
+	g.Expect(err).Should(BeNil())
+
+	// Passing nil as input means workData == nil; trying .foo on null returns null.
+	result, err := cf.Apply(nil)
+	g.Expect(err).Should(BeNil())
+	g.Expect(result).Should(Equal([]byte("null")))
+}
+
+func Test_CompiledJqFilter_Apply_UnmarshalableInput(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`.`)
+	g.Expect(err).Should(BeNil())
+
+	_, err = cf.Apply(map[string]any{"ch": make(chan int)})
+	g.Expect(err).ShouldNot(BeNil())
+}
+
+// Test_CompiledJqFilter_Reuse verifies that the same compiled filter can be
+// applied to different inputs and produces correct independent results.
+func Test_CompiledJqFilter_Reuse(t *testing.T) {
+	g := NewWithT(t)
+
+	cf, err := Compile(`.spec.replicas`)
+	g.Expect(err).Should(BeNil())
+
+	inputs := []map[string]any{
+		{"spec": map[string]any{"replicas": float64(1)}},
+		{"spec": map[string]any{"replicas": float64(3)}},
+		{"spec": map[string]any{"replicas": float64(5)}},
+	}
+	expected := []float64{1, 3, 5}
+
+	for i, input := range inputs {
+		result, err := cf.Apply(input)
+		g.Expect(err).Should(BeNil(), "input index %d", i)
+
+		var got float64
+		g.Expect(json.Unmarshal(result, &got)).Should(BeNil(), "input index %d", i)
+		g.Expect(got).Should(Equal(expected[i]), "input index %d", i)
+	}
+}
+
+// Test_Compile_ProducesIdenticalResultsToApplyFilter verifies that the
+// compiled path and the interpreted path yield identical output.
+func Test_Compile_ProducesIdenticalResultsToApplyFilter(t *testing.T) {
+	g := NewWithT(t)
+
+	filterStr := `.metadata | {name, namespace}`
+	input := map[string]any{
+		"metadata": map[string]any{
+			"name":      "my-pod",
+			"namespace": "default",
+			"labels":    map[string]any{"app": "foo"},
+		},
+	}
+
+	interpreted := NewFilter()
+	resultInterpreted, err := interpreted.ApplyFilter(filterStr, input)
+	g.Expect(err).Should(BeNil())
+
+	cf, err := Compile(filterStr)
+	g.Expect(err).Should(BeNil())
+	resultCompiled, err := cf.Apply(input)
+	g.Expect(err).Should(BeNil())
+
+	g.Expect(resultCompiled).Should(Equal(resultInterpreted))
+}

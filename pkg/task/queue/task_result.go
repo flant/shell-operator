@@ -15,8 +15,6 @@ const (
 	Keep    TaskStatus = "Keep"
 )
 
-const compactionThreshold = 100
-
 type TaskResult struct {
 	Status     TaskStatus
 	headTasks  []task.Task

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -60,7 +61,7 @@ func NewTask(taskType TaskType) *BaseTask {
 		Id:           taskId,
 		FailureCount: 0,
 		Type:         taskType,
-		LogLabels:    map[string]string{"task.id": taskId},
+		LogLabels:    map[string]string{pkg.LogKeyTaskDotID: taskId},
 		Props:        make(map[string]interface{}),
 		compactionID: taskId,
 	}
@@ -101,7 +102,7 @@ func (t *BaseTask) deepCopy() *BaseTask {
 func (t *BaseTask) DeepCopyWithNewUUID() Task {
 	newTask := t.deepCopy()
 	newTask.Id = uuid.Must(uuid.NewV4()).String()
-	newTask.LogLabels["task.id"] = newTask.Id
+	newTask.LogLabels[pkg.LogKeyTaskDotID] = newTask.Id
 	return newTask
 }
 

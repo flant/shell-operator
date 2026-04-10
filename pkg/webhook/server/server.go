@@ -12,12 +12,24 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
+
+	pkg "github.com/flant/shell-operator/pkg"
 )
 
 type WebhookServer struct {
 	Settings  *Settings
 	Namespace string
 	Router    chi.Router
+	Logger    *log.Logger
+}
+
+func NewWebhookServer(settings *Settings, namespace string, router chi.Router, logger *log.Logger) *WebhookServer {
+	return &WebhookServer{
+		Settings:  settings,
+		Namespace: namespace,
+		Router:    router,
+		Logger:    logger,
+	}
 }
 
 // Start runs https server to listen for AdmissionReview requests from the API-server.
@@ -81,10 +93,10 @@ func (s *WebhookServer) Start() error {
 	}
 
 	go func() {
-		log.Info("Webhook server listens", slog.String("address", listenAddr))
+		s.Logger.Info("Webhook server listens", slog.String(pkg.LogKeyAddress, listenAddr))
 		err := srv.ServeTLS(listener, "", "")
 		if err != nil {
-			log.Error("Error starting Webhook https server", log.Err(err))
+			s.Logger.Error("Error starting Webhook https server", log.Err(err))
 			// Stop process if server can't start.
 			os.Exit(1)
 		}

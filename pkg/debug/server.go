@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"gopkg.in/yaml.v3"
 
+	pkg "github.com/flant/shell-operator/pkg"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
@@ -70,7 +71,7 @@ func (s *Server) Init() error {
 		return fmt.Errorf("Debug HTTP server fail to listen on '%s': %w", address, err)
 	}
 
-	s.logger.Info("Debug endpoint listen on address", slog.String("address", address))
+	s.logger.Info("Debug endpoint listen on address", slog.String(pkg.LogKeyAddress, address))
 
 	go func() {
 		if err := http.Serve(listener, s.Router); err != nil {
@@ -145,7 +146,7 @@ func handleFormattedOutput(writer http.ResponseWriter, request *http.Request, ha
 		format = strings.TrimPrefix(format, ".")
 	}
 
-	structuredLogger.GetLogEntry(request).Debug("used format", slog.String("format", format))
+	structuredLogger.GetLogEntry(request).Debug("used format", slog.String(pkg.LogKeyFormat, format))
 
 	switch format {
 	case "text":

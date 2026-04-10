@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -16,9 +17,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
-	"github.com/flant/shell-operator/pkg/filter/jq"
+	pkg "github.com/flant/shell-operator/pkg"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
-	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
@@ -57,7 +58,9 @@ type resourceInformer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	metricStorage metric.Storage
+	metricStorage metricsstorage.Storage
+
+	factoryStore *FactoryStore
 
 	// a flag to stop handle events after Stop()
 	stopped bool
@@ -67,10 +70,11 @@ type resourceInformer struct {
 
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
-	client  *klient.Client
-	mstor   metric.Storage
-	eventCb func(kemtypes.KubeEvent)
-	monitor *MonitorConfig
+	client       *klient.Client
+	mstor        metricsstorage.Storage
+	factoryStore *FactoryStore
+	eventCb      func(kemtypes.KubeEvent)
+	monitor      *MonitorConfig
 
 	logger *log.Logger
 }
@@ -80,6 +84,7 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		id:                     uuid.Must(uuid.NewV4()).String(),
 		KubeClient:             cfg.client,
 		metricStorage:          cfg.mstor,
+		factoryStore:           cfg.factoryStore,
 		Namespace:              ns,
 		Name:                   name,
 		eventCb:                cfg.eventCb,
@@ -109,16 +114,16 @@ func (ei *resourceInformer) createSharedInformer() error {
 
 	// discover GroupVersionResource for informer
 	log.Debug("discover GVR for apiVersion...",
-		slog.String("debugName", ei.Monitor.Metadata.DebugName),
-		slog.String("apiVersion", ei.Monitor.ApiVersion),
-		slog.String("kind", ei.Monitor.Kind))
+		slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+		slog.String(pkg.LogKeyAPIVersion, ei.Monitor.ApiVersion),
+		slog.String(pkg.LogKeyKind, ei.Monitor.Kind))
 	if ei.GroupVersionResource, err = ei.KubeClient.GroupVersionResource(ei.Monitor.ApiVersion, ei.Monitor.Kind); err != nil {
 		return fmt.Errorf("%s: Cannot get GroupVersionResource info for apiVersion '%s' kind '%s' from api-server. Possibly CRD is not created before informers are started. Error was: %w", ei.Monitor.Metadata.DebugName, ei.Monitor.ApiVersion, ei.Monitor.Kind, err)
 	}
 	log.Debug("GVR for kind",
-		slog.String("debugName", ei.Monitor.Metadata.DebugName),
-		slog.String("kind", ei.Monitor.Kind),
-		slog.String("gvr", ei.GroupVersionResource.String()))
+		slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+		slog.String(pkg.LogKeyKind, ei.Monitor.Kind),
+		slog.String(pkg.LogKeyGVR, ei.GroupVersionResource.String()))
 
 	// define tweakListOptions for informer
 	fmtLabelSelector, err := FormatLabelSelector(ei.Monitor.LabelSelector)
@@ -154,7 +159,7 @@ func (ei *resourceInformer) createSharedInformer() error {
 // Snapshot returns all cached objects for this informer
 func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
 	ei.cacheLock.RLock()
-	res := make([]kemtypes.ObjectAndFilterResult, 0)
+	res := make([]kemtypes.ObjectAndFilterResult, 0, len(ei.cachedObjects))
 	for _, obj := range ei.cachedObjects {
 		res = append(res, *obj)
 	}
@@ -194,25 +199,25 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		List(context.TODO(), ei.ListOptions)
 	if err != nil {
 		log.Error("initial list resources of kind",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("kind", ei.Monitor.Kind),
+			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+			slog.String(pkg.LogKeyKind, ei.Monitor.Kind),
 			log.Err(err))
 		return err
 	}
 
 	if objList == nil || len(objList.Items) == 0 {
 		log.Debug("Got no existing resources",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("kind", ei.Monitor.Kind))
+			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+			slog.String(pkg.LogKeyKind, ei.Monitor.Kind))
 		return nil
 	}
 
 	// FIXME objList.Items has too much information for log
 	// log.Debugf("%s: Got %d existing '%s' resources: %+v", ei.Monitor.Metadata.DebugName, len(objList.Items), ei.Monitor.Kind, objList.Items)
 	log.Debug("initial list: Got existing resources",
-		slog.String("debugName", ei.Monitor.Metadata.DebugName),
-		slog.String("kind", ei.Monitor.Kind),
-		slog.Int("count", len(objList.Items)))
+		slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+		slog.String(pkg.LogKeyKind, ei.Monitor.Kind),
+		slog.Int(pkg.LogKeyCount, len(objList.Items)))
 
 	filteredObjects := make(map[string]*kemtypes.ObjectAndFilterResult)
 
@@ -224,14 +229,13 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		var err error
 		func() {
 			defer measure.Duration(func(d time.Duration) {
-				ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
+				ei.metricStorage.HistogramObserve(metrics.KubeJqFilterDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 			})()
-			filter := jq.NewFilter()
-			objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, &obj)
+			objFilterRes, err = applyFilter(ei.Monitor.CompiledJqFilter, ei.Monitor.JqFilter, ei.Monitor.FilterFunc, &obj)
 		}()
 
 		if err != nil {
-			return err
+			return fmt.Errorf("apply filter for '%s/%s': %w", ei.Monitor.Metadata.DebugName, obj.GetName(), err)
 		}
 
 		if !ei.Monitor.KeepFullObjectsInMemory {
@@ -241,9 +245,9 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		filteredObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
 		log.Debug("initial list: cached with checksum",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("resourceId", objFilterRes.Metadata.ResourceId),
-			slog.String("checksum", objFilterRes.Metadata.Checksum))
+			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+			slog.String(pkg.LogKeyResourceId, objFilterRes.Metadata.ResourceId),
+			slog.String(pkg.LogKeyChecksum, objFilterRes.Metadata.Checksum))
 	}
 
 	// Save objects to the cache.
@@ -254,7 +258,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 	}
 
 	ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
-	ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+	ei.metricStorage.GaugeSet(metrics.KubeSnapshotObjects, float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 
 	return nil
 }
@@ -279,15 +283,15 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	// check if stop
 	if ei.stopped {
 		log.Debug("received WATCH for stopped informer",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("namespace", ei.Namespace),
-			slog.String("name", ei.Name),
-			slog.String("eventType", string(eventType)))
+			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+			slog.String(pkg.LogKeyNamespace, ei.Namespace),
+			slog.String(pkg.LogKeyName, ei.Name),
+			slog.String(pkg.LogKeyEventType, string(eventType)))
 		return
 	}
 
 	defer measure.Duration(func(d time.Duration) {
-		ei.metricStorage.HistogramObserve("{PREFIX}kube_event_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
+		ei.metricStorage.HistogramObserve(metrics.KubeEventDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 	})()
 	defer trace.StartRegion(context.Background(), "handleWatchEvent").End()
 
@@ -304,15 +308,14 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	var err error
 	func() {
 		defer measure.Duration(func(d time.Duration) {
-			ei.metricStorage.HistogramObserve("{PREFIX}kube_jq_filter_duration_seconds", d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
+			ei.metricStorage.HistogramObserve(metrics.KubeJqFilterDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 		})()
-		filter := jq.NewFilter()
-		objFilterRes, err = applyFilter(ei.Monitor.JqFilter, filter, ei.Monitor.FilterFunc, obj)
+		objFilterRes, err = applyFilter(ei.Monitor.CompiledJqFilter, ei.Monitor.JqFilter, ei.Monitor.FilterFunc, obj)
 	}()
 	if err != nil {
 		log.Error("handleWatchEvent: applyFilter error",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("eventType", string(eventType)),
+			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+			slog.String(pkg.LogKeyEventType, string(eventType)),
 			log.Err(err))
 		return
 	}
@@ -334,9 +337,9 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
 			// update object in cache and do not send event
 			log.Debug("skip KubeEvent",
-				slog.String("debugName", ei.Monitor.Metadata.DebugName),
-				slog.String("eventType", string(eventType)),
-				slog.String("resourceId", resourceId),
+				slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+				slog.String(pkg.LogKeyEventType, string(eventType)),
+				slog.String(pkg.LogKeyResourceId, resourceId),
 			)
 			skipEvent = true
 		}
@@ -351,7 +354,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			ei.cachedObjectsIncrement.Modified++
 		}
 		// Update metrics.
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.GaugeSet(metrics.KubeSnapshotObjects, float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 		if skipEvent {
 			return
@@ -369,16 +372,16 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		ei.cachedObjectsInfo.Deleted++
 		ei.cachedObjectsIncrement.Deleted++
 		// Update metrics.
-		ei.metricStorage.GaugeSet("{PREFIX}kube_snapshot_objects", float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
+		ei.metricStorage.GaugeSet(metrics.KubeSnapshotObjects, float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 		ei.cacheLock.Unlock()
 	}
 
 	// Fire KubeEvent only if needed.
 	if ei.shouldFireEvent(eventType) {
 		log.Debug("send KubeEvent",
-			slog.String("debugName", ei.Monitor.Metadata.DebugName),
-			slog.String("eventType", string(eventType)),
-			slog.String("resourceId", resourceId))
+			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+			slog.String(pkg.LogKeyEventType, string(eventType)),
+			slog.String(pkg.LogKeyResourceId, resourceId))
 		// TODO: should be disabled by default and enabled by a debug feature switch
 		// log.Debugf("HandleKubeEvent: obj type is %T, value:\n%#v", obj, obj)
 
@@ -449,29 +452,29 @@ func (ei *resourceInformer) shouldFireEvent(checkEvent kemtypes.WatchEventType) 
 }
 
 func (ei *resourceInformer) start() {
-	log.Debug("RUN resource informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
+	log.Debug("RUN resource informer", slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName))
 
 	go func() {
 		if ei.ctx != nil {
 			<-ei.ctx.Done()
-			DefaultFactoryStore.Stop(ei.id, ei.FactoryIndex)
+			ei.factoryStore.Stop(ei.id, ei.FactoryIndex)
 		}
 	}()
 
 	// TODO: separate handler and informer
 	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage, ei.logger.Named("watch-error-handler"))
-	err := DefaultFactoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
+	err := ei.factoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
-		ei.Monitor.Logger.Error("cache is not synced for informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
+		ei.Monitor.Logger.Error("cache is not synced for informer", slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName))
 		return
 	}
 
-	log.Debug("informer is ready", slog.String("debugName", ei.Monitor.Metadata.DebugName))
+	log.Debug("informer is ready", slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName))
 }
 
-func (ei *resourceInformer) pauseHandleEvents() {
-	log.Debug("PAUSE resource informer", slog.String("debugName", ei.Monitor.Metadata.DebugName))
-	ei.stopped = true
+// wait blocks until the underlying shared informer for this FactoryIndex is stopped
+func (ei *resourceInformer) wait() {
+	ei.factoryStore.WaitStopped(ei.FactoryIndex)
 }
 
 // CachedObjectsInfo returns info accumulated from start.

@@ -21,7 +21,7 @@ type PromMetricValue struct {
 }
 
 func (pmv PromMetricValue) String() string {
-	labels := []string{}
+	labels := make([]string, 0, len(pmv.Labels))
 	for k, v := range pmv.Labels {
 		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
 	}

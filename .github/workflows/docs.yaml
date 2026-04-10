@@ -1,11 +1,9 @@
 name: Docs
-
 on:
   push:
     branches:
       - main
   pull_request:
-
 jobs:
   deploy:
     runs-on: ubuntu-24.04
@@ -13,14 +11,11 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v2
         with:
           mdbook-version: '0.4.10'
-
       - run: mdbook build docs
-
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         if: ${{ github.ref == 'refs/heads/main' }}
