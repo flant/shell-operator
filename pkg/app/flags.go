@@ -190,9 +190,11 @@ func bindLogFlags(cfg *Config, cmd *kingpin.CmdClause) {
 		StringVar(&cfg.Log.Type)
 
 	cmd.Flag("log-no-time", "Disable timestamp logging. Can be set with $LOG_NO_TIME.").
+		Default(fmt.Sprintf("%v", cfg.Log.NoTime)).
 		BoolVar(&cfg.Log.NoTime)
 
 	cmd.Flag("log-proxy-hook-json", "Proxy hook stdout/stderr JSON logging. Can be set with $LOG_PROXY_HOOK_JSON.").
+		Default(fmt.Sprintf("%v", cfg.Log.ProxyHookJSON)).
 		BoolVar(&cfg.Log.ProxyHookJSON)
 }
 
@@ -213,12 +215,12 @@ func bindDebugFlags(cfg *Config, kpApp *kingpin.Application, cmd *kingpin.CmdCla
 
 	cmd.Flag("debug-keep-tmp-files", "Set to true to disable cleanup of temporary files. Can be set with $DEBUG_KEEP_TMP_FILES.").
 		Hidden().
-		Default("false").
+		Default(fmt.Sprintf("%v", cfg.Debug.KeepTempFiles)).
 		BoolVar(&cfg.Debug.KeepTempFiles)
 
 	cmd.Flag("debug-kubernetes-api", "Enable client-go debug messages. Can be set with $DEBUG_KUBERNETES_API.").
 		Hidden().
-		Default("false").
+		Default(fmt.Sprintf("%v", cfg.Debug.KubernetesAPI)).
 		BoolVar(&cfg.Debug.KubernetesAPI)
 
 	// A command to show help about hidden debug-* flags.
