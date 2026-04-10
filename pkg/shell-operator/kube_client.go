@@ -9,7 +9,6 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
-	"github.com/flant/shell-operator/pkg/app"
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	"github.com/flant/shell-operator/pkg/metric"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
@@ -42,13 +41,8 @@ func defaultMainKubeClient(cfg KubeClientConfig, metricStorage metricsstorage.St
 	return client
 }
 
-func initDefaultMainKubeClient(metricStorage metricsstorage.Storage, logger *log.Logger) (*klient.Client, error) {
-	cfg := KubeClientConfig{
-		Context: app.KubeContext,
-		Config:  app.KubeConfig,
-		QPS:     app.KubeClientQps,
-		Burst:   app.KubeClientBurst,
-	}
+func initDefaultMainKubeClient(kubeCfg KubeClientConfig, metricStorage metricsstorage.Storage, logger *log.Logger) (*klient.Client, error) {
+	cfg := kubeCfg
 	//nolint:staticcheck
 	klient.RegisterKubernetesClientMetrics(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")), defaultMainKubeClientMetricLabels)
 	kubeClient := defaultMainKubeClient(cfg, metricStorage, defaultMainKubeClientMetricLabels, logger.Named("main-kube-client"))
@@ -73,14 +67,8 @@ func defaultObjectPatcherKubeClient(cfg KubeClientConfig, metricStorage metricss
 	return client
 }
 
-func initDefaultObjectPatcher(metricStorage metricsstorage.Storage, logger *log.Logger) (*objectpatch.ObjectPatcher, error) {
-	cfg := KubeClientConfig{
-		Context: app.KubeContext,
-		Config:  app.KubeConfig,
-		QPS:     app.ObjectPatcherKubeClientQps,
-		Burst:   app.ObjectPatcherKubeClientBurst,
-		Timeout: app.ObjectPatcherKubeClientTimeout,
-	}
+func initDefaultObjectPatcher(kubeCfg KubeClientConfig, metricStorage metricsstorage.Storage, logger *log.Logger) (*objectpatch.ObjectPatcher, error) {
+	cfg := kubeCfg
 	patcherKubeClient := defaultObjectPatcherKubeClient(cfg, metricStorage, defaultObjectPatcherKubeClientMetricLabels, logger.Named("object-patcher-kube-client"))
 	err := patcherKubeClient.Init()
 	if err != nil {
