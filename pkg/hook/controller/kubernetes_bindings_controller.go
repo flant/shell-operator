@@ -82,9 +82,9 @@ func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager k
 func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
 	res := make([]BindingExecutionInfo, 0)
 
-	c.l.Lock()
+	c.l.RLock()
 	alreadyEnabled := len(c.BindingMonitorLinks) == len(c.KubernetesBindings)
-	c.l.Unlock()
+	c.l.RUnlock()
 	if alreadyEnabled {
 		return res, nil
 	}
