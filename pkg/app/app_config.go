@@ -5,249 +5,161 @@ import (
 	"time"
 
 	env "github.com/caarlos0/env/v11"
-
-	"github.com/deckhouse/deckhouse/pkg/log"
 )
 
-type appConfig struct {
+// AppSettings holds shell-operator's primary runtime settings.
+// Defaults are set in NewConfig; env tags declare the variable name only.
+type AppSettings struct {
 	HooksDir                string `env:"HOOKS_DIR"`
-	TmpDir                  string `env:"TMP_DIR"`
+	TempDir                 string `env:"TMP_DIR"`
 	ListenAddress           string `env:"LISTEN_ADDRESS"`
 	ListenPort              string `env:"LISTEN_PORT"`
 	PrometheusMetricsPrefix string `env:"PROMETHEUS_METRICS_PREFIX"`
-	// unused?
-	HooksMetricsListenPort string `env:"HOOK_METRICS_LISTEN_PORT"`
-	Namespace              string `env:"NAMESPACE"`
+	Namespace               string `env:"NAMESPACE"`
 }
 
-func newAppConfig() *appConfig {
-	return &appConfig{}
-}
-
-type debugConfig struct {
-	HTTPServerAddress  string `env:"HTTP_SERVER_ADDR"`
-	KeepTemporaryFiles string `env:"KEEP_TMP_FILES"`
-	KubernetesAPI      bool   `env:"KUBERNETES_API"`
-	UnixSocket         string `env:"UNIX_SOCKET"`
-}
-
-func newDebugConfig() *debugConfig {
-	return &debugConfig{}
-}
-
-type kubeConfig struct {
-	// Settings for Kubernetes connection.
-	ContextName   string `env:"CONTEXT"`
-	ConfigPath    string `env:"CONFIG"`
-	ServerAddress string `env:"SERVER"`
-	// Rate limit settings for 'main' kube client
+// KubeSettings holds Kubernetes connection parameters.
+type KubeSettings struct {
+	Context     string  `env:"CONTEXT"`
+	Config      string  `env:"CONFIG"`
+	Server      string  `env:"SERVER"`
 	ClientQPS   float32 `env:"CLIENT_QPS"`
 	ClientBurst int     `env:"CLIENT_BURST"`
 }
 
-func newKubeConfig() *kubeConfig {
-	return &kubeConfig{}
-}
-
-type objectPatcherConfig struct {
-	// Settings for 'object_patcher' kube client
+// ObjectPatcherSettings holds settings for the object-patcher Kubernetes client.
+type ObjectPatcherSettings struct {
 	KubeClientQPS     float32       `env:"KUBE_CLIENT_QPS"`
 	KubeClientBurst   int           `env:"KUBE_CLIENT_BURST"`
 	KubeClientTimeout time.Duration `env:"KUBE_CLIENT_TIMEOUT"`
 }
 
-func newObjectPatcherConfig() *objectPatcherConfig {
-	return &objectPatcherConfig{}
+// AdmissionSettings holds settings for the validating-webhook server.
+type AdmissionSettings struct {
+	ConfigurationName string   `env:"CONFIGURATION_NAME"`
+	ServiceName       string   `env:"SERVICE_NAME"`
+	ServerCert        string   `env:"SERVER_CERT"`
+	ServerKey         string   `env:"SERVER_KEY"`
+	CA                string   `env:"CA"`
+	ClientCA          []string `env:"CLIENT_CA" envSeparator:","`
+	FailurePolicy     string   `env:"FAILURE_POLICY"`
+	ListenPort        string   `env:"LISTEN_PORT"`
+	ListenAddress     string   `env:"LISTEN_ADDRESS"`
 }
 
-type validatingWebhookConfig struct {
-	ConfigurationName string `env:"CONFIGURATION_NAME"`
-	ServiceName       string `env:"SERVICE_NAME"`
-	ServerCert        string `env:"SERVER_CERT"`
-	ServerKey         string `env:"SERVER_KEY"`
-	CA                string `env:"CA"`
-	// check separator?
-	ClientCA []string `env:"CLIENT_CA" envSeparator:","`
-	// enum "Fail" || "Ignore"
-	FailurePolicy string `env:"FAILURE_POLICY"`
-	ListenPort    string `env:"LISTEN_PORT"`
-	ListenAddress string `env:"LISTEN_ADDRESS"`
-}
-
-func newValidatingWebhookConfig() *validatingWebhookConfig {
-	return &validatingWebhookConfig{}
-}
-
-type conversionWebhookConfig struct {
-	ServiceName string `env:"SERVICE_NAME"`
-	ServerCert  string `env:"SERVER_CERT"`
-	ServerKey   string `env:"SERVER_KEY"`
-	CA          string `env:"CA"`
-	// check separator?
+// ConversionSettings holds settings for the conversion-webhook server.
+type ConversionSettings struct {
+	ServiceName   string   `env:"SERVICE_NAME"`
+	ServerCert    string   `env:"SERVER_CERT"`
+	ServerKey     string   `env:"SERVER_KEY"`
+	CA            string   `env:"CA"`
 	ClientCA      []string `env:"CLIENT_CA" envSeparator:","`
 	ListenPort    string   `env:"LISTEN_PORT"`
 	ListenAddress string   `env:"LISTEN_ADDRESS"`
 }
 
-func newConversionWebhookConfig() *conversionWebhookConfig {
-	return &conversionWebhookConfig{}
+// DebugSettings holds settings for the debug server.
+type DebugSettings struct {
+	UnixSocket     string `env:"UNIX_SOCKET"`
+	HTTPServerAddr string `env:"HTTP_SERVER_ADDR"`
+	KeepTempFiles  bool   `env:"KEEP_TMP_FILES"`
+	KubernetesAPI  bool   `env:"KUBERNETES_API"`
 }
 
-type logConfig struct {
+// LogSettings holds logging configuration.
+type LogSettings struct {
 	Level         string `env:"LEVEL"`
 	Type          string `env:"TYPE"`
 	NoTime        bool   `env:"NO_TIME"`
-	ProxyHookJson bool   `env:"PROXY_HOOK_JSON"`
+	ProxyHookJSON bool   `env:"PROXY_HOOK_JSON"`
 }
 
-func newLogConfig() *logConfig {
-	return &logConfig{}
-}
-
+// Config is the single source of truth for operator configuration.
+// Populate it in stages: NewConfig sets hardcoded defaults,
+// ParseEnv overrides with environment variables, BindFlags (in pkg/app/flags.go)
+// registers CLI flags whose defaults are the current cfg values so that an
+// explicit flag always wins. Priority: CLI flags > env vars > hardcoded defaults.
 type Config struct {
-	AppConfig               *appConfig               `envPrefix:"SHELL_OPERATOR_"`
-	KubeConfig              *kubeConfig              `envPrefix:"KUBE_"`
-	ObjectPatcherConfig     *objectPatcherConfig     `envPrefix:"OBJECT_PATCHER_"`
-	ValidatingWebhookConfig *validatingWebhookConfig `envPrefix:"VALIDATING_WEBHOOK_"`
-	ConversionWebhookConfig *conversionWebhookConfig `envPrefix:"CONVERSION_WEBHOOK_"`
-
-	DebugConfig *debugConfig `envPrefix:"DEBUG_"`
-
-	LogConfig *logConfig `envPrefix:"LOG_"`
-	LogLevel  log.Level  `env:"-"`
-
-	ready bool
+	App           AppSettings           `envPrefix:"SHELL_OPERATOR_"`
+	Kube          KubeSettings          `envPrefix:"KUBE_"`
+	ObjectPatcher ObjectPatcherSettings `envPrefix:"OBJECT_PATCHER_"`
+	Admission     AdmissionSettings     `envPrefix:"VALIDATING_WEBHOOK_"`
+	Conversion    ConversionSettings    `envPrefix:"CONVERSION_WEBHOOK_"`
+	Debug         DebugSettings         `envPrefix:"DEBUG_"`
+	Log           LogSettings           `envPrefix:"LOG_"`
 }
 
+// NewConfig returns a Config populated with all hardcoded defaults.
 func NewConfig() *Config {
 	return &Config{
-		AppConfig:               newAppConfig(),
-		KubeConfig:              newKubeConfig(),
-		ObjectPatcherConfig:     newObjectPatcherConfig(),
-		ValidatingWebhookConfig: newValidatingWebhookConfig(),
-		ConversionWebhookConfig: newConversionWebhookConfig(),
-		DebugConfig:             newDebugConfig(),
-		LogConfig:               newLogConfig(),
+		App: AppSettings{
+			HooksDir:                "hooks",
+			TempDir:                 "/tmp/shell-operator",
+			ListenAddress:           "0.0.0.0",
+			ListenPort:              "9115",
+			PrometheusMetricsPrefix: "shell_operator_",
+		},
+		Kube: KubeSettings{
+			ClientQPS:   5,
+			ClientBurst: 10,
+		},
+		ObjectPatcher: ObjectPatcherSettings{
+			KubeClientQPS:     5,
+			KubeClientBurst:   10,
+			KubeClientTimeout: 10 * time.Second,
+		},
+		Admission: AdmissionSettings{
+			ConfigurationName: "shell-operator-hooks",
+			ServiceName:       "shell-operator-validating-svc",
+			ServerCert:        "/validating-certs/tls.crt",
+			ServerKey:         "/validating-certs/tls.key",
+			CA:                "/validating-certs/ca.crt",
+			FailurePolicy:     "Fail",
+			ListenPort:        "9680",
+			ListenAddress:     "0.0.0.0",
+		},
+		Conversion: ConversionSettings{
+			ServiceName:   "shell-operator-conversion-svc",
+			ServerCert:    "/conversion-certs/tls.crt",
+			ServerKey:     "/conversion-certs/tls.key",
+			CA:            "/conversion-certs/ca.crt",
+			ListenPort:    "9681",
+			ListenAddress: "0.0.0.0",
+		},
+		Debug: DebugSettings{
+			UnixSocket: "/var/run/shell-operator/debug.socket",
+		},
+		Log: LogSettings{
+			Level: "info",
+			Type:  "text",
+		},
 	}
 }
 
-func (cfg *Config) Parse() error {
-	if cfg.IsReady() {
-		return nil
+// ParseEnv overrides cfg fields with values from environment variables.
+// Fields whose env var is not set retain their current values, so hardcoded
+// defaults from NewConfig are preserved when no env var is present.
+// Call after NewConfig so the hardcoded defaults serve as the baseline.
+func ParseEnv(cfg *Config) error {
+	if err := env.ParseWithOptions(cfg, env.Options{}); err != nil {
+		return fmt.Errorf("parse config from environment: %w", err)
 	}
-
-	opts := env.Options{
-		Prefix: "",
-	}
-
-	err := env.ParseWithOptions(cfg, opts)
-	if err != nil {
-		return fmt.Errorf("failed to parse config: %w", err)
-	}
-
-	cfg.LogLevel = log.LogLevelFromStr(cfg.LogConfig.Level)
-
 	return nil
 }
 
-func (cfg *Config) SetupGlobalVars() {
-	if cfg.IsReady() {
-		return
+// Validate returns an error if cfg contains invalid or inconsistent values.
+func Validate(cfg *Config) error {
+	if cfg.App.HooksDir == "" {
+		return fmt.Errorf("hooks directory must not be empty (set --hooks-dir or $SHELL_OPERATOR_HOOKS_DIR)")
 	}
-
-	setIfNotEmpty(&HooksDir, cfg.AppConfig.HooksDir)
-	setIfNotEmpty(&TempDir, cfg.AppConfig.TmpDir)
-	setIfNotEmpty(&ListenAddress, cfg.AppConfig.ListenAddress)
-	setIfNotEmpty(&ListenPort, cfg.AppConfig.ListenPort)
-	setIfNotEmpty(&PrometheusMetricsPrefix, cfg.AppConfig.PrometheusMetricsPrefix)
-	setIfNotEmpty(&Namespace, cfg.AppConfig.Namespace)
-
-	setIfNotEmpty(&DebugHttpServerAddr, cfg.DebugConfig.HTTPServerAddress)
-	setIfNotEmpty(&DebugKeepTmpFiles, cfg.DebugConfig.KeepTemporaryFiles == "true" || cfg.DebugConfig.KeepTemporaryFiles == "yes")
-	setIfNotEmpty(&DebugKubernetesAPI, cfg.DebugConfig.KubernetesAPI)
-	setIfNotEmpty(&DebugUnixSocket, cfg.DebugConfig.UnixSocket)
-
-	setIfNotEmpty(&KubeContext, cfg.KubeConfig.ContextName)
-	setIfNotEmpty(&KubeConfig, cfg.KubeConfig.ConfigPath)
-	setIfNotEmpty(&KubeServer, cfg.KubeConfig.ServerAddress)
-	setIfNotEmpty(&KubeClientQps, cfg.KubeConfig.ClientQPS)
-	setIfNotEmpty(&KubeClientBurst, cfg.KubeConfig.ClientBurst)
-
-	setIfNotEmpty(&ObjectPatcherKubeClientQps, cfg.ObjectPatcherConfig.KubeClientQPS)
-	setIfNotEmpty(&ObjectPatcherKubeClientBurst, cfg.ObjectPatcherConfig.KubeClientBurst)
-	setIfNotEmpty(&ObjectPatcherKubeClientTimeout, cfg.ObjectPatcherConfig.KubeClientTimeout)
-
-	setIfNotEmpty(&LogLevel, cfg.LogConfig.Level)
-	setIfNotEmpty(&LogNoTime, cfg.LogConfig.NoTime)
-	setIfNotEmpty(&LogType, cfg.LogConfig.Type)
-	setIfNotEmpty(&LogProxyHookJSON, cfg.LogConfig.ProxyHookJson)
-
-	setIfNotEmpty(&ValidatingWebhookConfigurationName, cfg.ValidatingWebhookConfig.ConfigurationName)
-	setIfNotEmpty(&ValidatingWebhookServiceName, cfg.ValidatingWebhookConfig.ServiceName)
-	setIfNotEmpty(&ValidatingWebhookServerCert, cfg.ValidatingWebhookConfig.ServerCert)
-	setIfNotEmpty(&ValidatingWebhookServerKey, cfg.ValidatingWebhookConfig.ServerKey)
-	setIfNotEmpty(&ValidatingWebhookCA, cfg.ValidatingWebhookConfig.CA)
-	setSliceIfNotEmpty(&ValidatingWebhookClientCA, cfg.ValidatingWebhookConfig.ClientCA)
-	setIfNotEmpty(&ValidatingWebhookFailurePolicy, cfg.ValidatingWebhookConfig.FailurePolicy)
-	setIfNotEmpty(&ValidatingWebhookListenPort, cfg.ValidatingWebhookConfig.ListenPort)
-	setIfNotEmpty(&ValidatingWebhookListenAddress, cfg.ValidatingWebhookConfig.ListenAddress)
-
-	setIfNotEmpty(&ConversionWebhookServiceName, cfg.ConversionWebhookConfig.ServiceName)
-	setIfNotEmpty(&ConversionWebhookServerCert, cfg.ConversionWebhookConfig.ServerCert)
-	setIfNotEmpty(&ConversionWebhookServerKey, cfg.ConversionWebhookConfig.ServerKey)
-	setIfNotEmpty(&ConversionWebhookCA, cfg.ConversionWebhookConfig.CA)
-	setSliceIfNotEmpty(&ConversionWebhookClientCA, cfg.ConversionWebhookConfig.ClientCA)
-	setIfNotEmpty(&ConversionWebhookListenPort, cfg.ConversionWebhookConfig.ListenPort)
-	setIfNotEmpty(&ConversionWebhookListenAddress, cfg.ConversionWebhookConfig.ListenAddress)
-}
-
-func (cfg *Config) IsReady() bool {
-	return cfg.ready
-}
-
-func (cfg *Config) SetReady() {
-	cfg.ready = true
-}
-
-var configInstance *Config
-
-func MustGetConfig() *Config {
-	cfg, err := GetConfig()
-	if err != nil {
-		panic(err)
+	if cfg.App.TempDir == "" {
+		return fmt.Errorf("temp directory must not be empty (set --tmp-dir or $SHELL_OPERATOR_TMP_DIR)")
 	}
-
-	return cfg
-}
-
-func GetConfig() (*Config, error) {
-	if configInstance != nil {
-		return configInstance, nil
+	if cfg.App.ListenPort == "" {
+		return fmt.Errorf("listen port must not be empty (set --listen-port or $SHELL_OPERATOR_LISTEN_PORT)")
 	}
-
-	cfg := NewConfig()
-	err := cfg.Parse()
-	if err != nil {
-		return nil, err
+	if cfg.Admission.FailurePolicy != "Fail" && cfg.Admission.FailurePolicy != "Ignore" {
+		return fmt.Errorf("validating webhook failure policy must be 'Fail' or 'Ignore', got %q", cfg.Admission.FailurePolicy)
 	}
-
-	configInstance = cfg
-
-	return configInstance, nil
-}
-
-func setIfNotEmpty[T comparable](v *T, env T) {
-	if !isZero(env) {
-		*v = env
-	}
-}
-
-func setSliceIfNotEmpty[T any](v *[]T, env []T) {
-	if len(env) != 0 {
-		*v = env
-	}
-}
-
-func isZero[T comparable](v T) bool {
-	return v == *new(T)
+	return nil
 }

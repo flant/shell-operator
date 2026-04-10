@@ -19,50 +19,55 @@ import (
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
+	webhookserver "github.com/flant/shell-operator/pkg/webhook/server"
 )
 
-// Init initialize logging, ensures directories and creates
+// Init initializes logging, ensures directories and creates
 // a ShellOperator instance with all dependencies.
-func Init(ctx context.Context, logger *log.Logger) (*ShellOperator, error) {
-	// Update webhook settings from parsed flags
-	// TODO: change this method to something else
-	admission.InitFromFlags(
-		app.ValidatingWebhookConfigurationName,
-		app.ValidatingWebhookServiceName,
-		app.ValidatingWebhookServerCert,
-		app.ValidatingWebhookServerKey,
-		app.ValidatingWebhookCA,
-		app.ValidatingWebhookClientCA,
-		app.ValidatingWebhookFailurePolicy,
-		app.ValidatingWebhookListenPort,
-		app.ValidatingWebhookListenAddress,
-	)
-	conversion.InitFromFlags(
-		app.ConversionWebhookServiceName,
-		app.ConversionWebhookServerCert,
-		app.ConversionWebhookServerKey,
-		app.ConversionWebhookCA,
-		app.ConversionWebhookClientCA,
-		app.ConversionWebhookListenPort,
-		app.ConversionWebhookListenAddress,
-	)
+// cfg must already have all configuration sources merged (NewConfig → ParseEnv → BindFlags → flags parsed).
+func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOperator, error) {
+	// Initialize webhook settings from merged configuration.
+	admission.InitFromSettings(admission.WebhookSettings{
+		Settings: webhookserver.Settings{
+			ServerCertPath: cfg.Admission.ServerCert,
+			ServerKeyPath:  cfg.Admission.ServerKey,
+			ClientCAPaths:  cfg.Admission.ClientCA,
+			ServiceName:    cfg.Admission.ServiceName,
+			ListenAddr:     cfg.Admission.ListenAddress,
+			ListenPort:     cfg.Admission.ListenPort,
+		},
+		CAPath:               cfg.Admission.CA,
+		ConfigurationName:    cfg.Admission.ConfigurationName,
+		DefaultFailurePolicy: cfg.Admission.FailurePolicy,
+	})
+	conversion.InitFromSettings(conversion.WebhookSettings{
+		Settings: webhookserver.Settings{
+			ServerCertPath: cfg.Conversion.ServerCert,
+			ServerKeyPath:  cfg.Conversion.ServerKey,
+			ClientCAPaths:  cfg.Conversion.ClientCA,
+			ServiceName:    cfg.Conversion.ServiceName,
+			ListenAddr:     cfg.Conversion.ListenAddress,
+			ListenPort:     cfg.Conversion.ListenPort,
+		},
+		CAPath: cfg.Conversion.CA,
+	})
 
 	runtimeConfig := config.NewConfig(logger)
 	// Init logging subsystem.
-	app.SetupLogging(runtimeConfig, logger)
+	app.SetupLogging(cfg.Log.Level, runtimeConfig, logger)
 
 	// Log version and jq filtering implementation.
 	logger.Info(app.AppStartMessage)
 	fl := jq.NewFilter()
 	logger.Debug(fl.FilterInfo())
 
-	hooksDir, err := utils.RequireExistingDirectory(app.HooksDir)
+	hooksDir, err := utils.RequireExistingDirectory(cfg.App.HooksDir)
 	if err != nil {
 		logger.Log(ctx, log.LevelFatal.Level(), "hooks directory is required", log.Err(err))
 		return nil, err
 	}
 
-	tempDir, err := utils.EnsureTempDirectory(app.TempDir)
+	tempDir, err := utils.EnsureTempDirectory(cfg.App.TempDir)
 	if err != nil {
 		logger.Log(ctx, log.LevelFatal.Level(), "temp directory", log.Err(err))
 		return nil, err
@@ -80,23 +85,34 @@ func Init(ctx context.Context, logger *log.Logger) (*ShellOperator, error) {
 	op := NewShellOperator(ctx, ms, hms, WithLogger(logger))
 
 	// Debug server.
-	debugServer, err := RunDefaultDebugServer(app.DebugUnixSocket, app.DebugHttpServerAddr, op.logger.Named("debug-server"))
+	debugServer, err := RunDefaultDebugServer(cfg.Debug.UnixSocket, cfg.Debug.HTTPServerAddr, op.logger.Named("debug-server"))
 	if err != nil {
 		logger.Log(ctx, log.LevelFatal.Level(), "start Debug server", log.Err(err))
 		return nil, err
 	}
 
-	err = op.AssembleCommonOperator(app.ListenAddress, app.ListenPort, []string{
+	err = op.AssembleCommonOperator(cfg.App.ListenAddress, cfg.App.ListenPort, []string{
 		"hook",
 		"binding",
 		"queue",
+	}, KubeClientConfig{
+		Context: cfg.Kube.Context,
+		Config:  cfg.Kube.Config,
+		QPS:     cfg.Kube.ClientQPS,
+		Burst:   cfg.Kube.ClientBurst,
+	}, KubeClientConfig{
+		Context: cfg.Kube.Context,
+		Config:  cfg.Kube.Config,
+		QPS:     cfg.ObjectPatcher.KubeClientQPS,
+		Burst:   cfg.ObjectPatcher.KubeClientBurst,
+		Timeout: cfg.ObjectPatcher.KubeClientTimeout,
 	})
 	if err != nil {
 		logger.Log(ctx, log.LevelFatal.Level(), "essemble common operator", log.Err(err))
 		return nil, err
 	}
 
-	err = op.assembleShellOperator(hooksDir, tempDir, debugServer, runtimeConfig)
+	err = op.assembleShellOperator(cfg, hooksDir, tempDir, debugServer, runtimeConfig)
 	if err != nil {
 		logger.Log(ctx, log.LevelFatal.Level(), "essemble shell operator", log.Err(err))
 		return nil, err
@@ -105,10 +121,12 @@ func Init(ctx context.Context, logger *log.Logger) (*ShellOperator, error) {
 	return op, nil
 }
 
-// AssembleCommonOperator instantiate common dependencies. These dependencies
-// may be used for shell-operator derivatives, like addon-operator.
-// requires listenAddress, listenPort to run http server for operator APIs
-func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string) error {
+// AssembleCommonOperator instantiates common dependencies used by both
+// shell-operator and its derivatives (e.g. addon-operator).
+// Requires listenAddress and listenPort to run the HTTP server for operator APIs.
+// kubeCfg provides Kubernetes connection settings for the main client and
+// object patcher; pass KubeClientConfig{} to fall back to in-cluster defaults.
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string, mainKubeCfg, patcherKubeCfg KubeClientConfig) error {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
@@ -121,13 +139,13 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	op.setupHookMetricStorage()
 
 	// 'main' Kubernetes client.
-	op.KubeClient, err = initDefaultMainKubeClient(op.MetricStorage, op.logger)
+	op.KubeClient, err = initDefaultMainKubeClient(mainKubeCfg, op.MetricStorage, op.logger)
 	if err != nil {
 		return err
 	}
 
 	// ObjectPatcher with a separate Kubernetes client.
-	op.ObjectPatcher, err = initDefaultObjectPatcher(op.MetricStorage, op.logger.Named("object-patcher"))
+	op.ObjectPatcher, err = initDefaultObjectPatcher(patcherKubeCfg, op.MetricStorage, op.logger.Named("object-patcher"))
 	if err != nil {
 		return err
 	}
@@ -137,19 +155,9 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 	return nil
 }
 
-// assembleShellOperator uses settings in app package to create all
-// dependencies needed for the full-fledged ShellOperator.
-//
-// - check directories
-// - start debug server
-// - initialize dependencies:
-//   - metric storage
-//   - kubernetes client config
-//   - empty set of task queues
-//   - hook manager
-//   - kubernetes events manager
-//   - schedule manager
-func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) error {
+// assembleShellOperator creates all dependencies needed for the full-fledged
+// ShellOperator using values from cfg.
+func (op *ShellOperator) assembleShellOperator(cfg *app.Config, hooksDir string, tempDir string, debugServer *debug.Server, runtimeConfig *config.Config) error {
 	registerRootRoute(op)
 	// for shell-operator only
 	err := metrics.RegisterHookMetrics(op.HookMetricStorage)
@@ -162,7 +170,7 @@ func (op *ShellOperator) assembleShellOperator(hooksDir string, tempDir string, 
 	op.RegisterDebugConfigRoutes(debugServer, runtimeConfig)
 
 	// Create webhookManagers with dependencies.
-	op.setupHookManagers(hooksDir, tempDir)
+	op.setupHookManagers(cfg, hooksDir, tempDir)
 
 	// Register the three built-in task type handlers. Extenders may add more
 	// handlers via op.taskHandlerRegistry.Register() after this call.
@@ -215,30 +223,30 @@ func (op *ShellOperator) SetupEventManagers() {
 }
 
 // setupHookManagers instantiates different hook managers.
-func (op *ShellOperator) setupHookManagers(hooksDir string, tempDir string) {
+func (op *ShellOperator) setupHookManagers(cfg *app.Config, hooksDir string, tempDir string) {
 	// Initialize admission webhooks manager.
 	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient, admission.WithLogger(op.logger.Named("admission-webhook-manager")))
 	op.AdmissionWebhookManager.Settings = admission.DefaultSettings
-	op.AdmissionWebhookManager.Namespace = app.Namespace
+	op.AdmissionWebhookManager.Namespace = cfg.App.Namespace
 
 	// Initialize conversion webhooks manager.
 	op.ConversionWebhookManager = conversion.NewWebhookManager(conversion.WithLogger(op.logger.Named("conversion-webhook-manager")))
 	op.ConversionWebhookManager.KubeClient = op.KubeClient
 	op.ConversionWebhookManager.Settings = conversion.DefaultSettings
-	op.ConversionWebhookManager.Namespace = app.Namespace
+	op.ConversionWebhookManager.Namespace = cfg.App.Namespace
 
 	// Initialize Hook manager.
-	cfg := &hook.ManagerConfig{
+	hookCfg := &hook.ManagerConfig{
 		WorkingDir:               hooksDir,
 		TempDir:                  tempDir,
 		KubeEventsManager:        op.KubeEventsManager,
 		ScheduleManager:          op.ScheduleManager,
 		AdmissionWebhookManager:  op.AdmissionWebhookManager,
 		ConversionWebhookManager: op.ConversionWebhookManager,
-		KeepTemporaryHookFiles:   app.DebugKeepTmpFiles,
-		LogProxyHookJSON:         app.LogProxyHookJSON,
+		KeepTemporaryHookFiles:   cfg.Debug.KeepTempFiles,
+		LogProxyHookJSON:         cfg.Log.ProxyHookJSON,
 		LogProxyHookJSONKey:      app.ProxyJsonLogKey,
 		Logger:                   op.logger.Named("hook-manager"),
 	}
-	op.HookManager = hook.NewHookManager(cfg)
+	op.HookManager = hook.NewHookManager(hookCfg)
 }
