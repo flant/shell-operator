@@ -39,7 +39,7 @@ func Test_CombineBindingContext_MultipleHooks(t *testing.T) {
 	TaskQueues.NewNamedQueue("test_multiple_hooks",
 		func(_ context.Context, _ task.Task) queue.TaskResult {
 			return queue.TaskResult{
-				Status: "Success",
+				Status: queue.Success,
 			}
 		},
 		queue.WithCompactableTypes(task_metadata.HookRun),
@@ -149,7 +149,7 @@ func Test_CombineBindingContext_Nil_On_NoCombine(t *testing.T) {
 	TaskQueues.NewNamedQueue("test_no_combine",
 		func(_ context.Context, _ task.Task) queue.TaskResult {
 			return queue.TaskResult{
-				Status: "Success",
+				Status: queue.Success,
 			}
 		},
 		queue.WithCompactableTypes(task_metadata.HookRun),
@@ -224,7 +224,7 @@ func Test_CombineBindingContext_Group_Compaction(t *testing.T) {
 	TaskQueues.NewNamedQueue("test_multiple_hooks",
 		func(_ context.Context, _ task.Task) queue.TaskResult {
 			return queue.TaskResult{
-				Status: "Success",
+				Status: queue.Success,
 			}
 		},
 		queue.WithCompactableTypes(task_metadata.HookRun),
@@ -342,7 +342,7 @@ func Test_CombineBindingContext_Group_Type(t *testing.T) {
 	TaskQueues.NewNamedQueue("test_multiple_hooks",
 		func(_ context.Context, _ task.Task) queue.TaskResult {
 			return queue.TaskResult{
-				Status: "Success",
+				Status: queue.Success,
 			}
 		},
 		queue.WithCompactableTypes(task_metadata.HookRun),

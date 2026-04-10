@@ -36,6 +36,10 @@ type Manager struct {
 	conversionWebhookManager *conversion.WebhookManager
 	admissionWebhookManager  *admission.WebhookManager
 
+	// hookDiscovery resolves the set of hook executables to load.
+	// Defaults to FileSystemHookDiscovery; tests may inject a stub.
+	hookDiscovery HookDiscovery
+
 	// hook execution options
 	keepTemporaryHookFiles bool
 	logProxyHookJSON       bool
@@ -64,6 +68,10 @@ type ManagerConfig struct {
 	AdmissionWebhookManager  *admission.WebhookManager
 	ConversionWebhookManager *conversion.WebhookManager
 
+	// HookDiscovery overrides the default filesystem-based hook discovery.
+	// When nil, FileSystemHookDiscovery is used.
+	HookDiscovery HookDiscovery
+
 	KeepTemporaryHookFiles bool
 	LogProxyHookJSON       bool
 	LogProxyHookJSONKey    string
@@ -72,6 +80,10 @@ type ManagerConfig struct {
 }
 
 func NewHookManager(config *ManagerConfig) *Manager {
+	disc := config.HookDiscovery
+	if disc == nil {
+		disc = FileSystemHookDiscovery{}
+	}
 	return &Manager{
 		hooksByName:      make(map[string]*Hook),
 		hookNamesInOrder: make([]string, 0),
@@ -84,6 +96,7 @@ func NewHookManager(config *ManagerConfig) *Manager {
 		scheduleManager:          config.ScheduleManager,
 		admissionWebhookManager:  config.AdmissionWebhookManager,
 		conversionWebhookManager: config.ConversionWebhookManager,
+		hookDiscovery:            disc,
 
 		keepTemporaryHookFiles: config.KeepTemporaryHookFiles,
 		logProxyHookJSON:       config.LogProxyHookJSON,
@@ -114,16 +127,16 @@ func (hm *Manager) Init() error {
 			log.Err(err))
 	}
 
-	hooksRelativePaths, err := utils_file.RecursiveGetExecutablePaths(hm.workingDir)
+	hookPaths, err := hm.hookDiscovery.Discover(hm.workingDir)
 	if err != nil {
 		return err
 	}
 
 	// sort hooks by path
-	sort.Strings(hooksRelativePaths)
-	hm.logger.Debug("Search hooks in paths", slog.Any(pkg.LogKeyPaths, hooksRelativePaths))
+	sort.Strings(hookPaths)
+	hm.logger.Debug("Search hooks in paths", slog.Any(pkg.LogKeyPaths, hookPaths))
 
-	for _, hookPath := range hooksRelativePaths {
+	for _, hookPath := range hookPaths {
 		hook, err := hm.loadHook(hookPath)
 		if err != nil {
 			return err
@@ -449,3 +462,37 @@ func (hm *Manager) UpdateConversionChains() error {
 func (hm *Manager) FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule {
 	return hm.conversionChains.FindConversionChain(crdName, rule)
 }
+
+// HookManager is the interface for the hook manager used by the operator.
+// It allows substituting test doubles in unit tests.
+type HookManager interface {
+	Init() error
+	GetHook(name string) *Hook
+	GetHookNames() []string
+	GetHooksInOrder(bindingType htypes.BindingType) ([]string, error)
+	CreateTasksFromKubeEvent(kubeEvent kemtypes.KubeEvent, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task
+	HandleCreateTasksFromScheduleEvent(crontab string, createTaskFn func(*Hook, controller.BindingExecutionInfo) task.Task) []task.Task
+	HandleAdmissionEvent(ctx context.Context, event admission.Event, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	DetectAdmissionEventType(event admission.Event) htypes.BindingType
+	HandleConversionEvent(ctx context.Context, crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTaskFn func(*Hook, controller.BindingExecutionInfo))
+	FindConversionChain(crdName string, rule conversion.Rule) []conversion.Rule
+}
+
+// HookDiscovery discovers hook executables to be loaded by the Manager.
+// The default implementation scans the filesystem; tests and alternative
+// runtimes can supply their own.
+type HookDiscovery interface {
+	// Discover returns a sorted list of absolute paths to hook executables.
+	Discover(workingDir string) ([]string, error)
+}
+
+// FileSystemHookDiscovery discovers hooks by recursively scanning workingDir
+// for executable files.
+type FileSystemHookDiscovery struct{}
+
+func (FileSystemHookDiscovery) Discover(workingDir string) ([]string, error) {
+	return utils_file.RecursiveGetExecutablePaths(workingDir)
+}
+
+// compile-time assertion
+var _ HookManager = (*Manager)(nil)
