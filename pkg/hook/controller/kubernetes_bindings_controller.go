@@ -31,7 +31,6 @@ type KubernetesBindingsController interface {
 	UpdateMonitor(monitorId string, kind, apiVersion string) error
 	UnlockEvents()
 	UnlockEventsFor(monitorID string)
-	StopMonitors()
 	CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool
 	HandleEvent(ctx context.Context, kubeEvent kemtypes.KubeEvent) BindingExecutionInfo
 	BindingNames() []string
@@ -83,21 +82,25 @@ func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager k
 func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
 	res := make([]BindingExecutionInfo, 0)
 
-	for _, config := range c.KubernetesBindings {
-		if _, found := c.getBindingMonitorLinksById(config.Monitor.Metadata.MonitorId); found {
-			continue
-		}
+	c.l.Lock()
+	alreadyEnabled := len(c.BindingMonitorLinks) == len(c.KubernetesBindings)
+	c.l.Unlock()
+	if alreadyEnabled {
+		return res, nil
+	}
 
-		err := c.kubeEventsManager.AddMonitor(config.Monitor)
-		if err != nil {
-			return nil, fmt.Errorf("run monitor: %s", err)
+	for _, config := range c.KubernetesBindings {
+		if _, found := c.getBindingMonitorLinksById(config.Monitor.Metadata.MonitorId); !found {
+			if err := c.kubeEventsManager.AddMonitor(config.Monitor); err != nil {
+				return nil, fmt.Errorf("run monitor: %s", err)
+			}
+			c.setBindingMonitorLinks(config.Monitor.Metadata.MonitorId, &KubernetesBindingToMonitorLink{
+				MonitorId:     config.Monitor.Metadata.MonitorId,
+				BindingConfig: config,
+			})
+			// Start monitor's informers to fill the cache.
+			c.kubeEventsManager.StartMonitor(config.Monitor.Metadata.MonitorId)
 		}
-		c.setBindingMonitorLinks(config.Monitor.Metadata.MonitorId, &KubernetesBindingToMonitorLink{
-			MonitorId:     config.Monitor.Metadata.MonitorId,
-			BindingConfig: config,
-		})
-		// Start monitor's informers to fill the cache.
-		c.kubeEventsManager.StartMonitor(config.Monitor.Metadata.MonitorId)
 
 		synchronizationInfo := c.HandleEvent(context.TODO(), kemtypes.KubeEvent{
 			MonitorId: config.Monitor.Metadata.MonitorId,
@@ -176,15 +179,6 @@ func (c *kubernetesBindingsController) UnlockEventsFor(monitorID string) {
 		return
 	}
 	m.EnableKubeEventCb()
-}
-
-// StopMonitors stops all monitors for the hook.
-// TODO handle error!
-func (c *kubernetesBindingsController) StopMonitors() {
-	c.iterateBindingMonitorLinks(func(monitorID string) bool {
-		_ = c.kubeEventsManager.StopMonitor(monitorID)
-		return false
-	})
 }
 
 func (c *kubernetesBindingsController) DisableKubernetesBindings() {

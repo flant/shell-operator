@@ -252,12 +252,6 @@ func (hc *HookController) UnlockKubernetesEventsFor(monitorID string) {
 	}
 }
 
-func (hc *HookController) StopMonitors() {
-	if hc.KubernetesController != nil {
-		hc.KubernetesController.StopMonitors()
-	}
-}
-
 func (hc *HookController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.UpdateMonitor(monitorId, kind, apiVersion)

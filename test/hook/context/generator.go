@@ -195,6 +195,6 @@ func (b *BindingContextController) RunBindingWithAllSnapshots(binding types.Bind
 
 func (b *BindingContextController) Stop() {
 	if b.HookCtrl != nil {
-		b.HookCtrl.StopMonitors()
+		b.HookCtrl.DisableKubernetesBindings()
 	}
 }
