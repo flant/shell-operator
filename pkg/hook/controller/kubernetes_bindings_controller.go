@@ -83,13 +83,11 @@ func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager k
 func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
 	res := make([]BindingExecutionInfo, 0)
 
-	c.l.Lock()
-	if len(c.BindingMonitorLinks) > 0 {
-		return res, nil
-	}
-	c.l.Unlock()
-
 	for _, config := range c.KubernetesBindings {
+		if _, found := c.getBindingMonitorLinksById(config.Monitor.Metadata.MonitorId); found {
+			continue
+		}
+
 		err := c.kubeEventsManager.AddMonitor(config.Monitor)
 		if err != nil {
 			return nil, fmt.Errorf("run monitor: %s", err)
@@ -191,11 +189,15 @@ func (c *kubernetesBindingsController) StopMonitors() {
 
 func (c *kubernetesBindingsController) DisableKubernetesBindings() {
 	c.l.Lock()
-	defer c.l.Unlock()
+	ids := make([]string, 0, len(c.BindingMonitorLinks))
+	for id := range c.BindingMonitorLinks {
+		ids = append(ids, id)
+	}
+	c.BindingMonitorLinks = make(map[string]*KubernetesBindingToMonitorLink)
+	c.l.Unlock()
 
-	for _, binding := range c.BindingMonitorLinks {
-		_ = c.kubeEventsManager.StopMonitor(binding.MonitorId)
-		delete(c.BindingMonitorLinks, binding.MonitorId)
+	for _, id := range ids {
+		_ = c.kubeEventsManager.StopMonitor(id)
 	}
 }
 
