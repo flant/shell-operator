@@ -24,7 +24,6 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/otel"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
@@ -227,49 +226,9 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 		h.HookController.EnableAdmissionBindings()
 	}
 
-	// Define handler for AdmissionEvent
-	op.AdmissionWebhookManager.WithAdmissionEventHandler(func(ctx context.Context, event admission.Event) (*admission.Response, error) {
-		eventBindingType := op.HookManager.DetectAdmissionEventType(event)
-		logLabels := map[string]string{
-			pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
-			pkg.LogKeyEvent:   string(eventBindingType),
-		}
-		logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-		logEntry = logEntry.With(
-			slog.String(pkg.LogKeyType, string(eventBindingType)),
-			slog.String(pkg.LogKeyConfigurationId, event.ConfigurationId),
-			slog.String(pkg.LogKeyWebhookID, event.WebhookId))
-		logEntry.Debug("Handle event")
-
-		var admissionTask task.Task
-		op.HookManager.HandleAdmissionEvent(ctx, event, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-			admissionTask = globalHookTaskFactory.NewHookRunTask(hook.Name, eventBindingType, info, logLabels)
-		})
-
-		// Assert exactly one task is created.
-		if admissionTask == nil {
-			logEntry.Error("Possible bug!!! No hook found for event")
-			return nil, fmt.Errorf("no hook found for '%s' '%s'", event.ConfigurationId, event.WebhookId)
-		}
-
-		res := op.taskHandler(ctx, admissionTask)
-
-		if res.Status == "Fail" {
-			return &admission.Response{
-				Allowed: false,
-				Message: "Hook failed",
-			}, nil
-		}
-
-		admissionProp := admissionTask.GetProp("admissionResponse")
-		admissionResponse, ok := admissionProp.(*admission.Response)
-		if !ok {
-			logEntry.Error("'admissionResponse' task prop is not of type *AdmissionResponse",
-				slog.String(pkg.LogKeyType, fmt.Sprintf("%T", admissionProp)))
-			return nil, fmt.Errorf("hook task prop error")
-		}
-		return admissionResponse, nil
-	})
+	// Delegate to the dedicated named type instead of an inlined closure.
+	admissionHandler := NewAdmissionEventHandler(op.HookManager, op.taskHandler, op.logger)
+	op.AdmissionWebhookManager.WithAdmissionEventHandler(admissionHandler.Handle)
 
 	if err := op.AdmissionWebhookManager.Start(); err != nil {
 		return fmt.Errorf("ValidatingWebhookManager start: %w", err)
@@ -311,78 +270,14 @@ func (op *ShellOperator) initConversionWebhookManager() error {
 	return nil
 }
 
-// conversionEventHandler is called when Kubernetes requests a conversion.
-func (op *ShellOperator) conversionEventHandler(ctx context.Context, crdName string, request *v1.ConversionRequest) (*conversion.Response, error) {
-	logLabels := map[string]string{
-		pkg.LogKeyEventID: uuid.Must(uuid.NewV4()).String(),
-		pkg.LogKeyBinding: string(types.KubernetesConversion),
-	}
-	logEntry := utils.EnrichLoggerWithLabels(op.logger, logLabels)
-
-	sourceVersions := conversion.ExtractAPIVersions(request.Objects)
-	logEntry.Info("Handle kubernetesCustomResourceConversion event for crd",
-		slog.String(pkg.LogKeyName, crdName),
-		slog.Int(pkg.LogKeyLen, len(request.Objects)),
-		slog.Any(pkg.LogKeyVersions, sourceVersions))
-
-	done := false
-	for _, srcVer := range sourceVersions {
-		rule := conversion.Rule{
-			FromVersion: srcVer,
-			ToVersion:   request.DesiredAPIVersion,
-		}
-		convPath := op.HookManager.FindConversionChain(crdName, rule)
-		if len(convPath) == 0 {
-			continue
-		}
-		logEntry.Info("Find conversion path for rule",
-			slog.String(pkg.LogKeyName, rule.String()),
-			slog.Any(pkg.LogKeyValue, convPath))
-
-		for _, convRule := range convPath {
-			var convTask task.Task
-			op.HookManager.HandleConversionEvent(ctx, crdName, request, convRule, func(hook *hook.Hook, info controller.BindingExecutionInfo) {
-				convTask = globalHookTaskFactory.NewHookRunTask(hook.Name, types.KubernetesConversion, info, logLabels)
-			})
-
-			if convTask == nil {
-				return nil, fmt.Errorf("no hook found for '%s' event for crd/%s", string(types.KubernetesConversion), crdName)
-			}
-
-			res := op.taskHandler(ctx, convTask)
-
-			if res.Status == "Fail" {
-				return &conversion.Response{
-					FailedMessage:    fmt.Sprintf("Hook failed to convert to %s", request.DesiredAPIVersion),
-					ConvertedObjects: nil,
-				}, nil
-			}
-
-			prop := convTask.GetProp("conversionResponse")
-			response, ok := prop.(*conversion.Response)
-			if !ok {
-				logEntry.Error("'conversionResponse' task prop is not of type *conversion.Response",
-					slog.String(pkg.LogKeyType, fmt.Sprintf("%T", prop)))
-				return nil, fmt.Errorf("hook task prop error")
-			}
-
-			// Set response objects as new objects for a next round.
-			request.Objects = response.ConvertedObjects
-
-			// Stop iterating if hook has converted all objects to a desiredAPIVersions.
-			newSourceVersions := conversion.ExtractAPIVersions(request.Objects)
-			// logEntry.Infof("Hook return conversion response: failMsg=%s, %d convertedObjects, versions:%v, desired: %s", response.FailedMessage, len(response.ConvertedObjects), newSourceVersions, event.Review.Request.DesiredAPIVersion)
-
-			if len(newSourceVersions) == 1 && newSourceVersions[0] == request.DesiredAPIVersion {
-				// success
-				done = true
-				break
-			}
-		}
-
-		if done {
-			break
-		}
+// taskHandler dispatches a task to the registered handler in the registry.
+// It is the function passed to each task queue as its handler.
+func (op *ShellOperator) taskHandler(ctx context.Context, t task.Task) queue.TaskResult {
+	res, handled := op.taskHandlerRegistry.Handle(ctx, t)
+	if !handled {
+		op.logger.Error("Possible Bug! Unknown task type",
+			slog.String(pkg.LogKeyType, string(t.GetType())))
+		return queue.TaskResult{Status: queue.Fail}
 	}
 	return res
 }
