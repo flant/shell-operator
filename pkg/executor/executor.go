@@ -32,6 +32,16 @@ func Run(cmd *exec.Cmd) error {
 	return cmd.Run()
 }
 
+// StderrError is returned by RunAndLogLines when a command fails and produces
+// output on stderr. Callers can use errors.As to access the raw stderr content.
+type StderrError struct {
+	Stderr string
+}
+
+func (e *StderrError) Error() string {
+	return fmt.Sprintf("stderr: %s", e.Stderr)
+}
+
 type Executor struct {
 	cmd              *exec.Cmd
 	logProxyHookJSON bool
@@ -147,7 +157,7 @@ func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]stri
 	err := e.cmd.Run()
 	if err != nil {
 		if len(stdErr.Bytes()) > 0 {
-			return nil, fmt.Errorf("stderr: %s", stdErr.String())
+			return nil, &StderrError{Stderr: stdErr.String()}
 		}
 
 		return nil, fmt.Errorf("cmd run: %w", err)
