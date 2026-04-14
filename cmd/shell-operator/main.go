@@ -1,66 +1,77 @@
 package main
 
 import (
-"fmt"
-"os"
+	"fmt"
+	"os"
 
-"github.com/deckhouse/deckhouse/pkg/log"
-"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/flant/kube-client/klogtolog"
+	"github.com/spf13/cobra"
 
-"github.com/flant/kube-client/klogtolog"
-"github.com/flant/shell-operator/pkg/app"
-"github.com/flant/shell-operator/pkg/debug"
-"github.com/flant/shell-operator/pkg/filter/jq"
+	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/debug"
+	"github.com/flant/shell-operator/pkg/filter/jq"
 )
 
 func main() {
-	// Build the config from defaults and environment variables.
-	// Flag defaults will be set to these pre-merged values so that an explicit
-	// CLI flag wins, an env var wins over the hardcoded default, but no flag
-	// ever reads the environment directly (.Envar() is not used).
+	// Build config from defaults and environment variables.
+	// Flag defaults are set to these pre-merged values so an explicit CLI flag
+	// wins, an env var wins over the hardcoded default, but no flag ever reads
+	// the environment directly.
 	cfg := app.NewConfig()
 	if err := app.ParseEnv(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
 		os.Exit(1)
 	}
 
-	kpApp := kingpin.New(app.AppName, fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription))
-
 	logger := log.NewLogger()
 	log.SetDefault(logger)
 
-	kpApp.UsageTemplate(app.OperatorUsageTemplate(app.AppName))
+	rootCmd := &cobra.Command{
+		Use:   app.AppName,
+		Short: fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription),
+		// klog adapter uses the final (post-parse) value of cfg.Debug.KubernetesAPI.
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			klogtolog.InitAdapter(cfg.Debug.KubernetesAPI, logger.Named("klog"))
+			return nil
+		},
+	}
 
-	// klog adapter uses the final (post-parse) value of cfg.Debug.KubernetesAPI.
-	kpApp.Action(func(_ *kingpin.ParseContext) error {
-klogtolog.InitAdapter(cfg.Debug.KubernetesAPI, logger.Named("klog"))
-return nil
-})
-
-	kpApp.Command("version", "Show version.").Action(func(_ *kingpin.ParseContext) error {
-fmt.Printf("%s %s\n", app.AppName, app.Version)
-fl := jq.NewFilter()
-		fmt.Println(fl.FilterInfo())
-		return nil
+	// version sub-command
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Show version.",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("%s %s\n", app.AppName, app.Version)
+			fl := jq.NewFilter()
+			fmt.Println(fl.FilterInfo())
+		},
 	})
 
-	startCmd := kpApp.Command("start", "Start shell-operator.").
-		Default().
-		Action(start(logger, cfg))
+	// start sub-command (default)
+	startCmd := &cobra.Command{
+		Use:   "start",
+		Short: "Start shell-operator.",
+		RunE:  start(logger, cfg),
+	}
+	applySliceFlags := app.BindFlags(cfg, rootCmd, startCmd)
+	startCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		applySliceFlags()
+		return nil
+	}
+	rootCmd.AddCommand(startCmd)
 
-	// Register all CLI flags; each flag's .Default() reflects the env-merged value.
-// No .Envar() - environment is handled exclusively by ParseEnv above.
-applySliceFlags := app.BindFlags(cfg, kpApp, startCmd)
+	debug.DefineDebugCommands(rootCmd)
+	debug.DefineDebugCommandsSelf(rootCmd)
 
-// Apply []string slice flag overrides before the start action runs.
-// PreAction executes after flag parsing but before Action.
-startCmd.PreAction(func(_ *kingpin.ParseContext) error {
-applySliceFlags()
-return nil
-})
+	// Make start the default command when no subcommand is given.
+	rootCmd.RunE = start(logger, cfg)
+	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		applySliceFlags()
+		return nil
+	}
 
-debug.DefineDebugCommands(kpApp)
-debug.DefineDebugCommandsSelf(kpApp)
-
-kingpin.MustParse(kpApp.Parse(os.Args[1:]))
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }

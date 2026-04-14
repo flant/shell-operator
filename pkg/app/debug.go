@@ -1,7 +1,7 @@
 package app
 
 import (
-"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/spf13/cobra"
 )
 
 // DebugUnixSocket is the default path for the debug unix socket.
@@ -13,9 +13,7 @@ var DebugUnixSocket = "/var/run/shell-operator/debug.socket"
 // DefineDebugUnixSocketFlag registers the --debug-unix-socket flag on cmd,
 // binding it to the DebugUnixSocket global. Called by debug sub-commands that
 // need to locate the operator's debug socket.
-func DefineDebugUnixSocketFlag(cmd *kingpin.CmdClause) {
-cmd.Flag("debug-unix-socket", "A path to a unix socket for a debug endpoint.").
-Hidden().
-Default(DebugUnixSocket).
-StringVar(&DebugUnixSocket)
+func DefineDebugUnixSocketFlag(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&DebugUnixSocket, "debug-unix-socket", DebugUnixSocket, "A path to a unix socket for a debug endpoint.")
+	_ = cmd.Flags().MarkHidden("debug-unix-socket")
 }

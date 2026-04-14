@@ -4,21 +4,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-// bindAndParse creates a fresh Config, applies BindFlags, parses argv, and
-// calls the returned post-parse fixup. cfg is ready to inspect on return.
+// bindAndParse creates a fresh cobra root+start command pair, registers all
+// flags via BindFlags, parses argv, and calls the returned post-parse fixup.
+// cfg is ready to inspect on return.
 func bindAndParse(t *testing.T, cfg *Config, argv []string) {
 	t.Helper()
-	kpApp := kingpin.New("test", "test app")
-	kpApp.Terminate(nil)
-	cmd := kpApp.Command("start", "start")
-	applySlices := BindFlags(cfg, kpApp, cmd)
-	_, err := kpApp.Parse(append([]string{"start"}, argv...))
-	require.NoError(t, err)
+	rootCmd := &cobra.Command{Use: "test", SilenceErrors: true, SilenceUsage: true}
+	startCmd := &cobra.Command{
+		Use:  "start",
+		RunE: func(cmd *cobra.Command, args []string) error { return nil },
+	}
+	rootCmd.AddCommand(startCmd)
+	applySlices := BindFlags(cfg, rootCmd, startCmd)
+	rootCmd.SetArgs(append([]string{"start"}, argv...))
+	require.NoError(t, rootCmd.Execute())
 	applySlices()
 }
 
