@@ -8,7 +8,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	pkg "github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
@@ -27,10 +27,10 @@ type KubernetesBindingsController interface {
 	WithKubernetesBindings([]htypes.OnKubernetesEventConfig)
 	WithKubeEventsManager(kubeeventsmanager.KubeEventsSource)
 	EnableKubernetesBindings() ([]BindingExecutionInfo, error)
+	DisableKubernetesBindings()
 	UpdateMonitor(monitorId string, kind, apiVersion string) error
 	UnlockEvents()
 	UnlockEventsFor(monitorID string)
-	StopMonitors()
 	CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool
 	HandleEvent(ctx context.Context, kubeEvent kemtypes.KubeEvent) BindingExecutionInfo
 	BindingNames() []string
@@ -82,17 +82,25 @@ func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager k
 func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
 	res := make([]BindingExecutionInfo, 0)
 
+	c.l.RLock()
+	alreadyEnabled := len(c.BindingMonitorLinks) == len(c.KubernetesBindings)
+	c.l.RUnlock()
+	if alreadyEnabled {
+		return res, nil
+	}
+
 	for _, config := range c.KubernetesBindings {
-		err := c.kubeEventsManager.AddMonitor(config.Monitor)
-		if err != nil {
-			return nil, fmt.Errorf("run monitor: %s", err)
+		if _, found := c.getBindingMonitorLinksById(config.Monitor.Metadata.MonitorId); !found {
+			if err := c.kubeEventsManager.AddMonitor(config.Monitor); err != nil {
+				return nil, fmt.Errorf("run monitor: %s", err)
+			}
+			c.setBindingMonitorLinks(config.Monitor.Metadata.MonitorId, &KubernetesBindingToMonitorLink{
+				MonitorId:     config.Monitor.Metadata.MonitorId,
+				BindingConfig: config,
+			})
+			// Start monitor's informers to fill the cache.
+			c.kubeEventsManager.StartMonitor(config.Monitor.Metadata.MonitorId)
 		}
-		c.setBindingMonitorLinks(config.Monitor.Metadata.MonitorId, &KubernetesBindingToMonitorLink{
-			MonitorId:     config.Monitor.Metadata.MonitorId,
-			BindingConfig: config,
-		})
-		// Start monitor's informers to fill the cache.
-		c.kubeEventsManager.StartMonitor(config.Monitor.Metadata.MonitorId)
 
 		synchronizationInfo := c.HandleEvent(context.TODO(), kemtypes.KubeEvent{
 			MonitorId: config.Monitor.Metadata.MonitorId,
@@ -173,13 +181,18 @@ func (c *kubernetesBindingsController) UnlockEventsFor(monitorID string) {
 	m.EnableKubeEventCb()
 }
 
-// StopMonitors stops all monitors for the hook.
-// TODO handle error!
-func (c *kubernetesBindingsController) StopMonitors() {
-	c.iterateBindingMonitorLinks(func(monitorID string) bool {
-		_ = c.kubeEventsManager.StopMonitor(monitorID)
-		return false
-	})
+func (c *kubernetesBindingsController) DisableKubernetesBindings() {
+	c.l.Lock()
+	ids := make([]string, 0, len(c.BindingMonitorLinks))
+	for id := range c.BindingMonitorLinks {
+		ids = append(ids, id)
+	}
+	c.BindingMonitorLinks = make(map[string]*KubernetesBindingToMonitorLink)
+	c.l.Unlock()
+
+	for _, id := range ids {
+		_ = c.kubeEventsManager.StopMonitor(id)
+	}
 }
 
 func (c *kubernetesBindingsController) CanHandleEvent(kubeEvent kemtypes.KubeEvent) bool {

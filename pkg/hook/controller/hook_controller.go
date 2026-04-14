@@ -252,17 +252,25 @@ func (hc *HookController) UnlockKubernetesEventsFor(monitorID string) {
 	}
 }
 
-func (hc *HookController) StopMonitors() {
-	if hc.KubernetesController != nil {
-		hc.KubernetesController.StopMonitors()
-	}
-}
-
 func (hc *HookController) UpdateMonitor(monitorId string, kind, apiVersion string) error {
 	if hc.KubernetesController != nil {
 		return hc.KubernetesController.UpdateMonitor(monitorId, kind, apiVersion)
 	}
 	return nil
+}
+
+func (hc *HookController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
+	if hc.KubernetesController != nil {
+		return hc.KubernetesController.EnableKubernetesBindings()
+	}
+
+	return nil, nil
+}
+
+func (hc *HookController) DisableKubernetesBindings() {
+	if hc.KubernetesController != nil {
+		hc.KubernetesController.DisableKubernetesBindings()
+	}
 }
 
 func (hc *HookController) EnableScheduleBindings() {
