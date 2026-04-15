@@ -1,7 +1,6 @@
 package admission
 
 import (
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
@@ -13,49 +12,25 @@ type WebhookSettings struct {
 	DefaultFailurePolicy string
 }
 
-// DefaultSettings returns default settings for validating webhook
-// This is initialized at startup and can be modified by flag parsing
+// DefaultSettings holds the active validating-webhook server settings.
+// It is populated by InitFromSettings during operator initialization.
+// Tests may use it directly; in production always call InitFromSettings first.
 var DefaultSettings = &WebhookSettings{
 	Settings: server.Settings{
-		ServerCertPath: app.ValidatingServerCertPathDefault,
-		ServerKeyPath:  app.ValidatingServerKeyPathDefault,
-		ClientCAPaths:  nil,
-		ServiceName:    app.ValidatingServiceNameDefault,
-		ListenAddr:     app.ValidatingListenAddrDefault,
-		ListenPort:     app.ValidatingListenPortDefault,
+		ServerCertPath: "/validating-certs/tls.crt",
+		ServerKeyPath:  "/validating-certs/tls.key",
+		ServiceName:    "shell-operator-validating-svc",
+		ListenAddr:     "0.0.0.0",
+		ListenPort:     "9680",
 	},
-	CAPath:               app.ValidatingCAPathDefault,
-	ConfigurationName:    app.ValidatingConfigurationNameDefault,
-	DefaultFailurePolicy: app.ValidatingFailurePolicyTypeDefault,
+	CAPath:               "/validating-certs/ca.crt",
+	ConfigurationName:    "shell-operator-hooks",
+	DefaultFailurePolicy: "Fail",
 }
 
-// InitFromFlags updates DefaultSettings with values from parsed flags
-func InitFromFlags(configName, serviceName, certPath, keyPath, caPath string, clientCAs []string, failurePolicy, port, addr string) {
-	if configName != "" {
-		DefaultSettings.ConfigurationName = configName
-	}
-	if serviceName != "" {
-		DefaultSettings.ServiceName = serviceName
-	}
-	if certPath != "" {
-		DefaultSettings.ServerCertPath = certPath
-	}
-	if keyPath != "" {
-		DefaultSettings.ServerKeyPath = keyPath
-	}
-	if caPath != "" {
-		DefaultSettings.CAPath = caPath
-	}
-	if len(clientCAs) > 0 {
-		DefaultSettings.ClientCAPaths = clientCAs
-	}
-	if failurePolicy != "" {
-		DefaultSettings.DefaultFailurePolicy = failurePolicy
-	}
-	if port != "" {
-		DefaultSettings.ListenPort = port
-	}
-	if addr != "" {
-		DefaultSettings.ListenAddr = addr
-	}
+// InitFromSettings replaces DefaultSettings with values derived from cfg.
+// Call this once during operator initialization, after all configuration
+// sources (env vars and CLI flags) have been merged into cfg.
+func InitFromSettings(s WebhookSettings) {
+	DefaultSettings = &s
 }
