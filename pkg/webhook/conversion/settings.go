@@ -1,7 +1,7 @@
 package conversion
 
 import (
-"github.com/flant/shell-operator/pkg/webhook/server"
+	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
 type WebhookSettings struct {

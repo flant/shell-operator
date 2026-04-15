@@ -26,7 +26,7 @@ const (
 )
 
 func start(logger *log.Logger, cfg *app.Config) func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
+	return func(_ *cobra.Command, _ []string) error {
 		app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
 		ctx := context.Background()
 		telemetryShutdown := registerTelemetry(ctx)
@@ -70,23 +70,23 @@ func registerTelemetry(ctx context.Context) func(ctx context.Context) error {
 
 	if authToken != "" {
 		opts = append(opts, otlptracegrpc.WithHeaders(map[string]string{
-"Authorization": "Bearer " + strings.TrimSpace(authToken),
-}))
+			"Authorization": "Bearer " + strings.TrimSpace(authToken),
+		}))
 	}
 
 	exporter, _ := otlptracegrpc.New(ctx, opts...)
 
 	resource := sdkresource.NewWithAttributes(
-semconv.SchemaURL,
-semconv.ServiceNameKey.String(AppName),
-semconv.TelemetrySDKLanguageKey.String("en"),
-semconv.K8SDeploymentName(AppName),
-)
+		semconv.SchemaURL,
+		semconv.ServiceNameKey.String(AppName),
+		semconv.TelemetrySDKLanguageKey.String("en"),
+		semconv.K8SDeploymentName(AppName),
+	)
 
 	provider := sdktrace.NewTracerProvider(
-sdktrace.WithBatcher(exporter),
-sdktrace.WithResource(resource),
-sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
 	otel.SetTracerProvider(provider)

@@ -27,7 +27,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 	queueListCmd := &cobra.Command{
 		Use:   "list",
 		Short: "Dump tasks in all queues.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			var refreshInterval time.Duration
 			output := termenv.NewOutput(os.Stdout)
 
@@ -92,7 +92,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 	queueMainCmd := &cobra.Command{
 		Use:   "main",
 		Short: "Dump tasks in the main queue.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			client, err := DefaultClient()
 			if err != nil {
 				return err
@@ -116,7 +116,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 	configListCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List available runtime parameters.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			client, err := DefaultClient()
 			if err != nil {
 				return err
@@ -140,7 +140,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 		Use:   "set <name> <value> [duration]",
 		Short: "Set runtime parameter.",
 		Args:  cobra.RangeArgs(2, 3),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			paramName = args[0]
 			paramValue = args[1]
 			if len(args) == 3 {
@@ -170,7 +170,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 		Use:   "raw <urlpath>",
 		Short: "Make a raw request to debug endpoint.",
 		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			var rawUrl string
 			if len(args) > 0 {
 				rawUrl = args[0]
@@ -199,7 +199,7 @@ func DefineDebugCommandsSelf(rootCmd *cobra.Command) {
 	hookListCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all hooks.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			client, err := DefaultClient()
 			if err != nil {
 				return err
@@ -220,7 +220,7 @@ func DefineDebugCommandsSelf(rootCmd *cobra.Command) {
 		Use:   "snapshot <hook_name>",
 		Short: "Dump hook snapshots.",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			client, err := DefaultClient()
 			if err != nil {
 				return err

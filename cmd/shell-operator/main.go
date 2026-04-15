@@ -5,9 +5,9 @@ import (
 	"os"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	"github.com/flant/kube-client/klogtolog"
 	"github.com/spf13/cobra"
 
+	"github.com/flant/kube-client/klogtolog"
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/filter/jq"
@@ -31,7 +31,7 @@ func main() {
 		Use:   app.AppName,
 		Short: fmt.Sprintf("%s %s: %s", app.AppName, app.Version, app.AppDescription),
 		// klog adapter uses the final (post-parse) value of cfg.Debug.KubernetesAPI.
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			klogtolog.InitAdapter(cfg.Debug.KubernetesAPI, logger.Named("klog"))
 			return nil
 		},
@@ -41,7 +41,7 @@ func main() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Show version.",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Printf("%s %s\n", app.AppName, app.Version)
 			fl := jq.NewFilter()
 			fmt.Println(fl.FilterInfo())
@@ -55,7 +55,7 @@ func main() {
 		RunE:  start(logger, cfg),
 	}
 	applySliceFlags := app.BindFlags(cfg, rootCmd, startCmd)
-	startCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+	startCmd.PreRunE = func(_ *cobra.Command, _ []string) error {
 		applySliceFlags()
 		return nil
 	}
@@ -66,7 +66,7 @@ func main() {
 
 	// Make start the default command when no subcommand is given.
 	rootCmd.RunE = start(logger, cfg)
-	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+	rootCmd.PreRunE = func(_ *cobra.Command, _ []string) error {
 		applySliceFlags()
 		return nil
 	}
