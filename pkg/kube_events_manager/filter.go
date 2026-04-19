@@ -42,7 +42,7 @@ func applyFilter(compiledFilter filter.CompiledFilter, jqFilterStr string, filte
 		}
 
 		res.FilterResult = filteredObj
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filteredBytes))
+		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfBytes(filteredBytes)
 
 		return res, nil
 	}
@@ -53,7 +53,7 @@ func applyFilter(compiledFilter filter.CompiledFilter, jqFilterStr string, filte
 		if err != nil {
 			return nil, err
 		}
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))
+		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfBytes(data)
 	} else {
 		filtered, err := compiledFilter.Apply(obj.UnstructuredContent())
 		if err != nil {
@@ -61,7 +61,7 @@ func applyFilter(compiledFilter filter.CompiledFilter, jqFilterStr string, filte
 		}
 
 		res.FilterResult = string(filtered)
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filtered))
+		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfBytes(filtered)
 	}
 
 	return res, nil

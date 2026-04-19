@@ -3,18 +3,39 @@ package checksum
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"hash"
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 )
 
+var md5Pool = sync.Pool{
+	New: func() any { return md5.New() },
+}
+
 func CalculateChecksum(stringArr ...string) string {
-	hasher := md5.New()
+	h := md5Pool.Get().(hash.Hash)
+	h.Reset()
 	sort.Strings(stringArr)
 	for _, value := range stringArr {
-		_, _ = hasher.Write([]byte(value))
+		_, _ = h.Write([]byte(value))
 	}
-	return hex.EncodeToString(hasher.Sum(nil))
+	sum := hex.EncodeToString(h.Sum(nil))
+	md5Pool.Put(h)
+	return sum
+}
+
+// CalculateChecksumOfBytes computes an MD5 hex digest directly from a byte
+// slice, avoiding the []byte→string→[]byte round-trip that CalculateChecksum
+// would require.
+func CalculateChecksumOfBytes(data []byte) string {
+	h := md5Pool.Get().(hash.Hash)
+	h.Reset()
+	_, _ = h.Write(data)
+	sum := hex.EncodeToString(h.Sum(nil))
+	md5Pool.Put(h)
+	return sum
 }
 
 func CalculateChecksumOfFile(path string) (string, error) {
