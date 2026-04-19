@@ -2,7 +2,7 @@ package kubeeventsmanager
 
 import (
 	"context"
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"reflect"
 	"runtime"

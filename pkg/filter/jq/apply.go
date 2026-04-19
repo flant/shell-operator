@@ -1,7 +1,7 @@
 package jq
 
 import (
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"errors"
 	"fmt"
 

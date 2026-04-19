@@ -1,7 +1,7 @@
 package object_patch
 
 import (
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 
 	"github.com/go-openapi/spec"

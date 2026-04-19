@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"io"
 	"log/slog"

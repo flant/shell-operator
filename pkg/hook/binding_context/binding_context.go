@@ -1,7 +1,7 @@
 package bindingcontext
 
 import (
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"io"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
