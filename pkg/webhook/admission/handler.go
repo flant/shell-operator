@@ -2,7 +2,7 @@ package admission
 
 import (
 	"context"
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"log/slog"
 	"net/http"

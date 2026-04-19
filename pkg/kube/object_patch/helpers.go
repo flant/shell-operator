@@ -2,7 +2,7 @@ package object_patch
 
 import (
 	"bytes"
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"io"
 

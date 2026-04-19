@@ -1,7 +1,7 @@
 package kubeeventsmanager
 
 import (
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,7 +15,8 @@ func TestApplyFilter(t *testing.T) {
 	t.Run("filter func with error", func(t *testing.T) {
 		uns := &unstructured.Unstructured{Object: map[string]interface{}{"foo": "bar"}}
 		_, err := applyFilter(nil, "", filterFuncWithError, uns)
-		assert.EqualError(t, err, "filterFn (github.com/flant/shell-operator/pkg/kube_events_manager.filterFuncWithError) contains an error: invalid character 'a' looking for beginning of value")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "filterFn (github.com/flant/shell-operator/pkg/kube_events_manager.filterFuncWithError) contains an error:")
 	})
 
 	t.Run("nil compiledFilter computes checksum over full object", func(t *testing.T) {

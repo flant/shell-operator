@@ -1,7 +1,7 @@
 package types
 
 import (
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	"sort"
 	"testing"
 

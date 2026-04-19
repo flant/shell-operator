@@ -238,16 +238,15 @@ func (h *Hook) GetConfigDescription() string {
 }
 
 func (h *Hook) prepareBindingContextJsonFile(context bctx.BindingContextList) (string, error) {
-	var err error
-	data, err := context.Json()
+	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
+
+	f, err := os.Create(bindingContextPath)
 	if err != nil {
 		return "", err
 	}
+	defer f.Close()
 
-	bindingContextPath := filepath.Join(h.TmpDir, fmt.Sprintf("hook-%s-binding-context-%s.json", h.SafeName(), uuid.Must(uuid.NewV4()).String()))
-
-	err = os.WriteFile(bindingContextPath, data, 0o644)
-	if err != nil {
+	if err := context.WriteJson(f); err != nil {
 		return "", err
 	}
 

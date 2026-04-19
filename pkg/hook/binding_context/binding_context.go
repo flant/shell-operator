@@ -1,7 +1,8 @@
 package bindingcontext
 
 import (
-	"encoding/json"
+	json "github.com/flant/shell-operator/pkg/utils/json"
+	"io"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admission/v1"
@@ -182,6 +183,13 @@ func ConvertBindingContextList(version string, contexts []BindingContext) Bindin
 }
 
 func (b BindingContextList) Json() ([]byte, error) {
-	data, err := json.MarshalIndent(b, "", "  ")
-	return data, err
+	return json.Marshal(b)
+}
+
+// WriteJson streams the JSON-encoded binding context list directly to w,
+// avoiding an intermediate []byte allocation that can be very large for
+// synchronization events with many objects.
+func (b BindingContextList) WriteJson(w io.Writer) error {
+	enc := json.NewEncoder(w)
+	return enc.Encode(b)
 }
