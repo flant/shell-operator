@@ -3,6 +3,7 @@ package jq
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/itchyny/gojq"
 
@@ -91,19 +92,48 @@ func (c *CompiledJqFilter) String() string {
 	return c.originalStr
 }
 
+// deepCopyAny recursively copies JSON-compatible values (maps, slices, and
+// primitives) without going through json.Marshal/Unmarshal. This is
+// significantly faster and allocates only the final structure.
 func deepCopyAny(input any) (any, error) {
 	if input == nil {
 		return nil, nil
 	}
-	data, err := json.Marshal(input)
-	if err != nil {
-		return nil, err
+	return deepCopyValue(input)
+}
+
+func deepCopyValue(v any) (any, error) {
+	switch val := v.(type) {
+	case map[string]any:
+		m := make(map[string]any, len(val))
+		for k, v := range val {
+			copied, err := deepCopyValue(v)
+			if err != nil {
+				return nil, err
+			}
+			m[k] = copied
+		}
+		return m, nil
+	case []any:
+		s := make([]any, len(val))
+		for i, v := range val {
+			copied, err := deepCopyValue(v)
+			if err != nil {
+				return nil, err
+			}
+			s[i] = copied
+		}
+		return s, nil
+	case string, bool, json.Number,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		return val, nil
+	case nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("deepCopyValue: unsupported type %T", v)
 	}
-	var output any
-	if err := json.Unmarshal(data, &output); err != nil {
-		return nil, err
-	}
-	return output, nil
 }
 
 // collectResults drains a gojq iterator and serialises the results to JSON.
