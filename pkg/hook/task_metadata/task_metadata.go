@@ -142,3 +142,15 @@ func (m HookMetadata) IsSynchronization() bool {
 	// Synchronization binding contexts are not combined with others, so check the first item is enough.
 	return len(m.BindingContext) > 0 && m.BindingContext[0].IsSynchronization()
 }
+
+// DropObjectPayload nils the Objects and Snapshots slices in every
+// BindingContext element. Call this immediately after a successful hook
+// execution so the GC can reclaim the Kubernetes-object payload while the
+// task is still referenced by the queue runner or retry bookkeeping.
+// On failure the binding context must be preserved for the retry run.
+func (m *HookMetadata) DropObjectPayload() {
+	for i := range m.BindingContext {
+		m.BindingContext[i].Objects = nil
+		m.BindingContext[i].Snapshots = nil
+	}
+}

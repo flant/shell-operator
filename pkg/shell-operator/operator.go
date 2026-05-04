@@ -490,9 +490,20 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 			taskLogEntry.Info("Hook executed successfully")
 			res.Status = queue.Success
 		}
-		op.MetricStorage.CounterAdd(metrics.HookRunAllowedErrorsTotal, allowed, metricLabels)
-		op.MetricStorage.CounterAdd(metrics.HookRunErrorsTotal, errors, metricLabels)
-		op.MetricStorage.CounterAdd(metrics.HookRunSuccessTotal, success, metricLabels)
+	op.MetricStorage.CounterAdd(metrics.HookRunAllowedErrorsTotal, allowed, metricLabels)
+	op.MetricStorage.CounterAdd(metrics.HookRunErrorsTotal, errors, metricLabels)
+	op.MetricStorage.CounterAdd(metrics.HookRunSuccessTotal, success, metricLabels)
+	}
+
+	// The hook subprocess has finished and consumed the binding context payload.
+	// On success (including AllowFailure) the task will not be retried, so we can
+	// nil out Objects and Snapshots immediately — the hook serialised them before
+	// running, and keeping them alive until the task drains from the queue wastes
+	// heap proportional to snapshot size × queue depth.
+	// On failure we leave the payload intact so the retry run receives it.
+	if res.Status == queue.Success {
+		hookMeta.DropObjectPayload()
+		t.UpdateMetadata(hookMeta)
 	}
 
 	// Unlock Kubernetes events for all monitors when Synchronization task is done.
