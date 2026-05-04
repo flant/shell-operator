@@ -1,7 +1,6 @@
 package types
 
 import (
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	pkg "github.com/flant/shell-operator/pkg"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 type WatchEventType string

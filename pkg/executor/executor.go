@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel"
 
 	pkg "github.com/flant/shell-operator/pkg"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 

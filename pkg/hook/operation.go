@@ -2,13 +2,14 @@ package hook
 
 import (
 	"bytes"
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
+
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 type MetricOperation struct {

@@ -2,7 +2,6 @@ package object_patch
 
 import (
 	"bytes"
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"io"
 
@@ -13,6 +12,7 @@ import (
 
 	"github.com/flant/kube-client/manifest"
 	"github.com/flant/shell-operator/pkg/filter"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 func unmarshalFromJSONOrYAML(specs []byte) ([]OperationSpec, error) {

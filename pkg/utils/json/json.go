@@ -9,16 +9,16 @@ import (
 )
 
 type (
-	Decoder              = gojson.Decoder
-	Encoder              = gojson.Encoder
-	Number               = gojson.Number
-	RawMessage           = gojson.RawMessage
-	Marshaler            = gojson.Marshaler
-	Unmarshaler          = gojson.Unmarshaler
+	Decoder               = gojson.Decoder
+	Encoder               = gojson.Encoder
+	Number                = gojson.Number
+	RawMessage            = gojson.RawMessage
+	Marshaler             = gojson.Marshaler
+	Unmarshaler           = gojson.Unmarshaler
 	InvalidUnmarshalError = gojson.InvalidUnmarshalError
-	UnmarshalTypeError   = gojson.UnmarshalTypeError
-	SyntaxError          = gojson.SyntaxError
-	MarshalerError       = gojson.MarshalerError
+	UnmarshalTypeError    = gojson.UnmarshalTypeError
+	SyntaxError           = gojson.SyntaxError
+	MarshalerError        = gojson.MarshalerError
 )
 
 var (

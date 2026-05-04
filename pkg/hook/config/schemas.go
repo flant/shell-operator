@@ -1,11 +1,12 @@
 package config
 
 import (
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/swag"
+
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 var Schemas = map[string]string{

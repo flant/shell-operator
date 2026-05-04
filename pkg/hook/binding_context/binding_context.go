@@ -3,14 +3,13 @@ package bindingcontext
 import (
 	"io"
 
-	json "github.com/flant/shell-operator/pkg/utils/json"
-
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admission/v1"
 	apixv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 // BindingContext contains information about event for hook

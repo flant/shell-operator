@@ -1,7 +1,6 @@
 package object_patch
 
 import (
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 
 	"github.com/go-openapi/spec"
@@ -10,6 +9,8 @@ import (
 	"github.com/go-openapi/validate"
 	"github.com/hashicorp/go-multierror"
 	"sigs.k8s.io/yaml"
+
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 var Schemas = map[string]string{
