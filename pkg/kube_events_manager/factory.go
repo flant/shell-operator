@@ -287,7 +287,9 @@ func (c *FactoryStore) GetByKey(index FactoryIndex, key string) (*unstructured.U
 	return obj, true
 }
 
-// WaitStopped blocks until there is no factory for the index or timeout
+// WaitStopped blocks until the factory for index has been fully shut down (its
+// informer goroutine has exited) or until FactoryShutdownTimeout elapses. If
+// there is no factory for the index the function returns immediately.
 func (c *FactoryStore) WaitStopped(index FactoryIndex) {
 	c.mu.Lock()
 
@@ -298,8 +300,9 @@ func (c *FactoryStore) WaitStopped(index FactoryIndex) {
 
 	ch, ok := c.stoppedCh[index]
 	if !ok {
+		// Register a channel so that Stop can signal us when the factory is gone.
 		ch = make(chan struct{})
-		close(ch)
+		c.stoppedCh[index] = ch
 	}
 
 	c.mu.Unlock()
