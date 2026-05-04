@@ -215,7 +215,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 
 	logMap, ok := line.(map[string]interface{})
 	defer func() {
-		pl.buf = []byte{}
+		pl.buf = pl.buf[:0]
 	}()
 
 	if !ok {
