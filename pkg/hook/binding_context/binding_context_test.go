@@ -2,8 +2,9 @@ package bindingcontext
 
 import (
 	"bytes"
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"testing"
+
+	json "github.com/flant/shell-operator/pkg/utils/json"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

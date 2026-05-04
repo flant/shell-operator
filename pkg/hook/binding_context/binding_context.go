@@ -1,8 +1,9 @@
 package bindingcontext
 
 import (
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"io"
+
+	json "github.com/flant/shell-operator/pkg/utils/json"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admission/v1"
