@@ -2,7 +2,6 @@ package kubeeventsmanager
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -13,6 +12,7 @@ import (
 	"github.com/flant/shell-operator/pkg/filter"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 // applyFilter filters object json representation with a pre-compiled jq expression,

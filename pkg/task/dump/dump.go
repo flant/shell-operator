@@ -2,13 +2,13 @@ package dump
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/flant/shell-operator/pkg/task"
 	"github.com/flant/shell-operator/pkg/task/queue"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 // asQueueNames implements sort.Interface for array of queue names.

@@ -1,13 +1,13 @@
 package jq
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/itchyny/gojq"
 
 	"github.com/flant/shell-operator/pkg/filter"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 var (

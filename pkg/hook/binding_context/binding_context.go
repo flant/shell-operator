@@ -1,7 +1,6 @@
 package bindingcontext
 
 import (
-	"encoding/json"
 	"io"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -10,6 +9,7 @@ import (
 
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 // BindingContext contains information about event for hook

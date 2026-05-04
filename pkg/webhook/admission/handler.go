@@ -2,7 +2,6 @@ package admission
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	pkg "github.com/flant/shell-operator/pkg"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 
