@@ -360,11 +360,14 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			slog.String(pkg.LogKeyEventType, string(eventType)))
 		return
 	}
-	// Idempotent: SetTransform on the SharedIndexInformer already strips noise
-	// for objects entering the cache, but stripping again here is cheap and
-	// guards against any code path that bypasses the transform (and against
-	// objects rebuilt from the typed cache).
-	stripUnstructuredNoise(obj)
+	// Do NOT strip obj here. SetTransform already stripped noise (managedFields,
+	// last-applied annotation) before the object entered the cache. For the
+	// dynamic path, obj is the live cached pointer — mutating its map races with
+	// the informer's processLoop goroutine which concurrently reads the same map
+	// via MetaNamespaceIndexFunc when processing subsequent deltas for this
+	// object. For the typed path, toUnstructured produced a fresh map from a
+	// typed struct that had ManagedFields set to nil by transformTyped, so there
+	// is nothing to strip there either.
 
 	resourceId := resourceId(obj)
 
