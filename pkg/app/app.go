@@ -27,6 +27,15 @@ var (
 
 var PrometheusMetricsPrefix = "shell_operator_"
 
+// UseTypedInformers enables an opt-in code path that stores well-known
+// Kubernetes kinds (Pods, ConfigMaps, Deployments, ...) in the SharedIndexInformer
+// cache as typed runtime.Objects instead of *unstructured.Unstructured. The
+// typed representation is 2–4× smaller for high-volume kinds. Read paths
+// transparently convert back to unstructured. Off by default to preserve
+// bit-for-bit existing behaviour. Toggle with --use-typed-informers /
+// $SHELL_OPERATOR_USE_TYPED_INFORMERS.
+var UseTypedInformers = false
+
 type FlagInfo struct {
 	Name  string
 	Help  string
@@ -69,6 +78,11 @@ var CommonFlagsInfo = map[string]FlagInfo{
 		"A namespace of a shell-operator. Used to setup validating webhooks. Can be set with $SHELL_OPERATOR_NAMESPACE.",
 		"SHELL_OPERATOR_NAMESPACE",
 	},
+	"use-typed-informers": {
+		"use-typed-informers",
+		"Cache well-known Kubernetes kinds (Pods, ConfigMaps, Deployments, ...) as typed runtime.Objects instead of *unstructured.Unstructured. Reduces steady-state memory by 2-4x for high-volume kinds at the cost of a per-event conversion. Can be set with $SHELL_OPERATOR_USE_TYPED_INFORMERS.",
+		"SHELL_OPERATOR_USE_TYPED_INFORMERS",
+	},
 }
 
 // DefineStartCommandFlags set shell-operator flags for cmd
@@ -108,6 +122,12 @@ func DefineStartCommandFlags(kpApp *kingpin.Application, cmd *kingpin.CmdClause)
 		Envar(flag.Envar).
 		Default(Namespace).
 		StringVar(&Namespace)
+
+	flag = CommonFlagsInfo["use-typed-informers"]
+	cmd.Flag(flag.Name, flag.Help).
+		Envar(flag.Envar).
+		Default("false").
+		BoolVar(&UseTypedInformers)
 
 	DefineKubeClientFlags(cmd)
 	DefineValidatingWebhookFlags(cmd)

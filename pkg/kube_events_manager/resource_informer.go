@@ -23,6 +23,24 @@ import (
 	"github.com/flant/shell-operator/pkg/utils/measure"
 )
 
+// cachedEntry is the slim per-object cache value held by resourceInformer.
+// The full *unstructured.Unstructured is intentionally NOT stored here: it
+// lives in the SharedIndexInformer's indexer (the same client-go cache shared
+// across the operator). When a snapshot is materialised, the live object is
+// resolved on demand via FactoryStore.GetByKey, which removes the per-binding
+// duplicate map of object pointers and the per-entry ObjectAndFilterResult
+// wrapper (Metadata.JqFilter / ResourceId / RemoveObject).
+type cachedEntry struct {
+	// IndexerKey is the SharedIndexInformer cache key (namespace/name or name
+	// for cluster-scoped resources). Used to resolve the live object.
+	IndexerKey string
+	// Checksum of the filter result; compared on update to suppress no-op events.
+	Checksum string
+	// FilterResult is the (typically small) jq output or filter-func result
+	// that hooks consume directly.
+	FilterResult any
+}
+
 type resourceInformer struct {
 	id         string
 	KubeClient *klient.Client
@@ -37,8 +55,11 @@ type resourceInformer struct {
 	GroupVersionResource schema.GroupVersionResource
 	ListOptions          metav1.ListOptions
 
-	// A cache of objects and filterResults. It is a part of the Monitor's snapshot.
-	cachedObjects map[string]*kemtypes.ObjectAndFilterResult
+	// A cache of (slim) filter results keyed by resourceId. It is a part of the
+	// Monitor's snapshot. The live *unstructured.Unstructured for each entry is
+	// looked up from the SharedIndexInformer's indexer when the snapshot is
+	// materialised, so this map does not hold a second copy of the objects.
+	cachedObjects map[string]*cachedEntry
 	cacheLock     sync.RWMutex
 
 	// Cached objects operations since start
@@ -89,7 +110,7 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		Name:                   name,
 		eventCb:                cfg.eventCb,
 		Monitor:                cfg.monitor,
-		cachedObjects:          make(map[string]*kemtypes.ObjectAndFilterResult),
+		cachedObjects:          make(map[string]*cachedEntry),
 		cacheLock:              sync.RWMutex{},
 		eventBufLock:           sync.Mutex{},
 		cachedObjectsInfo:      &CachedObjectsInfo{},
@@ -156,12 +177,29 @@ func (ei *resourceInformer) createSharedInformer() error {
 	return nil
 }
 
-// Snapshot returns all cached objects for this informer
+// Snapshot returns all cached objects for this informer.
+//
+// The slim cache stores only the filter result and checksum per object;
+// the full *unstructured.Unstructured is resolved here from the
+// SharedIndexInformer's indexer (a shared cache that already holds every
+// monitored object). This avoids a second per-binding map of object pointers.
 func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
 	ei.cacheLock.RLock()
+	keepObjects := ei.Monitor.KeepFullObjectsInMemory
+	jqFilter := ei.Monitor.JqFilter
 	res := make([]kemtypes.ObjectAndFilterResult, 0, len(ei.cachedObjects))
-	for _, obj := range ei.cachedObjects {
-		res = append(res, *obj)
+	for resourceId, entry := range ei.cachedObjects {
+		ofr := kemtypes.ObjectAndFilterResult{
+			FilterResult: entry.FilterResult,
+		}
+		ofr.Metadata.JqFilter = jqFilter
+		ofr.Metadata.Checksum = entry.Checksum
+		ofr.Metadata.ResourceId = resourceId
+		ofr.Metadata.RemoveObject = !keepObjects
+		if keepObjects {
+			ofr.Object, _ = ei.factoryStore.GetByKey(ei.FactoryIndex, entry.IndexerKey)
+		}
+		res = append(res, ofr)
 	}
 	ei.cacheLock.RUnlock()
 
@@ -219,11 +257,14 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		slog.String(pkg.LogKeyKind, ei.Monitor.Kind),
 		slog.Int(pkg.LogKeyCount, len(objList.Items)))
 
-	filteredObjects := make(map[string]*kemtypes.ObjectAndFilterResult)
+	filteredObjects := make(map[string]*cachedEntry, len(objList.Items))
 
 	for _, item := range objList.Items {
-		// copy loop var to avoid duplication of pointer in filteredObjects
+		// copy loop var; needed because applyFilter takes a pointer.
 		obj := item
+		// The dynamic client's List() bypasses the SharedIndexInformer transform,
+		// so apply the same field stripping here to keep cached objects small.
+		stripUnstructuredNoise(&obj)
 
 		var objFilterRes *kemtypes.ObjectAndFilterResult
 		var err error
@@ -238,11 +279,11 @@ func (ei *resourceInformer) loadExistedObjects() error {
 			return fmt.Errorf("apply filter for '%s/%s': %w", ei.Monitor.Metadata.DebugName, obj.GetName(), err)
 		}
 
-		if !ei.Monitor.KeepFullObjectsInMemory {
-			objFilterRes.RemoveFullObject()
+		filteredObjects[objFilterRes.Metadata.ResourceId] = &cachedEntry{
+			IndexerKey:   indexerKey(&obj),
+			Checksum:     objFilterRes.Metadata.Checksum,
+			FilterResult: objFilterRes.FilterResult,
 		}
-
-		filteredObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
 
 		log.Debug("initial list: cached with checksum",
 			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
@@ -261,6 +302,16 @@ func (ei *resourceInformer) loadExistedObjects() error {
 	ei.metricStorage.GaugeSet(metrics.KubeSnapshotObjects, float64(len(ei.cachedObjects)), ei.Monitor.Metadata.MetricLabels)
 
 	return nil
+}
+
+// indexerKey returns the cache.MetaNamespaceKeyFunc-style key for the given
+// object: "namespace/name" for namespaced resources, "name" for cluster-scoped.
+func indexerKey(obj *unstructured.Unstructured) string {
+	ns := obj.GetNamespace()
+	if ns == "" {
+		return obj.GetName()
+	}
+	return ns + "/" + obj.GetName()
 }
 
 func (ei *resourceInformer) OnAdd(obj interface{}, _ bool) {
@@ -298,7 +349,22 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 	if staleObj, stale := object.(cache.DeletedFinalStateUnknown); stale {
 		object = staleObj.Obj
 	}
-	obj := object.(*unstructured.Unstructured)
+	// The cache may hold either *unstructured.Unstructured (default) or a
+	// typed runtime.Object (when typed-informer support is enabled and the
+	// GVR is registered). Normalise to *unstructured.Unstructured here so the
+	// rest of the pipeline keeps working unchanged.
+	obj := toUnstructured(object)
+	if obj == nil {
+		log.Error("handleWatchEvent: could not normalise object to unstructured",
+			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
+			slog.String(pkg.LogKeyEventType, string(eventType)))
+		return
+	}
+	// Idempotent: SetTransform on the SharedIndexInformer already strips noise
+	// for objects entering the cache, but stripping again here is cheap and
+	// guards against any code path that bypasses the transform (and against
+	// objects rebuilt from the typed cache).
+	stripUnstructuredNoise(obj)
 
 	resourceId := resourceId(obj)
 
@@ -334,7 +400,7 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		ei.cacheLock.Lock()
 		cachedObject, objectInCache := ei.cachedObjects[resourceId]
 		skipEvent := false
-		if objectInCache && cachedObject.Metadata.Checksum == objFilterRes.Metadata.Checksum {
+		if objectInCache && cachedObject.Checksum == objFilterRes.Metadata.Checksum {
 			// update object in cache and do not send event
 			log.Debug("skip KubeEvent",
 				slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
@@ -343,7 +409,11 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			)
 			skipEvent = true
 		}
-		ei.cachedObjects[resourceId] = objFilterRes
+		ei.cachedObjects[resourceId] = &cachedEntry{
+			IndexerKey:   indexerKey(obj),
+			Checksum:     objFilterRes.Metadata.Checksum,
+			FilterResult: objFilterRes.FilterResult,
+		}
 		// Update cached objects info.
 		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
 		if eventType == kemtypes.WatchEventAdded {
@@ -463,7 +533,11 @@ func (ei *resourceInformer) start() {
 
 	// TODO: separate handler and informer
 	errorHandler := newWatchErrorHandler(ei.Monitor.Metadata.DebugName, ei.Monitor.Kind, ei.Monitor.Metadata.LogLabels, ei.metricStorage, ei.logger.Named("watch-error-handler"))
-	err := ei.factoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.FactoryIndex, ei, errorHandler)
+	// ei.KubeClient is *klient.Client, which embeds kubernetes.Interface and
+	// therefore satisfies it. Passing it directly lets the FactoryStore
+	// materialise a typed SharedInformerFactory when the typed-informer code
+	// path is enabled and the GVR is registered.
+	err := ei.factoryStore.Start(ei.ctx, ei.id, ei.KubeClient.Dynamic(), ei.KubeClient, ei.FactoryIndex, ei, errorHandler)
 	if err != nil {
 		ei.Monitor.Logger.Error("cache is not synced for informer", slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName))
 		return

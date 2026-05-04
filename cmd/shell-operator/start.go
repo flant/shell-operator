@@ -15,6 +15,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/flant/shell-operator/pkg/app"
+	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/metrics"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
 	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
@@ -33,6 +34,10 @@ func start(logger *log.Logger) func(_ *kingpin.ParseContext) error {
 
 		// Initialize metric names with the configured prefix
 		metrics.InitMetrics(app.PrometheusMetricsPrefix)
+
+		// Toggle the typed-informer cache code path. Must be set before
+		// monitors are created (i.e. before shell_operator.Init wires them up).
+		kubeeventsmanager.SetTypedInformerEnabled(app.UseTypedInformers)
 
 		// Init logging and initialize a ShellOperator instance.
 		operator, err := shell_operator.Init(ctx, logger.Named("shell-operator"))

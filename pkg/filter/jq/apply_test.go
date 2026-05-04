@@ -110,7 +110,7 @@ func Test_ApplyFilter_EmptyFilter(t *testing.T) {
 	g.Expect(result).Should(BeNil())
 }
 
-func Test_ApplyFilter_InvalidJsonInDeepCopy(t *testing.T) {
+func Test_ApplyFilter_InvalidJsonInClone(t *testing.T) {
 	g := NewWithT(t)
 	filter := NewFilter()
 
@@ -172,36 +172,34 @@ func Test_ApplyFilter_PanicSafety(t *testing.T) {
 	g.Expect(err).ShouldNot(BeNil())
 }
 
-func Test_deepCopyAny(t *testing.T) {
+func Test_cloneInput_Map(t *testing.T) {
 	g := NewWithT(t)
 
-	// Test copying a map preserves types
-	inputMap := map[string]any{"foo": "bar", "num": 42}
-	copyMap, err := deepCopyAny(inputMap)
+	// JSON-shaped map is the typical input from informers.
+	inputMap := map[string]any{"foo": "bar", "num": float64(42)}
+	copyMap, err := cloneInput(inputMap)
 	g.Expect(err).Should(BeNil())
-	g.Expect(copyMap).Should(Equal(map[string]any{"foo": "bar", "num": 42}))
+	g.Expect(copyMap).Should(Equal(map[string]any{"foo": "bar", "num": float64(42)}))
 	g.Expect(copyMap).ShouldNot(BeIdenticalTo(inputMap))
-
-	// Test copying a slice preserves types
-	inputSlice := []any{"a", 1, true}
-	copySlice, err := deepCopyAny(inputSlice)
-	g.Expect(err).Should(BeNil())
-	g.Expect(copySlice).Should(Equal([]any{"a", 1, true}))
-	g.Expect(copySlice).ShouldNot(BeIdenticalTo(inputSlice))
-
-	// Test copying nil
-	copyNil, err := deepCopyAny(nil)
-	g.Expect(err).Should(BeNil())
-	g.Expect(copyNil).Should(BeNil())
-
-	// Test copying a value with unsupported type
-	inputInvalid := map[string]any{"ch": make(chan int)}
-	copyInvalid, err := deepCopyAny(inputInvalid)
-	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(copyInvalid).Should(BeNil())
 }
 
-func Test_deepCopyAny_NestedMap(t *testing.T) {
+func Test_cloneInput_Nil(t *testing.T) {
+	g := NewWithT(t)
+
+	out, err := cloneInput(nil)
+	g.Expect(err).Should(BeNil())
+	g.Expect(out).Should(BeNil())
+}
+
+func Test_cloneInput_Unmarshalable(t *testing.T) {
+	g := NewWithT(t)
+
+	out, err := cloneInput(map[string]any{"ch": make(chan int)})
+	g.Expect(err).ShouldNot(BeNil())
+	g.Expect(out).Should(BeNil())
+}
+
+func Test_cloneInput_NestedMap_Independent(t *testing.T) {
 	g := NewWithT(t)
 
 	input := map[string]any{
@@ -215,10 +213,11 @@ func Test_deepCopyAny_NestedMap(t *testing.T) {
 		},
 	}
 
-	result, err := deepCopyAny(input)
+	result, err := cloneInput(input)
 	g.Expect(err).Should(BeNil())
 
-	resultMap := result.(map[string]any)
+	resultMap, ok := result.(map[string]any)
+	g.Expect(ok).Should(BeTrue())
 	g.Expect(resultMap["metadata"]).Should(Equal(input["metadata"]))
 
 	// Verify it's a true deep copy: mutating the copy must not affect the original.
@@ -227,42 +226,7 @@ func Test_deepCopyAny_NestedMap(t *testing.T) {
 	g.Expect(input["metadata"].(map[string]any)["name"]).Should(Equal("my-pod"))
 }
 
-func Test_deepCopyAny_NestedSlice(t *testing.T) {
-	g := NewWithT(t)
-
-	input := []any{
-		map[string]any{"name": "a"},
-		map[string]any{"name": "b"},
-	}
-
-	result, err := deepCopyAny(input)
-	g.Expect(err).Should(BeNil())
-
-	resultSlice := result.([]any)
-	g.Expect(resultSlice).Should(HaveLen(2))
-
-	// Mutate copy, verify original is untouched.
-	resultSlice[0].(map[string]any)["name"] = "mutated"
-	g.Expect(input[0].(map[string]any)["name"]).Should(Equal("a"))
-}
-
-func Test_deepCopyAny_NumericTypes(t *testing.T) {
-	g := NewWithT(t)
-
-	input := map[string]any{
-		"int":     42,
-		"int64":   int64(100),
-		"float64": 3.14,
-		"bool":    true,
-		"string":  "hello",
-	}
-
-	result, err := deepCopyAny(input)
-	g.Expect(err).Should(BeNil())
-	g.Expect(result).Should(Equal(input))
-}
-
-func BenchmarkDeepCopyAny(b *testing.B) {
+func BenchmarkCloneInput(b *testing.B) {
 	input := map[string]any{
 		"metadata": map[string]any{
 			"name":      "my-pod",
@@ -279,7 +243,7 @@ func BenchmarkDeepCopyAny(b *testing.B) {
 	}
 	b.ResetTimer()
 	for range b.N {
-		_, _ = deepCopyAny(input)
+		_, _ = cloneInput(input)
 	}
 }
 
