@@ -1,31 +1,33 @@
 // Package json is a drop-in replacement for encoding/json that delegates to
-// github.com/goccy/go-json for better marshal/unmarshal performance.
+// github.com/bytedance/sonic for better marshal/unmarshal performance.
 // All public symbols required by the rest of the codebase are re-exported here
 // so that callers only need to change their import path.
 package json
 
 import (
-	gojson "github.com/goccy/go-json"
+	stdjson "encoding/json"
+
+	"github.com/bytedance/sonic"
 )
 
 type (
-	Decoder               = gojson.Decoder
-	Encoder               = gojson.Encoder
-	Number                = gojson.Number
-	RawMessage            = gojson.RawMessage
-	Marshaler             = gojson.Marshaler
-	Unmarshaler           = gojson.Unmarshaler
-	InvalidUnmarshalError = gojson.InvalidUnmarshalError
-	UnmarshalTypeError    = gojson.UnmarshalTypeError
-	SyntaxError           = gojson.SyntaxError
-	MarshalerError        = gojson.MarshalerError
+	Decoder               = sonic.Decoder
+	Encoder               = sonic.Encoder
+	Number                = stdjson.Number
+	RawMessage            = stdjson.RawMessage
+	Marshaler             = stdjson.Marshaler
+	Unmarshaler           = stdjson.Unmarshaler
+	InvalidUnmarshalError = stdjson.InvalidUnmarshalError
+	UnmarshalTypeError    = stdjson.UnmarshalTypeError
+	SyntaxError           = stdjson.SyntaxError
+	MarshalerError        = stdjson.MarshalerError
 )
 
 var (
-	Marshal       = gojson.Marshal
-	MarshalIndent = gojson.MarshalIndent
-	Unmarshal     = gojson.Unmarshal
-	NewDecoder    = gojson.NewDecoder
-	NewEncoder    = gojson.NewEncoder
-	Valid         = gojson.Valid
+	Marshal       = sonic.Marshal
+	MarshalIndent = sonic.MarshalIndent
+	Unmarshal     = sonic.Unmarshal
+	NewDecoder    = sonic.ConfigDefault.NewDecoder
+	NewEncoder    = sonic.ConfigDefault.NewEncoder
+	Valid         = sonic.Valid
 )
