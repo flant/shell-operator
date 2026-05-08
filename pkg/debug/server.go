@@ -1,7 +1,6 @@
 package debug
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +18,7 @@ import (
 
 	pkg "github.com/flant/shell-operator/pkg"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 

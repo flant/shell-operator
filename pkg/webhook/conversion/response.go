@@ -2,7 +2,6 @@ package conversion
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 /*

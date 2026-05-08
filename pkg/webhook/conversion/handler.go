@@ -2,7 +2,6 @@ package conversion
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	pkg "github.com/flant/shell-operator/pkg"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	structuredLogger "github.com/flant/shell-operator/pkg/utils/structured-logger"
 )
 

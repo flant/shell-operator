@@ -2,7 +2,6 @@ package kubeeventsmanager
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -13,6 +12,7 @@ import (
 	"github.com/flant/shell-operator/pkg/filter"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 // applyFilter filters object json representation with a pre-compiled jq expression,
@@ -42,7 +42,7 @@ func applyFilter(compiledFilter filter.CompiledFilter, jqFilterStr string, filte
 		}
 
 		res.FilterResult = filteredObj
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filteredBytes))
+		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfBytes(filteredBytes)
 
 		return res, nil
 	}
@@ -53,7 +53,7 @@ func applyFilter(compiledFilter filter.CompiledFilter, jqFilterStr string, filte
 		if err != nil {
 			return nil, err
 		}
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(data))
+		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfBytes(data)
 	} else {
 		filtered, err := compiledFilter.Apply(obj.UnstructuredContent())
 		if err != nil {
@@ -61,7 +61,7 @@ func applyFilter(compiledFilter filter.CompiledFilter, jqFilterStr string, filte
 		}
 
 		res.FilterResult = string(filtered)
-		res.Metadata.Checksum = utils_checksum.CalculateChecksum(string(filtered))
+		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfBytes(filtered)
 	}
 
 	return res, nil

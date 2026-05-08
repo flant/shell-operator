@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel"
 
 	pkg "github.com/flant/shell-operator/pkg"
+	json "github.com/flant/shell-operator/pkg/utils/json"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -30,6 +30,16 @@ func Run(cmd *exec.Cmd) error {
 	log.Debug("Executing command", slog.String(pkg.LogKeyCommand, strings.Join(cmd.Args, " ")), slog.String(pkg.LogKeyDir, cmd.Dir))
 
 	return cmd.Run()
+}
+
+// StderrError is returned by RunAndLogLines when a command fails and produces
+// output on stderr. Callers can use errors.As to access the raw stderr content.
+type StderrError struct {
+	Message string
+}
+
+func (e *StderrError) Error() string {
+	return e.Message
 }
 
 type Executor struct {
@@ -147,7 +157,7 @@ func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]stri
 	err := e.cmd.Run()
 	if err != nil {
 		if len(stdErr.Bytes()) > 0 {
-			return nil, fmt.Errorf("stderr: %s", stdErr.String())
+			return nil, &StderrError{Message: stdErr.String()}
 		}
 
 		return nil, fmt.Errorf("cmd run: %w", err)
@@ -205,7 +215,7 @@ func (pl *proxyLogger) Write(p []byte) (int, error) {
 
 	logMap, ok := line.(map[string]interface{})
 	defer func() {
-		pl.buf = []byte{}
+		pl.buf = pl.buf[:0]
 	}()
 
 	if !ok {
