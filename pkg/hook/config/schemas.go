@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-openapi/spec"
-	"github.com/go-openapi/swag"
+	"github.com/go-openapi/swag/yamlutils"
 
 	json "github.com/flant/shell-operator/pkg/utils/json"
 )
@@ -478,11 +478,11 @@ func GetSchema(name string) *spec.Schema {
 
 // LoadSchema returns spec.Schema object loaded from yaml in Schemas map.
 func LoadSchema(name string) (*spec.Schema, error) {
-	yml, err := swag.BytesToYAMLDoc([]byte(Schemas[name]))
+	yml, err := yamlutils.BytesToYAMLDoc([]byte(Schemas[name]))
 	if err != nil {
 		return nil, fmt.Errorf("yaml unmarshal: %v", err)
 	}
-	d, err := swag.YAMLToJSON(yml)
+	d, err := yamlutils.YAMLToJSON(yml)
 	if err != nil {
 		return nil, fmt.Errorf("yaml to json: %v", err)
 	}
