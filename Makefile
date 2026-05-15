@@ -34,7 +34,7 @@ YQ = $(LOCALBIN)/yq
 ## TODO: remap in yaml file (version.yaml or smthng)
 ## Tool Versions
 # GO_BUILDER_VERSION must be without 'v' prefix
-GO_BUILDER_VERSION = 1.26.1
+GO_BUILDER_VERSION = 1.26.3
 GOLANGCI_LINT_VERSION = v2.11.4
 YQ_VERSION ?= v4.50.1
 
