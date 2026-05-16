@@ -80,7 +80,10 @@ func MetricOperationsFromReader(r io.Reader, defaultGroup string) ([]MetricOpera
 			metricOperation.Value = metricOperation.Add
 		}
 
-		if metricOperation.Group == "" {
+		if metricOperation.Group == "" && metricOperation.Action != "add" {
+			// Counter "add" operations without an explicit group must stay ungrouped so
+			// values accumulate across hook runs. Gauges and histograms still get the
+			// hook name as the default group for expire-and-refresh semantics.
 			metricOperation.Group = defaultGroup
 		}
 
