@@ -37,7 +37,7 @@ func defaultMainKubeClient(cfg KubeClientConfig, metricStorage metricsstorage.St
 	client.WithContextName(cfg.Context)
 	client.WithConfigPath(cfg.Config)
 	client.WithRateLimiterSettings(cfg.QPS, cfg.Burst)
-	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")))
+	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, app.PrometheusMetricsPrefix, logger.Named("kube-client-metrics-adapter")))
 	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultMainKubeClientMetricLabels))
 	return client
 }
@@ -50,7 +50,7 @@ func initDefaultMainKubeClient(metricStorage metricsstorage.Storage, logger *log
 		Burst:   app.KubeClientBurst,
 	}
 	//nolint:staticcheck
-	klient.RegisterKubernetesClientMetrics(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")), defaultMainKubeClientMetricLabels)
+	klient.RegisterKubernetesClientMetrics(metric.NewMetricsAdapter(metricStorage, app.PrometheusMetricsPrefix, logger.Named("kube-client-metrics-adapter")), defaultMainKubeClientMetricLabels)
 	kubeClient := defaultMainKubeClient(cfg, metricStorage, defaultMainKubeClientMetricLabels, logger.Named("main-kube-client"))
 	err := kubeClient.Init()
 	if err != nil {
@@ -65,7 +65,7 @@ func defaultObjectPatcherKubeClient(cfg KubeClientConfig, metricStorage metricss
 	client.WithContextName(cfg.Context)
 	client.WithConfigPath(cfg.Config)
 	client.WithRateLimiterSettings(cfg.QPS, cfg.Burst)
-	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")))
+	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, app.PrometheusMetricsPrefix, logger.Named("kube-client-metrics-adapter")))
 	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultObjectPatcherKubeClientMetricLabels))
 	if cfg.Timeout > 0 {
 		client.WithTimeout(cfg.Timeout)
