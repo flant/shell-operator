@@ -15,7 +15,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	pkg "github.com/flant/shell-operator/pkg"
-	"github.com/flant/shell-operator/pkg/app"
 )
 
 type baseHTTPServer struct {
@@ -115,6 +114,7 @@ func newBaseHTTPServer(address, port string) *baseHTTPServer {
 }
 
 func registerRootRoute(op *ShellOperator) {
+	port := op.APIServer.port
 	op.APIServer.RegisterRoute(http.MethodGet, "/", func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintf(writer, `<html>
   <head><title>Shell operator</title></head>
@@ -128,6 +128,6 @@ func registerRootRoute(op *ShellOperator) {
       <dd>- go tool pprof http://SHELL_OPERATOR_IP:%[1]s/debug/pprof/profile</dd>
     </dl>
   </body>
-</html>`, app.ListenPort)
+</html>`, port)
 	})
 }

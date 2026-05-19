@@ -1,7 +1,6 @@
 package conversion
 
 import (
-	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
@@ -11,41 +10,23 @@ type WebhookSettings struct {
 	CABundle []byte
 }
 
-// DefaultSettings returns default settings for conversion webhook
-// This is initialized at startup and can be modified by flag parsing
+// DefaultSettings holds the active conversion-webhook server settings.
+// It is populated by InitFromSettings during operator initialization.
+// Tests may use it directly; in production always call InitFromSettings first.
 var DefaultSettings = &WebhookSettings{
 	Settings: server.Settings{
-		ServerCertPath: app.ConversionServerCertPathDefault,
-		ServerKeyPath:  app.ConversionServerKeyPathDefault,
-		ClientCAPaths:  nil,
-		ServiceName:    app.ConversionServiceNameDefault,
-		ListenAddr:     app.ConversionListenAddrDefault,
-		ListenPort:     app.ConversionListenPortDefault,
+		ServerCertPath: "/conversion-certs/tls.crt",
+		ServerKeyPath:  "/conversion-certs/tls.key",
+		ServiceName:    "shell-operator-conversion-svc",
+		ListenAddr:     "0.0.0.0",
+		ListenPort:     "9681",
 	},
-	CAPath: app.ConversionCAPathDefault,
+	CAPath: "/conversion-certs/ca.crt",
 }
 
-// InitFromFlags updates DefaultSettings with values from parsed flags
-func InitFromFlags(serviceName, certPath, keyPath, caPath string, clientCAs []string, port, addr string) {
-	if serviceName != "" {
-		DefaultSettings.ServiceName = serviceName
-	}
-	if certPath != "" {
-		DefaultSettings.ServerCertPath = certPath
-	}
-	if keyPath != "" {
-		DefaultSettings.ServerKeyPath = keyPath
-	}
-	if caPath != "" {
-		DefaultSettings.CAPath = caPath
-	}
-	if len(clientCAs) > 0 {
-		DefaultSettings.ClientCAPaths = clientCAs
-	}
-	if port != "" {
-		DefaultSettings.ListenPort = port
-	}
-	if addr != "" {
-		DefaultSettings.ListenAddr = addr
-	}
+// InitFromSettings replaces DefaultSettings with values derived from cfg.
+// Call this once during operator initialization, after all configuration
+// sources (env vars and CLI flags) have been merged into cfg.
+func InitFromSettings(s WebhookSettings) {
+	DefaultSettings = &s
 }

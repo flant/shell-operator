@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/flant/shell-operator/pkg/app"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -39,7 +40,7 @@ func Test_Operator_startup_tasks(t *testing.T) {
 	op.MetricStorage = metricStorage
 
 	op.SetupEventManagers()
-	op.setupHookManagers(hooksDir, "")
+	op.setupHookManagers(app.NewConfig(), hooksDir, "")
 
 	err = op.initHookManager()
 	g.Expect(err).ShouldNot(HaveOccurred())

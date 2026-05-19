@@ -9,7 +9,6 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
-	"github.com/flant/shell-operator/pkg/app"
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	"github.com/flant/shell-operator/pkg/metric"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
@@ -44,15 +43,9 @@ func defaultMainKubeClient(cfg KubeClientConfig, metricStorage metricsstorage.St
 	return client
 }
 
-func initDefaultMainKubeClient(metricStorage metricsstorage.Storage, logger *log.Logger) (*klient.Client, error) {
-	cfg := KubeClientConfig{
-		Context:      app.KubeContext,
-		Config:       app.KubeConfig,
-		QPS:          app.KubeClientQps,
-		Burst:        app.KubeClientBurst,
-		MetricPrefix: app.PrometheusMetricsPrefix,
-	}
-	kubeClient := defaultMainKubeClient(cfg, metricStorage, defaultMainKubeClientMetricLabels, logger.Named("main-kube-client"))
+func initDefaultMainKubeClient(kubeCfg KubeClientConfig, metricStorage metricsstorage.Storage, logger *log.Logger) (*klient.Client, error) {
+	//nolint:staticcheck
+	kubeClient := defaultMainKubeClient(kubeCfg, metricStorage, defaultMainKubeClientMetricLabels, logger.Named("main-kube-client"))
 	err := kubeClient.Init()
 	if err != nil {
 		return nil, fmt.Errorf("initialize 'main' Kubernetes client: %s\n", err)
@@ -75,16 +68,8 @@ func defaultObjectPatcherKubeClient(cfg KubeClientConfig, metricStorage metricss
 	return client
 }
 
-func initDefaultObjectPatcher(metricStorage metricsstorage.Storage, logger *log.Logger) (*objectpatch.ObjectPatcher, error) {
-	cfg := KubeClientConfig{
-		Context:      app.KubeContext,
-		Config:       app.KubeConfig,
-		QPS:          app.ObjectPatcherKubeClientQps,
-		Burst:        app.ObjectPatcherKubeClientBurst,
-		Timeout:      app.ObjectPatcherKubeClientTimeout,
-		MetricPrefix: app.PrometheusMetricsPrefix,
-	}
-	patcherKubeClient := defaultObjectPatcherKubeClient(cfg, metricStorage, defaultObjectPatcherKubeClientMetricLabels, logger.Named("object-patcher-kube-client"))
+func initDefaultObjectPatcher(kubeCfg KubeClientConfig, metricStorage metricsstorage.Storage, logger *log.Logger) (*objectpatch.ObjectPatcher, error) {
+	patcherKubeClient := defaultObjectPatcherKubeClient(kubeCfg, metricStorage, defaultObjectPatcherKubeClientMetricLabels, logger.Named("object-patcher-kube-client"))
 	err := patcherKubeClient.Init()
 	if err != nil {
 		return nil, fmt.Errorf("initialize Kubernetes client for Object patcher: %s\n", err)

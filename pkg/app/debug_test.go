@@ -1,24 +1,23 @@
 package app
 
 import (
-	"testing"
+"testing"
 
-	"github.com/stretchr/testify/assert"
+"github.com/stretchr/testify/assert"
 )
 
-func TestDebugKeepTmpFiles_DefaultIsFalse(t *testing.T) {
-	assert.False(t, DebugKeepTmpFiles, "DebugKeepTmpFiles should default to false")
+func TestDebugKeepTempFiles_DefaultIsFalse(t *testing.T) {
+	cfg := NewConfig()
+	assert.False(t, cfg.Debug.KeepTempFiles, "KeepTempFiles should default to false")
 }
 
-// TestDebugKeepTmpFilesIsBool verifies the variable is the bool type
-// and that simple assignment behaves correctly (no string comparison needed).
-func TestDebugKeepTmpFilesIsBool(t *testing.T) {
-	saved := DebugKeepTmpFiles
-	defer func() { DebugKeepTmpFiles = saved }()
+// TestDebugKeepTempFilesIsBool verifies the field is of type bool.
+func TestDebugKeepTempFilesIsBool(t *testing.T) {
+	cfg := NewConfig()
 
-	DebugKeepTmpFiles = true
-	assert.True(t, DebugKeepTmpFiles)
+	cfg.Debug.KeepTempFiles = true
+	assert.True(t, cfg.Debug.KeepTempFiles)
 
-	DebugKeepTmpFiles = false
-	assert.False(t, DebugKeepTmpFiles)
+	cfg.Debug.KeepTempFiles = false
+	assert.False(t, cfg.Debug.KeepTempFiles)
 }
