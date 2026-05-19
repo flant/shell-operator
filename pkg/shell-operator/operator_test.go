@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/flant/shell-operator/pkg/app"
+	"github.com/flant/shell-operator/pkg/hook/controller"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/metric"
@@ -136,6 +137,12 @@ func Test_Reinit_softReinit_doesNotRequeueOnStartup(t *testing.T) {
 func Test_Reinit_fullReset_requeuesOnStartup(t *testing.T) {
 	op := newTestOperator(t)
 
+	// Capture old controller pointers before reinit to verify they are replaced.
+	oldControllers := map[string]*controller.HookController{}
+	for _, name := range op.HookManager.GetHookNames() {
+		oldControllers[name] = op.HookManager.GetHook(name).HookController
+	}
+
 	initialCount := len(collectTasks(op))
 
 	op.Reinit(context.Background(), true)
@@ -156,4 +163,10 @@ func Test_Reinit_fullReset_requeuesOnStartup(t *testing.T) {
 	assert.True(t, hasOnStartup, "full reset must re-enqueue onStartup tasks")
 	assert.True(t, taskTypes[EnableKubernetesBindings], "EnableKubernetesBindings tasks must be enqueued")
 	assert.True(t, taskTypes[EnableScheduleBindings], "EnableScheduleBindings tasks must be enqueued")
+
+	// Verify that old hook controllers were replaced, proving the disable+rebuild cycle ran.
+	for _, name := range op.HookManager.GetHookNames() {
+		newCtrl := op.HookManager.GetHook(name).HookController
+		assert.NotSame(t, oldControllers[name], newCtrl, "hook %s: controller must be a new instance after full reset", name)
+	}
 }
