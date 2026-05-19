@@ -40,6 +40,7 @@ func defaultMainKubeClient(cfg KubeClientConfig, metricStorage metricsstorage.St
 	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")))
 	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultMainKubeClientMetricLabels))
 	client.WithMetricPrefix(cfg.MetricPrefix)
+
 	return client
 }
 
