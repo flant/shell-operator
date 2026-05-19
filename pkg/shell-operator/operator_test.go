@@ -7,6 +7,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/flant/shell-operator/pkg/app"
 	. "github.com/flant/shell-operator/pkg/hook/task_metadata"
@@ -81,4 +82,78 @@ func Test_Operator_startup_tasks(t *testing.T) {
 		g.Expect(hm.HookName).To(HavePrefix(expect.hookPrefix), "hook name should match for task %d, got %+v %+v", i, tsk, hm)
 		i++
 	})
+}
+
+// newTestOperator builds a minimal ShellOperator from the startup_tasks testdata hooks,
+// ready for Reinit testing. The main queue is bootstrapped but not started.
+func newTestOperator(t *testing.T) *ShellOperator {
+	t.Helper()
+	hooksDir, err := utils.RequireExistingDirectory("testdata/startup_tasks/hooks")
+	require.NoError(t, err)
+
+	op := NewShellOperator(context.Background(), nil, nil, WithLogger(log.NewNop()))
+	op.SetupEventManagers()
+	op.setupHookManagers(app.NewConfig(), hooksDir, t.TempDir())
+	require.NoError(t, op.initHookManager())
+	op.bootstrapMainQueue(op.TaskQueues)
+	return op
+}
+
+// collectTasks returns all tasks currently in the main queue as a slice.
+func collectTasks(op *ShellOperator) []task.Task {
+	var tasks []task.Task
+	op.TaskQueues.GetMain().IterateSnapshot(func(tsk task.Task) {
+		tasks = append(tasks, tsk)
+	})
+	return tasks
+}
+
+func Test_Reinit_softReinit_doesNotRequeueOnStartup(t *testing.T) {
+	op := newTestOperator(t)
+
+	initialCount := len(collectTasks(op))
+
+	op.Reinit(context.Background(), false)
+
+	all := collectTasks(op)
+	reinitTasks := all[initialCount:]
+
+	for _, tsk := range reinitTasks {
+		hm, ok := HookMetadataAccessor(tsk)
+		require.True(t, ok)
+		assert.NotEqual(t, htypes.OnStartup, hm.BindingType, "soft reinit must not enqueue onStartup tasks")
+	}
+
+	// Binding-enable tasks must be present for hooks that have those bindings.
+	types := make(map[task.TaskType]bool)
+	for _, tsk := range reinitTasks {
+		types[tsk.GetType()] = true
+	}
+	assert.True(t, types[EnableKubernetesBindings], "EnableKubernetesBindings tasks must be enqueued")
+	assert.True(t, types[EnableScheduleBindings], "EnableScheduleBindings tasks must be enqueued")
+}
+
+func Test_Reinit_fullReset_requeuesOnStartup(t *testing.T) {
+	op := newTestOperator(t)
+
+	initialCount := len(collectTasks(op))
+
+	op.Reinit(context.Background(), true)
+
+	all := collectTasks(op)
+	reinitTasks := all[initialCount:]
+
+	taskTypes := make(map[task.TaskType]bool)
+	hasOnStartup := false
+	for _, tsk := range reinitTasks {
+		taskTypes[tsk.GetType()] = true
+		hm, ok := HookMetadataAccessor(tsk)
+		require.True(t, ok)
+		if hm.BindingType == htypes.OnStartup {
+			hasOnStartup = true
+		}
+	}
+	assert.True(t, hasOnStartup, "full reset must re-enqueue onStartup tasks")
+	assert.True(t, taskTypes[EnableKubernetesBindings], "EnableKubernetesBindings tasks must be enqueued")
+	assert.True(t, taskTypes[EnableScheduleBindings], "EnableScheduleBindings tasks must be enqueued")
 }
