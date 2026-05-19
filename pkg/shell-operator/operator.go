@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -823,6 +824,92 @@ func (op *ShellOperator) initAndStartHookQueues() {
 			}
 		}
 	}
+}
+
+// Reinit reloads all hooks without stopping the operator.
+//
+// It disables existing kubernetes and schedule bindings, re-runs hook discovery
+// and --config, then re-queues binding-enable tasks into the already-running main
+// queue. In-flight hook executions are not interrupted — they finish naturally.
+//
+// If fullReset is true, onStartup hooks are also re-queued (SIGUSR2 behaviour).
+// If fullReset is false, only bindings are re-enabled (SIGUSR1 behaviour).
+//
+// On any error the process exits with code 1, matching startup failure behaviour.
+func (op *ShellOperator) Reinit(ctx context.Context, fullReset bool) {
+	op.logger.Info("reinit begin", slog.Bool("fullReset", fullReset))
+
+	// Disable all existing bindings before rebuilding the hook index.
+	for _, hookName := range op.HookManager.GetHookNames() {
+		h := op.HookManager.GetHook(hookName)
+		if h.HookController != nil {
+			h.HookController.DisableKubernetesBindings()
+			h.HookController.DisableScheduleBindings()
+		}
+	}
+
+	if err := op.initHookManager(); err != nil {
+		op.logger.Error("reinit: hook manager init failed, exiting", log.Err(err))
+		os.Exit(1)
+	}
+
+	// Ensure queues exist for any new hooks introduced by the reload.
+	op.initAndStartHookQueues()
+
+	mainQueue := op.TaskQueues.GetMain()
+	logEntry := op.logger.With(pkg.LogKeyOperatorComponent, "reinit")
+
+	if fullReset {
+		onStartupHooks, err := op.HookManager.GetHooksInOrder(types.OnStartup)
+		if err != nil {
+			op.logger.Error("reinit: get onStartup hooks failed, exiting", log.Err(err))
+			os.Exit(1)
+		}
+		for _, hookName := range onStartupHooks {
+			bc := bindingcontext.BindingContext{Binding: string(types.OnStartup)}
+			bc.Metadata.BindingType = types.OnStartup
+			newTask := task.NewTask(task_metadata.HookRun).
+				WithMetadata(task_metadata.HookMetadata{
+					HookName:       hookName,
+					BindingType:    types.OnStartup,
+					BindingContext: []bindingcontext.BindingContext{bc},
+				}).
+				WithCompactionID(hookName).
+				WithQueuedAt(time.Now())
+			mainQueue.AddLast(newTask)
+			logEntry.Info("queue onStartup task", slog.String(pkg.LogKeyHook, hookName))
+		}
+	}
+
+	for _, hookName := range op.HookManager.GetHookNames() {
+		h := op.HookManager.GetHook(hookName)
+
+		if h.GetConfig().HasBinding(types.OnKubernetesEvent) {
+			newTask := task.NewTask(task_metadata.EnableKubernetesBindings).
+				WithMetadata(task_metadata.HookMetadata{
+					HookName: hookName,
+					Binding:  string(task_metadata.EnableKubernetesBindings),
+				}).
+				WithCompactionID(hookName).
+				WithQueuedAt(time.Now())
+			mainQueue.AddLast(newTask)
+			logEntry.Info("queue EnableKubernetesBindings task", slog.String(pkg.LogKeyHook, hookName))
+		}
+
+		if h.GetConfig().HasBinding(types.Schedule) {
+			newTask := task.NewTask(task_metadata.EnableScheduleBindings).
+				WithMetadata(task_metadata.HookMetadata{
+					HookName: hookName,
+					Binding:  string(task_metadata.EnableScheduleBindings),
+				}).
+				WithCompactionID(hookName).
+				WithQueuedAt(time.Now())
+			mainQueue.AddLast(newTask)
+			logEntry.Info("queue EnableScheduleBindings task", slog.String(pkg.LogKeyHook, hookName))
+		}
+	}
+
+	op.logger.Info("reinit complete", slog.Bool("fullReset", fullReset))
 }
 
 // Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
