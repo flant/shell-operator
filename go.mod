@@ -5,7 +5,7 @@ go 1.25.8
 require (
 	github.com/deckhouse/deckhouse/pkg/log v0.2.0
 	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0
-	github.com/flant/kube-client v1.6.0
+	github.com/flant/kube-client v1.7.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-openapi/spec v0.19.8
 	github.com/go-openapi/strfmt v0.19.5
@@ -14,9 +14,9 @@ require (
 	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kennygrant/sanitize v1.2.4
-	github.com/onsi/gomega v1.38.2
+	github.com/onsi/gomega v1.41.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.22.0
+	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
@@ -25,11 +25,11 @@ require (
 	golang.org/x/time v0.11.0
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.33.8
-	k8s.io/apiextensions-apiserver v0.33.8
-	k8s.io/apimachinery v0.33.8
-	k8s.io/client-go v0.33.8
-	sigs.k8s.io/yaml v1.4.0
+	k8s.io/api v0.33.12
+	k8s.io/apiextensions-apiserver v0.33.12
+	k8s.io/apimachinery v0.33.12
+	k8s.io/client-go v0.33.12
+	sigs.k8s.io/yaml v1.6.0
 )
 
 // Remove 'in body' from errors, fix for Go 1.16 (https://github.com/go-openapi/validate/pull/138).
@@ -38,6 +38,7 @@ replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v
 require (
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/deckhouse/module-sdk v0.10.4
+	github.com/goccy/go-json v0.10.6
 	github.com/gojuno/minimock/v3 v3.4.7
 	github.com/itchyny/gojq v0.12.17
 	github.com/muesli/termenv v0.16.0
@@ -71,7 +72,6 @@ require (
 	github.com/go-openapi/runtime v0.19.16 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
@@ -98,9 +98,9 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.62.0 // indirect
-	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -112,6 +112,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
 	golang.org/x/mod v0.33.0 // indirect
@@ -128,7 +129,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/cli-runtime v0.33.8 // indirect
+	k8s.io/cli-runtime v0.33.12 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect

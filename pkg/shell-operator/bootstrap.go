@@ -96,16 +96,18 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 		"binding",
 		"queue",
 	}, KubeClientConfig{
-		Context: cfg.Kube.Context,
-		Config:  cfg.Kube.Config,
-		QPS:     cfg.Kube.ClientQPS,
-		Burst:   cfg.Kube.ClientBurst,
+		Context:      cfg.Kube.Context,
+		Config:       cfg.Kube.Config,
+		QPS:          cfg.Kube.ClientQPS,
+		Burst:        cfg.Kube.ClientBurst,
+		MetricPrefix: cfg.App.PrometheusMetricsPrefix,
 	}, KubeClientConfig{
-		Context: cfg.Kube.Context,
-		Config:  cfg.Kube.Config,
-		QPS:     cfg.ObjectPatcher.KubeClientQPS,
-		Burst:   cfg.ObjectPatcher.KubeClientBurst,
-		Timeout: cfg.ObjectPatcher.KubeClientTimeout,
+		Context:      cfg.Kube.Context,
+		Config:       cfg.Kube.Config,
+		QPS:          cfg.ObjectPatcher.KubeClientQPS,
+		Burst:        cfg.ObjectPatcher.KubeClientBurst,
+		Timeout:      cfg.ObjectPatcher.KubeClientTimeout,
+		MetricPrefix: cfg.App.PrometheusMetricsPrefix,
 	})
 	if err != nil {
 		logger.Log(ctx, log.LevelFatal.Level(), "essemble common operator", log.Err(err))
