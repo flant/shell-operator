@@ -109,7 +109,7 @@ func collectTasks(op *ShellOperator) []task.Task {
 	return tasks
 }
 
-func Test_Reinit_softReinit_doesNotRequeueOnStartup(t *testing.T) {
+func Test_Reinit_softReinit(t *testing.T) {
 	op := newTestOperator(t)
 
 	initialCount := len(collectTasks(op))
@@ -134,7 +134,7 @@ func Test_Reinit_softReinit_doesNotRequeueOnStartup(t *testing.T) {
 	assert.True(t, types[EnableScheduleBindings], "EnableScheduleBindings tasks must be enqueued")
 }
 
-func Test_Reinit_fullReset_requeuesOnStartup(t *testing.T) {
+func Test_Reinit_fullReset(t *testing.T) {
 	op := newTestOperator(t)
 
 	// Capture old controller pointers before reinit to verify they are replaced.
