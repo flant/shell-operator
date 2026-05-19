@@ -23,11 +23,12 @@ var (
 // KubeClientConfig holds explicit connection settings for a Kubernetes client,
 // decoupling business logic from the global app.* configuration variables.
 type KubeClientConfig struct {
-	Context string
-	Config  string
-	QPS     float32
-	Burst   int
-	Timeout time.Duration // zero means no timeout
+	Context      string
+	Config       string
+	QPS          float32
+	Burst        int
+	Timeout      time.Duration // zero means no timeout
+	MetricPrefix string
 }
 
 // defaultMainKubeClient creates a Kubernetes client for hooks. No timeout specified, because
@@ -39,18 +40,18 @@ func defaultMainKubeClient(cfg KubeClientConfig, metricStorage metricsstorage.St
 	client.WithRateLimiterSettings(cfg.QPS, cfg.Burst)
 	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")))
 	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultMainKubeClientMetricLabels))
+	client.WithMetricPrefix(cfg.MetricPrefix)
 	return client
 }
 
 func initDefaultMainKubeClient(metricStorage metricsstorage.Storage, logger *log.Logger) (*klient.Client, error) {
 	cfg := KubeClientConfig{
-		Context: app.KubeContext,
-		Config:  app.KubeConfig,
-		QPS:     app.KubeClientQps,
-		Burst:   app.KubeClientBurst,
+		Context:      app.KubeContext,
+		Config:       app.KubeConfig,
+		QPS:          app.KubeClientQps,
+		Burst:        app.KubeClientBurst,
+		MetricPrefix: app.PrometheusMetricsPrefix,
 	}
-	//nolint:staticcheck
-	klient.RegisterKubernetesClientMetrics(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")), defaultMainKubeClientMetricLabels)
 	kubeClient := defaultMainKubeClient(cfg, metricStorage, defaultMainKubeClientMetricLabels, logger.Named("main-kube-client"))
 	err := kubeClient.Init()
 	if err != nil {
@@ -67,6 +68,7 @@ func defaultObjectPatcherKubeClient(cfg KubeClientConfig, metricStorage metricss
 	client.WithRateLimiterSettings(cfg.QPS, cfg.Burst)
 	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")))
 	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultObjectPatcherKubeClientMetricLabels))
+	client.WithMetricPrefix(cfg.MetricPrefix)
 	if cfg.Timeout > 0 {
 		client.WithTimeout(cfg.Timeout)
 	}
@@ -75,11 +77,12 @@ func defaultObjectPatcherKubeClient(cfg KubeClientConfig, metricStorage metricss
 
 func initDefaultObjectPatcher(metricStorage metricsstorage.Storage, logger *log.Logger) (*objectpatch.ObjectPatcher, error) {
 	cfg := KubeClientConfig{
-		Context: app.KubeContext,
-		Config:  app.KubeConfig,
-		QPS:     app.ObjectPatcherKubeClientQps,
-		Burst:   app.ObjectPatcherKubeClientBurst,
-		Timeout: app.ObjectPatcherKubeClientTimeout,
+		Context:      app.KubeContext,
+		Config:       app.KubeConfig,
+		QPS:          app.ObjectPatcherKubeClientQps,
+		Burst:        app.ObjectPatcherKubeClientBurst,
+		Timeout:      app.ObjectPatcherKubeClientTimeout,
+		MetricPrefix: app.PrometheusMetricsPrefix,
 	}
 	patcherKubeClient := defaultObjectPatcherKubeClient(cfg, metricStorage, defaultObjectPatcherKubeClientMetricLabels, logger.Named("object-patcher-kube-client"))
 	err := patcherKubeClient.Init()
