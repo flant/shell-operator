@@ -107,7 +107,7 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 		QPS:          cfg.ObjectPatcher.KubeClientQPS,
 		Burst:        cfg.ObjectPatcher.KubeClientBurst,
 		Timeout:      cfg.ObjectPatcher.KubeClientTimeout,
-		MetricPrefix: cfg.App.PrometheusMetricsPrefix,
+		MetricPrefix: "object_patcher_",
 	})
 	if err != nil {
 		logger.Log(ctx, log.LevelFatal.Level(), "essemble common operator", log.Err(err))
