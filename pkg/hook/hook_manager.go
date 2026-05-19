@@ -44,6 +44,7 @@ type Manager struct {
 	keepTemporaryHookFiles bool
 	logProxyHookJSON       bool
 	logProxyHookJSONKey    string
+	skipInvalidHooks       bool
 
 	// sorted hook names
 	hookNamesInOrder []string
@@ -75,6 +76,7 @@ type ManagerConfig struct {
 	KeepTemporaryHookFiles bool
 	LogProxyHookJSON       bool
 	LogProxyHookJSONKey    string
+	SkipInvalidHooks       bool
 
 	Logger *log.Logger
 }
@@ -101,6 +103,7 @@ func NewHookManager(config *ManagerConfig) *Manager {
 		keepTemporaryHookFiles: config.KeepTemporaryHookFiles,
 		logProxyHookJSON:       config.LogProxyHookJSON,
 		logProxyHookJSONKey:    config.LogProxyHookJSONKey,
+		skipInvalidHooks:       config.SkipInvalidHooks,
 
 		logger: config.Logger,
 	}
@@ -139,6 +142,10 @@ func (hm *Manager) Init() error {
 	for _, hookPath := range hookPaths {
 		hook, err := hm.loadHook(hookPath)
 		if err != nil {
+			if hm.skipInvalidHooks {
+				hm.logger.Warn("Skipping hook with invalid config", slog.String("hook", hookPath), log.Err(err))
+				continue
+			}
 			return err
 		}
 

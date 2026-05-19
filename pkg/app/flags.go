@@ -38,6 +38,7 @@ func bindAppFlags(cfg *Config, cmd *cobra.Command) {
 	f.StringVar(&cfg.App.ListenPort, "listen-port", cfg.App.ListenPort, "Port to use to serve metrics to Prometheus. Can be set with $SHELL_OPERATOR_LISTEN_PORT.")
 	f.StringVar(&cfg.App.PrometheusMetricsPrefix, "prometheus-metrics-prefix", cfg.App.PrometheusMetricsPrefix, "Prefix for Prometheus metrics. Can be set with $SHELL_OPERATOR_PROMETHEUS_METRICS_PREFIX.")
 	f.StringVar(&cfg.App.Namespace, "namespace", cfg.App.Namespace, "A namespace of a shell-operator. Used to set up validating webhooks. Can be set with $SHELL_OPERATOR_NAMESPACE.")
+	f.BoolVar(&cfg.App.SkipInvalidHooks, "skip-invalid-hooks", cfg.App.SkipInvalidHooks, "If true, log a warning and skip hooks that fail --config instead of aborting startup. Can be set with $SHELL_OPERATOR_SKIP_INVALID_HOOKS.")
 }
 
 func bindKubeFlags(cfg *Config, cmd *cobra.Command) {
