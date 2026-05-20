@@ -115,7 +115,12 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 // example, addon-operator builds its own and embeds shell-operator).
 //
 // It derives the HTTP server address, the main and object-patcher
-// KubeClientConfigs from cfg and delegates to AssembleCommonOperator.
+// KubeClientConfigs from cfg and delegates to AssembleCommonOperator. The
+// derivation reads only the supplied *app.Config — no environment variables
+// are consulted on this path, so the values you put into cfg are the values
+// shell-operator uses. See kubeClientConfigsFromAppConfig for the exact
+// field mapping.
+//
 // kubeEventsManagerLabels are the metric labels for the kube-events manager;
 // each embedder typically passes its own (e.g. addon-operator adds "module"
 // and "kind", shell-operator passes "hook"/"binding"/"queue").
@@ -123,8 +128,29 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 // Pass a nil cfg to fall back to zero-valued KubeClientConfig (in-cluster
 // defaults) — useful for tests.
 func (op *ShellOperator) AssembleCommonOperatorFromConfig(cfg *app.Config, kubeEventsManagerLabels []string) error {
+	listenAddress, listenPort := listenAddrFromAppConfig(cfg)
+	mainKubeCfg, patcherKubeCfg := kubeClientConfigsFromAppConfig(cfg)
+	return op.AssembleCommonOperator(listenAddress, listenPort, kubeEventsManagerLabels, mainKubeCfg, patcherKubeCfg)
+}
+
+// listenAddrFromAppConfig returns the HTTP server listen address/port from cfg
+// or empty strings when cfg is nil. Extracted as a helper so unit tests can
+// assert that no environment variable is consulted during derivation.
+func listenAddrFromAppConfig(cfg *app.Config) (string, string) {
 	if cfg == nil {
-		return op.AssembleCommonOperator("", "", kubeEventsManagerLabels, KubeClientConfig{}, KubeClientConfig{})
+		return "", ""
+	}
+	return cfg.App.ListenAddress, cfg.App.ListenPort
+}
+
+// kubeClientConfigsFromAppConfig derives the main and object-patcher
+// KubeClientConfigs from an *app.Config. The function is pure: it does not
+// touch the process environment, so any value present in cfg is used as-is
+// and library consumers can rely on env vars never overriding their config.
+// A nil cfg yields two zero KubeClientConfig values (in-cluster defaults).
+func kubeClientConfigsFromAppConfig(cfg *app.Config) (KubeClientConfig, KubeClientConfig) {
+	if cfg == nil {
+		return KubeClientConfig{}, KubeClientConfig{}
 	}
 	mainKubeCfg := KubeClientConfig{
 		Context:      cfg.Kube.Context,
@@ -141,7 +167,7 @@ func (op *ShellOperator) AssembleCommonOperatorFromConfig(cfg *app.Config, kubeE
 		Timeout:      cfg.ObjectPatcher.KubeClientTimeout,
 		MetricPrefix: "object_patcher_",
 	}
-	return op.AssembleCommonOperator(cfg.App.ListenAddress, cfg.App.ListenPort, kubeEventsManagerLabels, mainKubeCfg, patcherKubeCfg)
+	return mainKubeCfg, patcherKubeCfg
 }
 
 // AssembleCommonOperator instantiates common dependencies used by both
