@@ -16,7 +16,7 @@ The implementation lives in three files:
 |---|---|
 | `app_config.go` | `Config` struct, `NewConfig()` (hardcoded defaults), `ParseEnv()` (env layer), `Validate()` |
 | `flags.go` | `BindFlags()` — registers cobra/pflag CLI flags whose defaults are the *already-merged* `cfg` values |
-| `debug.go` | Package-level `DebugUnixSocket` global used by debug sub-commands |
+| `debug.go` | Package-level `DebugUnixSocket` global used by debug sub-commands, plus `ApplyConfig(cfg)` to copy cfg into it |
 
 ## How it works
 
@@ -330,6 +330,26 @@ For the full CLI-style bootstrap (logging, debug server, hooks discovery,
 admission/conversion webhooks), use `shell_operator.Init(ctx, cfg, logger)`;
 it now internally delegates to `AssembleCommonOperatorFromConfig` so the
 behaviour stays identical.
+
+### Forcing `cfg` into legacy globals
+
+Some debug sub-commands (`queue`, `hook`, `config`) bind their
+`--debug-unix-socket` flag to the package-level `app.DebugUnixSocket` global
+instead of `cfg`, because they don't go through the `start` command path. To
+guarantee that an outer-program-supplied `cfg` overrides this global, call
+`app.ApplyConfig(cfg)` once after you've built `cfg`:
+
+```go
+cfg := shapp.NewConfig()
+cfg.Debug.UnixSocket = "/run/myapp/debug.socket"
+shapp.ApplyConfig(cfg) // DebugUnixSocket now equals cfg.Debug.UnixSocket
+```
+
+`shell_operator.Init` and `BindFlags` already call `ApplyConfig` internally,
+so most callers don't need this. Call it explicitly only when you bypass
+both — e.g. you build `cfg` yourself and invoke debug sub-commands directly
+without `Init`/`BindFlags`. The function is idempotent and a `nil` cfg is a
+no-op.
 
 ## Adding a new parameter
 

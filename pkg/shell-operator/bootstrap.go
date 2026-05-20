@@ -26,6 +26,10 @@ import (
 // a ShellOperator instance with all dependencies.
 // cfg must already have all configuration sources merged (NewConfig → ParseEnv → BindFlags → flags parsed).
 func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOperator, error) {
+	// Propagate cfg into package-level globals (e.g. DebugUnixSocket) so
+	// library consumers that skip BindFlags still get them overridden from cfg.
+	app.ApplyConfig(cfg)
+
 	// Initialize webhook settings from merged configuration.
 	admission.InitFromSettings(admission.WebhookSettings{
 		Settings: webhookserver.Settings{
