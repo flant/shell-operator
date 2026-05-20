@@ -271,6 +271,66 @@ if len(cliClientCA) > 0 {
 }
 ```
 
+## Using shell-operator as a Go library
+
+When you embed shell-operator inside another binary (addon-operator,
+deckhouse, your own controller…), you typically have your own configuration
+plumbing and don't want shell-operator's env-var parsing or cobra flags to
+get in the way. The library-facing contract is just two things:
+
+1. Build a `*app.Config` yourself, however you like — from `NewConfig()`
+   defaults, `ParseEnv()`, your own globals, or any combination.
+2. Hand that `*app.Config` to the assembly methods on `*ShellOperator`.
+
+There are **no** wrapper constructors like `LoadConfig` — `Config` is a plain
+exported struct, so the consumer is in control. Typical flow:
+
+```go
+import (
+    shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
+    shapp "github.com/flant/shell-operator/pkg/app"
+)
+
+// 1. Build the config from whatever sources you have.
+cfg := shapp.NewConfig() // start from hardcoded defaults
+cfg.App.ListenAddress = myapp.ListenAddress
+cfg.App.ListenPort    = myapp.ListenPort
+cfg.Kube.Context      = myapp.KubeContext
+cfg.Kube.Config       = myapp.KubeConfig
+cfg.Kube.ClientQPS    = myapp.KubeClientQPS
+cfg.Kube.ClientBurst  = myapp.KubeClientBurst
+cfg.ObjectPatcher.KubeClientQPS     = myapp.ObjectPatcherKubeClientQPS
+cfg.ObjectPatcher.KubeClientBurst   = myapp.ObjectPatcherKubeClientBurst
+cfg.ObjectPatcher.KubeClientTimeout = myapp.ObjectPatcherKubeClientTimeout
+cfg.Log.Level = myapp.LogLevel
+
+// 2. Construct the engine and assemble its common parts from the config.
+so := shell_operator.NewShellOperator(ctx, ms, hms,
+    shell_operator.WithLogger(logger.Named("shell-operator")),
+)
+err := so.AssembleCommonOperatorFromConfig(cfg, []string{
+    "module", "hook", "binding", "queue", "kind",
+})
+```
+
+The new `AssembleCommonOperatorFromConfig(cfg, labels)` method on
+`*ShellOperator` is what makes this clean — it derives both
+`KubeClientConfig`s (main + object-patcher), the HTTP listen address/port,
+and the metric prefix from `cfg`, so the consumer does not have to unpack
+fields by hand. The older primitive-taking
+`AssembleCommonOperator(listenAddress, listenPort, labels, mainKubeCfg, patcherKubeCfg)`
+is still available for callers that need finer control.
+
+If you also want env-var parsing on top of your own values, call
+`ParseEnv(cfg)` between steps 1 and 2 — env values will overlay the fields you
+already set, mirroring the CLI's `defaults → env` order. If you want the
+opposite (your code wins over env), set those fields *after* `ParseEnv`.
+
+For the full CLI-style bootstrap (logging, debug server, hooks discovery,
+admission/conversion webhooks), use `shell_operator.Init(ctx, cfg, logger)`;
+it now internally delegates to `AssembleCommonOperatorFromConfig` so the
+behaviour stays identical.
+
 ## Adding a new parameter
 
 1. **Add a field** to the appropriate settings struct in `app_config.go`

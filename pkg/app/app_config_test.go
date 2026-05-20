@@ -300,3 +300,4 @@ func TestCLIFlagOverridesEnv(t *testing.T) {
 	assert.Equal(t, "1234", cfg.App.ListenPort)
 	assert.Equal(t, "debug", cfg.Log.Level)
 }
+
