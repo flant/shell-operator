@@ -91,23 +91,10 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 		return nil, err
 	}
 
-	err = op.AssembleCommonOperator(cfg.App.ListenAddress, cfg.App.ListenPort, []string{
+	err = op.AssembleCommonOperatorFromConfig(cfg, []string{
 		"hook",
 		"binding",
 		"queue",
-	}, KubeClientConfig{
-		Context:      cfg.Kube.Context,
-		Config:       cfg.Kube.Config,
-		QPS:          cfg.Kube.ClientQPS,
-		Burst:        cfg.Kube.ClientBurst,
-		MetricPrefix: cfg.App.PrometheusMetricsPrefix,
-	}, KubeClientConfig{
-		Context:      cfg.Kube.Context,
-		Config:       cfg.Kube.Config,
-		QPS:          cfg.ObjectPatcher.KubeClientQPS,
-		Burst:        cfg.ObjectPatcher.KubeClientBurst,
-		Timeout:      cfg.ObjectPatcher.KubeClientTimeout,
-		MetricPrefix: "object_patcher_",
 	})
 	if err != nil {
 		logger.Log(ctx, log.LevelFatal.Level(), "essemble common operator", log.Err(err))
@@ -123,11 +110,48 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 	return op, nil
 }
 
+// AssembleCommonOperatorFromConfig is the recommended assembly entry point for
+// library consumers that already hold a fully populated *app.Config (for
+// example, addon-operator builds its own and embeds shell-operator).
+//
+// It derives the HTTP server address, the main and object-patcher
+// KubeClientConfigs from cfg and delegates to AssembleCommonOperator.
+// kubeEventsManagerLabels are the metric labels for the kube-events manager;
+// each embedder typically passes its own (e.g. addon-operator adds "module"
+// and "kind", shell-operator passes "hook"/"binding"/"queue").
+//
+// Pass a nil cfg to fall back to zero-valued KubeClientConfig (in-cluster
+// defaults) — useful for tests.
+func (op *ShellOperator) AssembleCommonOperatorFromConfig(cfg *app.Config, kubeEventsManagerLabels []string) error {
+	if cfg == nil {
+		return op.AssembleCommonOperator("", "", kubeEventsManagerLabels, KubeClientConfig{}, KubeClientConfig{})
+	}
+	mainKubeCfg := KubeClientConfig{
+		Context:      cfg.Kube.Context,
+		Config:       cfg.Kube.Config,
+		QPS:          cfg.Kube.ClientQPS,
+		Burst:        cfg.Kube.ClientBurst,
+		MetricPrefix: cfg.App.PrometheusMetricsPrefix,
+	}
+	patcherKubeCfg := KubeClientConfig{
+		Context:      cfg.Kube.Context,
+		Config:       cfg.Kube.Config,
+		QPS:          cfg.ObjectPatcher.KubeClientQPS,
+		Burst:        cfg.ObjectPatcher.KubeClientBurst,
+		Timeout:      cfg.ObjectPatcher.KubeClientTimeout,
+		MetricPrefix: "object_patcher_",
+	}
+	return op.AssembleCommonOperator(cfg.App.ListenAddress, cfg.App.ListenPort, kubeEventsManagerLabels, mainKubeCfg, patcherKubeCfg)
+}
+
 // AssembleCommonOperator instantiates common dependencies used by both
 // shell-operator and its derivatives (e.g. addon-operator).
 // Requires listenAddress and listenPort to run the HTTP server for operator APIs.
 // kubeCfg provides Kubernetes connection settings for the main client and
 // object patcher; pass KubeClientConfig{} to fall back to in-cluster defaults.
+//
+// For library consumers that already hold an *app.Config, prefer
+// AssembleCommonOperatorFromConfig instead of unpacking fields by hand.
 func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string, mainKubeCfg, patcherKubeCfg KubeClientConfig) error {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
