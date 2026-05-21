@@ -218,7 +218,7 @@ kubernetes:
 
 - `name` is an optional identifier. It is used to distinguish different bindings during runtime. See also [binding context](#binding-context).
 
-- `apiVersion` is an optional group and version of object API. For example, it is `v1` for core objects (Pod, etc.), `rbac.authorization.k8s.io/v1beta1` for ClusterRole and `monitoring.coreos.com/v1` for prometheus-operator.
+- `apiVersion` is an optional group and version of object API. For example, it is `v1` for core objects (Pod, etc.), `rbac.authorization.k8s.io/v1` for ClusterRole and `monitoring.coreos.com/v1` for prometheus-operator.
 
 - `kind` is the type of a monitored Kubernetes resource. This field is required. CRDs are supported, but the resource should be registered in the cluster before Shell-operator starts. This can be checked with `kubectl api-resources` command. You can specify a case-insensitive name, kind or short name in this field. For example, to monitor a DaemonSet these forms are valid:
 
