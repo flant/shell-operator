@@ -12,6 +12,7 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
@@ -40,6 +41,12 @@ type monitor struct {
 	VaryingInformers varyingInformers
 
 	factoryStore *FactoryStore
+
+	// snapshotStore is the optional deduplicated object cache. When non-nil
+	// it is propagated into every resourceInformer the monitor creates,
+	// switching them from per-monitor `*Unstructured` storage to shared,
+	// reference-counted storage in the dedup store.
+	snapshotStore *dedupclient.SnapshotStore
 
 	eventCb       func(kemtypes.KubeEvent)
 	eventsEnabled bool
@@ -155,6 +162,17 @@ func NewMonitor(ctx context.Context, client *klient.Client, mstor metricsstorage
 
 func (m *monitor) GetConfig() *MonitorConfig {
 	return m.Config
+}
+
+// WithSnapshotStore associates a deduplicated snapshot store with this
+// monitor. It must be called before CreateInformers so the store reaches
+// every freshly constructed resourceInformer through resourceInformerConfig.
+// Passing nil is a no-op; the existing snapshotStore (if any) stays.
+func (m *monitor) WithSnapshotStore(s *dedupclient.SnapshotStore) {
+	if s == nil {
+		return
+	}
+	m.snapshotStore = s
 }
 
 // CreateInformers creates all informers and
@@ -319,12 +337,13 @@ func (m *monitor) EnableKubeEventCb() {
 func (m *monitor) CreateInformersForNamespace(namespace string) ([]*resourceInformer, error) {
 	informers := make([]*resourceInformer, 0)
 	cfg := &resourceInformerConfig{
-		client:       m.KubeClient,
-		mstor:        m.metricStorage,
-		factoryStore: m.factoryStore,
-		eventCb:      m.eventCb,
-		monitor:      m.Config,
-		logger:       m.logger.Named("resource-informer"),
+		client:        m.KubeClient,
+		mstor:         m.metricStorage,
+		factoryStore:  m.factoryStore,
+		snapshotStore: m.snapshotStore,
+		eventCb:       m.eventCb,
+		monitor:       m.Config,
+		logger:        m.logger.Named("resource-informer"),
 	}
 
 	objNames := []string{""}

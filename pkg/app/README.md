@@ -315,11 +315,16 @@ err := so.AssembleCommonOperatorFromConfig(cfg, []string{
 
 The new `AssembleCommonOperatorFromConfig(cfg, labels)` method on
 `*ShellOperator` is what makes this clean — it derives both
-`KubeClientConfig`s (main + object-patcher), the HTTP listen address/port,
-and the metric prefix from `cfg`, so the consumer does not have to unpack
-fields by hand. The older primitive-taking
+`KubeClientConfig`s (main + object-patcher), the deduplicated-kubeclient
+configuration (`DedupClientConfig`), the HTTP listen address/port, and the
+metric prefix from `cfg`, so the consumer does not have to unpack fields by
+hand. The older primitive-taking
 `AssembleCommonOperator(listenAddress, listenPort, labels, mainKubeCfg, patcherKubeCfg)`
-is still available for callers that need finer control.
+is still available for callers that need finer control; it preserves its
+original signature and disables the dedup cache. To enable the dedup cache
+without going through `*app.Config`, use the new
+`AssembleCommonOperatorWithDedupClient(...)` variant which adds a final
+`DedupClientConfig` parameter.
 
 If you also want env-var parsing on top of your own values, call
 `ParseEnv(cfg)` between steps 1 and 2 — env values will overlay the fields you

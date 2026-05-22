@@ -12,6 +12,7 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -42,6 +43,13 @@ type KubeEventsManager interface {
 	KubeEventsSource
 	WithMetricStorage(mstor metricsstorage.Storage)
 	MetricStorage() metricsstorage.Storage
+	// WithSnapshotStore wires a deduplicated snapshot store into the
+	// manager. When set, every monitor created afterwards delegates the
+	// storage of full `*Unstructured` bodies to the shared store, freeing
+	// per-monitor memory at the cost of an extra Get on snapshot reads.
+	// Passing nil restores the default (no dedup) behaviour. Must be
+	// called before any AddMonitor call to take effect for that monitor.
+	WithSnapshotStore(store *dedupclient.SnapshotStore)
 	Stop()
 	Wait()
 }
@@ -58,6 +66,11 @@ type kubeEventsManager struct {
 	metricStorage metricsstorage.Storage
 
 	factoryStore *FactoryStore
+
+	// snapshotStore, when non-nil, is propagated into every freshly
+	// created Monitor. Reading and writing this field is serialised via
+	// the m mutex because Monitor construction happens under m.
+	snapshotStore *dedupclient.SnapshotStore
 
 	m        sync.RWMutex
 	Monitors map[string]Monitor
@@ -88,11 +101,24 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor metricsstorage.Storage) {
 	mgr.metricStorage = mstor
 }
 
+// WithSnapshotStore registers a deduplicated snapshot store for use by
+// every subsequently-constructed Monitor. See KubeEventsManager docs for
+// the full contract.
+func (mgr *kubeEventsManager) WithSnapshotStore(snapshotStore *dedupclient.SnapshotStore) {
+	mgr.m.Lock()
+	defer mgr.m.Unlock()
+	mgr.snapshotStore = snapshotStore
+}
+
 // AddMonitor creates a monitor with informers and return a KubeEvent with existing objects.
 // TODO cleanup informers in case of error
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	mgr.logger.Debug("add kubernetes monitor", slog.String(pkg.LogKeyConfig, fmt.Sprintf("%+v", monitorConfig)))
+	mgr.m.RLock()
+	snapshotStore := mgr.snapshotStore
+	mgr.m.RUnlock()
+
 	mon := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,
@@ -105,6 +131,9 @@ func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 		},
 		mgr.logger.Named("monitor"),
 	)
+	if snapshotStore != nil {
+		mon.WithSnapshotStore(snapshotStore)
+	}
 
 	if err := mon.CreateInformers(); err != nil {
 		return err

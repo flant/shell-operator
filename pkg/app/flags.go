@@ -22,11 +22,13 @@ func BindFlags(cfg *Config, rootCmd *cobra.Command, cmd *cobra.Command) func() {
 	bindLogFlags(cfg, cmd)
 	applyAdmission := bindAdmissionWebhookFlags(cfg, cmd)
 	applyConversion := bindConversionWebhookFlags(cfg, cmd)
+	applyDedup := bindDedupClientFlags(cfg, cmd)
 	bindDebugFlags(cfg, rootCmd, cmd)
 
 	return func() {
 		applyAdmission()
 		applyConversion()
+		applyDedup()
 	}
 }
 
@@ -102,6 +104,55 @@ func bindConversionWebhookFlags(cfg *Config, cmd *cobra.Command) func() {
 			cfg.Conversion.ClientCA = cliClientCA
 		} else {
 			cfg.Conversion.ClientCA = envClientCA
+		}
+	}
+}
+
+// bindDedupClientFlags registers flags for the deduplicated kubeclient cache.
+// The two []string fields (Namespaces and WatchGVKs) follow the same pattern
+// used by the validating-webhook ClientCA flag: any explicit CLI invocation
+// fully replaces the env-var derived slice; otherwise the env value is kept.
+func bindDedupClientFlags(cfg *Config, cmd *cobra.Command) func() {
+	f := cmd.Flags()
+	f.BoolVar(&cfg.DedupClient.Enabled, "dedup-client-enabled", cfg.DedupClient.Enabled,
+		"Enable the deduplicated kubeclient cache (github.com/ldmonster/kubeclient). "+
+			"When set, shell-operator builds a controller-runtime compatible client backed "+
+			"by a deduplicated store. Can be set with $DEDUP_CLIENT_ENABLED.")
+	f.BoolVar(&cfg.DedupClient.SnapshotStore, "dedup-client-snapshot-store", cfg.DedupClient.SnapshotStore,
+		"Back per-monitor object snapshots with a process-wide deduplicated store "+
+			"(github.com/ldmonster/kubeclient/store). Trades a small per-snapshot-read CPU "+
+			"cost for a substantial drop in RSS when many monitors observe similar objects. "+
+			"Independent of --dedup-client-enabled. Can be set with $DEDUP_CLIENT_SNAPSHOT_STORE.")
+	f.IntVar(&cfg.DedupClient.ReconstructLRUSize, "dedup-client-reconstruct-lru-size",
+		cfg.DedupClient.ReconstructLRUSize,
+		"Size of the LRU that memoises reconstructed Unstructured objects in the dedup cache. "+
+			"Zero disables reconstruction caching. Can be set with $DEDUP_CLIENT_RECONSTRUCT_LRU_SIZE.")
+	f.DurationVar(&cfg.DedupClient.GCInterval, "dedup-client-gc-interval",
+		cfg.DedupClient.GCInterval,
+		"How often the deduplicated store reclaims unused interned values and subtrees. "+
+			"Zero leaves the kubeclient default in place. Can be set with $DEDUP_CLIENT_GC_INTERVAL.")
+
+	envNamespaces := cfg.DedupClient.Namespaces
+	envGVKs := cfg.DedupClient.WatchGVKs
+	var cliNamespaces, cliGVKs []string
+	f.StringArrayVar(&cliNamespaces, "dedup-client-namespace", nil,
+		"Namespace to restrict the dedup cache to. Repeat the flag to add more, or pass a "+
+			"comma-separated list via $DEDUP_CLIENT_NAMESPACES. Empty means all namespaces.")
+	f.StringArrayVar(&cliGVKs, "dedup-client-watch-gvk", nil,
+		"GroupVersionKind to pre-register with the dedup cache, formatted as "+
+			"\"<group>/<version>/<kind>\" (the group is empty for core resources, e.g. \"/v1/Pod\"). "+
+			"Repeat the flag to add more, or pass a comma-separated list via $DEDUP_CLIENT_WATCH_GVKS.")
+
+	return func() {
+		if len(cliNamespaces) > 0 {
+			cfg.DedupClient.Namespaces = cliNamespaces
+		} else {
+			cfg.DedupClient.Namespaces = envNamespaces
+		}
+		if len(cliGVKs) > 0 {
+			cfg.DedupClient.WatchGVKs = cliGVKs
+		} else {
+			cfg.DedupClient.WatchGVKs = envGVKs
 		}
 	}
 }

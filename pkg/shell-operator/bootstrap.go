@@ -134,7 +134,8 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 func (op *ShellOperator) AssembleCommonOperatorFromConfig(cfg *app.Config, kubeEventsManagerLabels []string) error {
 	listenAddress, listenPort := listenAddrFromAppConfig(cfg)
 	mainKubeCfg, patcherKubeCfg := kubeClientConfigsFromAppConfig(cfg)
-	return op.AssembleCommonOperator(listenAddress, listenPort, kubeEventsManagerLabels, mainKubeCfg, patcherKubeCfg)
+	dedupCfg := dedupClientConfigFromAppConfig(cfg)
+	return op.AssembleCommonOperatorWithDedupClient(listenAddress, listenPort, kubeEventsManagerLabels, mainKubeCfg, patcherKubeCfg, dedupCfg)
 }
 
 // listenAddrFromAppConfig returns the HTTP server listen address/port from cfg
@@ -174,15 +175,48 @@ func kubeClientConfigsFromAppConfig(cfg *app.Config) (KubeClientConfig, KubeClie
 	return mainKubeCfg, patcherKubeCfg
 }
 
+// dedupClientConfigFromAppConfig pulls deduplicated-kubeclient settings out
+// of an *app.Config. A nil cfg (or one where DedupClient.Enabled is false)
+// returns a zero-valued DedupClientConfig, which initDedupClient then
+// recognises as "do not construct". Keeping this as a pure helper makes the
+// derivation easy to unit-test without standing up a full operator.
+func dedupClientConfigFromAppConfig(cfg *app.Config) DedupClientConfig {
+	if cfg == nil {
+		return DedupClientConfig{}
+	}
+	return DedupClientConfig{
+		Enabled:            cfg.DedupClient.Enabled,
+		Namespaces:         cfg.DedupClient.Namespaces,
+		WatchGVKs:          cfg.DedupClient.WatchGVKs,
+		ReconstructLRUSize: cfg.DedupClient.ReconstructLRUSize,
+		GCInterval:         cfg.DedupClient.GCInterval,
+		SnapshotStore:      cfg.DedupClient.SnapshotStore,
+	}
+}
+
 // AssembleCommonOperator instantiates common dependencies used by both
 // shell-operator and its derivatives (e.g. addon-operator).
 // Requires listenAddress and listenPort to run the HTTP server for operator APIs.
 // kubeCfg provides Kubernetes connection settings for the main client and
 // object patcher; pass KubeClientConfig{} to fall back to in-cluster defaults.
 //
+// This method preserves the pre-deduplicated-kubeclient signature for
+// backwards compatibility: it delegates to AssembleCommonOperatorWithDedupClient
+// with a disabled DedupClientConfig, so behaviour is unchanged. Use the
+// DedupClient-aware variant (or AssembleCommonOperatorFromConfig) to enable
+// the deduplicated cache.
+//
 // For library consumers that already hold an *app.Config, prefer
 // AssembleCommonOperatorFromConfig instead of unpacking fields by hand.
 func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string, mainKubeCfg, patcherKubeCfg KubeClientConfig) error {
+	return op.AssembleCommonOperatorWithDedupClient(listenAddress, listenPort, kubeEventsManagerLabels, mainKubeCfg, patcherKubeCfg, DedupClientConfig{})
+}
+
+// AssembleCommonOperatorWithDedupClient is the full assembly entry point that
+// also constructs the optional deduplicated kubeclient. Pass a zero
+// DedupClientConfig (or one with Enabled=false) to keep behaviour identical
+// to AssembleCommonOperator.
+func (op *ShellOperator) AssembleCommonOperatorWithDedupClient(listenAddress, listenPort string, kubeEventsManagerLabels []string, mainKubeCfg, patcherKubeCfg KubeClientConfig, dedupCfg DedupClientConfig) error {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
@@ -206,7 +240,26 @@ func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string
 		return err
 	}
 
+	// Optional deduplicated kubeclient. Reuses the rest.Config + RESTMapper
+	// derived from the main kube client so users only configure connection
+	// details once.
+	op.DedupClient, err = initDedupClient(op.KubeClient, dedupCfg, op.logger.Named("dedup-kube-client"))
+	if err != nil {
+		return err
+	}
+
+	// Optional deduplicated SnapshotStore. Constructed independently of
+	// DedupClient because the two solve different problems: DedupClient
+	// is a kubeclient instance for hooks/extensions, SnapshotStore is the
+	// shared backing for kube-events-manager monitors. Either, both, or
+	// neither may be active.
+	op.SnapshotStore = initSnapshotStore(dedupCfg, op.logger.Named("dedup-snapshot-store"))
+
 	op.SetupEventManagers()
+
+	if op.SnapshotStore != nil && op.KubeEventsManager != nil {
+		op.KubeEventsManager.WithSnapshotStore(op.SnapshotStore)
+	}
 
 	return nil
 }
@@ -224,6 +277,7 @@ func (op *ShellOperator) assembleShellOperator(cfg *app.Config, hooksDir string,
 	op.RegisterDebugQueueRoutes(debugServer)
 	op.RegisterDebugHookRoutes(debugServer)
 	op.RegisterDebugConfigRoutes(debugServer, runtimeConfig)
+	op.RegisterDebugDedupClientRoutes(debugServer)
 
 	// Create webhookManagers with dependencies.
 	op.setupHookManagers(cfg, hooksDir, tempDir)
