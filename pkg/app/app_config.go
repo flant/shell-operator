@@ -48,6 +48,16 @@ type DedupClientSettings struct {
 	WatchGVKs          []string      `env:"WATCH_GVKS" envSeparator:","`
 	ReconstructLRUSize int           `env:"RECONSTRUCT_LRU_SIZE"`
 	GCInterval         time.Duration `env:"GC_INTERVAL"`
+
+	// SnapshotStore enables a process-wide deduplicated SnapshotStore that
+	// backs every kubernetes-binding monitor's per-object cache. When on,
+	// `*Unstructured` bodies live exactly once in memory across all
+	// resourceInformers (refcounted), trading a small per-snapshot-read CPU
+	// cost for a substantial drop in RSS for workloads with many similar
+	// objects. Independent of the runtime DedupClient (Enabled flag): the
+	// snapshot store can be turned on without spinning up any kubeclient
+	// informers.
+	SnapshotStore bool `env:"SNAPSHOT_STORE"`
 }
 
 // AdmissionSettings holds settings for the validating-webhook server.

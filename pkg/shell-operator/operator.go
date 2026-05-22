@@ -76,6 +76,14 @@ type ShellOperator struct {
 	// it is started in op.Start() and stopped during op.Shutdown().
 	DedupClient *dedupclient.Client
 
+	// SnapshotStore is the optional process-wide deduplicated cache that
+	// backs every kubernetes-binding monitor's per-object snapshot. When
+	// non-nil it is wired into the KubeEventsManager so resourceInformers
+	// store `*Unstructured` bodies once (refcounted) instead of per-monitor.
+	// Enabled via app.Config.DedupClient.SnapshotStore. Independent of
+	// DedupClient: either, both, or neither may be active.
+	SnapshotStore *dedupclient.SnapshotStore
+
 	ScheduleManager   schedulemanager.ScheduleManager
 	KubeEventsManager kubeeventsmanager.KubeEventsManager
 

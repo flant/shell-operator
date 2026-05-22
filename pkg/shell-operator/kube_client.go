@@ -105,6 +105,13 @@ type DedupClientConfig struct {
 	// kubeclient options. Zero means "use the kubeclient default".
 	ReconstructLRUSize int
 	GCInterval         time.Duration
+
+	// SnapshotStore toggles construction of the process-wide deduplicated
+	// SnapshotStore. The store backs per-monitor object caches; turning it
+	// on is the change that actually moves the RSS needle for workloads
+	// with many similar objects (the runtime DedupClient itself does not
+	// affect kube-events-manager memory). Independent of Enabled.
+	SnapshotStore bool
 }
 
 // initDedupClient constructs an optional deduplicated kubeclient using the
@@ -154,6 +161,20 @@ func initDedupClient(kubeClient *klient.Client, cfg DedupClientConfig, logger *l
 		return nil, fmt.Errorf("initialize dedup kubeclient: %w", err)
 	}
 	return c, nil
+}
+
+// initSnapshotStore constructs the optional deduplicated SnapshotStore.
+// Returning (nil, nil) when cfg.SnapshotStore is false keeps the assembly
+// caller simple — it nil-checks the result and skips the wiring. The
+// returned store is a fresh instance (no shared state with previous
+// processes) and is safe for concurrent use; the operator passes it to
+// KubeEventsManager.WithSnapshotStore so every later-created Monitor
+// uses it transparently.
+func initSnapshotStore(cfg DedupClientConfig, logger *log.Logger) *dedupclient.SnapshotStore {
+	if !cfg.SnapshotStore {
+		return nil
+	}
+	return dedupclient.NewSnapshotStore(logger)
 }
 
 // parseGVKs converts a list of "group/version/kind" strings into

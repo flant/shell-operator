@@ -91,22 +91,49 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 // payload so probes can distinguish "not configured" from "errored".
 func (op *ShellOperator) RegisterDebugDedupClientRoutes(dbgSrv *debug.Server) {
 	dbgSrv.RegisterHandler(http.MethodGet, "/dedup-client/status.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
-		if op.DedupClient == nil {
-			return map[string]any{
-				"enabled": false,
-				"reason":  "DedupClient is not configured (set --dedup-client-enabled or $DEDUP_CLIENT_ENABLED)",
-			}, nil
+		payload := map[string]any{
+			"client":        clientStatus(op),
+			"snapshotStore": snapshotStoreStatus(op),
 		}
-		// Cache wide synchronisation status — best-effort, capped at 0
-		// timeout so the probe never blocks the debug server.
-		ctx, cancel := context.WithTimeout(context.Background(), 0)
-		defer cancel()
-		synced := op.DedupClient.WaitForCacheSync(ctx)
-		return map[string]any{
-			"enabled":         true,
-			"cacheSyncedHint": synced,
-		}, nil
+		return payload, nil
 	})
+}
+
+// clientStatus reports the status of the runtime DedupClient.
+func clientStatus(op *ShellOperator) map[string]any {
+	if op.DedupClient == nil {
+		return map[string]any{
+			"enabled": false,
+			"reason":  "DedupClient is not configured (set --dedup-client-enabled or $DEDUP_CLIENT_ENABLED)",
+		}
+	}
+	// Cache wide synchronisation status — best-effort, capped at 0
+	// timeout so the probe never blocks the debug server.
+	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
+	synced := op.DedupClient.WaitForCacheSync(ctx)
+	return map[string]any{
+		"enabled":         true,
+		"cacheSyncedHint": synced,
+	}
+}
+
+// snapshotStoreStatus reports the live counters of the shared snapshot store.
+func snapshotStoreStatus(op *ShellOperator) map[string]any {
+	if op.SnapshotStore == nil {
+		return map[string]any{
+			"enabled": false,
+			"reason":  "SnapshotStore is not configured (set --dedup-client-snapshot-store or $DEDUP_CLIENT_SNAPSHOT_STORE)",
+		}
+	}
+	stats := op.SnapshotStore.Stats()
+	return map[string]any{
+		"enabled":       true,
+		"liveObjects":   stats.LiveObjects,
+		"totalAcquires": stats.TotalAcquires,
+		"totalReleases": stats.TotalReleases,
+		"totalDeletes":  stats.TotalDeletes,
+	}
 }
 
 // RegisterDebugConfigRoutes registers routes to manage runtime configuration.

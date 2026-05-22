@@ -190,6 +190,7 @@ func dedupClientConfigFromAppConfig(cfg *app.Config) DedupClientConfig {
 		WatchGVKs:          cfg.DedupClient.WatchGVKs,
 		ReconstructLRUSize: cfg.DedupClient.ReconstructLRUSize,
 		GCInterval:         cfg.DedupClient.GCInterval,
+		SnapshotStore:      cfg.DedupClient.SnapshotStore,
 	}
 }
 
@@ -247,7 +248,18 @@ func (op *ShellOperator) AssembleCommonOperatorWithDedupClient(listenAddress, li
 		return err
 	}
 
+	// Optional deduplicated SnapshotStore. Constructed independently of
+	// DedupClient because the two solve different problems: DedupClient
+	// is a kubeclient instance for hooks/extensions, SnapshotStore is the
+	// shared backing for kube-events-manager monitors. Either, both, or
+	// neither may be active.
+	op.SnapshotStore = initSnapshotStore(dedupCfg, op.logger.Named("dedup-snapshot-store"))
+
 	op.SetupEventManagers()
+
+	if op.SnapshotStore != nil && op.KubeEventsManager != nil {
+		op.KubeEventsManager.WithSnapshotStore(op.SnapshotStore)
+	}
 
 	return nil
 }

@@ -16,8 +16,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/ldmonster/kubeclient/store"
+
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metrics"
 	"github.com/flant/shell-operator/pkg/utils/measure"
@@ -38,8 +41,20 @@ type resourceInformer struct {
 	ListOptions          metav1.ListOptions
 
 	// A cache of objects and filterResults. It is a part of the Monitor's snapshot.
+	// When snapshotStore is non-nil, entries here have Object == nil and the
+	// authoritative `*Unstructured` body lives once in the shared dedup store
+	// keyed by cachedObjectKeys[resourceId]. getCachedObjects reconstitutes
+	// Object lazily on read so the public type behaviour is unchanged.
 	cachedObjects map[string]*kemtypes.ObjectAndFilterResult
 	cacheLock     sync.RWMutex
+
+	// snapshotStore, when non-nil, owns the storage of `*Unstructured`
+	// bodies. Each resourceInformer is one *owner* (identified by its
+	// id) so the store can refcount keys across overlapping watches.
+	snapshotStore *dedupclient.SnapshotStore
+	// cachedObjectKeys mirrors cachedObjects when snapshotStore is set.
+	// It is kept under cacheLock together with cachedObjects.
+	cachedObjectKeys map[string]store.ObjectKey
 
 	// Cached objects operations since start
 	cachedObjectsInfo *CachedObjectsInfo
@@ -70,11 +85,12 @@ type resourceInformer struct {
 
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
-	client       *klient.Client
-	mstor        metricsstorage.Storage
-	factoryStore *FactoryStore
-	eventCb      func(kemtypes.KubeEvent)
-	monitor      *MonitorConfig
+	client        *klient.Client
+	mstor         metricsstorage.Storage
+	factoryStore  *FactoryStore
+	snapshotStore *dedupclient.SnapshotStore
+	eventCb       func(kemtypes.KubeEvent)
+	monitor       *MonitorConfig
 
 	logger *log.Logger
 }
@@ -85,11 +101,13 @@ func newResourceInformer(ns, name string, cfg *resourceInformerConfig) *resource
 		KubeClient:             cfg.client,
 		metricStorage:          cfg.mstor,
 		factoryStore:           cfg.factoryStore,
+		snapshotStore:          cfg.snapshotStore,
 		Namespace:              ns,
 		Name:                   name,
 		eventCb:                cfg.eventCb,
 		Monitor:                cfg.monitor,
 		cachedObjects:          make(map[string]*kemtypes.ObjectAndFilterResult),
+		cachedObjectKeys:       make(map[string]store.ObjectKey),
 		cacheLock:              sync.RWMutex{},
 		eventBufLock:           sync.Mutex{},
 		cachedObjectsInfo:      &CachedObjectsInfo{},
@@ -156,12 +174,32 @@ func (ei *resourceInformer) createSharedInformer() error {
 	return nil
 }
 
-// Snapshot returns all cached objects for this informer
+// Snapshot returns all cached objects for this informer.
+//
+// When snapshotStore is set, every entry's `Object` field is reconstituted
+// from the shared dedup store at call time. Reconstitution is a fresh
+// allocation per call, so callers should treat the returned slice as
+// owned and avoid pinning it longer than necessary. If the store has
+// dropped a key concurrently (e.g. during shutdown) the returned entry
+// keeps Object=nil; downstream code already tolerates that path because
+// the same shape is used by Monitor.KeepFullObjectsInMemory==false.
 func (ei *resourceInformer) getCachedObjects() []kemtypes.ObjectAndFilterResult {
 	ei.cacheLock.RLock()
 	res := make([]kemtypes.ObjectAndFilterResult, 0, len(ei.cachedObjects))
-	for _, obj := range ei.cachedObjects {
-		res = append(res, *obj)
+	if ei.snapshotStore != nil {
+		for resID, entry := range ei.cachedObjects {
+			cp := *entry
+			if key, ok := ei.cachedObjectKeys[resID]; ok {
+				if obj, found := ei.snapshotStore.Get(key); found {
+					cp.Object = obj
+				}
+			}
+			res = append(res, cp)
+		}
+	} else {
+		for _, obj := range ei.cachedObjects {
+			res = append(res, *obj)
+		}
 	}
 	ei.cacheLock.RUnlock()
 
@@ -220,6 +258,14 @@ func (ei *resourceInformer) loadExistedObjects() error {
 		slog.Int(pkg.LogKeyCount, len(objList.Items)))
 
 	filteredObjects := make(map[string]*kemtypes.ObjectAndFilterResult)
+	// keysForStore is the set of (resourceId → ObjectKey) that need to be
+	// committed to the shared snapshot store under cacheLock. We collect
+	// them here so the dedup-store roundtrip happens before the lock is
+	// taken, keeping the critical section small.
+	var keysForStore map[string]store.ObjectKey
+	if ei.snapshotStore != nil {
+		keysForStore = make(map[string]store.ObjectKey, len(objList.Items))
+	}
 
 	for _, item := range objList.Items {
 		// copy loop var to avoid duplication of pointer in filteredObjects
@@ -240,6 +286,20 @@ func (ei *resourceInformer) loadExistedObjects() error {
 
 		if !ei.Monitor.KeepFullObjectsInMemory {
 			objFilterRes.RemoveFullObject()
+		} else if ei.snapshotStore != nil && objFilterRes.Object != nil {
+			// Move the body into the shared dedup store and drop our
+			// per-monitor pointer. RemoveObject MUST stay false so the
+			// snapshot still surfaces the body once Get reconstitutes
+			// it on read.
+			key := dedupclient.KeyFor(objFilterRes.Object)
+			if err := ei.snapshotStore.Acquire(ei.id, key, objFilterRes.Object); err != nil {
+				ei.logger.Warn("snapshot store: acquire failed during initial list, falling back to local copy",
+					slog.String(pkg.LogKeyResourceId, objFilterRes.Metadata.ResourceId),
+					log.Err(err))
+			} else {
+				keysForStore[objFilterRes.Metadata.ResourceId] = key
+				objFilterRes.Object = nil
+			}
 		}
 
 		filteredObjects[objFilterRes.Metadata.ResourceId] = objFilterRes
@@ -255,6 +315,9 @@ func (ei *resourceInformer) loadExistedObjects() error {
 	defer ei.cacheLock.Unlock()
 	for k, v := range filteredObjects {
 		ei.cachedObjects[k] = v
+	}
+	for k, key := range keysForStore {
+		ei.cachedObjectKeys[k] = key
 	}
 
 	ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
@@ -320,8 +383,26 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 		return
 	}
 
+	// storeKey is the shared dedup-store key for this object. It is set
+	// only when snapshotStore is enabled and KeepFullObjectsInMemory is
+	// true (the path that materially benefits from deduplication). Other
+	// paths leave storeKey at its zero value and skip Acquire/Release.
+	var storeKey store.ObjectKey
+	storeBacked := false
+
 	if !ei.Monitor.KeepFullObjectsInMemory {
 		objFilterRes.RemoveFullObject()
+	} else if ei.snapshotStore != nil && objFilterRes.Object != nil {
+		storeKey = dedupclient.KeyFor(objFilterRes.Object)
+		if err := ei.snapshotStore.Acquire(ei.id, storeKey, objFilterRes.Object); err != nil {
+			ei.logger.Warn("snapshot store: acquire failed on watch event, falling back to local copy",
+				slog.String(pkg.LogKeyResourceId, resourceId),
+				slog.String(pkg.LogKeyEventType, string(eventType)),
+				log.Err(err))
+		} else {
+			storeBacked = true
+			objFilterRes.Object = nil
+		}
 	}
 
 	// Do not fire Added or Modified if object is in cache and its checksum is equal to the newChecksum.
@@ -344,6 +425,9 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			skipEvent = true
 		}
 		ei.cachedObjects[resourceId] = objFilterRes
+		if storeBacked {
+			ei.cachedObjectKeys[resourceId] = storeKey
+		}
 		// Update cached objects info.
 		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
 		if eventType == kemtypes.WatchEventAdded {
@@ -362,6 +446,21 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 
 	case kemtypes.WatchEventDeleted:
 		ei.cacheLock.Lock()
+		// Drop the snapshot-store reference (if any) before forgetting
+		// the resourceId — otherwise we leak ownership in the store.
+		if ei.snapshotStore != nil {
+			if key, ok := ei.cachedObjectKeys[resourceId]; ok {
+				delete(ei.cachedObjectKeys, resourceId)
+				// Release outside the lock would be cleaner, but the
+				// store itself takes only its own (short-lived) mutex,
+				// so contention here is bounded.
+				if err := ei.snapshotStore.Release(ei.id, key); err != nil {
+					ei.logger.Warn("snapshot store: release failed on delete event",
+						slog.String(pkg.LogKeyResourceId, resourceId),
+						log.Err(err))
+				}
+			}
+		}
 		delete(ei.cachedObjects, resourceId)
 		// Update cached objects info.
 		ei.cachedObjectsInfo.Count = uint64(len(ei.cachedObjects))
@@ -458,6 +557,10 @@ func (ei *resourceInformer) start() {
 		if ei.ctx != nil {
 			<-ei.ctx.Done()
 			ei.factoryStore.Stop(ei.id, ei.FactoryIndex)
+			// Drop every snapshot-store reference this informer still
+			// holds. Without this the dedup store would leak entries
+			// for stopped monitors until process exit.
+			ei.releaseSnapshotStoreOwnership()
 		}
 	}()
 
@@ -470,6 +573,23 @@ func (ei *resourceInformer) start() {
 	}
 
 	log.Debug("informer is ready", slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName))
+}
+
+// releaseSnapshotStoreOwnership lets the shared dedup store reclaim every
+// key this informer still owns. It is idempotent: calling it twice (or
+// when snapshotStore is nil) is a safe no-op. Called from the start()
+// shutdown goroutine so it runs on monitor cancellation.
+func (ei *resourceInformer) releaseSnapshotStoreOwnership() {
+	if ei.snapshotStore == nil {
+		return
+	}
+	ei.snapshotStore.ReleaseOwner(ei.id)
+	ei.cacheLock.Lock()
+	// Clear the per-informer key map so subsequent reads see Object=nil.
+	if len(ei.cachedObjectKeys) > 0 {
+		ei.cachedObjectKeys = make(map[string]store.ObjectKey)
+	}
+	ei.cacheLock.Unlock()
 }
 
 // wait blocks until the underlying shared informer for this FactoryIndex is stopped
