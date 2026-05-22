@@ -34,6 +34,22 @@ type ObjectPatcherSettings struct {
 	KubeClientTimeout time.Duration `env:"KUBE_CLIENT_TIMEOUT"`
 }
 
+// DedupClientSettings configures the deduplicated kubeclient cache provided by
+// github.com/ldmonster/kubeclient. The cache stores a single canonical copy of
+// each repeated value and subtree across watched objects, dramatically lowering
+// in-memory footprint for clusters with many similar resources (e.g.
+// templated Deployments). All settings here are optional; when Enabled is
+// false the client is not constructed at all. List-typed env vars use a comma
+// separator: GVK strings follow the form "<group>/<version>/<kind>" (the
+// group may be empty for core resources, e.g. "/v1/Pod").
+type DedupClientSettings struct {
+	Enabled            bool          `env:"ENABLED"`
+	Namespaces         []string      `env:"NAMESPACES" envSeparator:","`
+	WatchGVKs          []string      `env:"WATCH_GVKS" envSeparator:","`
+	ReconstructLRUSize int           `env:"RECONSTRUCT_LRU_SIZE"`
+	GCInterval         time.Duration `env:"GC_INTERVAL"`
+}
+
 // AdmissionSettings holds settings for the validating-webhook server.
 type AdmissionSettings struct {
 	ConfigurationName string   `env:"CONFIGURATION_NAME"`
@@ -83,6 +99,7 @@ type Config struct {
 	App           AppSettings           `envPrefix:"SHELL_OPERATOR_"`
 	Kube          KubeSettings          `envPrefix:"KUBE_"`
 	ObjectPatcher ObjectPatcherSettings `envPrefix:"OBJECT_PATCHER_"`
+	DedupClient   DedupClientSettings   `envPrefix:"DEDUP_CLIENT_"`
 	Admission     AdmissionSettings     `envPrefix:"VALIDATING_WEBHOOK_"`
 	Conversion    ConversionSettings    `envPrefix:"CONVERSION_WEBHOOK_"`
 	Debug         DebugSettings         `envPrefix:"DEBUG_"`

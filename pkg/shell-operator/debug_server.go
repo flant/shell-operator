@@ -1,6 +1,7 @@
 package shell_operator
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -81,6 +82,30 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 			return nil, &debug.BadRequestError{Msg: fmt.Sprintf("hook '%s' is not exist", hookName)}
 		}
 		return h.HookController.SnapshotsDump(), nil
+	})
+}
+
+// RegisterDebugDedupClientRoutes exposes a small JSON snapshot of the
+// deduplicated-kubeclient state on the debug server. The route is registered
+// even when the dedup client is disabled, returning a clear "disabled"
+// payload so probes can distinguish "not configured" from "errored".
+func (op *ShellOperator) RegisterDebugDedupClientRoutes(dbgSrv *debug.Server) {
+	dbgSrv.RegisterHandler(http.MethodGet, "/dedup-client/status.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
+		if op.DedupClient == nil {
+			return map[string]any{
+				"enabled": false,
+				"reason":  "DedupClient is not configured (set --dedup-client-enabled or $DEDUP_CLIENT_ENABLED)",
+			}, nil
+		}
+		// Cache wide synchronisation status — best-effort, capped at 0
+		// timeout so the probe never blocks the debug server.
+		ctx, cancel := context.WithTimeout(context.Background(), 0)
+		defer cancel()
+		synced := op.DedupClient.WaitForCacheSync(ctx)
+		return map[string]any{
+			"enabled":         true,
+			"cacheSyncedHint": synced,
+		}, nil
 	})
 }
 
