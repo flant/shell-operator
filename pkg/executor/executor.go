@@ -189,7 +189,6 @@ func (e *Executor) Output() ([]byte, error) {
 	Registry.Register(e.cmd.Process.Pid)
 	defer Registry.Unregister(e.cmd.Process.Pid)
 
-	time.Sleep(2 * time.Second)
 	err := e.cmd.Wait()
 	if err != nil && captureErr {
 		if ee, ok := err.(*exec.ExitError); ok {
