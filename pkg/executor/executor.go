@@ -26,8 +26,8 @@ const (
 )
 
 // Run starts the command, waits for it to complete, and returns the error.
-// The child PID is registered in the global Registry while the process is
-// running so that a PID-1 zombie reaper does not steal it.
+// The child PID is registered in the global process registry while the process
+// is running so that a PID-1 zombie reaper does not steal it.
 func Run(cmd *exec.Cmd) error {
 	// TODO context: hook name, hook phase, hook binding
 	// TODO observability
