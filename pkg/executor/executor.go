@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"os/exec"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -26,48 +25,6 @@ const (
 	serviceName = "executor"
 )
 
-// ProcessRegistry tracks PIDs of processes started by the executor so that
-// a PID-1 zombie reaper can skip them (their parent already calls wait).
-// This prevents the reaper from stealing a child that cmd.Wait expects to reap.
-type ProcessRegistry struct {
-	mu         sync.RWMutex
-	activePIDs map[int32]struct{}
-}
-
-// NewProcessRegistry creates a new ProcessRegistry.
-func NewProcessRegistry() *ProcessRegistry {
-	return &ProcessRegistry{
-		activePIDs: make(map[int32]struct{}),
-	}
-}
-
-// Register adds pid to the set of active PIDs.
-func (r *ProcessRegistry) Register(pid int) {
-	r.mu.Lock()
-	r.activePIDs[int32(pid)] = struct{}{}
-	r.mu.Unlock()
-}
-
-// Unregister removes pid from the set of active PIDs.
-func (r *ProcessRegistry) Unregister(pid int) {
-	r.mu.Lock()
-	delete(r.activePIDs, int32(pid))
-	r.mu.Unlock()
-}
-
-// IsActive reports whether pid is currently tracked as an active process.
-func (r *ProcessRegistry) IsActive(pid int) bool {
-	r.mu.RLock()
-	_, ok := r.activePIDs[int32(pid)]
-	r.mu.RUnlock()
-	return ok
-}
-
-// Registry is the global process registry shared between the executor and
-// the PID-1 zombie reaper. All executor methods that spawn child processes
-// register their PIDs here so the reaper can skip them.
-var Registry = NewProcessRegistry()
-
 // Run starts the command, waits for it to complete, and returns the error.
 // The child PID is registered in the global Registry while the process is
 // running so that a PID-1 zombie reaper does not steal it.
@@ -80,8 +37,8 @@ func Run(cmd *exec.Cmd) error {
 		return err
 	}
 
-	Registry.Register(cmd.Process.Pid)
-	defer Registry.Unregister(cmd.Process.Pid)
+	registerPID(cmd.Process.Pid)
+	defer unregisterPID(cmd.Process.Pid)
 
 	return cmd.Wait()
 }
@@ -186,8 +143,8 @@ func (e *Executor) Output() ([]byte, error) {
 		return nil, err
 	}
 
-	Registry.Register(e.cmd.Process.Pid)
-	defer Registry.Unregister(e.cmd.Process.Pid)
+	registerPID(e.cmd.Process.Pid)
+	defer unregisterPID(e.cmd.Process.Pid)
 
 	err := e.cmd.Wait()
 	if err != nil && captureErr {
@@ -241,8 +198,8 @@ func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]stri
 		return nil, fmt.Errorf("cmd start: %w", err)
 	}
 
-	Registry.Register(e.cmd.Process.Pid)
-	defer Registry.Unregister(e.cmd.Process.Pid)
+	registerPID(e.cmd.Process.Pid)
+	defer unregisterPID(e.cmd.Process.Pid)
 
 	err := e.cmd.Wait()
 	if err != nil {
