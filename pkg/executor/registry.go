@@ -26,22 +26,25 @@ type processRegistry struct {
 // register adds pid to the set of active PIDs.
 func (r *processRegistry) register(pid int) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.activePIDs[int32(pid)] = struct{}{}
-	r.mu.Unlock()
 }
 
 // unregister removes pid from the set of active PIDs.
 func (r *processRegistry) unregister(pid int) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	delete(r.activePIDs, int32(pid))
-	r.mu.Unlock()
 }
 
 // IsActive reports whether pid is currently tracked as an active process.
 func (r *processRegistry) IsActive(pid int) bool {
 	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	_, ok := r.activePIDs[int32(pid)]
-	r.mu.RUnlock()
 
 	return ok
 }
