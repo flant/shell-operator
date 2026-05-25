@@ -92,7 +92,7 @@ jobs:
           echo "========================================="
       - name: Set up QEMU
         if: needs.check.outputs.build_multi_arch == 'true'
-        uses: docker/setup-qemu-action@v3.6.0
+        uses: docker/setup-qemu-action@v4.0.0
         with:
           platforms: "${{ env.QEMU_PLATFORMS }}"
       - name: Set up Docker Buildx
