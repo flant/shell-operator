@@ -47,19 +47,36 @@ jobs:
         include:
           - k8s_version: "1.28"
             kind_node_image: "kindest/node:v1.28.15"
+            kind_version: "v0.27.0"
             cluster_name: "kube-1-28"
           - k8s_version: "1.29"
             kind_node_image: "kindest/node:v1.29.14"
+            kind_version: "v0.27.0"
             cluster_name: "kube-1-29"
           - k8s_version: "1.30"
             kind_node_image: "kindest/node:v1.30.10"
+            kind_version: "v0.27.0"
             cluster_name: "kube-1-30"
           - k8s_version: "1.31"
             kind_node_image: "kindest/node:v1.31.6"
+            kind_version: "v0.27.0"
             cluster_name: "kube-1-31"
           - k8s_version: "1.32"
             kind_node_image: "kindest/node:v1.32.3"
+            kind_version: "v0.27.0"
             cluster_name: "kube-1-32"
+          - k8s_version: "1.33"
+            kind_node_image: "kindest/node:v1.33.7"
+            kind_version: "v0.31.0"
+            cluster_name: "kube-1-33"
+          - k8s_version: "1.34"
+            kind_node_image: "kindest/node:v1.34.3"
+            kind_version: "v0.31.0"
+            cluster_name: "kube-1-34"
+          - k8s_version: "1.35"
+            kind_node_image: "kindest/node:v1.35.0"
+            kind_version: "v0.31.0"
+            cluster_name: "kube-1-35"
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
@@ -91,7 +108,7 @@ jobs:
       - name: Start kind cluster
         uses: engineerd/setup-kind@v0.6.2
         with:
-          version: "v0.27.0"
+          version: ${{ matrix.kind_version }}
           image: ${{ matrix.kind_node_image }}
           name: ${{ matrix.cluster_name }}
       - name: Run integration tests

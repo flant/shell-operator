@@ -23,8 +23,16 @@ type Registerer interface {
 
 // SetupLogging sets the log level and registers a runtime config hook so the
 // level can be changed without restarting the operator.
+//
+// If runtimeConfig is nil, only the default log level is applied and no
+// runtime hook is registered. This makes the function safe to call from
+// tests and other contexts that do not have a runtime config.
 func SetupLogging(level string, runtimeConfig Registerer, logger *log.Logger) {
 	log.SetDefaultLevel(log.LogLevelFromStr(level))
+
+	if runtimeConfig == nil {
+		return
+	}
 
 	runtimeConfig.Register("log.level",
 		fmt.Sprintf("Global log level. Default duration for debug level is %s", ForcedDurationForDebugLevel),
