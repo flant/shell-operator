@@ -14,7 +14,7 @@ jobs:
         with:
           go-version: "1.26.1"
       - name: Check out shell-operator code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Restore Go modules
         id: go-modules-cache
         uses: actions/cache@v5.0.5
@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: 3.8
       - name: Check out addon-operator code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Run codespell
         run: |
           pip install codespell==v1.17.1
