@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"log/slog"
+	"runtime/debug"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -71,7 +72,10 @@ func (tqs *TaskQueueSet) Start(ctx context.Context) {
 	tqs.IterateSnapshot(ctx, func(ctx context.Context, queue *TaskQueue) {
 		defer func() {
 			if r := recover(); r != nil {
-				tqs.logger.Warn("panic recovered in Start", slog.Any(pkg.LogKeyError, r))
+				tqs.logger.Warn("panic recovered in TaskQueueSet Start",
+					slog.Any(pkg.LogKeyError, r),
+					slog.String(pkg.LogKeyStack, string(debug.Stack())),
+				)
 			}
 		}()
 

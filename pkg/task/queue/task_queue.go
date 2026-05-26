@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -767,6 +768,21 @@ func (q *TaskQueue) Start(ctx context.Context) {
 	q.startMetricsMonitoring()
 
 	go func() {
+		// Outer recover is a last-resort safety net: it prevents the whole worker
+		// goroutine from being torn down if a panic escapes processOne (e.g. from
+		// q.compaction or q.waitForTask). The main per-task recovery happens
+		// inside processOne so that the for-loop keeps running after a panic.
+		defer func() {
+			if r := recover(); r != nil {
+				q.logger.Error("panic escaped TaskQueue worker, queue stopped",
+					slog.String(pkg.LogKeyQueue, q.Name),
+					slog.Any(pkg.LogKeyError, r),
+					slog.String(pkg.LogKeyStack, string(debug.Stack())),
+				)
+				q.SetStatus(QueueStatusStop)
+			}
+		}()
+
 		q.SetStatus(QueueStatusIdle)
 		var sleepDelay time.Duration
 		for {
@@ -778,112 +794,139 @@ func (q *TaskQueue) Start(ctx context.Context) {
 				return
 			}
 
-			q.withLock(func() {
-				if q.queueTasksCounter.IsAnyCapReached() {
-					q.lazydebug("triggering compaction before task processing", func() []any {
-						return []any{slog.String(pkg.LogKeyQueue, q.Name), slog.String(pkg.LogKeyTaskID, t.GetId()), slog.String(pkg.LogKeyTaskType, string(t.GetType())), slog.Int(pkg.LogKeyQueueLength, q.storage.Length())}
-					})
-
-					q.compaction(q.queueTasksCounter.GetReachedCap())
-
-					q.lazydebug("compaction completed, queue no longer dirty", func() []any {
-						return []any{slog.String(pkg.LogKeyQueue, q.Name), slog.Int(pkg.LogKeyQueueLengthAfter, q.storage.Length())}
-					})
-				}
-			})
-
-			// set that current task is being processed, so we don't merge it with other tasks
-			t.SetProcessing(true)
-
-			// use lazydebug because it dumps whole queue and task
-			q.lazydebug("queue tasks after wait", func() []any {
-				return []any{
-					slog.String(pkg.LogKeyQueue, q.Name),
-					slog.String(pkg.LogKeyTasks, q.String()),
-				}
-			})
-
-			q.lazydebug("queue task to handle", func() []any {
-				return []any{
-					slog.String(pkg.LogKeyQueue, q.Name),
-					slog.String(pkg.LogKeyTaskType, string(t.GetType())),
-				}
-			})
-
-			var nextSleepDelay time.Duration
-			q.SetStatus(QueueStatusRunningTask)
-
-			defer func() {
-				if r := recover(); r != nil {
-					q.logger.Warn("panic recovered in Start", slog.Any(pkg.LogKeyError, r))
-				}
-			}()
-			taskRes := q.Handler(ctx, t)
-
-			// Check Done channel after long-running operation.
-			select {
-			case <-q.ctx.Done():
-				q.logger.Info("queue stopped after task handling", slog.String(pkg.LogKeyName, q.Name))
-				q.SetStatus(QueueStatusStop)
+			nextSleepDelay, stop := q.processOne(ctx, t, sleepDelay)
+			if stop {
 				return
-			default:
 			}
-
-			switch taskRes.Status {
-			case Success, Keep:
-				// Insert new tasks right after the current task in reverse order.
-				q.withLock(func() {
-					q.storage.ProcessResult(taskRes, t)
-
-					t.SetProcessing(false) // release processing flag
-				})
-
-				q.SetStatus(QueueStatusIdle)
-			case Fail:
-				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
-					q.logger.Warn("result is fail, cannot process tasks in result",
-						slog.Int(pkg.LogKeyAfterTaskCount, len(taskRes.GetAfterTasks())),
-						slog.Int(pkg.LogKeyHeadTaskCount, len(taskRes.GetHeadTasks())),
-						slog.Int(pkg.LogKeyTailTaskCount, len(taskRes.GetTailTasks())))
-				}
-
-				t.SetProcessing(false)
-				// Exponential backoff delay before retry.
-				nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
-				t.IncrementFailureCount()
-				q.SetStatusText(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
-			case Repeat:
-				if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
-					q.logger.Warn("result is repeat, cannot process tasks in result",
-						slog.Int(pkg.LogKeyAfterTaskCount, len(taskRes.GetAfterTasks())),
-						slog.Int(pkg.LogKeyHeadTaskCount, len(taskRes.GetHeadTasks())),
-						slog.Int(pkg.LogKeyTailTaskCount, len(taskRes.GetTailTasks())))
-				}
-
-				// repeat a current task after a small delay
-				t.SetProcessing(false)
-				nextSleepDelay = q.DelayOnRepeat
-				q.SetStatus(QueueStatusRepeatTask)
-			}
-
-			if taskRes.DelayBeforeNextTask != 0 {
-				nextSleepDelay = taskRes.DelayBeforeNextTask
-				q.SetStatusText(fmt.Sprintf("sleep for %s", nextSleepDelay.String()))
-			}
-
 			sleepDelay = nextSleepDelay
-
-			if taskRes.AfterHandle != nil {
-				taskRes.AfterHandle()
-			}
-			// use lazydebug because it dumps whole queue
-			q.lazydebug("queue: tasks after handle", func() []any {
-				return []any{slog.String(pkg.LogKeyQueue, q.Name), slog.String(pkg.LogKeyTasks, q.String())}
-			})
 		}
 	}()
 
 	q.started.Store(true)
+}
+
+// processOne processes a single task fetched from the queue.
+// It contains its own recover() so a panic inside q.Handler does NOT kill
+// the worker goroutine - the loop continues with the next task.
+//
+// Returns the sleepDelay to use before fetching the next task, and stop=true
+// if the worker must exit (queue context cancelled).
+func (q *TaskQueue) processOne(ctx context.Context, t task.Task, _ time.Duration) (nextSleepDelay time.Duration, stop bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			q.logger.Warn("panic recovered in TaskQueue Start",
+				slog.String(pkg.LogKeyQueue, q.Name),
+				slog.String(pkg.LogKeyTaskID, t.GetId()),
+				slog.String(pkg.LogKeyTaskType, string(t.GetType())),
+				slog.Any(pkg.LogKeyError, r),
+				slog.String(pkg.LogKeyStack, string(debug.Stack())),
+			)
+
+			// Make sure the task is no longer marked as processing and apply
+			// a backoff so we don't hot-loop on the same panicking task.
+			t.SetProcessing(false)
+			t.IncrementFailureCount()
+			nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
+			q.SetStatus(QueueStatusIdle)
+			q.SetStatusText(fmt.Sprintf("sleep after panic for %s", nextSleepDelay.String()))
+		}
+	}()
+
+	q.withLock(func() {
+		if q.queueTasksCounter.IsAnyCapReached() {
+			q.lazydebug("triggering compaction before task processing", func() []any {
+				return []any{slog.String(pkg.LogKeyQueue, q.Name), slog.String(pkg.LogKeyTaskID, t.GetId()), slog.String(pkg.LogKeyTaskType, string(t.GetType())), slog.Int(pkg.LogKeyQueueLength, q.storage.Length())}
+			})
+
+			q.compaction(q.queueTasksCounter.GetReachedCap())
+
+			q.lazydebug("compaction completed, queue no longer dirty", func() []any {
+				return []any{slog.String(pkg.LogKeyQueue, q.Name), slog.Int(pkg.LogKeyQueueLengthAfter, q.storage.Length())}
+			})
+		}
+	})
+
+	// set that current task is being processed, so we don't merge it with other tasks
+	t.SetProcessing(true)
+
+	q.lazydebug("queue tasks after wait", func() []any {
+		return []any{
+			slog.String(pkg.LogKeyQueue, q.Name),
+			slog.String(pkg.LogKeyTasks, q.String()),
+		}
+	})
+
+	q.lazydebug("queue task to handle", func() []any {
+		return []any{
+			slog.String(pkg.LogKeyQueue, q.Name),
+			slog.String(pkg.LogKeyTaskType, string(t.GetType())),
+		}
+	})
+
+	q.SetStatus(QueueStatusRunningTask)
+
+	taskRes := q.Handler(ctx, t)
+
+	// Check Done channel after long-running operation.
+	select {
+	case <-q.ctx.Done():
+		q.logger.Info("queue stopped after task handling", slog.String(pkg.LogKeyName, q.Name))
+		q.SetStatus(QueueStatusStop)
+		stop = true
+		return
+	default:
+	}
+
+	switch taskRes.Status {
+	case Success, Keep:
+		// Insert new tasks right after the current task in reverse order.
+		q.withLock(func() {
+			q.storage.ProcessResult(taskRes, t)
+
+			t.SetProcessing(false) // release processing flag
+		})
+
+		q.SetStatus(QueueStatusIdle)
+	case Fail:
+		if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
+			q.logger.Warn("result is fail, cannot process tasks in result",
+				slog.Int(pkg.LogKeyAfterTaskCount, len(taskRes.GetAfterTasks())),
+				slog.Int(pkg.LogKeyHeadTaskCount, len(taskRes.GetHeadTasks())),
+				slog.Int(pkg.LogKeyTailTaskCount, len(taskRes.GetTailTasks())))
+		}
+
+		t.SetProcessing(false)
+		// Exponential backoff delay before retry.
+		nextSleepDelay = q.ExponentialBackoffFn(t.GetFailureCount())
+		t.IncrementFailureCount()
+		q.SetStatusText(fmt.Sprintf("sleep after fail for %s", nextSleepDelay.String()))
+	case Repeat:
+		if len(taskRes.GetAfterTasks()) > 0 || len(taskRes.GetHeadTasks()) > 0 || len(taskRes.GetTailTasks()) > 0 {
+			q.logger.Warn("result is repeat, cannot process tasks in result",
+				slog.Int(pkg.LogKeyAfterTaskCount, len(taskRes.GetAfterTasks())),
+				slog.Int(pkg.LogKeyHeadTaskCount, len(taskRes.GetHeadTasks())),
+				slog.Int(pkg.LogKeyTailTaskCount, len(taskRes.GetTailTasks())))
+		}
+
+		// repeat a current task after a small delay
+		t.SetProcessing(false)
+		nextSleepDelay = q.DelayOnRepeat
+		q.SetStatus(QueueStatusRepeatTask)
+	}
+
+	if taskRes.DelayBeforeNextTask != 0 {
+		nextSleepDelay = taskRes.DelayBeforeNextTask
+		q.SetStatusText(fmt.Sprintf("sleep for %s", nextSleepDelay.String()))
+	}
+
+	if taskRes.AfterHandle != nil {
+		taskRes.AfterHandle()
+	}
+	q.lazydebug("queue: tasks after handle", func() []any {
+		return []any{slog.String(pkg.LogKeyQueue, q.Name), slog.String(pkg.LogKeyTasks, q.String())}
+	})
+
+	return nextSleepDelay, false
 }
 
 // waitForTask returns a task that can be processed or a nil if context is canceled.
@@ -1007,7 +1050,12 @@ func (q *TaskQueue) IterateSnapshot(doFn func(task.Task)) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			q.logger.Warn("panic recovered in IterateSnapshot", slog.Any(pkg.LogKeyError, r))
+			q.logger.Warn("panic recovered in TaskQueue IterateSnapshot",
+				slog.Any(pkg.LogKeyError, r),
+				slog.String(pkg.LogKeyStack, string(debug.Stack())),
+				slog.String(pkg.LogKeyQueue, q.Name),
+				slog.Int(pkg.LogKeyTasksCount, len(snapshot)),
+			)
 		}
 	}()
 
@@ -1072,7 +1120,12 @@ func (q *TaskQueue) withLock(fn func()) {
 		q.m.Unlock()
 
 		if r := recover(); r != nil {
-			q.logger.Warn("panic recovered in withLock", slog.Any(pkg.LogKeyError, r))
+			q.logger.Warn("panic recovered in withLock",
+				slog.Any(pkg.LogKeyError, r),
+				slog.String(pkg.LogKeyStack, string(debug.Stack())),
+				slog.String(pkg.LogKeyQueue, q.Name),
+				slog.Int(pkg.LogKeyQueueLength, q.Length()),
+			)
 		}
 	}()
 
