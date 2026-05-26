@@ -33,11 +33,9 @@ func Run(cmd *exec.Cmd) error {
 	// TODO observability
 	log.Debug("Executing command", slog.String(pkg.LogKeyCommand, strings.Join(cmd.Args, " ")), slog.String(pkg.LogKeyDir, cmd.Dir))
 
-	if err := cmd.Start(); err != nil {
+	if err := startAndRegister(cmd); err != nil {
 		return err
 	}
-
-	registerPID(cmd.Process.Pid)
 	defer unregisterPID(cmd.Process.Pid)
 
 	return cmd.Wait()
@@ -139,11 +137,9 @@ func (e *Executor) Output() ([]byte, error) {
 		e.cmd.Stderr = &stderrBuf
 	}
 
-	if err := e.cmd.Start(); err != nil {
+	if err := startAndRegister(e.cmd); err != nil {
 		return nil, err
 	}
-
-	registerPID(e.cmd.Process.Pid)
 	defer unregisterPID(e.cmd.Process.Pid)
 
 	err := e.cmd.Wait()
@@ -194,11 +190,9 @@ func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]stri
 	e.cmd.Stdout = plo
 	e.cmd.Stderr = io.MultiWriter(ple, stdErr)
 
-	if err := e.cmd.Start(); err != nil {
+	if err := startAndRegister(e.cmd); err != nil {
 		return nil, fmt.Errorf("cmd start: %w", err)
 	}
-
-	registerPID(e.cmd.Process.Pid)
 	defer unregisterPID(e.cmd.Process.Pid)
 
 	err := e.cmd.Wait()

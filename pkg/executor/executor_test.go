@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -258,7 +259,7 @@ func randStringRunes(n int) string {
 func newTestRegistry(t *testing.T) *processRegistry {
 	t.Helper()
 
-	r := &processRegistry{activePIDs: make(map[int32]struct{})}
+	r := &processRegistry{activePIDs: make(map[int]struct{})}
 	orig := registry
 	registry = r
 	t.Cleanup(func() { registry = orig })
@@ -267,7 +268,7 @@ func newTestRegistry(t *testing.T) *processRegistry {
 }
 
 func TestProcessRegistry_Basic(t *testing.T) {
-	r := &processRegistry{activePIDs: make(map[int32]struct{})}
+	r := &processRegistry{activePIDs: make(map[int]struct{})}
 
 	// Initially empty
 	assert.False(t, r.IsActive(1), "IsActive should return false for unknown PID")
@@ -284,7 +285,7 @@ func TestProcessRegistry_Basic(t *testing.T) {
 }
 
 func TestProcessRegistry_DoubleUnregister(t *testing.T) {
-	r := &processRegistry{activePIDs: make(map[int32]struct{})}
+	r := &processRegistry{activePIDs: make(map[int]struct{})}
 
 	r.register(100)
 	r.unregister(100)
@@ -294,7 +295,7 @@ func TestProcessRegistry_DoubleUnregister(t *testing.T) {
 }
 
 func TestProcessRegistry_Concurrent(t *testing.T) {
-	r := &processRegistry{activePIDs: make(map[int32]struct{})}
+	r := &processRegistry{activePIDs: make(map[int]struct{})}
 	const goroutines = 100
 	const pidsPerGoroutine = 100
 
@@ -356,6 +357,33 @@ func TestTracker_IsActive(t *testing.T) {
 
 	unregisterPID(42)
 	assert.False(t, tracker.IsActive(42))
+}
+
+func TestStartAndRegister_AtomicWithReaper(t *testing.T) {
+	r := newTestRegistry(t)
+
+	// StartAndRegister must hold the write-lock across both cmd.Start() and
+	// PID registration, so there is no window where a zombie reaper could
+	// observe IsActive(pid) == false for a child that cmd.Wait will later reap.
+	cmd := exec.Command("sleep", "2")
+	require.NoError(t, startAndRegister(cmd))
+	defer cmd.Process.Kill()
+
+	pid := cmd.Process.Pid
+
+	// The PID must already be visible in the registry — no race window.
+	assert.True(t, r.IsActive(pid), "PID should be registered immediately after StartAndRegister returns")
+
+	// Simulate what the reaper does: check via the ProcessTracker interface.
+	tracker := Tracker()
+	assert.True(t, tracker.IsActive(pid), "ProcessTracker must see the PID as active")
+
+	// Clean up: wait for the process to finish after killing it.
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+
+	unregisterPID(pid)
+	assert.False(t, r.IsActive(pid), "PID should be gone after unregister")
 }
 
 func TestGlobalRegistry_Output_RegistersPID(t *testing.T) {
