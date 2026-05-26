@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -159,4 +160,13 @@ func (m *WebhookManager) Start() error {
 	}
 
 	return nil
+}
+
+// Shutdown stops the underlying webhook https server. Safe to call when the
+// manager was never started.
+func (m *WebhookManager) Shutdown(ctx context.Context) error {
+	if m.Server == nil {
+		return nil
+	}
+	return m.Server.Shutdown(ctx)
 }

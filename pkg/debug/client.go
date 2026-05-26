@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/flant/shell-operator/pkg/app"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
 )
 
@@ -53,8 +52,11 @@ func (c *Client) Close() {
 	}
 }
 
+// DefaultClient connects to the unix socket pointed at by DefaultSocketPath.
+// CLI commands bind --debug-unix-socket against DefaultSocketPath via
+// DefineSocketFlag so that this function picks up any flag-supplied override.
 func DefaultClient() (*Client, error) {
-	return NewClient(app.DebugUnixSocket)
+	return NewClient(DefaultSocketPath)
 }
 
 func (c *Client) Get(url string) ([]byte, error) {

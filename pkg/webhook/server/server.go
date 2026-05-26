@@ -1,13 +1,16 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -21,6 +24,11 @@ type WebhookServer struct {
 	Namespace string
 	Router    chi.Router
 	Logger    *log.Logger
+
+	mu       sync.Mutex
+	srv      *http.Server
+	listener net.Listener
+	doneCh   chan struct{}
 }
 
 func NewWebhookServer(settings *Settings, namespace string, router chi.Router, logger *log.Logger) *WebhookServer {
@@ -33,8 +41,10 @@ func NewWebhookServer(settings *Settings, namespace string, router chi.Router, l
 }
 
 // Start runs https server to listen for AdmissionReview requests from the API-server.
+// Start does not block; the server runs in its own goroutine. A non-nil error
+// means the server failed to bind or load TLS material. Once Start returns nil,
+// the only way the server stops is via Shutdown.
 func (s *WebhookServer) Start() error {
-	// Load server certificate.
 	keyPair, err := tls.LoadX509KeyPair(
 		s.Settings.ServerCertPath,
 		s.Settings.ServerKeyPath,
@@ -43,7 +53,6 @@ func (s *WebhookServer) Start() error {
 		return fmt.Errorf("load TLS certs: %v", err)
 	}
 
-	// Construct a hostname for certificate.
 	host := fmt.Sprintf("%s.%s",
 		s.Settings.ServiceName,
 		s.Namespace,
@@ -54,7 +63,6 @@ func (s *WebhookServer) Start() error {
 		ServerName:   host,
 	}
 
-	// Load client CA if defined
 	if len(s.Settings.ClientCAPaths) > 0 {
 		roots := x509.NewCertPool()
 
@@ -75,7 +83,6 @@ func (s *WebhookServer) Start() error {
 	}
 
 	listenAddr := net.JoinHostPort(s.Settings.ListenAddr, s.Settings.ListenPort)
-	// Check if port is available
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return fmt.Errorf("try listen on '%s': %v", listenAddr, err)
@@ -92,15 +99,48 @@ func (s *WebhookServer) Start() error {
 		ReadHeaderTimeout: timeout,
 	}
 
+	doneCh := make(chan struct{})
+
+	s.mu.Lock()
+	s.srv = srv
+	s.listener = listener
+	s.doneCh = doneCh
+	s.mu.Unlock()
+
 	go func() {
+		defer close(doneCh)
 		s.Logger.Info("Webhook server listens", slog.String(pkg.LogKeyAddress, listenAddr))
-		err := srv.ServeTLS(listener, "", "")
-		if err != nil {
-			s.Logger.Error("Error starting Webhook https server", log.Err(err))
-			// Stop process if server can't start.
-			os.Exit(1)
+		if err := srv.ServeTLS(listener, "", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			s.Logger.Error("Webhook https server stopped with error", log.Err(err))
 		}
 	}()
 
+	return nil
+}
+
+// Shutdown gracefully stops the webhook https server. It is safe to call when
+// the server was never started or has already been shut down — both return nil.
+// The provided ctx bounds how long Shutdown waits for in-flight handlers.
+func (s *WebhookServer) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	srv := s.srv
+	doneCh := s.doneCh
+	s.srv = nil
+	s.mu.Unlock()
+
+	if srv == nil {
+		return nil
+	}
+
+	if err := srv.Shutdown(ctx); err != nil {
+		return fmt.Errorf("webhook https server shutdown: %w", err)
+	}
+	if doneCh != nil {
+		select {
+		case <-doneCh:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	return nil
 }

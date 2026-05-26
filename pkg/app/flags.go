@@ -115,10 +115,9 @@ func bindLogFlags(cfg *Config, cmd *cobra.Command) {
 }
 
 func bindDebugFlags(cfg *Config, rootCmd *cobra.Command, cmd *cobra.Command) {
-	// Sync the package-level global so debug sub-commands (queue, hook, etc.)
-	// that bind to DebugUnixSocket get the env/default value.
-	ApplyConfig(cfg)
-
+	// Note: cfg.Debug.UnixSocket is the source of truth. The CLI (main.go)
+	// is responsible for syncing it into debug.DefaultSocketPath after flag
+	// parsing so debug sub-commands can connect to the same socket.
 	f := cmd.Flags()
 	f.StringVar(&cfg.Debug.UnixSocket, "debug-unix-socket", cfg.Debug.UnixSocket, "A path to a unix socket for a debug endpoint. Can be set with $DEBUG_UNIX_SOCKET.")
 	_ = f.MarkHidden("debug-unix-socket")

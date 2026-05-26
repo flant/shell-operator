@@ -43,14 +43,18 @@ type TaskRunner func(ctx context.Context, t task.Task) queue.TaskResult
 type AdmissionEventHandler struct {
 	hookManager hook.HookManager
 	taskRunner  TaskRunner
+	taskFactory HookTaskFactory
 	logger      *log.Logger
 }
 
-// NewAdmissionEventHandler creates a new AdmissionEventHandler.
-func NewAdmissionEventHandler(hm hook.HookManager, runner TaskRunner, logger *log.Logger) *AdmissionEventHandler {
+// NewAdmissionEventHandler creates a new AdmissionEventHandler. The factory
+// argument is used to build HookRun tasks; pass HookTaskFactory{} to use the
+// default zero-value implementation.
+func NewAdmissionEventHandler(hm hook.HookManager, runner TaskRunner, factory HookTaskFactory, logger *log.Logger) *AdmissionEventHandler {
 	return &AdmissionEventHandler{
 		hookManager: hm,
 		taskRunner:  runner,
+		taskFactory: factory,
 		logger:      logger,
 	}
 }
@@ -71,8 +75,9 @@ func (h *AdmissionEventHandler) Handle(ctx context.Context, event admission.Even
 	logEntry.Debug("Handle event")
 
 	var admissionTask task.Task
-	h.hookManager.HandleAdmissionEvent(ctx, event, func(h *hook.Hook, info controller.BindingExecutionInfo) {
-		admissionTask = globalHookTaskFactory.NewHookRunTask(h.Name, eventBindingType, info, logLabels)
+	factory := h.taskFactory
+	h.hookManager.HandleAdmissionEvent(ctx, event, func(hk *hook.Hook, info controller.BindingExecutionInfo) {
+		admissionTask = factory.NewHookRunTask(hk.Name, eventBindingType, info, logLabels)
 	})
 
 	if admissionTask == nil {
@@ -104,14 +109,18 @@ func (h *AdmissionEventHandler) Handle(ctx context.Context, event admission.Even
 type ConversionEventHandler struct {
 	hookManager hook.HookManager
 	taskRunner  TaskRunner
+	taskFactory HookTaskFactory
 	logger      *log.Logger
 }
 
-// NewConversionEventHandler creates a new ConversionEventHandler.
-func NewConversionEventHandler(hm hook.HookManager, runner TaskRunner, logger *log.Logger) *ConversionEventHandler {
+// NewConversionEventHandler creates a new ConversionEventHandler. The factory
+// argument is used to build HookRun tasks; pass HookTaskFactory{} to use the
+// default zero-value implementation.
+func NewConversionEventHandler(hm hook.HookManager, runner TaskRunner, factory HookTaskFactory, logger *log.Logger) *ConversionEventHandler {
 	return &ConversionEventHandler{
 		hookManager: hm,
 		taskRunner:  runner,
+		taskFactory: factory,
 		logger:      logger,
 	}
 }
@@ -145,10 +154,11 @@ func (h *ConversionEventHandler) Handle(ctx context.Context, crdName string, req
 			slog.String(pkg.LogKeyName, rule.String()),
 			slog.Any(pkg.LogKeyValue, convPath))
 
+		factory := h.taskFactory
 		for _, convRule := range convPath {
 			var convTask task.Task
 			h.hookManager.HandleConversionEvent(ctx, crdName, request, convRule, func(hk *hook.Hook, info controller.BindingExecutionInfo) {
-				convTask = globalHookTaskFactory.NewHookRunTask(hk.Name, types.KubernetesConversion, info, logLabels)
+				convTask = factory.NewHookRunTask(hk.Name, types.KubernetesConversion, info, logLabels)
 			})
 
 			if convTask == nil {

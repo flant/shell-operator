@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/spf13/cobra"
@@ -15,9 +17,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 
 	"github.com/flant/shell-operator/pkg/app"
-	"github.com/flant/shell-operator/pkg/metrics"
 	shell_operator "github.com/flant/shell-operator/pkg/shell-operator"
-	utils_signal "github.com/flant/shell-operator/pkg/utils/signal"
 )
 
 const (
@@ -25,31 +25,29 @@ const (
 	AppDescription = "Shell-operator is a tool for running event-driven scripts in a Kubernetes cluster"
 )
 
+// start returns the cobra RunE used by the "start" sub-command. It owns the
+// process-wide concerns (signal handling, OpenTelemetry, log defaults) and
+// delegates the actual lifecycle to shell-operator's Run method, which Starts,
+// blocks until ctx is done, and synchronously Shuts down.
 func start(logger *log.Logger, cfg *app.Config) func(cmd *cobra.Command, args []string) error {
 	return func(_ *cobra.Command, _ []string) error {
-		app.AppStartMessage = fmt.Sprintf("%s %s", app.AppName, app.Version)
-		ctx := context.Background()
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
 		telemetryShutdown := registerTelemetry(ctx)
+		defer func() { _ = telemetryShutdown(context.Background()) }()
 
-		// Initialize metric names with the configured prefix.
-		metrics.InitMetrics(cfg.App.PrometheusMetricsPrefix)
+		fmt.Println(app.AppName, app.Version)
 
-		// Init logging and initialize a ShellOperator instance.
-		operator, err := shell_operator.Init(ctx, cfg, logger.Named("shell-operator"))
+		op, err := shell_operator.NewShellOperator(ctx, cfg, shell_operator.WithLogger(logger.Named("shell-operator")))
 		if err != nil {
-			return fmt.Errorf("init failed: %w", err)
+			return fmt.Errorf("build shell-operator: %w", err)
 		}
 
-		operator.Start()
-
-		// Block until OS signal.
-		utils_signal.WaitForProcessInterruption(func() {
-			operator.Shutdown()
-			_ = telemetryShutdown(ctx)
-			os.Exit(1)
-		})
-
-		return nil
+		// Run blocks until ctx is canceled (typically by SIGINT/SIGTERM) and
+		// performs a synchronous Shutdown before returning. No os.Exit on the
+		// graceful path; the caller (cobra) maps a nil return to exit 0.
+		return op.Run(ctx)
 	}
 }
 

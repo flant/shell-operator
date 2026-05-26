@@ -74,10 +74,10 @@ func TestLoadHook_allHooksHaveNonNilConfig(t *testing.T) {
 // returns an error when the hook binary doesn't exist or fails.
 func TestFetchHookConfig_returnsErrorForNonExecutable(t *testing.T) {
 	conversionManager := conversion.NewWebhookManager()
-	conversionManager.Settings = conversion.DefaultSettings
+	conversionManager.Settings = testConversionSettings()
 
 	admissionManager := admission.NewWebhookManager(nil)
-	admissionManager.Settings = admission.DefaultSettings
+	admissionManager.Settings = testAdmissionSettings()
 
 	cfg := &ManagerConfig{
 		WorkingDir:               t.TempDir(),

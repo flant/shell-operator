@@ -27,7 +27,13 @@ import (
 
 // Metric name variables organized by functional area.
 // Each variable represents a unique metric name used throughout shell-operator.
-// These variables are initialized with prefix replacement at startup.
+// These variables are initialized with prefix replacement at startup via
+// InitMetrics. InitMetrics is idempotent for the same prefix because the
+// substitution removes the {PREFIX} placeholder on the first call.
+//
+// Library callers that need a per-instance snapshot of the resolved names
+// should use NewNames(prefix) and pass the returned *Names around explicitly,
+// avoiding the package-level globals altogether.
 var (
 	// ============================================================================
 	// Common Metrics
@@ -87,6 +93,76 @@ var (
 // with a specific prefix instead of relying on the metrics storage's automatic replacement.
 func ReplacePrefix(metricName, prefix string) string {
 	return strings.ReplaceAll(metricName, "{PREFIX}", prefix)
+}
+
+// Names is a per-instance snapshot of every metric name shell-operator emits,
+// with the {PREFIX} placeholder already substituted. Library consumers that
+// embed shell-operator may build one with NewNames(prefix) and reference its
+// fields instead of the package-level variables, which avoids any reliance on
+// the global InitMetrics call having run with a compatible prefix.
+type Names struct {
+	LiveTicks                               string
+	TasksQueueActionDurationSeconds         string
+	TasksQueueLength                        string
+	TasksQueueCompactionOperationsTotal     string
+	TasksQueueCompactionTasksByHook         string
+	HookEnableKubernetesBindingsSeconds     string
+	HookEnableKubernetesBindingsErrorsTotal string
+	HookEnableKubernetesBindingsSuccess     string
+	HookRunSeconds                          string
+	HookRunUserCPUSeconds                   string
+	HookRunSysCPUSeconds                    string
+	HookRunMaxRSSBytes                      string
+	HookRunErrorsTotal                      string
+	HookRunAllowedErrorsTotal               string
+	HookRunSuccessTotal                     string
+	TaskWaitInQueueSecondsTotal             string
+	KubeSnapshotObjects                     string
+	KubeJqFilterDurationSeconds             string
+	KubeEventDurationSeconds                string
+	KubernetesClientWatchErrorsTotal        string
+}
+
+// NewNames builds a *Names with prefix substituted into every metric template.
+// Calling NewNames does not mutate any package-level state, so multiple
+// instances with different prefixes can coexist when needed.
+func NewNames(prefix string) *Names {
+	r := func(name string) string { return ReplacePrefix(name, prefix) }
+
+	// Source the templates straight from the package vars but force them back
+	// to the {PREFIX} form so the resolved prefix wins, regardless of any
+	// previous InitMetrics call. We do this by re-resolving against the known
+	// suffix, defaulting to the current var value when there's no placeholder
+	// match left to recover.
+	tpl := func(current, suffix string) string {
+		if strings.Contains(current, "{PREFIX}") {
+			return r(current)
+		}
+		return prefix + suffix
+	}
+
+	return &Names{
+		LiveTicks:                               tpl(LiveTicks, "live_ticks"),
+		TasksQueueActionDurationSeconds:         tpl(TasksQueueActionDurationSeconds, "tasks_queue_action_duration_seconds"),
+		TasksQueueLength:                        tpl(TasksQueueLength, "tasks_queue_length"),
+		TasksQueueCompactionOperationsTotal:     "d8_telemetry_" + prefix + "tasks_queue_compaction_operations_total",
+		TasksQueueCompactionTasksByHook:         "d8_telemetry_" + prefix + "tasks_queue_compaction_tasks_by_hook",
+		HookEnableKubernetesBindingsSeconds:     tpl(HookEnableKubernetesBindingsSeconds, "hook_enable_kubernetes_bindings_seconds"),
+		HookEnableKubernetesBindingsErrorsTotal: tpl(HookEnableKubernetesBindingsErrorsTotal, "hook_enable_kubernetes_bindings_errors_total"),
+		HookEnableKubernetesBindingsSuccess:     tpl(HookEnableKubernetesBindingsSuccess, "hook_enable_kubernetes_bindings_success"),
+		HookRunSeconds:                          tpl(HookRunSeconds, "hook_run_seconds"),
+		HookRunUserCPUSeconds:                   tpl(HookRunUserCPUSeconds, "hook_run_user_cpu_seconds"),
+		HookRunSysCPUSeconds:                    tpl(HookRunSysCPUSeconds, "hook_run_sys_cpu_seconds"),
+		HookRunMaxRSSBytes:                      tpl(HookRunMaxRSSBytes, "hook_run_max_rss_bytes"),
+		HookRunErrorsTotal:                      tpl(HookRunErrorsTotal, "hook_run_errors_total"),
+		HookRunAllowedErrorsTotal:               tpl(HookRunAllowedErrorsTotal, "hook_run_allowed_errors_total"),
+		HookRunSuccessTotal:                     tpl(HookRunSuccessTotal, "hook_run_success_total"),
+		TaskWaitInQueueSecondsTotal:             tpl(TaskWaitInQueueSecondsTotal, "task_wait_in_queue_seconds_total"),
+		KubeSnapshotObjects:                     tpl(KubeSnapshotObjects, "kube_snapshot_objects"),
+		KubeJqFilterDurationSeconds:             tpl(KubeJqFilterDurationSeconds, "kube_jq_filter_duration_seconds"),
+		KubeEventDurationSeconds:                tpl(KubeEventDurationSeconds, "kube_event_duration_seconds"),
+		KubernetesClientWatchErrorsTotal:        tpl(KubernetesClientWatchErrorsTotal, "kubernetes_client_watch_errors_total"),
+	}
 }
 
 // InitMetrics initializes all metric name variables by replacing {PREFIX} placeholders

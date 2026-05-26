@@ -35,11 +35,11 @@ func NewContextCombiner() *ContextCombiner {
 		metricsstorage.WithLogger(log.NewNop()),
 	)
 
-	op := shell_operator.NewShellOperator(
+	op := shell_operator.NewBareShellOperator(
 		context.Background(),
-		metricStorage,
-		metricStorage,
 		shell_operator.WithLogger(log.NewNop()),
+		shell_operator.WithMetricStorage(metricStorage),
+		shell_operator.WithHookMetricStorage(metricStorage),
 	)
 
 	op.TaskQueues = queue.NewTaskQueueSet().WithMetricStorage(metricStorage)
