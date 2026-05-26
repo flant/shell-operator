@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -12,6 +13,17 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg"
+)
+
+const (
+	// submitMaxRetries is the number of retry attempts for webhook configuration
+	// registration against the API server. Brief API server unavailability (e.g.
+	// during rolling restarts or leader election) should not cause a fatal exit.
+	submitMaxRetries = 5
+	// submitInitialBackoff is the initial delay between retries. It doubles on
+	// each consecutive failure up to submitMaxBackoff.
+	submitInitialBackoff = 2 * time.Second
+	submitMaxBackoff     = 15 * time.Second
 )
 
 type WebhookResourceOptions struct {
@@ -103,10 +115,27 @@ func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfigurati
 	listOpts := metav1.ListOptions{
 		FieldSelector: "metadata.name=" + conf.Name,
 	}
-	list, err := client.List(context.TODO(), listOpts)
-	if err != nil {
+
+	var list *v1.ValidatingWebhookConfigurationList
+	var err error
+	backoff := submitInitialBackoff
+	for attempt := 0; attempt <= submitMaxRetries; attempt++ {
+		list, err = client.List(context.TODO(), listOpts)
+		if err == nil {
+			break
+		}
+		if attempt < submitMaxRetries {
+			logger.Warn("list ValidatingWebhookConfiguration failed, retrying",
+				log.Err(err),
+				slog.Int("attempt", attempt+1),
+				slog.Duration("backoff", backoff))
+			time.Sleep(backoff)
+			backoff = min(backoff*2, submitMaxBackoff)
+			continue
+		}
 		return fmt.Errorf("list ValidatingWebhookConfiguration: %w", err)
 	}
+
 	if len(list.Items) == 0 {
 		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
 		if err != nil {
@@ -187,10 +216,27 @@ func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) 
 	listOpts := metav1.ListOptions{
 		FieldSelector: "metadata.name=" + conf.Name,
 	}
-	list, err := client.List(context.TODO(), listOpts)
-	if err != nil {
+
+	var list *v1.MutatingWebhookConfigurationList
+	var err error
+	backoff := submitInitialBackoff
+	for attempt := 0; attempt <= submitMaxRetries; attempt++ {
+		list, err = client.List(context.TODO(), listOpts)
+		if err == nil {
+			break
+		}
+		if attempt < submitMaxRetries {
+			logger.Warn("list MutatingWebhookConfiguration failed, retrying",
+				log.Err(err),
+				slog.Int("attempt", attempt+1),
+				slog.Duration("backoff", backoff))
+			time.Sleep(backoff)
+			backoff = min(backoff*2, submitMaxBackoff)
+			continue
+		}
 		return fmt.Errorf("list MutatingWebhookConfiguration: %w", err)
 	}
+
 	if len(list.Items) == 0 {
 		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
 		if err != nil {

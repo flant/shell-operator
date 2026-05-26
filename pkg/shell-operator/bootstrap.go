@@ -3,6 +3,8 @@ package shell_operator
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
@@ -239,18 +241,52 @@ func (op *ShellOperator) assembleShellOperator(cfg *app.Config, hooksDir string,
 	}
 
 	// Load validation hooks.
-	err = op.initValidatingWebhookManager()
+	// Retry with backoff: a brief API server blip during startup should not
+	// cause a fatal crash and a long CrashLoopBackOff cycle.
+	err = retryWithBackoff(op.logger, "ValidatingWebhookManager", op.initValidatingWebhookManager)
 	if err != nil {
 		return fmt.Errorf("initialize ValidatingWebhookManager fail: %w", err)
 	}
 
 	// Load conversion hooks.
-	err = op.initConversionWebhookManager()
+	err = retryWithBackoff(op.logger, "ConversionWebhookManager", op.initConversionWebhookManager)
 	if err != nil {
 		return fmt.Errorf("initialize ConversionWebhookManager fail: %w", err)
 	}
 
 	return nil
+}
+
+const (
+	webhookInitMaxRetries     = 8
+	webhookInitMinBackoff     = 1 * time.Second
+	webhookInitMaxBackoff     = 15 * time.Second
+	webhookInitTotalBudgetStr = "~2 min"
+)
+
+// retryWithBackoff retries fn with exponential backoff. It is used to tolerate
+// brief API server unavailability during webhook manager initialization so the
+// process does not exit fatally and enter a long CrashLoopBackOff cycle.
+func retryWithBackoff(logger *log.Logger, name string, fn func() error) error {
+	backoff := webhookInitMinBackoff
+	var lastErr error
+	for attempt := 0; attempt <= webhookInitMaxRetries; attempt++ {
+		lastErr = fn()
+		if lastErr == nil {
+			return nil
+		}
+		if attempt < webhookInitMaxRetries {
+			logger.Warn("webhook manager init failed, retrying",
+				slog.String("manager", name),
+				slog.Int("attempt", attempt+1),
+				slog.Duration("backoff", backoff),
+				slog.String("budget", webhookInitTotalBudgetStr),
+				log.Err(lastErr))
+			time.Sleep(backoff)
+			backoff = min(backoff*2, webhookInitMaxBackoff)
+		}
+	}
+	return lastErr
 }
 
 // SetupEventManagers instantiate queues and managers for schedule and Kubernetes events.
