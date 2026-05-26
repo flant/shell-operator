@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -44,6 +45,11 @@ type Manager struct {
 	keepTemporaryHookFiles bool
 	logProxyHookJSON       bool
 	logProxyHookJSONKey    string
+
+	// indexMu protects hookNamesInOrder, hooksByName and hooksInOrder so that
+	// Init() (which fully rebuilds the indices) does not race with concurrent
+	// readers from queue workers and event handlers.
+	indexMu sync.RWMutex
 
 	// sorted hook names
 	hookNamesInOrder []string
@@ -115,11 +121,12 @@ func (hm *Manager) TempDir() string {
 }
 
 // Init finds executables in WorkingDir, execute them with --config argument and add them into indices.
+//
+// Indices are built into local maps first and only swapped into the Manager
+// under indexMu, so concurrent readers (queue workers, event handlers) never
+// observe a half-built state.
 func (hm *Manager) Init() error {
 	hm.logger.Info("Initialize hooks manager. Search for and load all hooks.")
-
-	hm.hooksInOrder = make(map[htypes.BindingType][]*Hook)
-	hm.hooksByName = make(map[string]*Hook)
 
 	if err := utils_file.RecursiveCheckLibDirectory(hm.workingDir); err != nil {
 		hm.logger.Error("failed to check lib directory",
@@ -136,6 +143,10 @@ func (hm *Manager) Init() error {
 	sort.Strings(hookPaths)
 	hm.logger.Debug("Search hooks in paths", slog.Any(pkg.LogKeyPaths, hookPaths))
 
+	newHooksInOrder := make(map[htypes.BindingType][]*Hook)
+	newHooksByName := make(map[string]*Hook)
+	newHookNamesInOrder := make([]string, 0, len(hookPaths))
+
 	for _, hookPath := range hookPaths {
 		hook, err := hm.loadHook(hookPath)
 		if err != nil {
@@ -144,11 +155,17 @@ func (hm *Manager) Init() error {
 
 		// register hook in indices
 		for _, binding := range hook.Config.Bindings() {
-			hm.hooksInOrder[binding] = append(hm.hooksInOrder[binding], hook)
+			newHooksInOrder[binding] = append(newHooksInOrder[binding], hook)
 		}
-		hm.hooksByName[hook.Name] = hook
-		hm.hookNamesInOrder = append(hm.hookNamesInOrder, hook.Name)
+		newHooksByName[hook.Name] = hook
+		newHookNamesInOrder = append(newHookNamesInOrder, hook.Name)
 	}
+
+	hm.indexMu.Lock()
+	hm.hooksInOrder = newHooksInOrder
+	hm.hooksByName = newHooksByName
+	hm.hookNamesInOrder = newHookNamesInOrder
+	hm.indexMu.Unlock()
 
 	// Validate conversion chains and create index with conversion paths.
 	err = hm.UpdateConversionChains()
@@ -283,7 +300,9 @@ func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint str
 }
 
 func (hm *Manager) GetHook(name string) *Hook {
+	hm.indexMu.RLock()
 	hook, exists := hm.hooksByName[name]
+	hm.indexMu.RUnlock()
 	if exists {
 		return hook
 	}
@@ -291,15 +310,30 @@ func (hm *Manager) GetHook(name string) *Hook {
 	return nil
 }
 
+// GetHookNames returns a snapshot copy of registered hook names.
+// A copy is returned so callers can iterate without holding the lock and
+// without observing concurrent mutations from Init().
 func (hm *Manager) GetHookNames() []string {
-	return hm.hookNamesInOrder
+	hm.indexMu.RLock()
+	defer hm.indexMu.RUnlock()
+
+	names := make([]string, len(hm.hookNamesInOrder))
+	copy(names, hm.hookNamesInOrder)
+	return names
 }
 
 func (hm *Manager) GetHooksInOrder(bindingType htypes.BindingType) ([]string, error) {
-	hooks, ok := hm.hooksInOrder[bindingType]
+	hm.indexMu.RLock()
+	src, ok := hm.hooksInOrder[bindingType]
 	if !ok {
+		hm.indexMu.RUnlock()
 		return []string{}, nil
 	}
+	// Work on a copy so we can release the lock and so we don't mutate the
+	// underlying slice (sort.Slice below) while other readers may scan it.
+	hooks := make([]*Hook, len(src))
+	copy(hooks, src)
+	hm.indexMu.RUnlock()
 
 	// OnStartup hooks are sorted by onStartup config value
 	// FIXME: onStartup value is now a config validating error, no need to check it here again.
