@@ -137,6 +137,13 @@ var _ Monitor = (*monitor)(nil)
 func NewMonitor(ctx context.Context, client *klient.Client, mstor metricsstorage.Storage, factoryStore *FactoryStore, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
+	// Ensure config.Logger is set: resource_informer and namespace_informer
+	// access MonitorConfig.Logger directly (ei.Monitor.Logger / ni.Monitor.Logger).
+	// Without this, a nil Logger causes a nil pointer dereference.
+	if config.Logger == nil {
+		config.Logger = logger
+	}
+
 	return &monitor{
 		ctx:               cctx,
 		cancel:            cancel,
