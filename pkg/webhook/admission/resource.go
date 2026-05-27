@@ -13,18 +13,30 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/utils/retry"
 )
 
 const (
 	// submitMaxRetries is the number of retry attempts for webhook configuration
 	// registration against the API server. Brief API server unavailability (e.g.
 	// during rolling restarts or leader election) should not cause a fatal exit.
+	//
+	// Note: the bootstrap-level webhook-init retry (8 attempts, 1 s initial backoff)
+	// wraps this submit-level retry (5 attempts, 2 s initial backoff).  The two
+	// layers stack but serve different purposes — outer retries the full manager
+	// init; inner retries only the API server registration call.
 	submitMaxRetries = 5
 	// submitInitialBackoff is the initial delay between retries. It doubles on
 	// each consecutive failure up to submitMaxBackoff.
 	submitInitialBackoff = 2 * time.Second
 	submitMaxBackoff     = 15 * time.Second
 )
+
+var submitRetryConfig = retry.Config{
+	MaxRetries:     submitMaxRetries,
+	InitialBackoff: submitInitialBackoff,
+	MaxBackoff:     submitMaxBackoff,
+}
 
 type WebhookResourceOptions struct {
 	KubeClient        *klient.Client
@@ -57,7 +69,7 @@ func (w *ValidatingWebhookResource) Get(id string) *ValidatingWebhookConfig {
 	return w.hooks[id]
 }
 
-func (w *ValidatingWebhookResource) Register() error {
+func (w *ValidatingWebhookResource) Register(ctx context.Context) error {
 	configuration := &v1.ValidatingWebhookConfiguration{
 		Webhooks: []v1.ValidatingWebhook{},
 	}
@@ -83,7 +95,7 @@ func (w *ValidatingWebhookResource) Register() error {
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.ValidatingWebhook)
 	}
 
-	return w.submit(configuration)
+	return w.submit(ctx, configuration)
 }
 
 func (w *ValidatingWebhookResource) Unregister() error {
@@ -108,48 +120,31 @@ func createWebhookPath(webhook IWebhookConfig) *string {
 	return &res
 }
 
-func (w *ValidatingWebhookResource) submit(conf *v1.ValidatingWebhookConfiguration) error {
-	logger := w.logger.With(slog.String(pkg.LogKeyName, conf.Name))
+func (w *ValidatingWebhookResource) submit(ctx context.Context, conf *v1.ValidatingWebhookConfiguration) error {
 	client := w.opts.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations()
-
 	listOpts := metav1.ListOptions{
 		FieldSelector: "metadata.name=" + conf.Name,
 	}
 
-	var list *v1.ValidatingWebhookConfigurationList
-	var err error
-	backoff := submitInitialBackoff
-	for attempt := 0; attempt <= submitMaxRetries; attempt++ {
-		list, err = client.List(context.TODO(), listOpts)
-		if err == nil {
-			break
-		}
-		if attempt < submitMaxRetries {
-			logger.Warn("list ValidatingWebhookConfiguration failed, retrying",
-				log.Err(err),
-				slog.Int("attempt", attempt+1),
-				slog.Duration("backoff", backoff))
-			time.Sleep(backoff)
-			backoff = min(backoff*2, submitMaxBackoff)
-			continue
-		}
-		return fmt.Errorf("list ValidatingWebhookConfiguration: %w", err)
-	}
-
-	if len(list.Items) == 0 {
-		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
-		if err != nil {
-			logger.Error("Create ValidatingWebhookConfiguration", log.Err(err))
-		}
-	} else {
-		newConf := list.Items[0]
-		newConf.Webhooks = conf.Webhooks
-		_, err = client.Update(context.TODO(), &newConf, pkg.DefaultUpdateOptions())
-		if err != nil {
-			logger.Error("Replace ValidatingWebhookConfiguration", log.Err(err))
-		}
-	}
-	return nil
+	return retry.WithBackoff(ctx, submitRetryConfig, w.logger.With(slog.String(pkg.LogKeyName, conf.Name)),
+		"ValidatingWebhookConfiguration/submit", func() error {
+			list, err := client.List(ctx, listOpts)
+			if err != nil {
+				return fmt.Errorf("list ValidatingWebhookConfiguration: %w", err)
+			}
+			if len(list.Items) == 0 {
+				if _, err := client.Create(ctx, conf, pkg.DefaultCreateOptions()); err != nil {
+					return fmt.Errorf("create ValidatingWebhookConfiguration: %w", err)
+				}
+			} else {
+				newConf := list.Items[0]
+				newConf.Webhooks = conf.Webhooks
+				if _, err := client.Update(ctx, &newConf, pkg.DefaultUpdateOptions()); err != nil {
+					return fmt.Errorf("update ValidatingWebhookConfiguration: %w", err)
+				}
+			}
+			return nil
+		})
 }
 
 type MutatingWebhookResource struct {
@@ -175,7 +170,7 @@ func (w *MutatingWebhookResource) Get(id string) *MutatingWebhookConfig {
 	return w.hooks[id]
 }
 
-func (w *MutatingWebhookResource) Register() error {
+func (w *MutatingWebhookResource) Register(ctx context.Context) error {
 	configuration := &v1.MutatingWebhookConfiguration{
 		Webhooks: []v1.MutatingWebhook{},
 	}
@@ -201,7 +196,7 @@ func (w *MutatingWebhookResource) Register() error {
 		configuration.Webhooks = append(configuration.Webhooks, *webhook.MutatingWebhook)
 	}
 
-	return w.submit(configuration)
+	return w.submit(ctx, configuration)
 }
 
 func (w *MutatingWebhookResource) Unregister() error {
@@ -209,46 +204,29 @@ func (w *MutatingWebhookResource) Unregister() error {
 		Delete(context.TODO(), w.opts.ConfigurationName, metav1.DeleteOptions{})
 }
 
-func (w *MutatingWebhookResource) submit(conf *v1.MutatingWebhookConfiguration) error {
-	logger := w.logger.With(slog.String(pkg.LogKeyName, conf.Name))
+func (w *MutatingWebhookResource) submit(ctx context.Context, conf *v1.MutatingWebhookConfiguration) error {
 	client := w.opts.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations()
-
 	listOpts := metav1.ListOptions{
 		FieldSelector: "metadata.name=" + conf.Name,
 	}
 
-	var list *v1.MutatingWebhookConfigurationList
-	var err error
-	backoff := submitInitialBackoff
-	for attempt := 0; attempt <= submitMaxRetries; attempt++ {
-		list, err = client.List(context.TODO(), listOpts)
-		if err == nil {
-			break
-		}
-		if attempt < submitMaxRetries {
-			logger.Warn("list MutatingWebhookConfiguration failed, retrying",
-				log.Err(err),
-				slog.Int("attempt", attempt+1),
-				slog.Duration("backoff", backoff))
-			time.Sleep(backoff)
-			backoff = min(backoff*2, submitMaxBackoff)
-			continue
-		}
-		return fmt.Errorf("list MutatingWebhookConfiguration: %w", err)
-	}
-
-	if len(list.Items) == 0 {
-		_, err = client.Create(context.TODO(), conf, pkg.DefaultCreateOptions())
-		if err != nil {
-			logger.Error("Create MutatingWebhookConfiguration", log.Err(err))
-		}
-	} else {
-		newConf := list.Items[0]
-		newConf.Webhooks = conf.Webhooks
-		_, err = client.Update(context.TODO(), &newConf, pkg.DefaultUpdateOptions())
-		if err != nil {
-			logger.Error("Replace MutatingWebhookConfiguration", log.Err(err))
-		}
-	}
-	return nil
+	return retry.WithBackoff(ctx, submitRetryConfig, w.logger.With(slog.String(pkg.LogKeyName, conf.Name)),
+		"MutatingWebhookConfiguration/submit", func() error {
+			list, err := client.List(ctx, listOpts)
+			if err != nil {
+				return fmt.Errorf("list MutatingWebhookConfiguration: %w", err)
+			}
+			if len(list.Items) == 0 {
+				if _, err := client.Create(ctx, conf, pkg.DefaultCreateOptions()); err != nil {
+					return fmt.Errorf("create MutatingWebhookConfiguration: %w", err)
+				}
+			} else {
+				newConf := list.Items[0]
+				newConf.Webhooks = conf.Webhooks
+				if _, err := client.Update(ctx, &newConf, pkg.DefaultUpdateOptions()); err != nil {
+					return fmt.Errorf("update MutatingWebhookConfiguration: %w", err)
+				}
+			}
+			return nil
+		})
 }

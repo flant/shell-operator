@@ -37,9 +37,11 @@ type namespaceInformer struct {
 
 	addFn func(string)
 	delFn func(string)
+
+	logger *log.Logger
 }
 
-func NewNamespaceInformer(ctx context.Context, client *klient.Client, monitor *MonitorConfig) *namespaceInformer {
+func NewNamespaceInformer(ctx context.Context, client *klient.Client, monitor *MonitorConfig, logger *log.Logger) *namespaceInformer {
 	cctx, cancel := context.WithCancel(ctx)
 
 	informer := &namespaceInformer{
@@ -48,6 +50,7 @@ func NewNamespaceInformer(ctx context.Context, client *klient.Client, monitor *M
 		KubeClient:     client,
 		Monitor:        monitor,
 		ExistedObjects: make(map[string]bool),
+		logger:         logger,
 	}
 	return informer
 }
@@ -151,7 +154,7 @@ func (ni *namespaceInformer) start() {
 	if err := wait.PollUntilContextCancel(cctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 		return ni.SharedInformer.HasSynced(), nil
 	}); err != nil {
-		ni.Monitor.Logger.Error("Cache is not synced for informer",
+		ni.logger.Error("Cache is not synced for informer",
 			slog.String(pkg.LogKeyDebugName, ni.Monitor.Metadata.DebugName))
 	}
 
