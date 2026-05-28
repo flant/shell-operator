@@ -21,10 +21,9 @@ const (
 	// registration against the API server. Brief API server unavailability (e.g.
 	// during rolling restarts or leader election) should not cause a fatal exit.
 	//
-	// Note: the bootstrap-level webhook-init retry (8 attempts, 1 s initial backoff)
-	// wraps this submit-level retry (5 attempts, 2 s initial backoff).  The two
-	// layers stack but serve different purposes — outer retries the full manager
-	// init; inner retries only the API server registration call.
+	// This retry is intentionally scoped to API-server registration calls only.
+	// Do not wrap full webhook-manager bootstrap with another retry layer: server
+	// Start() is not idempotent and may leave running listeners/goroutines.
 	submitMaxRetries = 5
 	// submitInitialBackoff is the initial delay between retries. It doubles on
 	// each consecutive failure up to submitMaxBackoff.

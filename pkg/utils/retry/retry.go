@@ -10,7 +10,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 )
 
-// Config controls the parameters for [RetryWithBackoff].
+// Config controls the parameters for [WithBackoff].
 type Config struct {
 	// MaxRetries is the maximum number of retry attempts (not counting the
 	// initial call).  The total number of calls to fn is MaxRetries+1.
@@ -22,7 +22,7 @@ type Config struct {
 	MaxBackoff time.Duration
 }
 
-// RetryWithBackoff retries fn with exponential backoff, honouring ctx
+// WithBackoff retries fn with exponential backoff, honouring ctx
 // cancellation during sleep intervals.  The caller label is used in log
 // messages.  Returns the last error from fn if all attempts fail, or nil on
 // success.  If ctx is cancelled during a backoff sleep, ctx.Err() is returned

@@ -3,7 +3,6 @@ package shell_operator
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
@@ -18,7 +17,6 @@ import (
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
 	"github.com/flant/shell-operator/pkg/task/queue"
 	utils "github.com/flant/shell-operator/pkg/utils/file"
-	"github.com/flant/shell-operator/pkg/utils/retry"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
 	"github.com/flant/shell-operator/pkg/webhook/conversion"
 	webhookserver "github.com/flant/shell-operator/pkg/webhook/server"
@@ -241,36 +239,18 @@ func (op *ShellOperator) assembleShellOperator(cfg *app.Config, hooksDir string,
 	}
 
 	// Load validation hooks.
-	// Retry with backoff: a brief API server blip during startup should not
-	// cause a fatal crash and a long CrashLoopBackOff cycle.
-	err = retry.WithBackoff(op.ctx, webhookInitRetryConfig, op.logger, "ValidatingWebhookManager", op.initValidatingWebhookManager)
+	err = op.initValidatingWebhookManager()
 	if err != nil {
 		return fmt.Errorf("initialize ValidatingWebhookManager fail: %w", err)
 	}
 
 	// Load conversion hooks.
-	err = retry.WithBackoff(op.ctx, webhookInitRetryConfig, op.logger, "ConversionWebhookManager", op.initConversionWebhookManager)
+	err = op.initConversionWebhookManager()
 	if err != nil {
 		return fmt.Errorf("initialize ConversionWebhookManager fail: %w", err)
 	}
 
 	return nil
-}
-
-const (
-	// webhookInitMaxRetries controls how many times webhook manager init is
-	// retried during startup.  maxRetries=8 + initialBackoff=1 s + maxBackoff=15 s
-	// yields ~75 s of sleep plus call execution time (not a hard wall-clock
-	// budget — for that, use a context deadline).
-	webhookInitMaxRetries = 8
-	webhookInitMinBackoff = 1 * time.Second
-	webhookInitMaxBackoff = 15 * time.Second
-)
-
-var webhookInitRetryConfig = retry.Config{
-	MaxRetries:     webhookInitMaxRetries,
-	InitialBackoff: webhookInitMinBackoff,
-	MaxBackoff:     webhookInitMaxBackoff,
 }
 
 // SetupEventManagers instantiate queues and managers for schedule and Kubernetes events.
