@@ -3,11 +3,11 @@ package executor
 import (
 	"bytes"
 	"context"
-	json "github.com/flant/shell-operator/pkg/utils/json"
 	"fmt"
 	"io"
 	"math/rand/v2"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -16,6 +16,8 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 func TestRunAndLogLines(t *testing.T) {
@@ -249,4 +251,222 @@ func randStringRunes(n int) string {
 		b[i] = letterRunes[rand.IntN(len(letterRunes))]
 	}
 	return string(b)
+}
+
+// newTestRegistry creates a fresh processRegistry for tests, swaps the
+// global singleton, and restores the original with t.Cleanup. It returns
+// the fresh test registry.
+func newTestRegistry(t *testing.T) *processRegistry {
+	t.Helper()
+
+	r := &processRegistry{activePIDs: make(map[int]struct{})}
+	orig := registry
+	registry = r
+	t.Cleanup(func() { registry = orig })
+
+	return r
+}
+
+func TestProcessRegistry_Basic(t *testing.T) {
+	r := &processRegistry{activePIDs: make(map[int]struct{})}
+
+	// Initially empty
+	assert.False(t, r.IsActive(1), "IsActive should return false for unknown PID")
+	assert.False(t, r.IsActive(12345), "IsActive should return false for unknown PID")
+
+	// Register and check
+	r.register(42)
+	assert.True(t, r.IsActive(42), "IsActive should return true for registered PID")
+	assert.False(t, r.IsActive(43), "IsActive should return false for different PID")
+
+	// Unregister and check
+	r.unregister(42)
+	assert.False(t, r.IsActive(42), "IsActive should return false after unregister")
+}
+
+func TestProcessRegistry_DoubleUnregister(t *testing.T) {
+	r := &processRegistry{activePIDs: make(map[int]struct{})}
+
+	r.register(100)
+	r.unregister(100)
+	r.unregister(100) // should not panic
+
+	assert.False(t, r.IsActive(100))
+}
+
+func TestProcessRegistry_Concurrent(t *testing.T) {
+	r := &processRegistry{activePIDs: make(map[int]struct{})}
+	const goroutines = 100
+	const pidsPerGoroutine = 100
+
+	done := make(chan struct{})
+
+	// Concurrently register PIDs
+	for i := range goroutines {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			for j := 0; j < pidsPerGoroutine; j++ {
+				r.register(i*pidsPerGoroutine + j)
+			}
+		}()
+	}
+
+	for range goroutines {
+		<-done
+	}
+
+	// All PIDs should be registered
+	for i := range goroutines {
+		for j := 0; j < pidsPerGoroutine; j++ {
+			assert.True(t, r.IsActive(i*pidsPerGoroutine+j))
+		}
+	}
+
+	// Concurrently unregister PIDs
+	for i := range goroutines {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			for j := 0; j < pidsPerGoroutine; j++ {
+				r.unregister(i*pidsPerGoroutine + j)
+			}
+		}()
+	}
+
+	for range goroutines {
+		<-done
+	}
+
+	// All PIDs should be unregistered
+	for i := range goroutines {
+		for j := 0; j < pidsPerGoroutine; j++ {
+			assert.False(t, r.IsActive(i*pidsPerGoroutine+j))
+		}
+	}
+}
+
+func TestTracker_IsActive(t *testing.T) {
+	newTestRegistry(t)
+	tracker := Tracker()
+
+	// PID not registered
+	assert.False(t, tracker.IsActive(42))
+
+	// Register via internal helper (same path as executor methods)
+	registerPID(42)
+	assert.True(t, tracker.IsActive(42))
+
+	unregisterPID(42)
+	assert.False(t, tracker.IsActive(42))
+}
+
+func TestStartAndRegister_AtomicWithReaper(t *testing.T) {
+	r := newTestRegistry(t)
+
+	// StartAndRegister must hold the write-lock across both cmd.Start() and
+	// PID registration, so there is no window where a zombie reaper could
+	// observe IsActive(pid) == false for a child that cmd.Wait will later reap.
+	cmd := exec.Command("sleep", "2")
+	require.NoError(t, startAndRegister(cmd))
+	defer cmd.Process.Kill()
+
+	pid := cmd.Process.Pid
+
+	// The PID must already be visible in the registry — no race window.
+	assert.True(t, r.IsActive(pid), "PID should be registered immediately after StartAndRegister returns")
+
+	// Simulate what the reaper does: check via the ProcessTracker interface.
+	tracker := Tracker()
+	assert.True(t, tracker.IsActive(pid), "ProcessTracker must see the PID as active")
+
+	// Clean up: wait for the process to finish after killing it.
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+
+	unregisterPID(pid)
+	assert.False(t, r.IsActive(pid), "PID should be gone after unregister")
+}
+
+func TestGlobalRegistry_Output_RegistersPID(t *testing.T) {
+	r := newTestRegistry(t)
+
+	ex := NewExecutor("", "sh", []string{"-c", "sleep 0.2; echo hello"}, []string{})
+
+	outputCh := make(chan []byte, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		output, err := ex.Output()
+		outputCh <- output
+		errCh <- err
+	}()
+
+	assert.Eventually(t, func() bool {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		return len(r.activePIDs) > 0
+	}, time.Second, 10*time.Millisecond, "expected registry to contain an active PID while Output is running")
+
+	output := <-outputCh
+	err := <-errCh
+	assert.NoError(t, err)
+	assert.Contains(t, string(output), "hello")
+
+	r.mu.RLock()
+	count := len(r.activePIDs)
+	r.mu.RUnlock()
+	assert.Empty(t, count, "expected registry to be empty after Output returns")
+}
+
+func TestGlobalRegistry_Output_FailedStart(t *testing.T) {
+	newTestRegistry(t)
+
+	// Command that doesn't exist — Start() should fail.
+	ex := NewExecutor("", "/nonexistent/binary", []string{}, []string{})
+	_, err := ex.Output()
+	assert.Error(t, err)
+}
+
+func TestGlobalRegistry_RunAndLogLines_RegistersPID(t *testing.T) {
+	r := newTestRegistry(t)
+
+	logger := log.NewLogger()
+	logger.SetLevel(log.LevelInfo)
+
+	ex := NewExecutor("", "sh", []string{"-c", "sleep 0.2; echo test-output"}, []string{}).
+		WithLogger(logger)
+
+	usageCh := make(chan *CmdUsage, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		usage, err := ex.RunAndLogLines(context.Background(), map[string]string{})
+		usageCh <- usage
+		errCh <- err
+	}()
+
+	assert.Eventually(t, func() bool {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		return len(r.activePIDs) > 0
+	}, time.Second, 10*time.Millisecond, "expected registry to contain an active PID while RunAndLogLines is running")
+
+	usage := <-usageCh
+	err := <-errCh
+	assert.NoError(t, err)
+	assert.NotNil(t, usage)
+
+	r.mu.RLock()
+	count := len(r.activePIDs)
+	r.mu.RUnlock()
+	assert.Empty(t, count, "expected registry to be empty after RunAndLogLines returns")
+}
+
+func TestGlobalRegistry_RunAndLogLines_FailedStart(t *testing.T) {
+	newTestRegistry(t)
+
+	logger := log.NewLogger()
+
+	ex := NewExecutor("", "/nonexistent/binary", []string{}, []string{}).
+		WithLogger(logger)
+
+	_, err := ex.RunAndLogLines(context.Background(), map[string]string{})
+	assert.Error(t, err)
 }
