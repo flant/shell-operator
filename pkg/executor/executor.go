@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -24,12 +25,20 @@ const (
 	serviceName = "executor"
 )
 
+// Run starts the command, waits for it to complete, and returns the error.
+// The child PID is registered in the global process registry while the process
+// is running so that a PID-1 zombie reaper does not steal it.
 func Run(cmd *exec.Cmd) error {
 	// TODO context: hook name, hook phase, hook binding
 	// TODO observability
 	log.Debug("Executing command", slog.String(pkg.LogKeyCommand, strings.Join(cmd.Args, " ")), slog.String(pkg.LogKeyDir, cmd.Dir))
 
-	return cmd.Run()
+	if err := startAndRegister(cmd); err != nil {
+		return err
+	}
+	defer unregisterPID(cmd.Process.Pid)
+
+	return cmd.Wait()
 }
 
 // StderrError is returned by RunAndLogLines when a command fails and produces
@@ -113,7 +122,34 @@ func (e *Executor) Output() ([]byte, error) {
 	e.logger.Debug("Executing command",
 		slog.String(pkg.LogKeyCommand, strings.Join(e.cmd.Args, " ")),
 		slog.String(pkg.LogKeyDir, e.cmd.Dir))
-	return e.cmd.Output()
+
+	// Reproduce cmd.Output() but interleave PID registration so that the
+	// PID-1 zombie reaper skips this process.
+	if e.cmd.Stdout != nil {
+		return nil, errors.New("exec: Stdout already set")
+	}
+	var stdout bytes.Buffer
+	e.cmd.Stdout = &stdout
+
+	captureErr := e.cmd.Stderr == nil
+	var stderrBuf bytes.Buffer
+	if captureErr {
+		e.cmd.Stderr = &stderrBuf
+	}
+
+	if err := startAndRegister(e.cmd); err != nil {
+		return nil, err
+	}
+	defer unregisterPID(e.cmd.Process.Pid)
+
+	err := e.cmd.Wait()
+	if err != nil && captureErr {
+		if ee, ok := err.(*exec.ExitError); ok {
+			ee.Stderr = stderrBuf.Bytes()
+		}
+	}
+
+	return stdout.Bytes(), err
 }
 
 type CmdUsage struct {
@@ -154,7 +190,12 @@ func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]stri
 	e.cmd.Stdout = plo
 	e.cmd.Stderr = io.MultiWriter(ple, stdErr)
 
-	err := e.cmd.Run()
+	if err := startAndRegister(e.cmd); err != nil {
+		return nil, fmt.Errorf("cmd start: %w", err)
+	}
+	defer unregisterPID(e.cmd.Process.Pid)
+
+	err := e.cmd.Wait()
 	if err != nil {
 		if len(stdErr.Bytes()) > 0 {
 			return nil, &StderrError{Message: stdErr.String()}
