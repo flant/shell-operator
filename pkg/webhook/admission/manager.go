@@ -139,21 +139,21 @@ func (m *WebhookManager) AddMutatingWebhook(config *MutatingWebhookConfig) {
 	r.Set(config)
 }
 
-func (m *WebhookManager) Start() error {
+func (m *WebhookManager) Start(ctx context.Context) error {
 	err := m.Server.Start()
 	if err != nil {
 		return fmt.Errorf("start webhook server: %w", err)
 	}
 
 	for _, r := range m.ValidatingResources {
-		err = r.Register()
+		err = r.Register(ctx)
 		if err != nil {
 			return fmt.Errorf("register validating webhook: %w", err)
 		}
 	}
 
 	for _, r := range m.MutatingResources {
-		err = r.Register()
+		err = r.Register(ctx)
 		if err != nil {
 			return fmt.Errorf("register mutating webhook: %w", err)
 		}
