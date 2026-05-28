@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/spf13/cobra"
@@ -41,6 +43,20 @@ func start(logger *log.Logger, cfg *app.Config) func(cmd *cobra.Command, args []
 		}
 
 		operator.Start()
+
+		// Listen for SIGUSR1 (soft reinit) and SIGUSR2 (full reset) in the background.
+		go func() {
+			ch := make(chan os.Signal, 1)
+			signal.Notify(ch, syscall.SIGUSR1, syscall.SIGUSR2)
+			for sig := range ch {
+				switch sig {
+				case syscall.SIGUSR1:
+					operator.Reinit(ctx, false)
+				case syscall.SIGUSR2:
+					operator.Reinit(ctx, true)
+				}
+			}
+		}()
 
 		// Block until OS signal.
 		utils_signal.WaitForProcessInterruption(func() {
