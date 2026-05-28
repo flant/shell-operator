@@ -194,7 +194,7 @@ func (m *monitor) CreateInformers() error {
 
 	if m.Config.NamespaceSelector != nil && m.Config.NamespaceSelector.LabelSelector != nil {
 		logEntry.Debug("Create NamespaceInformer for namespace.labelSelector")
-		m.NamespaceInformer = NewNamespaceInformer(m.ctx, m.KubeClient, m.Config)
+		m.NamespaceInformer = NewNamespaceInformer(m.ctx, m.KubeClient, m.Config, m.logger)
 		err := m.NamespaceInformer.createSharedInformer(
 			func(nsName string) {
 				// Added/Modified event: check, create and run informers for Ns

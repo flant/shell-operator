@@ -230,7 +230,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 	admissionHandler := NewAdmissionEventHandler(op.HookManager, op.taskHandler, op.logger)
 	op.AdmissionWebhookManager.WithAdmissionEventHandler(admissionHandler.Handle)
 
-	if err := op.AdmissionWebhookManager.Start(); err != nil {
+	if err := op.AdmissionWebhookManager.Start(op.ctx); err != nil {
 		return fmt.Errorf("ValidatingWebhookManager start: %w", err)
 	}
 

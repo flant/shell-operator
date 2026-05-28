@@ -93,6 +93,15 @@ func (mgr *kubeEventsManager) WithMetricStorage(mstor metricsstorage.Storage) {
 // TODO use Context to stop informers
 func (mgr *kubeEventsManager) AddMonitor(monitorConfig *MonitorConfig) error {
 	mgr.logger.Debug("add kubernetes monitor", slog.String(pkg.LogKeyConfig, fmt.Sprintf("%+v", monitorConfig)))
+
+	// Ensure MonitorConfig.Logger is set: resource_informer and
+	// namespace_informer access this field directly for error-path
+	// logging.  Propagate here (rather than inside NewMonitor) so that
+	// NewMonitor does not silently mutate a caller-owned struct.
+	if monitorConfig.Logger == nil {
+		monitorConfig.Logger = mgr.logger.Named("monitor")
+	}
+
 	mon := NewMonitor(
 		mgr.ctx,
 		mgr.KubeClient,
