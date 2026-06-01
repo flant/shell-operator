@@ -12,7 +12,6 @@ import (
 	"github.com/flant/shell-operator/pkg/filter"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	utils_checksum "github.com/flant/shell-operator/pkg/utils/checksum"
-	json "github.com/flant/shell-operator/pkg/utils/json"
 )
 
 // applyFilter filters object json representation with a pre-compiled jq expression,
@@ -36,24 +35,18 @@ func applyFilter(compiledFilter filter.CompiledFilter, jqFilterStr string, filte
 			return nil, fmt.Errorf("filterFn (%s) contains an error: %v", runtime.FuncForPC(reflect.ValueOf(filterFn).Pointer()).Name(), err)
 		}
 
-		filteredBytes, err := json.Marshal(filteredObj)
-		if err != nil {
-			return nil, err
-		}
-
 		res.FilterResult = filteredObj
-		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfBytes(filteredBytes)
+		// Checksum the filter result directly from its in-memory value
+		// instead of round-tripping it through encoding/json.
+		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfObject(filteredObj)
 
 		return res, nil
 	}
 
-	// Render obj to JSON text to apply jq filter.
+	// Checksum the object's decomposed content directly; the informers flow
+	// must not marshal objects to JSON just to detect changes.
 	if compiledFilter == nil {
-		data, err := json.Marshal(obj)
-		if err != nil {
-			return nil, err
-		}
-		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfBytes(data)
+		res.Metadata.Checksum = utils_checksum.CalculateChecksumOfObject(obj.UnstructuredContent())
 	} else {
 		filtered, err := compiledFilter.Apply(obj.UnstructuredContent())
 		if err != nil {
