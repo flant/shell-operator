@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,7 +17,7 @@ import (
 var (
 	ClusterName   string
 	ContextName   string
-	KubeClient    *klient.Client
+	KubeClient    *dedupclient.Client
 	ObjectPatcher *objectpatch.ObjectPatcher
 )
 
@@ -31,9 +31,8 @@ func RunIntegrationSuite(t *testing.T, description string, clusterPrefix string)
 
 var _ = BeforeSuite(func() {
 	// Initialize kube client out-of-cluster
-	KubeClient = klient.New(klient.WithLogger(log.NewNop()))
-	KubeClient.WithContextName(ContextName)
-	err := KubeClient.Init()
+	var err error
+	KubeClient, err = dedupclient.New(dedupclient.Config{Context: ContextName}, log.NewNop())
 	Expect(err).ShouldNot(HaveOccurred())
 
 	ObjectPatcher = objectpatch.NewObjectPatcher(KubeClient, log.NewNop())

@@ -6,20 +6,9 @@ import (
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	klient "github.com/flant/kube-client/client"
-	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/kube/dedupclient"
-	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
-	"github.com/flant/shell-operator/pkg/metric"
-	utils "github.com/flant/shell-operator/pkg/utils/labels"
-)
-
-var (
-	defaultMainKubeClientMetricLabels          = map[string]string{pkg.MetricKeyComponent: "main"}
-	defaultObjectPatcherKubeClientMetricLabels = map[string]string{pkg.MetricKeyComponent: "object_patcher"}
 )
 
 // KubeClientConfig holds explicit connection settings for a Kubernetes client,
@@ -33,61 +22,10 @@ type KubeClientConfig struct {
 	MetricPrefix string
 }
 
-// defaultMainKubeClient creates a Kubernetes client for hooks. No timeout specified, because
-// timeout will reset connections for Watchers.
-func defaultMainKubeClient(cfg KubeClientConfig, metricStorage metricsstorage.Storage, metricLabels map[string]string, logger *log.Logger) *klient.Client {
-	client := klient.New(klient.WithLogger(logger))
-	client.WithContextName(cfg.Context)
-	client.WithConfigPath(cfg.Config)
-	client.WithRateLimiterSettings(cfg.QPS, cfg.Burst)
-	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")))
-	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultMainKubeClientMetricLabels))
-	client.WithMetricPrefix(cfg.MetricPrefix)
-
-	return client
-}
-
-func initDefaultMainKubeClient(kubeCfg KubeClientConfig, metricStorage metricsstorage.Storage, logger *log.Logger) (*klient.Client, error) {
-	//nolint:staticcheck
-	kubeClient := defaultMainKubeClient(kubeCfg, metricStorage, defaultMainKubeClientMetricLabels, logger.Named("main-kube-client"))
-	err := kubeClient.Init()
-	if err != nil {
-		return nil, fmt.Errorf("initialize 'main' Kubernetes client: %s\n", err)
-	}
-	return kubeClient, nil
-}
-
-// defaultObjectPatcherKubeClient initializes a Kubernetes client for ObjectPatcher. Timeout is specified here.
-func defaultObjectPatcherKubeClient(cfg KubeClientConfig, metricStorage metricsstorage.Storage, metricLabels map[string]string, logger *log.Logger) *klient.Client {
-	client := klient.New(klient.WithLogger(logger))
-	client.WithContextName(cfg.Context)
-	client.WithConfigPath(cfg.Config)
-	client.WithRateLimiterSettings(cfg.QPS, cfg.Burst)
-	client.WithMetricStorage(metric.NewMetricsAdapter(metricStorage, logger.Named("kube-client-metrics-adapter")))
-	client.WithMetricLabels(utils.DefaultIfEmpty(metricLabels, defaultObjectPatcherKubeClientMetricLabels))
-	client.WithMetricPrefix(cfg.MetricPrefix)
-	if cfg.Timeout > 0 {
-		client.WithTimeout(cfg.Timeout)
-	}
-	return client
-}
-
-func initDefaultObjectPatcher(kubeCfg KubeClientConfig, metricStorage metricsstorage.Storage, logger *log.Logger) (*objectpatch.ObjectPatcher, error) {
-	patcherKubeClient := defaultObjectPatcherKubeClient(kubeCfg, metricStorage, defaultObjectPatcherKubeClientMetricLabels, logger.Named("object-patcher-kube-client"))
-	err := patcherKubeClient.Init()
-	if err != nil {
-		return nil, fmt.Errorf("initialize Kubernetes client for Object patcher: %s\n", err)
-	}
-	return objectpatch.NewObjectPatcher(patcherKubeClient, logger), nil
-}
-
-// DedupClientConfig consolidates the parameters needed to build the optional
-// deduplicated kubeclient on top of an already initialised *klient.Client. It
-// mirrors app.Config.DedupClient but stays decoupled from the app package so
-// addon-operator and other library consumers can populate it directly.
+// DedupClientConfig consolidates the parameters for the singleton
+// deduplicated Kubernetes client. Enabled is retained only for deprecated
+// configuration compatibility; the singleton is always constructed.
 type DedupClientConfig struct {
-	// Enabled toggles construction of the deduplicated client. When false,
-	// initDedupClient returns (nil, nil) and the operator runs as before.
 	Enabled bool
 
 	// Namespaces restricts the cache to this list of namespaces. Empty
@@ -97,7 +35,7 @@ type DedupClientConfig struct {
 	// WatchGVKs is a list of GVK strings to pre-register with the cache.
 	// Each entry follows the form "<group>/<version>/<kind>"; the group
 	// is empty for core resources (e.g. "/v1/Pod"). Malformed entries
-	// cause initDedupClient to return an error so misconfiguration is
+	// cause initSingletonKubeClient to return an error so misconfiguration is
 	// caught at startup rather than silently ignored.
 	WatchGVKs []string
 
@@ -108,48 +46,23 @@ type DedupClientConfig struct {
 
 	// SnapshotStore toggles construction of the process-wide deduplicated
 	// SnapshotStore. The store backs per-monitor object caches; turning it
-	// on is the change that actually moves the RSS needle for workloads
-	// with many similar objects (the runtime DedupClient itself does not
-	// affect kube-events-manager memory). Independent of Enabled.
+	// on deduplicates monitor snapshots, while Enabled moves informer
+	// list/watch storage to the dedup-backed path. Independent of Enabled.
 	SnapshotStore bool
 }
 
-// initDedupClient constructs an optional deduplicated kubeclient using the
-// rest.Config and RESTMapper exposed by an already-initialised KubeClient.
-// Returning (nil, nil) when cfg.Enabled is false keeps the call site at the
-// assembly layer simple — it only has to nil-check the result.
-func initDedupClient(kubeClient *klient.Client, cfg DedupClientConfig, logger *log.Logger) (*dedupclient.Client, error) {
-	if !cfg.Enabled {
-		return nil, nil
-	}
-	if kubeClient == nil {
-		return nil, fmt.Errorf("initialize dedup kubeclient: main kube client is nil")
-	}
-
-	restCfg := kubeClient.RestConfig()
-	if restCfg == nil {
-		return nil, fmt.Errorf("initialize dedup kubeclient: main kube client has no rest.Config (is it initialised?)")
-	}
-
-	mapper, mapperErr := kubeClient.ToRESTMapper()
-	if mapperErr != nil {
-		// Fall through with a nil mapper; kubeclient will use its built-in
-		// default. The error is logged so misconfiguration is visible but
-		// non-fatal — many operators run fine with the default mapper.
-		logger.Warn("could not derive RESTMapper from main kube client; "+
-			"dedup kubeclient will fall back to the default in-memory mapper",
-			log.Err(mapperErr))
-		mapper = nil
-	}
-
+func initSingletonKubeClient(kubeCfg KubeClientConfig, cfg DedupClientConfig, logger *log.Logger) (*dedupclient.Client, error) {
 	gvks, err := parseGVKs(cfg.WatchGVKs)
 	if err != nil {
-		return nil, fmt.Errorf("initialize dedup kubeclient: parse watched GVKs: %w", err)
+		return nil, fmt.Errorf("initialize singleton kubeclient: parse watched GVKs: %w", err)
 	}
 
 	dedupCfg := dedupclient.Config{
-		RESTConfig:         restCfg,
-		RESTMapper:         mapper,
+		Context:            kubeCfg.Context,
+		Config:             kubeCfg.Config,
+		QPS:                kubeCfg.QPS,
+		Burst:              kubeCfg.Burst,
+		Timeout:            kubeCfg.Timeout,
 		Namespaces:         cfg.Namespaces,
 		WatchGVKs:          gvks,
 		ReconstructLRUSize: cfg.ReconstructLRUSize,
@@ -158,7 +71,7 @@ func initDedupClient(kubeClient *klient.Client, cfg DedupClientConfig, logger *l
 
 	c, err := dedupclient.New(dedupCfg, logger)
 	if err != nil {
-		return nil, fmt.Errorf("initialize dedup kubeclient: %w", err)
+		return nil, fmt.Errorf("initialize singleton kubeclient: %w", err)
 	}
 	return c, nil
 }

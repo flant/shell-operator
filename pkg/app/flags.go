@@ -115,14 +115,13 @@ func bindConversionWebhookFlags(cfg *Config, cmd *cobra.Command) func() {
 func bindDedupClientFlags(cfg *Config, cmd *cobra.Command) func() {
 	f := cmd.Flags()
 	f.BoolVar(&cfg.DedupClient.Enabled, "dedup-client-enabled", cfg.DedupClient.Enabled,
-		"Enable the deduplicated kubeclient cache (github.com/ldmonster/kubeclient). "+
-			"When set, shell-operator builds a controller-runtime compatible client backed "+
-			"by a deduplicated store. Can be set with $DEDUP_CLIENT_ENABLED.")
+		"Deprecated no-op retained for compatibility. The singleton deduplicated kubeclient "+
+			"cache (github.com/ldmonster/kubeclient) is always constructed. Can be set with $DEDUP_CLIENT_ENABLED.")
 	f.BoolVar(&cfg.DedupClient.SnapshotStore, "dedup-client-snapshot-store", cfg.DedupClient.SnapshotStore,
 		"Back per-monitor object snapshots with a process-wide deduplicated store "+
 			"(github.com/ldmonster/kubeclient/store). Trades a small per-snapshot-read CPU "+
 			"cost for a substantial drop in RSS when many monitors observe similar objects. "+
-			"Independent of --dedup-client-enabled. Can be set with $DEDUP_CLIENT_SNAPSHOT_STORE.")
+			"Can be set with $DEDUP_CLIENT_SNAPSHOT_STORE.")
 	f.IntVar(&cfg.DedupClient.ReconstructLRUSize, "dedup-client-reconstruct-lru-size",
 		cfg.DedupClient.ReconstructLRUSize,
 		"Size of the LRU that memoises reconstructed Unstructured objects in the dedup cache. "+

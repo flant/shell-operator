@@ -12,6 +12,7 @@ import (
 	"github.com/flant/shell-operator/pkg/debug"
 	"github.com/flant/shell-operator/pkg/filter/jq"
 	"github.com/flant/shell-operator/pkg/hook"
+	objectpatch "github.com/flant/shell-operator/pkg/kube/object_patch"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	"github.com/flant/shell-operator/pkg/metrics"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
@@ -122,7 +123,7 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 // KubeClientConfigs from cfg and delegates to AssembleCommonOperator. The
 // derivation reads only the supplied *app.Config — no environment variables
 // are consulted on this path, so the values you put into cfg are the values
-// shell-operator uses. See kubeClientConfigsFromAppConfig for the exact
+// shell-operator uses. See kubeClientConfigFromAppConfig for the exact
 // field mapping.
 //
 // kubeEventsManagerLabels are the metric labels for the kube-events manager;
@@ -133,9 +134,9 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 // defaults) — useful for tests.
 func (op *ShellOperator) AssembleCommonOperatorFromConfig(cfg *app.Config, kubeEventsManagerLabels []string) error {
 	listenAddress, listenPort := listenAddrFromAppConfig(cfg)
-	mainKubeCfg, patcherKubeCfg := kubeClientConfigsFromAppConfig(cfg)
+	kubeCfg := kubeClientConfigFromAppConfig(cfg)
 	dedupCfg := dedupClientConfigFromAppConfig(cfg)
-	return op.AssembleCommonOperatorWithDedupClient(listenAddress, listenPort, kubeEventsManagerLabels, mainKubeCfg, patcherKubeCfg, dedupCfg)
+	return op.AssembleCommonOperator(listenAddress, listenPort, kubeEventsManagerLabels, kubeCfg, dedupCfg)
 }
 
 // listenAddrFromAppConfig returns the HTTP server listen address/port from cfg
@@ -148,38 +149,27 @@ func listenAddrFromAppConfig(cfg *app.Config) (string, string) {
 	return cfg.App.ListenAddress, cfg.App.ListenPort
 }
 
-// kubeClientConfigsFromAppConfig derives the main and object-patcher
-// KubeClientConfigs from an *app.Config. The function is pure: it does not
+// kubeClientConfigFromAppConfig derives the singleton KubeClientConfig from
+// an *app.Config. The function is pure: it does not
 // touch the process environment, so any value present in cfg is used as-is
 // and library consumers can rely on env vars never overriding their config.
-// A nil cfg yields two zero KubeClientConfig values (in-cluster defaults).
-func kubeClientConfigsFromAppConfig(cfg *app.Config) (KubeClientConfig, KubeClientConfig) {
+// A nil cfg yields a zero KubeClientConfig value (in-cluster defaults).
+func kubeClientConfigFromAppConfig(cfg *app.Config) KubeClientConfig {
 	if cfg == nil {
-		return KubeClientConfig{}, KubeClientConfig{}
+		return KubeClientConfig{}
 	}
-	mainKubeCfg := KubeClientConfig{
+	return KubeClientConfig{
 		Context:      cfg.Kube.Context,
 		Config:       cfg.Kube.Config,
 		QPS:          cfg.Kube.ClientQPS,
 		Burst:        cfg.Kube.ClientBurst,
 		MetricPrefix: cfg.App.PrometheusMetricsPrefix,
 	}
-	patcherKubeCfg := KubeClientConfig{
-		Context:      cfg.Kube.Context,
-		Config:       cfg.Kube.Config,
-		QPS:          cfg.ObjectPatcher.KubeClientQPS,
-		Burst:        cfg.ObjectPatcher.KubeClientBurst,
-		Timeout:      cfg.ObjectPatcher.KubeClientTimeout,
-		MetricPrefix: "object_patcher_",
-	}
-	return mainKubeCfg, patcherKubeCfg
 }
 
 // dedupClientConfigFromAppConfig pulls deduplicated-kubeclient settings out
-// of an *app.Config. A nil cfg (or one where DedupClient.Enabled is false)
-// returns a zero-valued DedupClientConfig, which initDedupClient then
-// recognises as "do not construct". Keeping this as a pure helper makes the
-// derivation easy to unit-test without standing up a full operator.
+// of an *app.Config. Enabled is preserved for compatibility with config
+// parsing, but the singleton client is always constructed.
 func dedupClientConfigFromAppConfig(cfg *app.Config) DedupClientConfig {
 	if cfg == nil {
 		return DedupClientConfig{}
@@ -194,29 +184,7 @@ func dedupClientConfigFromAppConfig(cfg *app.Config) DedupClientConfig {
 	}
 }
 
-// AssembleCommonOperator instantiates common dependencies used by both
-// shell-operator and its derivatives (e.g. addon-operator).
-// Requires listenAddress and listenPort to run the HTTP server for operator APIs.
-// kubeCfg provides Kubernetes connection settings for the main client and
-// object patcher; pass KubeClientConfig{} to fall back to in-cluster defaults.
-//
-// This method preserves the pre-deduplicated-kubeclient signature for
-// backwards compatibility: it delegates to AssembleCommonOperatorWithDedupClient
-// with a disabled DedupClientConfig, so behaviour is unchanged. Use the
-// DedupClient-aware variant (or AssembleCommonOperatorFromConfig) to enable
-// the deduplicated cache.
-//
-// For library consumers that already hold an *app.Config, prefer
-// AssembleCommonOperatorFromConfig instead of unpacking fields by hand.
-func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string, mainKubeCfg, patcherKubeCfg KubeClientConfig) error {
-	return op.AssembleCommonOperatorWithDedupClient(listenAddress, listenPort, kubeEventsManagerLabels, mainKubeCfg, patcherKubeCfg, DedupClientConfig{})
-}
-
-// AssembleCommonOperatorWithDedupClient is the full assembly entry point that
-// also constructs the optional deduplicated kubeclient. Pass a zero
-// DedupClientConfig (or one with Enabled=false) to keep behaviour identical
-// to AssembleCommonOperator.
-func (op *ShellOperator) AssembleCommonOperatorWithDedupClient(listenAddress, listenPort string, kubeEventsManagerLabels []string, mainKubeCfg, patcherKubeCfg KubeClientConfig, dedupCfg DedupClientConfig) error {
+func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string, kubeCfg KubeClientConfig, dedupCfg DedupClientConfig) error {
 	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
 
 	// built-in metrics
@@ -228,31 +196,15 @@ func (op *ShellOperator) AssembleCommonOperatorWithDedupClient(listenAddress, li
 	// metrics from user's hooks
 	op.setupHookMetricStorage()
 
-	// 'main' Kubernetes client.
-	op.KubeClient, err = initDefaultMainKubeClient(mainKubeCfg, op.MetricStorage, op.logger)
-	if err != nil {
-		return err
+	if op.KubeClient == nil {
+		op.KubeClient, err = initSingletonKubeClient(kubeCfg, dedupCfg, op.logger.Named("kube-client"))
+		if err != nil {
+			return err
+		}
 	}
 
-	// ObjectPatcher with a separate Kubernetes client.
-	op.ObjectPatcher, err = initDefaultObjectPatcher(patcherKubeCfg, op.MetricStorage, op.logger.Named("object-patcher"))
-	if err != nil {
-		return err
-	}
+	op.ObjectPatcher = objectpatch.NewObjectPatcher(op.KubeClient, op.logger.Named("object-patcher"))
 
-	// Optional deduplicated kubeclient. Reuses the rest.Config + RESTMapper
-	// derived from the main kube client so users only configure connection
-	// details once.
-	op.DedupClient, err = initDedupClient(op.KubeClient, dedupCfg, op.logger.Named("dedup-kube-client"))
-	if err != nil {
-		return err
-	}
-
-	// Optional deduplicated SnapshotStore. Constructed independently of
-	// DedupClient because the two solve different problems: DedupClient
-	// is a kubeclient instance for hooks/extensions, SnapshotStore is the
-	// shared backing for kube-events-manager monitors. Either, both, or
-	// neither may be active.
 	op.SnapshotStore = initSnapshotStore(dedupCfg, op.logger.Named("dedup-snapshot-store"))
 
 	op.SetupEventManagers()
@@ -320,6 +272,7 @@ func (op *ShellOperator) SetupEventManagers() {
 
 	// Initialize kubernetes events manager.
 	op.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(op.ctx, op.KubeClient, op.logger.Named("kube-events-manager"))
+	op.KubeEventsManager.WithDedupClient(op.KubeClient)
 	op.KubeEventsManager.WithMetricStorage(op.MetricStorage)
 
 	// Initialize events handler that emit tasks to run hooks

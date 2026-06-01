@@ -2,13 +2,13 @@
 
 Two-part integration of
 [`github.com/ldmonster/kubeclient`](https://github.com/ldmonster/kubeclient)
-into shell-operator. Both parts can be enabled independently — the one that
-moves the RSS needle for typical workloads is the **SnapshotStore**.
+into shell-operator. Both parts can be enabled independently and target
+different memory holders in the Kubernetes binding path.
 
 | Component        | Type                       | Purpose                                                                                                  | Flag                                |
 | ---------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `Client`         | `*kubeclient.DedupClient` wrapper | Controller-runtime compatible Kubernetes client for hooks/extensions, with its own deduplicated cache. | `--dedup-client-enabled`            |
-| `SnapshotStore`  | `*store.DedupStore` wrapper       | Process-wide, reference-counted cache that backs every kube-events-manager monitor's per-object snapshot. **This is what reduces memory.** | `--dedup-client-snapshot-store`     |
+| `Client`         | `*kubeclient.DedupClient` singleton facade | The only Kubernetes client shell-operator constructs. It exposes controller-runtime, dynamic, typed, discovery, and RESTMapper APIs, and backs kube-events-manager resource informers with dedup stores. | always on |
+| `SnapshotStore`  | `*store.DedupStore` wrapper       | Process-wide, reference-counted cache that backs every kube-events-manager monitor's per-object snapshot. | `--dedup-client-snapshot-store`     |
 
 For clusters with thousands of similar resources (e.g. templated
 `Deployment`s) the upstream store reports **60–90 %** lower cache memory
@@ -17,24 +17,18 @@ usage thanks to value interning and subtree deduplication.
 ## Quick start
 
 ```go
-import (
-    klient "github.com/flant/kube-client/client"
-    "github.com/flant/shell-operator/pkg/kube/dedupclient"
-)
-
-func newDedup(main *klient.Client, logger *log.Logger) (*dedupclient.Client, error) {
-    mapper, _ := main.ToRESTMapper()
-    return dedupclient.New(dedupclient.Config{
-        RESTConfig: main.RestConfig(),
-        RESTMapper: mapper,
-        Namespaces: []string{"kube-system", "default"}, // empty = all
-        WatchGVKs: []schema.GroupVersionKind{
-            {Group: "", Version: "v1", Kind: "Pod"},
-            {Group: "apps", Version: "v1", Kind: "Deployment"},
-        },
-        ReconstructLRUSize: 4096, // 0 disables reconstruction caching
-    }, logger)
-}
+client, err := dedupclient.New(dedupclient.Config{
+    Context:    "kind-dev",          // optional kubeconfig context
+    Config:     "/path/to/kubeconfig", // optional kubeconfig path
+    QPS:        20,
+    Burst:      40,
+    Namespaces: []string{"kube-system", "default"}, // empty = all
+    WatchGVKs: []schema.GroupVersionKind{
+        {Group: "", Version: "v1", Kind: "Pod"},
+        {Group: "apps", Version: "v1", Kind: "Deployment"},
+    },
+    ReconstructLRUSize: 4096, // 0 disables reconstruction caching
+}, logger)
 ```
 
 `Start(ctx)` spins up the cache run loop in a single dedicated goroutine and
@@ -43,28 +37,29 @@ exit (or for `ctx` to expire).
 
 ## How shell-operator wires it up
 
-When `app.Config.DedupClient.Enabled` is `true`,
-`AssembleCommonOperatorFromConfig` calls `initDedupClient`, which hands the
-main `klient.Client`'s `rest.Config` and `RESTMapper` to
-`dedupclient.New`. The resulting `*Client` is stored on
-`shell_operator.ShellOperator.DedupClient`, started during `op.Start()`, and
-stopped from `op.Shutdown()`.
+`AssembleCommonOperatorFromConfig` always constructs one `*dedupclient.Client`
+unless a library caller has already injected one with
+`shell_operator.WithKubeClient(...)`. The resulting singleton is stored on
+`shell_operator.ShellOperator.KubeClient`, started during `op.Start()`, and
+stopped from `op.Shutdown()`. Kubernetes binding resource informers use the
+singleton's dedup-backed informer factory; namespace label-selector informers
+still use the singleton's typed client-go namespace interface.
 
 Configuration knobs (env vars / CLI flags):
 
 | Env var                              | Flag                                 | Meaning                                                      |
 | ------------------------------------ | ------------------------------------ | ------------------------------------------------------------ |
-| `DEDUP_CLIENT_ENABLED`               | `--dedup-client-enabled`             | Construct the deduplicated client at all.                    |
-| `DEDUP_CLIENT_SNAPSHOT_STORE`        | `--dedup-client-snapshot-store`      | Back per-monitor snapshots with the shared dedup store. Independent of `--dedup-client-enabled`. |
+| `DEDUP_CLIENT_ENABLED`               | `--dedup-client-enabled`             | Deprecated no-op; the singleton dedup client is always constructed. |
+| `DEDUP_CLIENT_SNAPSHOT_STORE`        | `--dedup-client-snapshot-store`      | Back per-monitor snapshots with the shared dedup store. |
 | `DEDUP_CLIENT_NAMESPACES`            | `--dedup-client-namespace`           | Comma-separated (env) or repeated (flag) namespace allow-list. Empty = all. |
 | `DEDUP_CLIENT_WATCH_GVKS`            | `--dedup-client-watch-gvk`           | GVKs to pre-register, formatted as `<group>/<version>/<kind>` (group empty for core). |
 | `DEDUP_CLIENT_RECONSTRUCT_LRU_SIZE`  | `--dedup-client-reconstruct-lru-size`| LRU size for reconstructed Unstructured objects. 0 disables. |
 | `DEDUP_CLIENT_GC_INTERVAL`           | `--dedup-client-gc-interval`         | GC interval for unused interned values/subtrees. 0 = upstream default. |
 
-When both features are off the wrappers are **not** constructed at all, so
-this integration adds zero runtime overhead to existing deployments.
+The singleton client is always constructed. Optional knobs only tune cache
+scope, reconstruction, GC, and monitor snapshot storage.
 
-## SnapshotStore — the memory win
+## SnapshotStore — monitor snapshot memory
 
 `SnapshotStore` plugs into shell-operator's `pkg/kube_events_manager` so that
 every monitor's `cachedObjects` map stops holding `*Unstructured` pointers

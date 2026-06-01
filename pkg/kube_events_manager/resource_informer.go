@@ -18,7 +18,6 @@ import (
 
 	"github.com/ldmonster/kubeclient/store"
 
-	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -28,7 +27,7 @@ import (
 
 type resourceInformer struct {
 	id         string
-	KubeClient *klient.Client
+	KubeClient *dedupclient.Client
 	Monitor    *MonitorConfig
 	// Filter by namespace
 	Namespace string
@@ -85,7 +84,7 @@ type resourceInformer struct {
 
 // resourceInformer should implement ResourceInformer
 type resourceInformerConfig struct {
-	client        *klient.Client
+	client        *dedupclient.Client
 	mstor         metricsstorage.Storage
 	factoryStore  *FactoryStore
 	snapshotStore *dedupclient.SnapshotStore
@@ -161,6 +160,11 @@ func (ei *resourceInformer) createSharedInformer() error {
 	}
 
 	ei.FactoryIndex = FactoryIndex{
+		GVK: schema.GroupVersionKind{
+			Group:   ei.GroupVersionResource.Group,
+			Version: ei.GroupVersionResource.Version,
+			Kind:    ei.Monitor.Kind,
+		},
 		GVR:           ei.GroupVersionResource,
 		Namespace:     ei.Namespace,
 		FieldSelector: ei.ListOptions.FieldSelector,

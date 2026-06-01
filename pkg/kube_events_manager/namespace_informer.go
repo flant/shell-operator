@@ -15,8 +15,8 @@ import (
 	corev1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 )
 
 const (
@@ -29,7 +29,7 @@ type namespaceInformer struct {
 	stopped bool
 	done    chan struct{}
 
-	KubeClient     *klient.Client
+	KubeClient     *dedupclient.Client
 	Monitor        *MonitorConfig
 	SharedInformer cache.SharedInformer
 
@@ -39,7 +39,7 @@ type namespaceInformer struct {
 	delFn func(string)
 }
 
-func NewNamespaceInformer(ctx context.Context, client *klient.Client, monitor *MonitorConfig) *namespaceInformer {
+func NewNamespaceInformer(ctx context.Context, client *dedupclient.Client, monitor *MonitorConfig) *namespaceInformer {
 	cctx, cancel := context.WithCancel(ctx)
 
 	informer := &namespaceInformer{

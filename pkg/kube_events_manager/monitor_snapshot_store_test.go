@@ -50,7 +50,7 @@ func Test_Monitor_SnapshotStore_BackingPath(t *testing.T) {
 
 	snapshotStore := dedupclient.NewSnapshotStore(log.NewNop())
 
-	mon := NewMonitor(context.Background(), fc.Client, metricStorage, NewFactoryStore(), monitorCfg, func(_ kemtypes.KubeEvent) {}, log.NewNop())
+	mon := NewMonitor(context.Background(), testDedupClientFromLegacy(fc.Client), metricStorage, NewFactoryStore(), monitorCfg, func(_ kemtypes.KubeEvent) {}, log.NewNop())
 	mon.WithSnapshotStore(snapshotStore)
 
 	require.NoError(t, mon.CreateInformers())
@@ -107,7 +107,7 @@ func Test_Monitor_SnapshotStore_DefaultPath(t *testing.T) {
 	metricStorage.HistogramObserveMock.Set(func(_ string, _ float64, _ map[string]string, _ []float64) {})
 	metricStorage.GaugeSetMock.When(metrics.KubeSnapshotObjects, 1, map[string]string(nil)).Then()
 
-	mon := NewMonitor(context.Background(), fc.Client, metricStorage, NewFactoryStore(), monitorCfg, func(_ kemtypes.KubeEvent) {}, log.NewNop())
+	mon := NewMonitor(context.Background(), testDedupClientFromLegacy(fc.Client), metricStorage, NewFactoryStore(), monitorCfg, func(_ kemtypes.KubeEvent) {}, log.NewNop())
 	require.NoError(t, mon.CreateInformers())
 	mon.Start(context.TODO())
 

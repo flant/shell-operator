@@ -14,8 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 
-	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
@@ -25,7 +25,7 @@ func Test_MainKubeEventsManager_Run(t *testing.T) {
 	gvrToListKind := map[schema.GroupVersionResource]string{
 		{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 	}
-	kubeClient := klient.NewFake(gvrToListKind)
+	kubeClient := dedupclient.NewFake(gvrToListKind)
 
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
@@ -93,7 +93,7 @@ func Test_MainKubeEventsManager_HandleEvents(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kubeClient := klient.NewFake(nil)
+	kubeClient := dedupclient.NewFake(nil)
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
@@ -245,7 +245,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 	defer cancel()
 
 	// Add GVR
-	kubeClient := klient.NewFake(nil)
+	kubeClient := dedupclient.NewFake(nil)
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	if !ok {
 		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
@@ -421,7 +421,7 @@ func Test_FakeClient_CatchUpdates(t *testing.T) {
 // instance owns its own FactoryStore so parallel tests do not share informer state.
 func TestNewKubeEventsManager_IsolatedFactoryStore(t *testing.T) {
 	ctx := context.Background()
-	kubeClient := klient.NewFake(nil)
+	kubeClient := dedupclient.NewFake(nil)
 
 	mgr1 := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
 	mgr2 := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
@@ -436,4 +436,16 @@ func TestNewKubeEventsManager_IsolatedFactoryStore(t *testing.T) {
 	if mgr1.factoryStore == mgr2.factoryStore {
 		t.Fatal("mgr1 and mgr2 must not share the same factoryStore")
 	}
+}
+
+func TestKubeEventsManager_WithDedupClient_EnablesDedupInformers(t *testing.T) {
+	ctx := context.Background()
+	kubeClient := dedupclient.NewFake(nil)
+
+	mgr := NewKubeEventsManager(ctx, kubeClient, log.NewNop())
+	assert.False(t, mgr.factoryStore.useDedup)
+
+	mgr.WithDedupClient(&dedupclient.Client{})
+
+	assert.True(t, mgr.factoryStore.useDedup)
 }

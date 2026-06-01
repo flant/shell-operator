@@ -10,7 +10,6 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
-	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -32,7 +31,7 @@ type Monitor interface {
 type monitor struct {
 	Name       string
 	Config     *MonitorConfig
-	KubeClient *klient.Client
+	KubeClient *dedupclient.Client
 	// Static list of informers
 	ResourceInformers []*resourceInformer
 	// Namespace informer to get new namespaces
@@ -141,7 +140,7 @@ func (c *cancelForNs) Delete(key string) {
 
 var _ Monitor = (*monitor)(nil)
 
-func NewMonitor(ctx context.Context, client *klient.Client, mstor metricsstorage.Storage, factoryStore *FactoryStore, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
+func NewMonitor(ctx context.Context, client *dedupclient.Client, mstor metricsstorage.Storage, factoryStore *FactoryStore, config *MonitorConfig, eventCb func(kemtypes.KubeEvent), logger *log.Logger) *monitor {
 	cctx, cancel := context.WithCancel(ctx)
 
 	return &monitor{

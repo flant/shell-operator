@@ -41,7 +41,8 @@ type ObjectPatcherSettings struct {
 // templated Deployments). All settings here are optional; when Enabled is
 // false the client is not constructed at all. List-typed env vars use a comma
 // separator: GVK strings follow the form "<group>/<version>/<kind>" (the
-// group may be empty for core resources, e.g. "/v1/Pod").
+// group may be empty for core resources, e.g. "/v1/Pod"). Enabled is
+// deprecated and ignored; the singleton dedup client is always constructed.
 type DedupClientSettings struct {
 	Enabled            bool          `env:"ENABLED"`
 	Namespaces         []string      `env:"NAMESPACES" envSeparator:","`
@@ -54,9 +55,9 @@ type DedupClientSettings struct {
 	// `*Unstructured` bodies live exactly once in memory across all
 	// resourceInformers (refcounted), trading a small per-snapshot-read CPU
 	// cost for a substantial drop in RSS for workloads with many similar
-	// objects. Independent of the runtime DedupClient (Enabled flag): the
-	// snapshot store can be turned on without spinning up any kubeclient
-	// informers.
+	// objects. The singleton client already moves informer list/watch storage
+	// to the dedup path; SnapshotStore moves monitor snapshot storage to a
+	// shared dedup store.
 	SnapshotStore bool `env:"SNAPSHOT_STORE"`
 }
 

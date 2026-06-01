@@ -9,11 +9,7 @@ import (
 	"github.com/flant/shell-operator/pkg/app"
 )
 
-// TestKubeClientConfigsFromAppConfig_DerivedFromConfig is a basic check that
-// the per-client KubeClientConfigs are built straight from the supplied
-// *app.Config (including the special "object_patcher_" metric prefix for the
-// patcher client).
-func TestKubeClientConfigsFromAppConfig_DerivedFromConfig(t *testing.T) {
+func TestKubeClientConfigFromAppConfig_DerivedFromConfig(t *testing.T) {
 	cfg := &app.Config{
 		App: app.AppSettings{
 			ListenAddress:           "127.0.0.1",
@@ -34,40 +30,32 @@ func TestKubeClientConfigsFromAppConfig_DerivedFromConfig(t *testing.T) {
 	}
 
 	addr, port := listenAddrFromAppConfig(cfg)
-	main, patcher := kubeClientConfigsFromAppConfig(cfg)
+	kubeCfg := kubeClientConfigFromAppConfig(cfg)
 
 	assert.Equal(t, "127.0.0.1", addr)
 	assert.Equal(t, "9000", port)
 
-	assert.Equal(t, "explicit-ctx", main.Context)
-	assert.Equal(t, "/explicit/kubeconfig", main.Config)
-	assert.InDelta(t, float32(42), main.QPS, 0.001)
-	assert.Equal(t, 84, main.Burst)
-	assert.Equal(t, time.Duration(0), main.Timeout)
-	assert.Equal(t, "embedded_", main.MetricPrefix)
-
-	assert.Equal(t, "explicit-ctx", patcher.Context)
-	assert.Equal(t, "/explicit/kubeconfig", patcher.Config)
-	assert.InDelta(t, float32(11), patcher.QPS, 0.001)
-	assert.Equal(t, 22, patcher.Burst)
-	assert.Equal(t, 7*time.Second, patcher.Timeout)
-	assert.Equal(t, "object_patcher_", patcher.MetricPrefix)
+	assert.Equal(t, "explicit-ctx", kubeCfg.Context)
+	assert.Equal(t, "/explicit/kubeconfig", kubeCfg.Config)
+	assert.InDelta(t, float32(42), kubeCfg.QPS, 0.001)
+	assert.Equal(t, 84, kubeCfg.Burst)
+	assert.Equal(t, time.Duration(0), kubeCfg.Timeout)
+	assert.Equal(t, "embedded_", kubeCfg.MetricPrefix)
 }
 
-// TestKubeClientConfigsFromAppConfig_NilCfg verifies the nil-cfg fallback
-// yields zero KubeClientConfig values (which klient treats as in-cluster
+// TestKubeClientConfigFromAppConfig_NilCfg verifies the nil-cfg fallback
+// yields a zero KubeClientConfig value (which means in-cluster
 // defaults) without consulting the environment.
-func TestKubeClientConfigsFromAppConfig_NilCfg(t *testing.T) {
+func TestKubeClientConfigFromAppConfig_NilCfg(t *testing.T) {
 	t.Setenv("KUBE_CONTEXT", "env-ctx")
 	t.Setenv("SHELL_OPERATOR_LISTEN_PORT", "7777")
 
 	addr, port := listenAddrFromAppConfig(nil)
-	main, patcher := kubeClientConfigsFromAppConfig(nil)
+	kubeCfg := kubeClientConfigFromAppConfig(nil)
 
 	assert.Empty(t, addr)
 	assert.Empty(t, port)
-	assert.Equal(t, KubeClientConfig{}, main)
-	assert.Equal(t, KubeClientConfig{}, patcher)
+	assert.Equal(t, KubeClientConfig{}, kubeCfg)
 }
 
 // TestAssembleFromConfig_EnvDoesNotOverrideConfig is the regression test that
@@ -110,26 +98,18 @@ func TestAssembleFromConfig_EnvDoesNotOverrideConfig(t *testing.T) {
 	}
 
 	addr, port := listenAddrFromAppConfig(cfg)
-	main, patcher := kubeClientConfigsFromAppConfig(cfg)
+	kubeCfg := kubeClientConfigFromAppConfig(cfg)
 
 	// Listen address/port must come from cfg, not env.
 	assert.Equal(t, "127.0.0.1", addr)
 	assert.Equal(t, "9000", port)
 
 	// Main client values come from cfg.Kube / cfg.App.
-	assert.Equal(t, "lib-ctx", main.Context)
-	assert.Equal(t, "/lib/kubeconfig", main.Config)
-	assert.InDelta(t, float32(1), main.QPS, 0.001)
-	assert.Equal(t, 2, main.Burst)
-	assert.Equal(t, "lib_prefix_", main.MetricPrefix)
-
-	// Patcher client values come from cfg.ObjectPatcher.
-	assert.Equal(t, "lib-ctx", patcher.Context)
-	assert.Equal(t, "/lib/kubeconfig", patcher.Config)
-	assert.InDelta(t, float32(3), patcher.QPS, 0.001)
-	assert.Equal(t, 4, patcher.Burst)
-	assert.Equal(t, 5*time.Second, patcher.Timeout)
-	assert.Equal(t, "object_patcher_", patcher.MetricPrefix)
+	assert.Equal(t, "lib-ctx", kubeCfg.Context)
+	assert.Equal(t, "/lib/kubeconfig", kubeCfg.Config)
+	assert.InDelta(t, float32(1), kubeCfg.QPS, 0.001)
+	assert.Equal(t, 2, kubeCfg.Burst)
+	assert.Equal(t, "lib_prefix_", kubeCfg.MetricPrefix)
 
 	// And the source-of-truth cfg itself is untouched by the call.
 	assert.Equal(t, "127.0.0.1", cfg.App.ListenAddress)

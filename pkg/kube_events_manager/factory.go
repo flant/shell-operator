@@ -2,11 +2,13 @@ package kubeeventsmanager
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/ldmonster/kubeclient/store"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -24,6 +26,7 @@ const (
 var DefaultSyncTime = 100 * time.Millisecond
 
 type FactoryIndex struct {
+	GVK           schema.GroupVersionKind
 	GVR           schema.GroupVersionResource
 	Namespace     string
 	FieldSelector string
@@ -32,6 +35,7 @@ type FactoryIndex struct {
 
 type Factory struct {
 	shared               dynamicinformer.DynamicSharedInformerFactory
+	dedup                *dedupResourceInformer
 	handlerRegistrations map[string]cache.ResourceEventHandlerRegistration
 	ctx                  context.Context
 	cancel               context.CancelFunc
@@ -43,6 +47,8 @@ type FactoryStore struct {
 	mu        sync.Mutex
 	data      map[FactoryIndex]*Factory
 	stoppedCh map[FactoryIndex]chan struct{}
+	useDedup  bool
+	storeFor  func(FactoryIndex) store.Store
 }
 
 func NewFactoryStore() *FactoryStore {
@@ -53,6 +59,13 @@ func NewFactoryStore() *FactoryStore {
 	return fs
 }
 
+func (c *FactoryStore) EnableDedupInformers(storeFor func(FactoryIndex) store.Store) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.useDedup = true
+	c.storeFor = storeFor
+}
+
 func (c *FactoryStore) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -60,10 +73,11 @@ func (c *FactoryStore) Reset() {
 	c.stoppedCh = make(map[FactoryIndex]chan struct{})
 }
 
-func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
+func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory, dedup *dedupResourceInformer) {
 	ctx, cancel := context.WithCancel(ctx)
 	c.data[index] = &Factory{
 		shared:               f,
+		dedup:                dedup,
 		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
 		ctx:                  ctx,
 		cancel:               cancel,
@@ -82,6 +96,11 @@ func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index 
 		return f
 	}
 
+	if c.useDedup {
+		c.add(ctx, index, nil, newDedupResourceInformer(client, index, c.dedupStore(index)))
+		return c.data[index]
+	}
+
 	// define resyncPeriod for informer
 	resyncPeriod := randomizedResyncPeriod()
 
@@ -98,9 +117,20 @@ func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index 
 		client, resyncPeriod, index.Namespace, tweakListOptions)
 	factory.ForResource(index.GVR)
 
-	c.add(ctx, index, factory)
+	c.add(ctx, index, factory, nil)
 
 	return c.data[index]
+}
+
+func (c *FactoryStore) dedupStore(index FactoryIndex) store.Store {
+	if c.storeFor != nil {
+		return c.storeFor(index)
+	}
+	return store.NewDedupStore()
+}
+
+func factoryIndexStoreKey(index FactoryIndex) string {
+	return fmt.Sprintf("%s|%s|%s|%s", index.GVR.String(), index.Namespace, index.FieldSelector, index.LabelSelector)
 }
 
 func (c *FactoryStore) Start(ctx context.Context, informerId string, client dynamic.Interface, index FactoryIndex, handler cache.ResourceEventHandler, errorHandler *WatchErrorHandler) error {
@@ -108,6 +138,10 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	defer c.mu.Unlock()
 
 	factory := c.get(ctx, client, index)
+
+	if c.useDedup && factory.dedup != nil {
+		return c.startDedupInformer(ctx, informerId, factory, index, handler, errorHandler)
+	}
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
 	// Add error handler, ignore "already started" error.
@@ -154,11 +188,84 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 	return nil
 }
 
+func (c *FactoryStore) startDedupInformer(ctx context.Context, informerId string, factory *Factory, index FactoryIndex, handler cache.ResourceEventHandler, errorHandler *WatchErrorHandler) error {
+	factory.dedup.addEventHandler(informerId, handler)
+
+	log.Debug("Factory store: increased usage counter of the dedup factory",
+		slog.Int(pkg.LogKeyValue, factory.dedup.handlerCount()),
+		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+	if factory.done == nil {
+		factory.done = make(chan struct{})
+
+		go func() {
+			defer close(factory.done)
+			err := factory.dedup.run(factory.ctx, errorHandler)
+			if err != nil && err != context.Canceled {
+				log.Warn("Factory store: dedup informer exited with error",
+					slog.String(pkg.LogKeyNamespace, index.Namespace),
+					slog.String(pkg.LogKeyGVR, index.GVR.String()),
+					log.Err(err))
+			}
+
+			log.Debug("Factory store: dedup informer goroutine exited",
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+		}()
+	}
+
+	if !factory.dedup.synced() {
+		if err := wait.PollUntilContextCancel(ctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
+			return factory.dedup.synced(), nil
+		}); err != nil {
+			return err
+		}
+	}
+
+	log.Debug("Factory store: started dedup informer",
+		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+	return nil
+}
+
 func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 	c.mu.Lock()
 	f, ok := c.data[index]
 	if !ok {
 		// already deleted
+		c.mu.Unlock()
+		return
+	}
+
+	if f.dedup != nil {
+		f.dedup.removeEventHandler(informerId)
+
+		log.Debug("Factory store: decreased usage counter of the dedup factory",
+			slog.Int(pkg.LogKeyValue, f.dedup.handlerCount()),
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+		if f.dedup.handlerCount() == 0 {
+			log.Debug("Factory store: last handler removed, canceling dedup informer",
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+			done := f.done
+			f.cancel()
+			c.mu.Unlock()
+			if done != nil {
+				<-done
+			}
+
+			c.mu.Lock()
+			delete(c.data, index)
+
+			log.Debug("Factory store: deleted dedup factory",
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+			if ch, ok := c.stoppedCh[index]; ok {
+				close(ch)
+				delete(c.stoppedCh, index)
+			}
+		}
+
 		c.mu.Unlock()
 		return
 	}

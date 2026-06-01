@@ -6,7 +6,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
-	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
@@ -21,7 +21,7 @@ const DefaultConfigurationId = "hooks"
 //   - Call AddWebhook for every binding in hooks
 //   - Start() to run server and create ValidatingWebhookConfiguration/MutatingWebhookConfiguration
 type WebhookManager struct {
-	KubeClient *klient.Client
+	KubeClient *dedupclient.Client
 
 	Settings  *WebhookSettings
 	Namespace string
@@ -44,7 +44,7 @@ func WithLogger(logger *log.Logger) Option {
 	}
 }
 
-func NewWebhookManager(kubeClient *klient.Client, opts ...Option) *WebhookManager {
+func NewWebhookManager(kubeClient *dedupclient.Client, opts ...Option) *WebhookManager {
 	manager := &WebhookManager{
 		ValidatingResources: make(map[string]*ValidatingWebhookResource),
 		MutatingResources:   make(map[string]*MutatingWebhookResource),

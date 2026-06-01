@@ -118,37 +118,14 @@ func TestDedupClientConfigFromAppConfig_PassThrough(t *testing.T) {
 	assert.Equal(t, 30*time.Second, got.GCInterval)
 }
 
-func TestInitDedupClient_DisabledReturnsNil(t *testing.T) {
+func TestInitSingletonKubeClient_RejectsMalformedGVK(t *testing.T) {
 	t.Parallel()
 
-	c, err := initDedupClient(nil, DedupClientConfig{Enabled: false}, nil)
-	require.NoError(t, err)
-	assert.Nil(t, c, "Enabled=false must skip construction even when kubeClient is nil")
-}
-
-func TestInitDedupClient_EnabledRequiresKubeClient(t *testing.T) {
-	t.Parallel()
-
-	_, err := initDedupClient(nil, DedupClientConfig{Enabled: true}, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "main kube client is nil")
-}
-
-func TestInitDedupClient_RejectsMalformedGVK(t *testing.T) {
-	t.Parallel()
-
-	// We don't need a real kube client for this test path because parseGVKs
-	// is invoked before any rest.Config is touched. But initDedupClient does
-	// dereference kubeClient before parsing — so we short-circuit by
-	// constructing a request that fails at the GVK-parse step.
 	cfg := DedupClientConfig{
 		Enabled:   true,
 		WatchGVKs: []string{"not-a-valid-gvk"},
 	}
-	_, err := initDedupClient(nil, cfg, nil)
+	_, err := initSingletonKubeClient(KubeClientConfig{}, cfg, nil)
 	require.Error(t, err)
-	// The "main kube client is nil" branch fires first, which is the
-	// stronger guarantee at this layer; parse-level rejection is exercised
-	// directly by TestParseGVKs above.
-	assert.Contains(t, err.Error(), "main kube client is nil")
+	assert.Contains(t, err.Error(), "parse watched GVKs")
 }

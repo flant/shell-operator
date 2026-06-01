@@ -22,8 +22,25 @@ import (
 // RESTConfig is the only mandatory field; all other fields have sensible
 // defaults and may be left zero-valued.
 type Config struct {
+	// Context is the kubeconfig context name used when RESTConfig is nil.
+	Context string
+
+	// Config is the kubeconfig path used when RESTConfig is nil.
+	Config string
+
+	// Server is an explicit API server URL. It bypasses kubeconfig and
+	// in-cluster loading when set.
+	Server string
+
+	// QPS and Burst tune the shared rest.Config rate limiter.
+	QPS   float32
+	Burst int
+
+	// Timeout sets the shared rest.Config timeout. Zero leaves it unset.
+	Timeout time.Duration
+
 	// RESTConfig is the *rest.Config used by the underlying dynamic client.
-	// Required.
+	// Optional; when nil the client loads out-of-cluster or in-cluster config.
 	RESTConfig *rest.Config
 
 	// RESTMapper resolves GroupKind/Version → GroupVersionResource. When nil,

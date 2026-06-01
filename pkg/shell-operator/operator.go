@@ -25,7 +25,6 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/otel"
 
-	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/hook"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -66,22 +65,14 @@ type ShellOperator struct {
 	// HookMetricStorage separate metric storage for metrics, which are returned by user hooks
 	HookMetricStorage metricsstorage.Storage
 
-	KubeClient    *klient.Client
+	KubeClient    *dedupclient.Client
 	ObjectPatcher *objectpatch.ObjectPatcher
-
-	// DedupClient is the optional controller-runtime compatible Kubernetes
-	// client backed by a deduplicated cache (github.com/ldmonster/kubeclient).
-	// It is nil unless the deduplicated client is enabled at assembly time
-	// (see app.Config.DedupClient and AssembleCommonOperator). When non-nil,
-	// it is started in op.Start() and stopped during op.Shutdown().
-	DedupClient *dedupclient.Client
 
 	// SnapshotStore is the optional process-wide deduplicated cache that
 	// backs every kubernetes-binding monitor's per-object snapshot. When
 	// non-nil it is wired into the KubeEventsManager so resourceInformers
 	// store `*Unstructured` bodies once (refcounted) instead of per-monitor.
-	// Enabled via app.Config.DedupClient.SnapshotStore. Independent of
-	// DedupClient: either, both, or neither may be active.
+	// Enabled via app.Config.DedupClient.SnapshotStore.
 	SnapshotStore *dedupclient.SnapshotStore
 
 	ScheduleManager   schedulemanager.ScheduleManager
@@ -106,6 +97,12 @@ type Option func(operator *ShellOperator)
 func WithLogger(logger *log.Logger) Option {
 	return func(operator *ShellOperator) {
 		operator.logger = logger
+	}
+}
+
+func WithKubeClient(client *dedupclient.Client) Option {
+	return func(operator *ShellOperator) {
+		operator.KubeClient = client
 	}
 }
 
@@ -147,11 +144,10 @@ func (op *ShellOperator) Start() {
 
 	op.APIServer.Start(op.ctx)
 
-	// Spin up the deduplicated kubeclient cache before any consumer asks
-	// for it. Failure to start is logged but non-fatal: the rest of the
-	// operator can still operate via the existing KubeClient/ObjectPatcher.
-	if op.DedupClient != nil {
-		if err := op.DedupClient.Start(op.ctx); err != nil {
+	// Spin up the singleton deduplicated kubeclient cache before any
+	// consumer asks for it.
+	if op.KubeClient != nil {
+		if err := op.KubeClient.Start(op.ctx); err != nil {
 			op.logger.Error("start dedup kubeclient cache", log.Err(err))
 		}
 	}
@@ -897,9 +893,9 @@ func (op *ShellOperator) Shutdown() {
 	// the dedup cache run loop, but Shutdown is also called from paths that
 	// don't always invoke Stop(). Trigger an explicit, time-bounded shutdown
 	// so the goroutine is guaranteed to exit even on direct Shutdown() use.
-	if op.DedupClient != nil {
+	if op.KubeClient != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), WaitQueuesTimeout)
-		if err := op.DedupClient.Shutdown(shutdownCtx); err != nil {
+		if err := op.KubeClient.Shutdown(shutdownCtx); err != nil {
 			op.logger.Warn("dedup kubeclient cache did not shut down cleanly",
 				slog.String(pkg.LogKeyPhase, "shutdown"),
 				log.Err(err))

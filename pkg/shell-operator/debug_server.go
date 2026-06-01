@@ -86,9 +86,7 @@ func (op *ShellOperator) RegisterDebugHookRoutes(dbgSrv *debug.Server) {
 }
 
 // RegisterDebugDedupClientRoutes exposes a small JSON snapshot of the
-// deduplicated-kubeclient state on the debug server. The route is registered
-// even when the dedup client is disabled, returning a clear "disabled"
-// payload so probes can distinguish "not configured" from "errored".
+// singleton deduplicated kubeclient state on the debug server.
 func (op *ShellOperator) RegisterDebugDedupClientRoutes(dbgSrv *debug.Server) {
 	dbgSrv.RegisterHandler(http.MethodGet, "/dedup-client/status.{format:(json|yaml|text)}", func(_ *http.Request) (interface{}, error) {
 		payload := map[string]any{
@@ -99,19 +97,19 @@ func (op *ShellOperator) RegisterDebugDedupClientRoutes(dbgSrv *debug.Server) {
 	})
 }
 
-// clientStatus reports the status of the runtime DedupClient.
+// clientStatus reports the status of the singleton dedup client.
 func clientStatus(op *ShellOperator) map[string]any {
-	if op.DedupClient == nil {
+	if op.KubeClient == nil {
 		return map[string]any{
 			"enabled": false,
-			"reason":  "DedupClient is not configured (set --dedup-client-enabled or $DEDUP_CLIENT_ENABLED)",
+			"reason":  "KubeClient is not configured",
 		}
 	}
 	// Cache wide synchronisation status — best-effort, capped at 0
 	// timeout so the probe never blocks the debug server.
 	ctx, cancel := context.WithTimeout(context.Background(), 0)
 	defer cancel()
-	synced := op.DedupClient.WaitForCacheSync(ctx)
+	synced := op.KubeClient.WaitForCacheSync(ctx)
 	return map[string]any{
 		"enabled":         true,
 		"cacheSyncedHint": synced,

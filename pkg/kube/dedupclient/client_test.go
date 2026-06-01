@@ -12,12 +12,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func TestNew_RequiresRESTConfig(t *testing.T) {
+func TestNew_RejectsEmptyRESTConfigHost(t *testing.T) {
 	t.Parallel()
 
-	_, err := New(Config{}, nil)
+	_, err := New(Config{RESTConfig: &rest.Config{}}, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "rest.Config is required")
+	assert.Contains(t, err.Error(), "rest config host can't be empty")
 }
 
 // TestNew_AcceptsZeroValueOptions exercises the buildOptions translation

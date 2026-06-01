@@ -9,8 +9,8 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+	"github.com/ldmonster/kubeclient/store"
 
-	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
@@ -50,6 +50,9 @@ type KubeEventsManager interface {
 	// Passing nil restores the default (no dedup) behaviour. Must be
 	// called before any AddMonitor call to take effect for that monitor.
 	WithSnapshotStore(store *dedupclient.SnapshotStore)
+	// WithDedupClient switches subsequently-created Kubernetes binding
+	// informers to the dedup-backed implementation. A nil client is a no-op.
+	WithDedupClient(client *dedupclient.Client)
 	Stop()
 	Wait()
 }
@@ -59,7 +62,7 @@ type kubeEventsManager struct {
 	// channel to emit KubeEvent objects
 	KubeEventCh chan kemtypes.KubeEvent
 
-	KubeClient *klient.Client
+	KubeClient *dedupclient.Client
 
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -71,6 +74,7 @@ type kubeEventsManager struct {
 	// created Monitor. Reading and writing this field is serialised via
 	// the m mutex because Monitor construction happens under m.
 	snapshotStore *dedupclient.SnapshotStore
+	dedupClient   *dedupclient.Client
 
 	m        sync.RWMutex
 	Monitors map[string]Monitor
@@ -82,7 +86,7 @@ type kubeEventsManager struct {
 var _ KubeEventsManager = (*kubeEventsManager)(nil)
 
 // NewKubeEventsManager returns an implementation of KubeEventsManager.
-func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *log.Logger) *kubeEventsManager {
+func NewKubeEventsManager(ctx context.Context, client *dedupclient.Client, logger *log.Logger) *kubeEventsManager {
 	cctx, cancel := context.WithCancel(ctx)
 	em := &kubeEventsManager{
 		ctx:          cctx,
@@ -108,6 +112,18 @@ func (mgr *kubeEventsManager) WithSnapshotStore(snapshotStore *dedupclient.Snaps
 	mgr.m.Lock()
 	defer mgr.m.Unlock()
 	mgr.snapshotStore = snapshotStore
+}
+
+func (mgr *kubeEventsManager) WithDedupClient(client *dedupclient.Client) {
+	if client == nil {
+		return
+	}
+	mgr.m.Lock()
+	defer mgr.m.Unlock()
+	mgr.dedupClient = client
+	mgr.factoryStore.EnableDedupInformers(func(index FactoryIndex) store.Store {
+		return client.InformerStore(factoryIndexStoreKey(index))
+	})
 }
 
 // AddMonitor creates a monitor with informers and return a KubeEvent with existing objects.

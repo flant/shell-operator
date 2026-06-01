@@ -15,8 +15,10 @@ import (
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	schedulemanager "github.com/flant/shell-operator/pkg/schedule_manager"
+	"k8s.io/client-go/discovery/cached/memory"
 )
 
 func init() {
@@ -39,6 +41,7 @@ type BindingContextController struct {
 	ScheduleManager   schedulemanager.ScheduleManager
 
 	fakeCluster *fake.Cluster
+	kubeClient  *dedupclient.Client
 
 	mu      sync.Mutex
 	started atomic.Bool
@@ -64,7 +67,8 @@ func NewBindingContextController(config string, logger *log.Logger, version ...f
 		logger:      logger,
 	}
 
-	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.fakeCluster.Client, b.logger.Named("kube-events-manager"))
+	b.kubeClient = dedupclient.NewFromClients(fc.Client, fc.Client.Dynamic(), nil, memory.NewMemCacheClient(fc.Client.Discovery()))
+	b.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(ctx, b.kubeClient, b.logger.Named("kube-events-manager"))
 	b.KubeEventsManager.WithMetricStorage(metricsstorage.NewMetricStorage(
 		metricsstorage.WithLogger(log.NewNop()),
 	))
@@ -88,6 +92,7 @@ func (b *BindingContextController) FakeCluster() *fake.Cluster {
 // RegisterCRD registers custom resources for the cluster
 func (b *BindingContextController) RegisterCRD(group, version, kind string, namespaced bool) {
 	b.fakeCluster.RegisterCRD(group, version, kind, namespaced)
+	b.kubeClient.ReplaceDynamic(b.fakeCluster.Client.Dynamic())
 }
 
 // Run generates binding contexts for hook tests

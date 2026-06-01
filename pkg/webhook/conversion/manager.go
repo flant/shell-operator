@@ -8,7 +8,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	klient "github.com/flant/kube-client/client"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	"github.com/flant/shell-operator/pkg/webhook/server"
 )
 
@@ -27,7 +27,7 @@ type EventHandlerFn func(ctx context.Context, cdrName string, request *v1.Conver
 //   - Start server loop.
 //   - Update clientConfig in each registered CRD.
 type WebhookManager struct {
-	KubeClient *klient.Client
+	KubeClient *dedupclient.Client
 
 	EventHandlerFn EventHandlerFn
 	Settings       *WebhookSettings

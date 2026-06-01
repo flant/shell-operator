@@ -10,12 +10,12 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 )
 
 type WebhookResourceOptions struct {
-	KubeClient        *klient.Client
+	KubeClient        *dedupclient.Client
 	Namespace         string
 	ConfigurationName string
 	ServiceName       string

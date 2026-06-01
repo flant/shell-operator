@@ -11,8 +11,10 @@ import (
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/config"
 	"github.com/flant/shell-operator/pkg/hook/types"
+	"github.com/flant/shell-operator/pkg/kube/dedupclient"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"k8s.io/client-go/discovery/cached/memory"
 )
 
 // Test updating snapshots for combined contexts.
@@ -20,7 +22,8 @@ func Test_UpdateSnapshots(t *testing.T) {
 	g := NewWithT(t)
 
 	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
-	mgr := kubeeventsmanager.NewKubeEventsManager(context.Background(), fc.Client, log.NewNop())
+	kubeClient := dedupclient.NewFromClients(fc.Client, fc.Client.Dynamic(), nil, memory.NewMemCacheClient(fc.Client.Discovery()))
+	mgr := kubeeventsmanager.NewKubeEventsManager(context.Background(), kubeClient, log.NewNop())
 
 	testHookConfig := `
 configVersion: v1

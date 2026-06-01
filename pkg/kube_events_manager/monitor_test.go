@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/ldmonster/kubeclient/store"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -58,7 +60,7 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 	metricStorage.GaugeSetMock.When(metrics.KubeSnapshotObjects, 2, map[string]string(nil)).Then()
 	metricStorage.GaugeSetMock.When(metrics.KubeSnapshotObjects, 3, map[string]string(nil)).Then()
 
-	mon := NewMonitor(context.Background(), fc.Client, metricStorage, NewFactoryStore(), monitorCfg, func(ev kemtypes.KubeEvent) {
+	mon := NewMonitor(context.Background(), testDedupClientFromLegacy(fc.Client), metricStorage, NewFactoryStore(), monitorCfg, func(ev kemtypes.KubeEvent) {
 		objsMutex.Lock()
 		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
 		objsMutex.Unlock()
@@ -154,6 +156,68 @@ func Test_Monitor_should_handle_dynamic_ns_events(t *testing.T) {
 		return ok
 	}, "5s", "10ms").
 		ShouldNot(BeTrue(), "Should not create informer for non-matched Namespace")
+}
+
+func Test_Monitor_UsesDedupInformerFactory(t *testing.T) {
+	g := NewWithT(t)
+	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
+
+	createNsWithLabels(fc, "default", nil)
+	createCM(fc, "default", testCM("initial-cm"))
+
+	monitorCfg := &MonitorConfig{
+		ApiVersion: "v1",
+		Kind:       "ConfigMap",
+		EventTypes: []kemtypes.WatchEventType{kemtypes.WatchEventAdded},
+		NamespaceSelector: &kemtypes.NamespaceSelector{
+			NameSelector: &kemtypes.NameSelector{
+				MatchNames: []string{"default"},
+			},
+		},
+	}
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Optional().Set(func(_ string, _ float64, _ map[string]string, _ []float64) {})
+	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {})
+
+	var objsMutex sync.Mutex
+	objsFromEvents := make([]string, 0)
+
+	factoryStore := NewFactoryStore()
+	kubeClient := testDedupClientFromLegacy(fc.Client)
+	factoryStore.EnableDedupInformers(func(index FactoryIndex) store.Store {
+		return kubeClient.InformerStore(factoryIndexStoreKey(index))
+	})
+	mon := NewMonitor(context.Background(), kubeClient, metricStorage, factoryStore, monitorCfg, func(ev kemtypes.KubeEvent) {
+		objsMutex.Lock()
+		objsFromEvents = append(objsFromEvents, snapshotResourceIDs(ev.Objects)...)
+		objsMutex.Unlock()
+	}, log.NewNop())
+
+	require.NoError(t, mon.CreateInformers())
+	mon.Start(context.TODO())
+	defer func() {
+		mon.Stop()
+		mon.Wait()
+	}()
+
+	factoryStore.mu.Lock()
+	for _, factory := range factoryStore.data {
+		assert.NotNil(t, factory.dedup)
+		assert.Nil(t, factory.shared)
+	}
+	factoryStore.mu.Unlock()
+
+	g.Expect(snapshotResourceIDs(mon.Snapshot())).Should(ContainElement("default/ConfigMap/initial-cm"))
+
+	mon.EnableKubeEventCb()
+	createCM(fc, "default", testCM("event-cm"))
+
+	g.Eventually(func() []string {
+		objsMutex.Lock()
+		defer objsMutex.Unlock()
+		return append([]string(nil), objsFromEvents...)
+	}, "5s", "10ms").Should(ContainElement("default/ConfigMap/event-cm"))
 }
 
 func createNsWithLabels(fc *fake.Cluster, name string, labels map[string]string) {
