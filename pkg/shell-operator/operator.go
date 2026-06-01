@@ -326,6 +326,16 @@ func (op *ShellOperator) taskHandleEnableScheduleBindings(_ context.Context, t t
 	taskLogEntry := utils.EnrichLoggerWithLabels(logEntry, hookLogLabels)
 
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
+	if taskHook == nil {
+		taskLogEntry.Error("hook not found in hook manager, dropping EnableScheduleBindings task",
+			slog.String(pkg.LogKeyHook, hookMeta.HookName))
+		return queue.TaskResult{Status: queue.Fail}
+	}
+	if taskHook.HookController == nil {
+		taskLogEntry.Error("hook controller is nil, dropping EnableScheduleBindings task",
+			slog.String(pkg.LogKeyHook, hookMeta.HookName))
+		return queue.TaskResult{Status: queue.Fail}
+	}
 	taskHook.HookController.EnableScheduleBindings()
 	taskLogEntry.Info("Schedule binding for hook enabled successfully")
 
@@ -373,6 +383,16 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 	taskLogEntry.Info("Enable kubernetes binding for hook")
 
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
+	if taskHook == nil {
+		taskLogEntry.Error("hook not found in hook manager, dropping EnableKubernetesBindings task",
+			slog.String(pkg.LogKeyHook, hookMeta.HookName))
+		return queue.TaskResult{Status: queue.Fail}
+	}
+	if taskHook.HookController == nil {
+		taskLogEntry.Error("hook controller is nil, dropping EnableKubernetesBindings task",
+			slog.String(pkg.LogKeyHook, hookMeta.HookName))
+		return queue.TaskResult{Status: queue.Fail}
+	}
 
 	hookRunTasks := make([]task.Task, 0)
 
@@ -420,6 +440,12 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 		return queue.TaskResult{Status: queue.Fail}
 	}
 	taskHook := op.HookManager.GetHook(hookMeta.HookName)
+	if taskHook == nil {
+		op.logger.Error("hook not found in hook manager, dropping HookRun task",
+			slog.String(pkg.LogKeyHook, hookMeta.HookName),
+			slog.String(pkg.LogKeyType, string(t.GetType())))
+		return queue.TaskResult{Status: queue.Fail}
+	}
 
 	err := taskHook.RateLimitWait(context.Background())
 	if err != nil {
