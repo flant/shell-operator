@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"gopkg.in/robfig/cron.v2"
@@ -44,6 +45,8 @@ type scheduleManager struct {
 	ScheduleCh chan string
 	Entries    map[string]*CronEntry
 
+	stopped chan struct{}
+
 	logger *log.Logger
 	mu     sync.Mutex
 }
@@ -64,9 +67,22 @@ func NewScheduleManager(ctx context.Context, logger *log.Logger) *scheduleManage
 	return sm
 }
 
+// Stop cancels the manager context and blocks until the cron is fully stopped.
+// Calling Stop without a preceding Start returns immediately. Calling Stop
+// multiple times is safe.
 func (sm *scheduleManager) Stop() {
 	if sm.cancel != nil {
 		sm.cancel()
+	}
+	sm.mu.Lock()
+	stopped := sm.stopped
+	sm.mu.Unlock()
+	if stopped == nil {
+		return
+	}
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
 	}
 }
 
@@ -142,9 +158,21 @@ func (sm *scheduleManager) Remove(delEntry smtypes.ScheduleEntry) {
 }
 
 func (sm *scheduleManager) Start() {
+	sm.mu.Lock()
+	if sm.stopped != nil {
+		sm.mu.Unlock()
+		return
+	}
+	stopped := make(chan struct{})
+	sm.stopped = stopped
+	sm.mu.Unlock()
+
 	sm.cron.Start()
 	go func() {
+		defer close(stopped)
 		<-sm.ctx.Done()
+		// cron.v2 Stop signals the scheduler goroutine to exit.
+		// Closing stopped lets Stop() callers observe completion.
 		sm.cron.Stop()
 	}()
 }

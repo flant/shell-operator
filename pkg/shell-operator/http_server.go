@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -22,40 +23,83 @@ type baseHTTPServer struct {
 
 	address string
 	port    string
+
+	mu     sync.Mutex
+	srv    *http.Server
+	doneCh chan struct{}
+	logger *log.Logger
 }
 
-// Start runs http server
-func (bhs *baseHTTPServer) Start(ctx context.Context) {
+// Start runs the http server in a background goroutine. It returns
+// immediately. Lifecycle errors (failure to listen, etc.) are reported
+// asynchronously via the server logger; for graceful stop callers must use
+// Shutdown(ctx). The ctx argument is retained for backwards compatibility but
+// is not used for shutdown anymore — see Shutdown.
+func (bhs *baseHTTPServer) Start(_ context.Context) {
 	srv := &http.Server{
 		Addr:         bhs.address + ":" + bhs.port,
 		Handler:      bhs.router,
 		ReadTimeout:  90 * time.Second,
 		WriteTimeout: 90 * time.Second,
 	}
+	doneCh := make(chan struct{})
+
+	bhs.mu.Lock()
+	bhs.srv = srv
+	bhs.doneCh = doneCh
+	bhs.mu.Unlock()
+
+	logger := bhs.serverLogger()
 
 	go func() {
+		defer close(doneCh)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal("base http server listen", log.Err(err))
+			logger.Error("base http server stopped with error", log.Err(err))
 		}
 	}()
-	log.Info("base http server started",
+
+	logger.Info("base http server started",
 		slog.String(pkg.LogKeyAddress, bhs.address),
 		slog.String(pkg.LogKeyPort, bhs.port))
+}
 
-	go func() {
-		<-ctx.Done()
-		log.Info("base http server stopped")
+// Shutdown gracefully stops the http server. It is safe to call multiple times
+// and when Start was never invoked — both return nil.
+func (bhs *baseHTTPServer) Shutdown(ctx context.Context) error {
+	bhs.mu.Lock()
+	srv := bhs.srv
+	doneCh := bhs.doneCh
+	bhs.srv = nil
+	bhs.mu.Unlock()
 
-		cctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer func() {
-			// extra handling here
-			cancel()
-		}()
+	if srv == nil {
+		return nil
+	}
 
-		if err := srv.Shutdown(cctx); err != nil {
-			log.Fatal("base http server shutdown failed", log.Err(err))
+	if err := srv.Shutdown(ctx); err != nil {
+		return fmt.Errorf("base http server shutdown: %w", err)
+	}
+	if doneCh != nil {
+		select {
+		case <-doneCh:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-	}()
+	}
+	bhs.serverLogger().Info("base http server stopped")
+	return nil
+}
+
+// serverLogger returns the per-instance logger if set, falling back to the
+// package default so older constructors keep working.
+func (bhs *baseHTTPServer) serverLogger() *log.Logger {
+	bhs.mu.Lock()
+	l := bhs.logger
+	bhs.mu.Unlock()
+	if l != nil {
+		return l
+	}
+	return log.NewLogger()
 }
 
 // RegisterRoute register http.HandlerFunc
@@ -75,16 +119,14 @@ func (bhs *baseHTTPServer) RegisterRoute(method, pattern string, h http.HandlerF
 	}
 }
 
-func newBaseHTTPServer(address, port string) *baseHTTPServer {
+func newBaseHTTPServer(address, port string, logger *log.Logger) *baseHTTPServer {
 	router := chi.NewRouter()
 
-	// inject pprof
 	router.Mount("/debug", middleware.Profiler())
 
 	router.Get("/discovery", func(writer http.ResponseWriter, _ *http.Request) {
 		buf := bytes.NewBuffer(nil)
 		walkFn := func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
-			// skip pprof routes
 			if strings.HasPrefix(route, "/debug/") {
 				return nil
 			}
@@ -108,6 +150,7 @@ func newBaseHTTPServer(address, port string) *baseHTTPServer {
 		router:  router,
 		address: address,
 		port:    port,
+		logger:  logger,
 	}
 
 	return srv

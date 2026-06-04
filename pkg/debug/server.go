@@ -1,6 +1,8 @@
 package debug
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/go-chi/chi/v5"
@@ -28,6 +31,13 @@ type Server struct {
 	HttpAddr   string
 
 	Router chi.Router
+
+	mu         sync.Mutex
+	unixSrv    *http.Server
+	unixDone   chan struct{}
+	httpSrv    *http.Server
+	httpDone   chan struct{}
+	socketPath string // captured at Init time so Shutdown can remove it
 
 	logger *log.Logger
 }
@@ -65,7 +75,6 @@ func (s *Server) Init() error {
 		}
 	}
 
-	// Check if socket is available
 	listener, err := net.Listen("unix", address)
 	if err != nil {
 		return fmt.Errorf("Debug HTTP server fail to listen on '%s': %w", address, err)
@@ -73,23 +82,94 @@ func (s *Server) Init() error {
 
 	s.logger.Info("Debug endpoint listen on address", slog.String(pkg.LogKeyAddress, address))
 
+	unixSrv := &http.Server{Handler: s.Router}
+	unixDone := make(chan struct{})
+
+	s.mu.Lock()
+	s.unixSrv = unixSrv
+	s.unixDone = unixDone
+	s.socketPath = address
+	s.mu.Unlock()
+
 	go func() {
-		if err := http.Serve(listener, s.Router); err != nil {
-			s.logger.Error("Error starting Debug socket server", log.Err(err))
-			os.Exit(1)
+		defer close(unixDone)
+		if err := unixSrv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			s.logger.Error("Debug unix socket server stopped with error", log.Err(err))
 		}
 	}()
 
 	if s.HttpAddr != "" {
+		httpSrv := &http.Server{
+			Addr:    s.HttpAddr,
+			Handler: s.Router,
+		}
+		httpDone := make(chan struct{})
+
+		s.mu.Lock()
+		s.httpSrv = httpSrv
+		s.httpDone = httpDone
+		s.mu.Unlock()
+
 		go func() {
-			if err := http.ListenAndServe(s.HttpAddr, s.Router); err != nil {
-				s.logger.Error("Error starting Debug HTTP server", log.Err(err))
-				os.Exit(1)
+			defer close(httpDone)
+			if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				s.logger.Error("Debug HTTP server stopped with error", log.Err(err))
 			}
 		}()
 	}
 
 	return nil
+}
+
+// Shutdown gracefully stops both the unix-socket server and the optional HTTP
+// server. The unix socket file is removed on the way out. Safe to call when
+// Init was never run or after a previous Shutdown.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	unixSrv := s.unixSrv
+	unixDone := s.unixDone
+	httpSrv := s.httpSrv
+	httpDone := s.httpDone
+	socketPath := s.socketPath
+	s.unixSrv = nil
+	s.httpSrv = nil
+	s.mu.Unlock()
+
+	var errs []error
+
+	if unixSrv != nil {
+		if err := unixSrv.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("debug unix server shutdown: %w", err))
+		}
+		if unixDone != nil {
+			select {
+			case <-unixDone:
+			case <-ctx.Done():
+				errs = append(errs, ctx.Err())
+			}
+		}
+	}
+
+	if httpSrv != nil {
+		if err := httpSrv.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("debug http server shutdown: %w", err))
+		}
+		if httpDone != nil {
+			select {
+			case <-httpDone:
+			case <-ctx.Done():
+				errs = append(errs, ctx.Err())
+			}
+		}
+	}
+
+	if socketPath != "" {
+		if err := os.Remove(socketPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			errs = append(errs, fmt.Errorf("remove debug socket %q: %w", socketPath, err))
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 // RegisterHandler registers http handler for unix/http debug server

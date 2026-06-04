@@ -68,11 +68,9 @@ func (HookTaskFactory) NewSyncHookRunTask(h *hook.Hook, info controller.BindingE
 		WithCompactionID(h.Name)
 }
 
-// globalHookTaskFactory is the package-level factory used by operator event handlers.
-var globalHookTaskFactory HookTaskFactory
-
 // newHookRunTaskNow is a convenience wrapper that also stamps WithQueuedAt(time.Now()).
+// It uses a zero-value HookTaskFactory because the factory carries no state.
 func newHookRunTaskNow(hookName string, bindingType types.BindingType, info controller.BindingExecutionInfo, logLabels map[string]string) task.Task {
-	return globalHookTaskFactory.NewHookRunTask(hookName, bindingType, info, logLabels).
+	return HookTaskFactory{}.NewHookRunTask(hookName, bindingType, info, logLabels).
 		WithQueuedAt(time.Now())
 }

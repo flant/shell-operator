@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
-	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/pkg/app"
 	"github.com/flant/shell-operator/pkg/config"
@@ -22,16 +21,86 @@ import (
 	webhookserver "github.com/flant/shell-operator/pkg/webhook/server"
 )
 
-// Init initializes logging, ensures directories and creates
-// a ShellOperator instance with all dependencies.
-// cfg must already have all configuration sources merged (NewConfig → ParseEnv → BindFlags → flags parsed).
-func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOperator, error) {
-	// Propagate cfg into package-level globals (e.g. DebugUnixSocket) so
-	// library consumers that skip BindFlags still get them overridden from cfg.
-	app.ApplyConfig(cfg)
+// NewShellOperator builds a fully assembled, ready-to-Start operator from cfg.
+// It supersedes the previous Init + NewShellOperator pair: it owns directory
+// validation, metric storage construction, logging setup, debug server, kube
+// clients, hook discovery and webhook initialization.
+//
+// The returned operator is in the "ready" state — call Start to begin
+// processing and Shutdown to tear everything down. After Shutdown returns,
+// build a fresh instance via NewShellOperator to start over; *ShellOperator
+// values are not meant to be reused across Stop/Start cycles.
+func NewShellOperator(ctx context.Context, cfg *app.Config, opts ...Option) (*ShellOperator, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("shell-operator: cfg must not be nil")
+	}
 
-	// Initialize webhook settings from merged configuration.
-	admission.InitFromSettings(admission.WebhookSettings{
+	bare := newBareShellOperator(ctx, opts...)
+
+	runtimeConfig := config.NewConfig(bare.logger)
+	app.SetupLogging(cfg.Log.Level, runtimeConfig, bare.logger)
+
+	// Ensure metric names use cfg's prefix. metrics.InitMetrics is idempotent
+	// for the same prefix (the {PREFIX} placeholder is replaced once) so
+	// re-instantiating with the same prefix is safe. We also build a
+	// per-instance *metrics.Names snapshot so library consumers have a
+	// stable accessor that does not depend on the package-level globals.
+	metrics.InitMetrics(cfg.App.PrometheusMetricsPrefix)
+	bare.MetricNames = metrics.NewNames(cfg.App.PrometheusMetricsPrefix)
+
+	bare.logger.Info(fmt.Sprintf("%s %s", app.AppName, app.Version))
+	fl := jq.NewFilter()
+	bare.logger.Debug(fl.FilterInfo())
+
+	hooksDir, err := utils.RequireExistingDirectory(cfg.App.HooksDir)
+	if err != nil {
+		return nil, fmt.Errorf("hooks directory: %w", err)
+	}
+
+	tempDir, err := utils.EnsureTempDirectory(cfg.App.TempDir)
+	if err != nil {
+		return nil, fmt.Errorf("temp directory: %w", err)
+	}
+
+	// Debug server is started immediately so a crash before Start still
+	// leaves diagnostics reachable; Shutdown tears it down.
+	debugServer, err := RunDefaultDebugServer(cfg.Debug.UnixSocket, cfg.Debug.HTTPServerAddr, bare.logger.Named("debug-server"))
+	if err != nil {
+		return nil, fmt.Errorf("start debug server: %w", err)
+	}
+	bare.DebugServer = debugServer
+
+	if err := bare.AssembleCommonOperatorFromConfig(cfg, []string{
+		"hook",
+		"binding",
+		"queue",
+	}); err != nil {
+		// Best-effort cleanup of the just-started debug server.
+		_ = debugServer.Shutdown(ctx)
+		return nil, fmt.Errorf("assemble common operator: %w", err)
+	}
+
+	if err := bare.assembleShellOperator(cfg, hooksDir, tempDir, debugServer, runtimeConfig); err != nil {
+		_ = debugServer.Shutdown(ctx)
+		return nil, fmt.Errorf("assemble shell operator: %w", err)
+	}
+
+	return bare, nil
+}
+
+// Init is a thin wrapper kept for compatibility with code that still calls
+// the previous bootstrap entry point. New code should call NewShellOperator
+// directly.
+//
+// Deprecated: use NewShellOperator(ctx, cfg, WithLogger(logger)) instead.
+func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOperator, error) {
+	return NewShellOperator(ctx, cfg, WithLogger(logger))
+}
+
+// admissionSettingsFromConfig builds a *admission.WebhookSettings directly
+// from cfg without touching any package-level globals.
+func admissionSettingsFromConfig(cfg *app.Config) *admission.WebhookSettings {
+	return &admission.WebhookSettings{
 		Settings: webhookserver.Settings{
 			ServerCertPath: cfg.Admission.ServerCert,
 			ServerKeyPath:  cfg.Admission.ServerKey,
@@ -43,8 +112,13 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 		CAPath:               cfg.Admission.CA,
 		ConfigurationName:    cfg.Admission.ConfigurationName,
 		DefaultFailurePolicy: cfg.Admission.FailurePolicy,
-	})
-	conversion.InitFromSettings(conversion.WebhookSettings{
+	}
+}
+
+// conversionSettingsFromConfig builds a *conversion.WebhookSettings directly
+// from cfg without touching any package-level globals.
+func conversionSettingsFromConfig(cfg *app.Config) *conversion.WebhookSettings {
+	return &conversion.WebhookSettings{
 		Settings: webhookserver.Settings{
 			ServerCertPath: cfg.Conversion.ServerCert,
 			ServerKeyPath:  cfg.Conversion.ServerKey,
@@ -54,64 +128,7 @@ func Init(ctx context.Context, cfg *app.Config, logger *log.Logger) (*ShellOpera
 			ListenPort:     cfg.Conversion.ListenPort,
 		},
 		CAPath: cfg.Conversion.CA,
-	})
-
-	runtimeConfig := config.NewConfig(logger)
-	// Init logging subsystem.
-	app.SetupLogging(cfg.Log.Level, runtimeConfig, logger)
-
-	// Log version and jq filtering implementation.
-	logger.Info(app.AppStartMessage)
-	fl := jq.NewFilter()
-	logger.Debug(fl.FilterInfo())
-
-	hooksDir, err := utils.RequireExistingDirectory(cfg.App.HooksDir)
-	if err != nil {
-		logger.Log(ctx, log.LevelFatal.Level(), "hooks directory is required", log.Err(err))
-		return nil, err
 	}
-
-	tempDir, err := utils.EnsureTempDirectory(cfg.App.TempDir)
-	if err != nil {
-		logger.Log(ctx, log.LevelFatal.Level(), "temp directory", log.Err(err))
-		return nil, err
-	}
-
-	ms := metricsstorage.NewMetricStorage(
-		metricsstorage.WithLogger(logger.Named("metric-storage")),
-	)
-
-	hms := metricsstorage.NewMetricStorage(
-		metricsstorage.WithNewRegistry(),
-		metricsstorage.WithLogger(logger.Named("hook-metric-storage")),
-	)
-
-	op := NewShellOperator(ctx, ms, hms, WithLogger(logger))
-
-	// Debug server.
-	debugServer, err := RunDefaultDebugServer(cfg.Debug.UnixSocket, cfg.Debug.HTTPServerAddr, op.logger.Named("debug-server"))
-	if err != nil {
-		logger.Log(ctx, log.LevelFatal.Level(), "start Debug server", log.Err(err))
-		return nil, err
-	}
-
-	err = op.AssembleCommonOperatorFromConfig(cfg, []string{
-		"hook",
-		"binding",
-		"queue",
-	})
-	if err != nil {
-		logger.Log(ctx, log.LevelFatal.Level(), "essemble common operator", log.Err(err))
-		return nil, err
-	}
-
-	err = op.assembleShellOperator(cfg, hooksDir, tempDir, debugServer, runtimeConfig)
-	if err != nil {
-		logger.Log(ctx, log.LevelFatal.Level(), "essemble shell operator", log.Err(err))
-		return nil, err
-	}
-
-	return op, nil
 }
 
 // AssembleCommonOperatorFromConfig is the recommended assembly entry point for
@@ -183,7 +200,7 @@ func kubeClientConfigsFromAppConfig(cfg *app.Config) (KubeClientConfig, KubeClie
 // For library consumers that already hold an *app.Config, prefer
 // AssembleCommonOperatorFromConfig instead of unpacking fields by hand.
 func (op *ShellOperator) AssembleCommonOperator(listenAddress, listenPort string, kubeEventsManagerLabels []string, mainKubeCfg, patcherKubeCfg KubeClientConfig) error {
-	op.APIServer = newBaseHTTPServer(listenAddress, listenPort)
+	op.APIServer = newBaseHTTPServer(listenAddress, listenPort, op.logger.Named("api-server"))
 
 	// built-in metrics
 	err := op.setupMetricStorage(kubeEventsManagerLabels)
@@ -278,20 +295,19 @@ func (op *ShellOperator) SetupEventManagers() {
 	op.ManagerEventsHandler = newManagerEventsHandler(op.ctx, cfg)
 }
 
-// setupHookManagers instantiates different hook managers.
+// setupHookManagers instantiates different hook managers. Settings for the
+// admission and conversion webhook managers are derived directly from cfg —
+// there are no package-level singletons to populate.
 func (op *ShellOperator) setupHookManagers(cfg *app.Config, hooksDir string, tempDir string) {
-	// Initialize admission webhooks manager.
 	op.AdmissionWebhookManager = admission.NewWebhookManager(op.KubeClient, admission.WithLogger(op.logger.Named("admission-webhook-manager")))
-	op.AdmissionWebhookManager.Settings = admission.DefaultSettings
+	op.AdmissionWebhookManager.Settings = admissionSettingsFromConfig(cfg)
 	op.AdmissionWebhookManager.Namespace = cfg.App.Namespace
 
-	// Initialize conversion webhooks manager.
 	op.ConversionWebhookManager = conversion.NewWebhookManager(conversion.WithLogger(op.logger.Named("conversion-webhook-manager")))
 	op.ConversionWebhookManager.KubeClient = op.KubeClient
-	op.ConversionWebhookManager.Settings = conversion.DefaultSettings
+	op.ConversionWebhookManager.Settings = conversionSettingsFromConfig(cfg)
 	op.ConversionWebhookManager.Namespace = cfg.App.Namespace
 
-	// Initialize Hook manager.
 	hookCfg := &hook.ManagerConfig{
 		WorkingDir:               hooksDir,
 		TempDir:                  tempDir,

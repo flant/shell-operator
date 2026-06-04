@@ -443,7 +443,10 @@ func convertValidating(cfgV1 KubernetesAdmissionConfigV1) htypes.ValidatingConfi
 	if cfgV1.FailurePolicy != nil {
 		webhook.FailurePolicy = cfgV1.FailurePolicy
 	} else {
-		defaultFailurePolicy := v1.FailurePolicyType(admission.DefaultSettings.DefaultFailurePolicy)
+		// "Fail" matches Kubernetes' own default and what the operator used
+		// to embed as admission.DefaultSettings.DefaultFailurePolicy. Hooks
+		// that need a different default should set it explicitly.
+		defaultFailurePolicy := v1.FailurePolicyType("Fail")
 		webhook.FailurePolicy = &defaultFailurePolicy
 	}
 

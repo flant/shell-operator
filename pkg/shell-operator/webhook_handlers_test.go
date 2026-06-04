@@ -97,7 +97,7 @@ func TestAdmissionEventHandler_Handle_noHookFound_returnsError(t *testing.T) {
 	runner := func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{Status: queue.Success}
 	}
-	h := NewAdmissionEventHandler(hm, runner, log.NewNop())
+	h := NewAdmissionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 	event := admission.Event{
 		WebhookId:       "wh1",
 		ConfigurationId: "cfg1",
@@ -118,7 +118,7 @@ func TestAdmissionEventHandler_Handle_taskRunnerFail_returnsDenied(t *testing.T)
 	runner := func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{Status: queue.Fail}
 	}
-	h := NewAdmissionEventHandler(hm, runner, log.NewNop())
+	h := NewAdmissionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 	event := admission.Event{
 		WebhookId:       "wh1",
 		ConfigurationId: "cfg1",
@@ -140,7 +140,7 @@ func TestAdmissionEventHandler_Handle_taskRunnerSuccess_returnsProp(t *testing.T
 		},
 	}
 	runner := (&stubTaskRunnerWithProp{propKey: "admissionResponse", propValue: want, status: queue.Success}).run
-	h := NewAdmissionEventHandler(hm, runner, log.NewNop())
+	h := NewAdmissionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 	event := admission.Event{
 		WebhookId:       "wh1",
 		ConfigurationId: "cfg1",
@@ -159,7 +159,7 @@ func TestAdmissionEventHandler_Handle_badPropType_returnsError(t *testing.T) {
 		},
 	}
 	runner := (&stubTaskRunnerWithProp{propKey: "admissionResponse", propValue: "wrong-type", status: queue.Success}).run
-	h := NewAdmissionEventHandler(hm, runner, log.NewNop())
+	h := NewAdmissionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 	event := admission.Event{
 		WebhookId:       "wh1",
 		ConfigurationId: "cfg1",
@@ -182,7 +182,7 @@ func TestConversionEventHandler_Handle_noConversionPath_returnsNilError(t *testi
 	runner := func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{Status: queue.Success}
 	}
-	h := NewConversionEventHandler(hm, runner, log.NewNop())
+	h := NewConversionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 
 	req := &v1.ConversionRequest{
 		DesiredAPIVersion: "v2",
@@ -207,7 +207,7 @@ func TestConversionEventHandler_Handle_taskRunnerFail_returnsFailedResponse(t *t
 	runner := func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{Status: queue.Fail}
 	}
-	h := NewConversionEventHandler(hm, runner, log.NewNop())
+	h := NewConversionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 
 	req := &v1.ConversionRequest{
 		DesiredAPIVersion: "v2",
@@ -233,7 +233,7 @@ func TestConversionEventHandler_Handle_noHookForPath_returnsError(t *testing.T) 
 	runner := func(_ context.Context, _ task.Task) queue.TaskResult {
 		return queue.TaskResult{Status: queue.Success}
 	}
-	h := NewConversionEventHandler(hm, runner, log.NewNop())
+	h := NewConversionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 
 	req := &v1.ConversionRequest{
 		DesiredAPIVersion: "v2",
@@ -254,7 +254,7 @@ func TestConversionEventHandler_Handle_badPropType_returnsError(t *testing.T) {
 		},
 	}
 	runner := (&stubTaskRunnerWithProp{propKey: "conversionResponse", propValue: "wrong-type", status: queue.Success}).run
-	h := NewConversionEventHandler(hm, runner, log.NewNop())
+	h := NewConversionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 
 	req := &v1.ConversionRequest{
 		DesiredAPIVersion: "v2",
@@ -282,7 +282,7 @@ func TestConversionEventHandler_Handle_success_returnsProp(t *testing.T) {
 		t.SetProp("conversionResponse", want)
 		return queue.TaskResult{Status: queue.Success}
 	}
-	h := NewConversionEventHandler(hm, runner, log.NewNop())
+	h := NewConversionEventHandler(hm, runner, HookTaskFactory{}, log.NewNop())
 
 	req := &v1.ConversionRequest{
 		DesiredAPIVersion: "v2",

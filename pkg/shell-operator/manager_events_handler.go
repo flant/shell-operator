@@ -2,6 +2,8 @@ package shell_operator
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -33,6 +35,10 @@ type ManagerEventsHandler struct {
 
 	taskQueues *queue.TaskQueueSet
 
+	startOnce sync.Once
+	started   atomic.Bool
+	doneCh    chan struct{}
+
 	logger *log.Logger
 }
 
@@ -45,6 +51,7 @@ func newManagerEventsHandler(ctx context.Context, cfg *managerEventsHandlerConfi
 		scheduleManager:   cfg.smgr,
 		kubeEventsManager: cfg.mgr,
 		taskQueues:        cfg.tqs,
+		doneCh:            make(chan struct{}),
 		logger:            cfg.logger,
 	}
 }
@@ -61,32 +68,58 @@ func (m *ManagerEventsHandler) WithScheduleEventHandler(fn func(ctx context.Cont
 	m.scheduleCb = fn
 }
 
-// Start runs events handler. This function is used in addon-operator
+// Start runs the events handler. Calling Start a second time is a no-op;
+// the original loop keeps running until Stop is called.
 func (m *ManagerEventsHandler) Start() {
-	go func() {
-		for {
-			var tailTasks []task.Task
+	m.startOnce.Do(func() {
+		m.started.Store(true)
+		go func() {
+			defer close(m.doneCh)
 			logEntry := m.logger.With(pkg.LogKeyOperatorComponent, "handleEvents")
 
-			ctx := context.Background()
+			for {
+				var tailTasks []task.Task
 
-			select {
-			case crontab := <-m.scheduleManager.Ch():
-				if m.scheduleCb != nil {
-					tailTasks = m.scheduleCb(ctx, crontab)
+				select {
+				case crontab := <-m.scheduleManager.Ch():
+					if m.scheduleCb != nil {
+						tailTasks = m.scheduleCb(m.ctx, crontab)
+					}
+
+				case kubeEvent := <-m.kubeEventsManager.Ch():
+					if m.kubeEventCb != nil {
+						tailTasks = m.kubeEventCb(m.ctx, kubeEvent)
+					}
+
+				case <-m.ctx.Done():
+					logEntry.Info("Stop")
+					return
 				}
 
-			case kubeEvent := <-m.kubeEventsManager.Ch():
-				if m.kubeEventCb != nil {
-					tailTasks = m.kubeEventCb(ctx, kubeEvent)
-				}
-
-			case <-m.ctx.Done():
-				logEntry.Info("Stop")
-				return
+				m.taskQueues.AddTailTasks(tailTasks...)
 			}
+		}()
+	})
+}
 
-			m.taskQueues.AddTailTasks(tailTasks...)
-		}
-	}()
+// Stop signals the events handler loop to exit. Stop is non-blocking; pair it
+// with Wait when you need a synchronous teardown.
+func (m *ManagerEventsHandler) Stop() {
+	if m.cancel != nil {
+		m.cancel()
+	}
+}
+
+// Wait blocks until the events handler loop has exited or ctx is canceled.
+// When Start was never called, Wait returns immediately.
+func (m *ManagerEventsHandler) Wait(ctx context.Context) error {
+	if !m.started.Load() {
+		return nil
+	}
+	select {
+	case <-m.doneCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

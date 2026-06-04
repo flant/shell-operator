@@ -19,10 +19,10 @@ func newHookManager(t *testing.T, testdataDir string) *Manager {
 	hooksDir, _ := filepath.Abs(testdataDir)
 
 	conversionManager := conversion.NewWebhookManager()
-	conversionManager.Settings = conversion.DefaultSettings
+	conversionManager.Settings = testConversionSettings()
 
 	admissionManager := admission.NewWebhookManager(nil)
-	admissionManager.Settings = admission.DefaultSettings
+	admissionManager.Settings = testAdmissionSettings()
 
 	cfg := &ManagerConfig{
 		WorkingDir:               hooksDir,
@@ -388,10 +388,10 @@ func Test_HookManager_onstartup_order(t *testing.T) {
 
 func Test_ManagerConfig_HookOptions_PropagateToManager(t *testing.T) {
 	conversionManager := conversion.NewWebhookManager()
-	conversionManager.Settings = conversion.DefaultSettings
+	conversionManager.Settings = testConversionSettings()
 
 	admissionManager := admission.NewWebhookManager(nil)
-	admissionManager.Settings = admission.DefaultSettings
+	admissionManager.Settings = testAdmissionSettings()
 
 	cfg := &ManagerConfig{
 		WorkingDir:               t.TempDir(),

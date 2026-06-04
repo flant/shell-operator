@@ -57,6 +57,11 @@ func main() {
 	applySliceFlags := app.BindFlags(cfg, rootCmd, startCmd)
 	startCmd.PreRunE = func(_ *cobra.Command, _ []string) error {
 		applySliceFlags()
+		// Sync the resolved debug socket path into the package-level CLI
+		// default so any debug-* sub-command launched in the same process
+		// (e.g. embedded test harnesses) sees the same value the operator
+		// will bind to.
+		debug.DefaultSocketPath = cfg.Debug.UnixSocket
 		return nil
 	}
 	rootCmd.AddCommand(startCmd)
@@ -68,6 +73,7 @@ func main() {
 	rootCmd.RunE = start(logger, cfg)
 	rootCmd.PreRunE = func(_ *cobra.Command, _ []string) error {
 		applySliceFlags()
+		debug.DefaultSocketPath = cfg.Debug.UnixSocket
 		return nil
 	}
 

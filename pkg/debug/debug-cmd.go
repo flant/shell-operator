@@ -8,8 +8,6 @@ import (
 
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
-
-	"github.com/flant/shell-operator/pkg/app"
 )
 
 var (
@@ -86,7 +84,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 	queueListCmd.Flags().BoolVarP(&watch, "watch", "w", false, "Keep watching.")
 	queueListCmd.Flags().StringVarP(&watchInterval, "watchInterval", "t", watchInterval, "Watch refresh interval.")
 	AddOutputJsonYamlTextFlag(queueListCmd)
-	app.DefineDebugUnixSocketFlag(queueListCmd)
+	DefineSocketFlag(queueListCmd)
 	queueCmd.AddCommand(queueListCmd)
 
 	queueMainCmd := &cobra.Command{
@@ -106,7 +104,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 		},
 	}
 	AddOutputJsonYamlTextFlag(queueMainCmd)
-	app.DefineDebugUnixSocketFlag(queueMainCmd)
+	DefineSocketFlag(queueMainCmd)
 	queueCmd.AddCommand(queueMainCmd)
 
 	// Runtime config command.
@@ -130,7 +128,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 		},
 	}
 	AddOutputJsonYamlTextFlag(configListCmd)
-	app.DefineDebugUnixSocketFlag(configListCmd)
+	DefineSocketFlag(configListCmd)
 	configCmd.AddCommand(configListCmd)
 
 	var paramName string
@@ -162,7 +160,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 			return nil
 		},
 	}
-	app.DefineDebugUnixSocketFlag(configSetCmd)
+	DefineSocketFlag(configSetCmd)
 	configCmd.AddCommand(configSetCmd)
 
 	// Raw request command
@@ -188,7 +186,7 @@ func DefineDebugCommands(rootCmd *cobra.Command) {
 			return nil
 		},
 	}
-	app.DefineDebugUnixSocketFlag(rawCommand)
+	DefineSocketFlag(rawCommand)
 	rootCmd.AddCommand(rawCommand)
 }
 
@@ -213,7 +211,7 @@ func DefineDebugCommandsSelf(rootCmd *cobra.Command) {
 		},
 	}
 	AddOutputJsonYamlTextFlag(hookListCmd)
-	app.DefineDebugUnixSocketFlag(hookListCmd)
+	DefineSocketFlag(hookListCmd)
 	hookCmd.AddCommand(hookListCmd)
 
 	hookSnapshotCmd := &cobra.Command{
@@ -234,7 +232,7 @@ func DefineDebugCommandsSelf(rootCmd *cobra.Command) {
 		},
 	}
 	AddOutputJsonYamlTextFlag(hookSnapshotCmd)
-	app.DefineDebugUnixSocketFlag(hookSnapshotCmd)
+	DefineSocketFlag(hookSnapshotCmd)
 	hookCmd.AddCommand(hookSnapshotCmd)
 }
 

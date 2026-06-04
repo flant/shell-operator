@@ -36,8 +36,13 @@ func Test_Operator_startup_tasks(t *testing.T) {
 	metricStorage.GaugeSetMock.Optional().Set(func(_ string, _ float64, _ map[string]string) {
 	})
 
-	op := NewShellOperator(context.Background(), nil, nil, WithLogger(log.NewNop()))
-	op.MetricStorage = metricStorage
+	// newBareShellOperator is the test-only constructor that builds an empty
+	// operator without performing directory validation or starting any
+	// servers. Production callers should use NewShellOperator(ctx, cfg, ...).
+	op := newBareShellOperator(context.Background(),
+		WithLogger(log.NewNop()),
+		WithMetricStorage(metricStorage),
+	)
 
 	op.SetupEventManagers()
 	op.setupHookManagers(app.NewConfig(), hooksDir, "")

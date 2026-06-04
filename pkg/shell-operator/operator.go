@@ -16,8 +16,10 @@ package shell_operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -49,7 +51,9 @@ const (
 	serviceName = "shell-operator"
 )
 
-var WaitQueuesTimeout = time.Second * 10
+// DefaultShutdownTimeout bounds how long Shutdown waits for queues, informers
+// and HTTP servers to drain when the caller's context has no deadline.
+const DefaultShutdownTimeout = 30 * time.Second
 
 type ShellOperator struct {
 	ctx    context.Context
@@ -80,9 +84,41 @@ type ShellOperator struct {
 	AdmissionWebhookManager  *admission.WebhookManager
 	ConversionWebhookManager *conversion.WebhookManager
 
+	// DebugServer is optional. When non-nil, Shutdown stops it. The assembly
+	// path in Init() populates it with the default debug server.
+	DebugServer DebugShutdowner
+
 	// taskHandlerRegistry maps task types to their executor functions.
 	// Extenders (addon-operator) may register additional task types.
 	taskHandlerRegistry *TaskHandlerRegistry
+
+	// taskFactory builds HookRun tasks. It carries no state and is exposed
+	// as a field so extenders can substitute a custom factory if needed.
+	taskFactory HookTaskFactory
+
+	// MetricNames is a per-instance snapshot of resolved metric names.
+	// Library callers may consult it to avoid relying on the package-level
+	// metrics globals. NewShellOperator populates it from cfg's prefix; the
+	// bare constructor leaves it nil — callers can fill it later via
+	// metrics.NewNames(prefix) if needed.
+	MetricNames *metrics.Names
+
+	// wg tracks goroutines spawned by Start (runMetrics, etc.) so Shutdown
+	// can wait for them to drain.
+	wg sync.WaitGroup
+
+	// startOnce / shutdownOnce make Start and Shutdown idempotent.
+	startOnce    sync.Once
+	startErr     error
+	shutdownOnce sync.Once
+	shutdownErr  error
+}
+
+// DebugShutdowner is the subset of *debug.Server that ShellOperator needs at
+// shutdown time. Using an interface avoids importing pkg/debug into operator.go
+// and keeps the debug server optional.
+type DebugShutdowner interface {
+	Shutdown(ctx context.Context) error
 }
 
 type Option func(operator *ShellOperator)
@@ -93,7 +129,38 @@ func WithLogger(logger *log.Logger) Option {
 	}
 }
 
-func NewShellOperator(ctx context.Context, metricsStorage, hookMetricStorage metricsstorage.Storage, opts ...Option) *ShellOperator {
+// WithMetricStorage overrides the default per-instance MetricStorage. Most
+// callers should not need this; pass it only when sharing the registry with
+// an outer program.
+func WithMetricStorage(ms metricsstorage.Storage) Option {
+	return func(operator *ShellOperator) {
+		operator.MetricStorage = ms
+	}
+}
+
+// WithHookMetricStorage overrides the default per-instance HookMetricStorage.
+func WithHookMetricStorage(ms metricsstorage.Storage) Option {
+	return func(operator *ShellOperator) {
+		operator.HookMetricStorage = ms
+	}
+}
+
+// NewBareShellOperator constructs an empty *ShellOperator without wiring any
+// of the heavy components (HookManager, webhook managers, debug server, etc.).
+// It is intended for tests and downstream tooling that need to assemble a
+// subset of the operator manually; production code should call
+// NewShellOperator(ctx, cfg, ...) instead.
+//
+// The returned operator has only context, logger, MetricStorage and
+// HookMetricStorage initialized. All other fields are nil and the caller is
+// responsible for populating them before Start.
+func NewBareShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
+	return newBareShellOperator(ctx, opts...)
+}
+
+// newBareShellOperator is the internal implementation shared with the public
+// constructor and the test-only NewBareShellOperator.
+func newBareShellOperator(ctx context.Context, opts ...Option) *ShellOperator {
 	cctx, cancel := context.WithCancel(ctx)
 
 	so := &ShellOperator{
@@ -109,48 +176,178 @@ func NewShellOperator(ctx context.Context, metricsStorage, hookMetricStorage met
 		so.logger = log.NewLogger().Named("shell-operator")
 	}
 
-	so.MetricStorage = metricsStorage
-	so.HookMetricStorage = hookMetricStorage
-
 	if so.MetricStorage == nil {
-		so.logger.Warn("MetricStorage is not provided, create a new default one")
-		so.MetricStorage = metricsstorage.NewMetricStorage()
+		so.MetricStorage = metricsstorage.NewMetricStorage(
+			metricsstorage.WithLogger(so.logger.Named("metric-storage")),
+		)
 	}
 
 	if so.HookMetricStorage == nil {
-		so.logger.Warn("HookMetricStorage is not provided, create a new default one")
-		so.HookMetricStorage = metricsstorage.NewMetricStorage(metricsstorage.WithNewRegistry())
+		so.HookMetricStorage = metricsstorage.NewMetricStorage(
+			metricsstorage.WithNewRegistry(),
+			metricsstorage.WithLogger(so.logger.Named("hook-metric-storage")),
+		)
 	}
 
 	return so
 }
 
-// Start run the operator
-func (op *ShellOperator) Start() {
-	op.logger.Info("start shell-operator")
+// Start runs the operator: opens listeners, primes queues, spawns the metric
+// and event goroutines. It is non-blocking. Calling Start twice is a no-op;
+// the first call's error is returned to subsequent callers.
+func (op *ShellOperator) Start(_ context.Context) error {
+	op.startOnce.Do(func() {
+		op.logger.Info("start shell-operator")
 
-	op.APIServer.Start(op.ctx)
+		if op.APIServer != nil {
+			op.APIServer.Start(op.ctx)
+		}
 
-	// Create 'main' queue and add onStartup tasks and enable bindings tasks.
-	op.bootstrapMainQueue(op.TaskQueues)
-	// Start main task queue handler
-	op.TaskQueues.StartMain(op.ctx)
-	op.initAndStartHookQueues()
+		if op.TaskQueues != nil {
+			op.bootstrapMainQueue(op.TaskQueues)
+			op.TaskQueues.StartMain(op.ctx)
+			op.initAndStartHookQueues()
+		}
 
-	// Start emit "live" metrics
-	op.runMetrics()
+		// Start emit "live" metrics. Goroutines tracked via op.wg so Shutdown
+		// can wait for them.
+		op.runMetrics()
 
-	// Managers are generating events. This go-routine handles all events and converts them into queued tasks.
-	// Start it before start all informers to catch all kubernetes events (#42)
-	op.ManagerEventsHandler.Start()
+		// Managers generate events. Start the demux loop before informers so
+		// no early Kubernetes event is dropped (#42).
+		if op.ManagerEventsHandler != nil {
+			op.ManagerEventsHandler.Start()
+		}
 
-	// Unlike KubeEventsManager, ScheduleManager has one go-routine.
-	op.ScheduleManager.Start()
+		if op.ScheduleManager != nil {
+			op.ScheduleManager.Start()
+		}
+	})
+	return op.startErr
 }
 
-func (op *ShellOperator) Stop() {
+// Run is a convenience that Start()s the operator, blocks until ctx is
+// canceled, then performs a synchronous Shutdown with a derived timeout. Use
+// it from main() and tests; library consumers that want fine-grained control
+// should call Start and Shutdown directly.
+func (op *ShellOperator) Run(ctx context.Context) error {
+	if err := op.Start(ctx); err != nil {
+		return err
+	}
+	<-ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+	defer cancel()
+	return op.Shutdown(shutdownCtx)
+}
+
+// Shutdown gracefully tears down everything started by Start. It is
+// synchronous: when Shutdown returns, no goroutine spawned by the operator is
+// still running and every TCP port / unix socket / file descriptor opened
+// during Start has been released. Subsequent calls return the original
+// shutdown error.
+//
+// The supplied ctx bounds how long Shutdown waits for in-flight queues,
+// informers and HTTP servers; if it has no deadline DefaultShutdownTimeout
+// is applied automatically.
+func (op *ShellOperator) Shutdown(ctx context.Context) error {
+	op.shutdownOnce.Do(func() {
+		op.shutdownErr = op.doShutdown(ctx)
+	})
+	return op.shutdownErr
+}
+
+func (op *ShellOperator) doShutdown(ctx context.Context) error {
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, DefaultShutdownTimeout)
+		defer cancel()
+	}
+
+	op.logger.Info("shutdown begin", slog.String(pkg.LogKeyPhase, "shutdown"))
+
+	// Cancel the operator-scoped context first. This signals every
+	// ctx-aware goroutine (event handler loop, queue workers, schedule
+	// helper) to start unwinding.
 	if op.cancel != nil {
 		op.cancel()
+	}
+
+	var errs []error
+
+	if op.ScheduleManager != nil {
+		op.ScheduleManager.Stop()
+		op.logger.Info("schedule manager stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
+	}
+
+	if op.ManagerEventsHandler != nil {
+		op.ManagerEventsHandler.Stop()
+		if err := op.ManagerEventsHandler.Wait(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("manager events handler: %w", err))
+		}
+		op.logger.Info("manager events handler stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
+	}
+
+	if op.KubeEventsManager != nil {
+		op.KubeEventsManager.Stop()
+		op.logger.Info("waiting informers", slog.String(pkg.LogKeyPhase, "shutdown"))
+		op.KubeEventsManager.Wait()
+		op.logger.Info("informers stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
+	}
+
+	if op.TaskQueues != nil {
+		if err := op.TaskQueues.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("task queues: %w", err))
+		} else {
+			op.logger.Info("task queues stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
+		}
+	}
+
+	if op.AdmissionWebhookManager != nil {
+		if err := op.AdmissionWebhookManager.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("admission webhook: %w", err))
+		}
+	}
+
+	if op.ConversionWebhookManager != nil {
+		if err := op.ConversionWebhookManager.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("conversion webhook: %w", err))
+		}
+	}
+
+	if op.DebugServer != nil {
+		if err := op.DebugServer.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("debug server: %w", err))
+		}
+	}
+
+	if op.APIServer != nil {
+		if err := op.APIServer.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("api server: %w", err))
+		}
+	}
+
+	// Wait for runMetrics and other tracked goroutines.
+	if err := waitWG(ctx, &op.wg); err != nil {
+		errs = append(errs, fmt.Errorf("operator goroutines: %w", err))
+	}
+
+	op.logger.Info("shutdown done", slog.String(pkg.LogKeyPhase, "shutdown"))
+	return errors.Join(errs...)
+}
+
+// waitWG blocks until wg becomes zero or ctx is canceled.
+func waitWG(ctx context.Context, wg *sync.WaitGroup) error {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
@@ -227,7 +424,7 @@ func (op *ShellOperator) initValidatingWebhookManager() error {
 	}
 
 	// Delegate to the dedicated named type instead of an inlined closure.
-	admissionHandler := NewAdmissionEventHandler(op.HookManager, op.taskHandler, op.logger)
+	admissionHandler := NewAdmissionEventHandler(op.HookManager, op.taskHandler, op.taskFactory, op.logger)
 	op.AdmissionWebhookManager.WithAdmissionEventHandler(admissionHandler.Handle)
 
 	if err := op.AdmissionWebhookManager.Start(op.ctx); err != nil {
@@ -250,7 +447,7 @@ func (op *ShellOperator) initConversionWebhookManager() error {
 	}
 
 	// Assign the dedicated handler type instead of an inlined method.
-	conversionHandler := NewConversionEventHandler(op.HookManager, op.taskHandler, op.logger)
+	conversionHandler := NewConversionEventHandler(op.HookManager, op.taskHandler, op.taskFactory, op.logger)
 	op.ConversionWebhookManager.EventHandlerFn = conversionHandler.Handle
 
 	err := op.ConversionWebhookManager.Init()
@@ -373,7 +570,7 @@ func (op *ShellOperator) taskHandleEnableKubernetesBindings(ctx context.Context,
 
 	// Run hook for each binding with Synchronization binding context. Ignore queue name here, execute in main queue.
 	err := taskHook.HookController.HandleEnableKubernetesBindings(ctx, func(info controller.BindingExecutionInfo) {
-		hookRunTasks = append(hookRunTasks, globalHookTaskFactory.NewSyncHookRunTask(taskHook, info, hookLogLabels))
+		hookRunTasks = append(hookRunTasks, op.taskFactory.NewSyncHookRunTask(taskHook, info, hookLogLabels))
 	})
 
 	success := 0.0
@@ -422,9 +619,10 @@ func (op *ShellOperator) taskHandleHookRun(ctx context.Context, t task.Task) que
 		return queue.TaskResult{Status: queue.Fail}
 	}
 
-	err := taskHook.RateLimitWait(context.Background())
+	err := taskHook.RateLimitWait(ctx)
 	if err != nil {
-		// This could happen when the Context is canceled, so just repeat the task until the queue is stopped.
+		// Context cancellation (e.g. shutdown) lands here; repeat so a future
+		// task handler tick can decide whether to keep going.
 		return queue.TaskResult{
 			Status: queue.Repeat,
 		}
@@ -792,30 +990,53 @@ func (op *ShellOperator) bootstrapMainQueue(tqs *queue.TaskQueueSet) {
 	}
 }
 
+// runMetrics spawns two long-running metric goroutines. Both honor op.ctx and
+// are tracked by op.wg so Shutdown waits for them to finish.
 func (op *ShellOperator) runMetrics() {
 	if op.MetricStorage == nil {
 		return
 	}
 
-	// live ticks.
-	go func() {
-		for {
+	op.wg.Add(1)
+	go op.runLiveTicks()
+
+	if op.TaskQueues != nil {
+		op.wg.Add(1)
+		go op.runQueueLengthMetric()
+	}
+}
+
+func (op *ShellOperator) runLiveTicks() {
+	defer op.wg.Done()
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	// Emit one tick immediately so the metric appears before the first interval.
+	op.MetricStorage.CounterAdd(metrics.LiveTicks, 1.0, map[string]string{})
+	for {
+		select {
+		case <-op.ctx.Done():
+			return
+		case <-ticker.C:
 			op.MetricStorage.CounterAdd(metrics.LiveTicks, 1.0, map[string]string{})
-			time.Sleep(10 * time.Second)
 		}
-	}()
+	}
+}
 
-	// task queue length
-	go func() {
-		for {
-			op.TaskQueues.IterateSnapshot(context.TODO(), func(_ context.Context, queue *queue.TaskQueue) {
-				queueLen := float64(queue.Length())
-				op.MetricStorage.GaugeSet(metrics.TasksQueueLength, queueLen, map[string]string{pkg.MetricKeyQueue: queue.Name})
+func (op *ShellOperator) runQueueLengthMetric() {
+	defer op.wg.Done()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-op.ctx.Done():
+			return
+		case <-ticker.C:
+			op.TaskQueues.IterateSnapshot(op.ctx, func(_ context.Context, q *queue.TaskQueue) {
+				op.MetricStorage.GaugeSet(metrics.TasksQueueLength, float64(q.Length()),
+					map[string]string{pkg.MetricKeyQueue: q.Name})
 			})
-
-			time.Sleep(5 * time.Second)
 		}
-	}()
+	}
 }
 
 // initAndStartHookQueues create all queues defined in hooks
@@ -849,22 +1070,4 @@ func (op *ShellOperator) initAndStartHookQueues() {
 			}
 		}
 	}
-}
-
-// Shutdown pause kubernetes events handling and stop queues. Wait for queues to stop.
-func (op *ShellOperator) Shutdown() {
-	op.logger.Info("shutdown begin", slog.String(pkg.LogKeyPhase, "shutdown"))
-	op.ScheduleManager.Stop()
-	op.logger.Info("schedule manager stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
-
-	op.KubeEventsManager.Stop()
-	op.logger.Info("waiting informers", slog.String(pkg.LogKeyPhase, "shutdown"))
-	op.KubeEventsManager.Wait()
-	op.logger.Info("informers stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
-
-	op.TaskQueues.Stop()
-	op.logger.Info("waiting task queues", slog.String(pkg.LogKeyPhase, "shutdown"))
-	// Wait for queues to stop, but no more than 10 seconds
-	op.TaskQueues.WaitStopWithTimeout(WaitQueuesTimeout)
-	op.logger.Info("task queues stopped", slog.String(pkg.LogKeyPhase, "shutdown"))
 }

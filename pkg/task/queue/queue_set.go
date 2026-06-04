@@ -242,3 +242,35 @@ func (tqs *TaskQueueSet) WaitStopWithTimeout(timeout time.Duration) {
 		}
 	}
 }
+
+// Shutdown stops every queue in the set and blocks until either all workers
+// reach QueueStatusStop or ctx is canceled / deadlines. Returns ctx.Err() on
+// timeout and nil on a clean stop. Safe to call once; calling it on an
+// already-stopped set is a no-op.
+func (tqs *TaskQueueSet) Shutdown(ctx context.Context) error {
+	if tqs.cancel != nil {
+		tqs.cancel()
+	}
+
+	checkTick := time.NewTicker(50 * time.Millisecond)
+	defer checkTick.Stop()
+
+	for {
+		stopped := true
+		for _, q := range tqs.Queues.List() {
+			if q.GetStatusType() != QueueStatusStop {
+				stopped = false
+				break
+			}
+		}
+		if stopped {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-checkTick.C:
+		}
+	}
+}
