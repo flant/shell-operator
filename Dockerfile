@@ -36,7 +36,7 @@ RUN GOOS=linux \
 FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.23
 
 ARG TARGETPLATFORM
-ARG kubectlVersion=v1.33.12
+ARG kubectlVersion=v1.34.8
 
 # Install runtime dependencies
 RUN apk --no-cache add \
