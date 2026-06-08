@@ -45,8 +45,8 @@ github.com/evanphx/json-patch/v5 v5.9.11 h1:/8HVnzMq13/3x9TPvjG08wUGqBTmZBsCWzjT
 github.com/evanphx/json-patch/v5 v5.9.11/go.mod h1:3j+LviiESTElxA4p3EMKAB9HXj3/XEtnUf6OZxqIQTM=
 github.com/flant/go-openapi-validate v0.19.12-flant.0 h1:xk6kvc9fHKMgUdB6J7kbpbLR5vJOUzKAK8p3nrD7mDk=
 github.com/flant/go-openapi-validate v0.19.12-flant.0/go.mod h1:Rzou8hA/CBw8donlS6WNEUQupNvUZ0waH08tGe6kAQ4=
-github.com/flant/kube-client v1.7.1-0.20260605100710-8050d6e77be2 h1:tLOXX5WPAVaOsg71u9bHAEafhEhyhWKrvHuPgUrA/yw=
-github.com/flant/kube-client v1.7.1-0.20260605100710-8050d6e77be2/go.mod h1:5EoNMmJaTVX25dCVhqA5LoLQOqgmogdZu6MckOBYTrc=
+github.com/flant/kube-client v1.8.0 h1:fYlfF+gkfVfEXqrrOvOIqBCnuljgPWCnQio2jiDp42w=
+github.com/flant/kube-client v1.8.0/go.mod h1:5EoNMmJaTVX25dCVhqA5LoLQOqgmogdZu6MckOBYTrc=
 github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh78=
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/gkampitakis/ciinfo v0.3.2 h1:JcuOPk8ZU7nZQjdUhctuhQofk7BGHuIy0c9Ez8BNhXs=

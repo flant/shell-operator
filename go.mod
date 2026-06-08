@@ -5,7 +5,7 @@ go 1.25.8
 require (
 	github.com/deckhouse/deckhouse/pkg/log v0.2.0
 	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0
-	github.com/flant/kube-client v1.7.1-0.20260605100710-8050d6e77be2
+	github.com/flant/kube-client v1.8.0
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/go-openapi/spec v0.22.1
 	github.com/go-openapi/strfmt v0.26.2
