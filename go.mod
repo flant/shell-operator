@@ -37,7 +37,7 @@ replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/deckhouse/module-sdk v0.11.0
+	github.com/deckhouse/module-sdk v0.11.1
 	github.com/go-openapi/swag/yamlutils v0.26.0
 	github.com/goccy/go-json v0.10.6
 	github.com/gojuno/minimock/v3 v3.4.7
@@ -87,7 +87,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-containerregistry v0.21.5 // indirect
+	github.com/google/go-containerregistry v0.21.3 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
