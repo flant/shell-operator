@@ -1,8 +1,8 @@
 # Prebuilt jq from deckhouse base images (v1.0.40).
 FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:4b36dcf53c35b50e0afbc445232713aff15f788a61b832cd720bf9e88fc9fba8 AS libjq
 
-# Go builder stage (builder/golang-alpine, Go 1.25 on alpine 3.22).
-FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:9701f93cec25acec10837e2399f7fda7e4c23303bed6514bfa0ff692396f170b AS builder
+# Go builder stage (builder/golang-alpine, Go 1.26.4 on alpine 3.22).
+FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:193e8ed6cd7fc19015ab615ccf92d0fe02471e66e3e5abf560b3a87fb05bdb62 AS builder
 
 ARG appVersion=latest
 
