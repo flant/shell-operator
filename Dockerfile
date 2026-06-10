@@ -1,8 +1,8 @@
-# Prebuilt jq.
-FROM --platform=${TARGETPLATFORM:-linux/amd64} flant/jq:b6be13d5-musl AS libjq
+# Prebuilt jq from deckhouse base images (v1.0.40).
+FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:4b36dcf53c35b50e0afbc445232713aff15f788a61b832cd720bf9e88fc9fba8 AS libjq
 
-# Go builder stage
-FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.26.3-alpine3.23 AS builder
+# Go builder stage (builder/golang-alpine, Go 1.26.4 on alpine 3.22).
+FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:193e8ed6cd7fc19015ab615ccf92d0fe02471e66e3e5abf560b3a87fb05bdb62 AS builder
 
 ARG appVersion=latest
 
@@ -32,8 +32,8 @@ RUN GOOS=linux \
     -o shell-operator \
     ./cmd/shell-operator
 
-# Final runtime image
-FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.23
+# Final runtime image (builder/alpine 3.22 from deckhouse base images v1.0.40).
+FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:8fa8cf713bf8cfc9038901e5b2fbc97d0403794d834dc4a619e9e81312a6feef
 
 ARG TARGETPLATFORM
 ARG kubectlVersion=v1.34.8
