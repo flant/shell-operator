@@ -1,6 +1,6 @@
 module github.com/flant/shell-operator
 
-go 1.25.11
+go 1.26.4
 
 require (
 	github.com/deckhouse/deckhouse/pkg/log v0.2.0
