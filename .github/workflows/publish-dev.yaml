@@ -103,7 +103,7 @@ jobs:
       - name: Login to Deckhouse Registry
         uses: docker/login-action@v4.2.0
         with:
-          registry: dev-registry.deckhouse.io
+          registry: registry.deckhouse.io
           username: ${{ secrets.DECKHOUSE_REGISTRY_LOGIN }}
           password: ${{ secrets.DECKHOUSE_REGISTRY_PASSWORD }}
       - name: Login to Github Container Registry
@@ -135,7 +135,7 @@ jobs:
                 echo "Ignore image for non-runnable platform ${platform}"
                 echo "  ${image}"
                 echo "====================================="
-                continue          
+                continue
               fi
               echo "====================================="
               echo "Inspect image for platform ${platform}"
