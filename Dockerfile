@@ -58,7 +58,7 @@ RUN mkdir /hooks
 # Copy necessary files
 ADD frameworks/shell /frameworks/shell
 ADD shell_lib.sh /
-COPY --from=libjq /bin/jq /usr/bin
+COPY --from=libjq /usr/bin/jq /usr/bin/jq
 COPY --from=builder /app/shell-operator /
 
 # Set working directory
