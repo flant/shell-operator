@@ -11,7 +11,7 @@ require (
 	github.com/go-openapi/strfmt v0.26.2
 	github.com/go-openapi/swag v0.26.0 // indirect
 	github.com/go-openapi/validate v0.25.1
-	github.com/gofrs/uuid/v5 v5.3.2
+	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/onsi/gomega v1.41.0
