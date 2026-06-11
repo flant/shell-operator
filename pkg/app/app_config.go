@@ -16,6 +16,7 @@ type AppSettings struct {
 	ListenPort              string `env:"LISTEN_PORT"`
 	PrometheusMetricsPrefix string `env:"PROMETHEUS_METRICS_PREFIX"`
 	Namespace               string `env:"NAMESPACE"`
+	SkipInvalidHooks        bool   `env:"SKIP_INVALID_HOOKS"`
 }
 
 // KubeSettings holds Kubernetes connection parameters.
