@@ -45,6 +45,7 @@ type Manager struct {
 	keepTemporaryHookFiles bool
 	logProxyHookJSON       bool
 	logProxyHookJSONKey    string
+	skipInvalidHooks       bool
 
 	// indexMu protects hookNamesInOrder, hooksByName and hooksInOrder so that
 	// Init() (which fully rebuilds the indices) does not race with concurrent
@@ -81,6 +82,7 @@ type ManagerConfig struct {
 	KeepTemporaryHookFiles bool
 	LogProxyHookJSON       bool
 	LogProxyHookJSONKey    string
+	SkipInvalidHooks       bool
 
 	Logger *log.Logger
 }
@@ -107,6 +109,7 @@ func NewHookManager(config *ManagerConfig) *Manager {
 		keepTemporaryHookFiles: config.KeepTemporaryHookFiles,
 		logProxyHookJSON:       config.LogProxyHookJSON,
 		logProxyHookJSONKey:    config.LogProxyHookJSONKey,
+		skipInvalidHooks:       config.SkipInvalidHooks,
 
 		logger: config.Logger,
 	}
@@ -150,6 +153,10 @@ func (hm *Manager) Init() error {
 	for _, hookPath := range hookPaths {
 		hook, err := hm.loadHook(hookPath)
 		if err != nil {
+			if hm.skipInvalidHooks {
+				hm.logger.Warn("Skipping hook with invalid config", slog.String("hook", hookPath), log.Err(err))
+				continue
+			}
 			return err
 		}
 
