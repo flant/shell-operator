@@ -40,14 +40,22 @@ type Factory struct {
 }
 
 type FactoryStore struct {
-	mu        sync.Mutex
-	data      map[FactoryIndex]*Factory
+	mu   sync.Mutex
+	data map[FactoryIndex]*Factory
+	// baseCtx is the lifetime anchor for every shared informer created by the
+	// store. Shared informers are long-lived, store-owned resources, so their
+	// contexts must descend from baseCtx (tied to the events-manager), NOT from
+	// the transient context of whichever consumer happened to register first.
+	// Otherwise cancelling one consumer's context would tear down the shared
+	// informer for every other consumer still using it.
+	baseCtx   context.Context
 	stoppedCh map[FactoryIndex]chan struct{}
 }
 
-func NewFactoryStore() *FactoryStore {
+func NewFactoryStore(ctx context.Context) *FactoryStore {
 	fs := &FactoryStore{
 		data:      make(map[FactoryIndex]*Factory),
+		baseCtx:   ctx,
 		stoppedCh: make(map[FactoryIndex]chan struct{}),
 	}
 	return fs
@@ -60,8 +68,11 @@ func (c *FactoryStore) Reset() {
 	c.stoppedCh = make(map[FactoryIndex]chan struct{})
 }
 
-func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
-	ctx, cancel := context.WithCancel(ctx)
+func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
+	// Derive from the store's baseCtx, not from the caller's context: the
+	// shared informer's lifetime is owned by the store and must only end when
+	// the last handler is removed (see Stop) or the manager shuts down.
+	ctx, cancel := context.WithCancel(c.baseCtx)
 	c.data[index] = &Factory{
 		shared:               f,
 		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
@@ -74,12 +85,37 @@ func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinf
 		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 }
 
-func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index FactoryIndex) *Factory {
+// isDead reports whether the factory's shared informer goroutine has already
+// exited (its Run returned and done was closed). A dead factory must never be
+// reused: attaching a handler to it silently succeeds while the informer never
+// lists/watches again, freezing the snapshot until the process restarts.
+func (f *Factory) isDead() bool {
+	if f.done == nil {
+		return false
+	}
+	select {
+	case <-f.done:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) *Factory {
 	f, ok := c.data[index]
-	if ok {
+	if ok && !f.isDead() {
 		log.Debug("Factory store: the factory with index found",
 			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 		return f
+	}
+	if ok {
+		// The cached factory's informer has terminated (e.g. torn down in the
+		// window of a concurrent Stop). Discard the corpse and rebuild instead
+		// of handing back a dead informer.
+		log.Warn("Factory store: cached factory is dead, recreating",
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+		f.cancel()
+		delete(c.data, index)
 	}
 
 	// define resyncPeriod for informer
@@ -98,20 +134,25 @@ func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index 
 		client, resyncPeriod, index.Namespace, tweakListOptions)
 	factory.ForResource(index.GVR)
 
-	c.add(ctx, index, factory)
+	c.add(index, factory)
 
 	return c.data[index]
 }
 
 func (c *FactoryStore) Start(ctx context.Context, informerId string, client dynamic.Interface, index FactoryIndex, handler cache.ResourceEventHandler, errorHandler *WatchErrorHandler) error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
-	factory := c.get(ctx, client, index)
+	factory := c.get(client, index)
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
-	// Add error handler, ignore "already started" error.
-	_ = informer.SetWatchErrorHandler(errorHandler.handler)
+	// Register the watch error handler. This returns an error when the shared
+	// informer is already running (a previous consumer registered its handler);
+	// that is expected on a reused factory, so log rather than silently drop it.
+	if err := informer.SetWatchErrorHandler(errorHandler.handler); err != nil {
+		log.Debug("Factory store: couldn't set watch error handler, informer likely already started",
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
+			log.Err(err))
+	}
 
 	registration, err := informer.AddEventHandler(handler)
 	if err != nil {
@@ -139,6 +180,12 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 		}()
 	}
+
+	// Release the store lock before waiting for the initial sync. Holding c.mu
+	// across a blocking cache sync would serialize Start/Stop of every other
+	// informer behind a single slow initial LIST/discovery (throttled API,
+	// heavy CRD). The informer handle is safe to poll without the lock.
+	c.mu.Unlock()
 
 	if !informer.HasSynced() {
 		if err := wait.PollUntilContextCancel(ctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
@@ -190,10 +237,18 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 			}
 
 			c.mu.Lock()
-			delete(c.data, index)
+			// Only remove the factory if it is still the same instance we just
+			// cancelled. While the lock was released (waiting on done), a
+			// concurrent Start could have observed this dead factory, rebuilt
+			// it, and installed a fresh, live one under the same index — that
+			// one must not be deleted, or its informer goroutine would be
+			// orphaned and untracked.
+			if cur, ok := c.data[index]; ok && cur == f {
+				delete(c.data, index)
 
-			log.Debug("Factory store: deleted factory",
-				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+				log.Debug("Factory store: deleted factory",
+					slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+			}
 
 			if ch, ok := c.stoppedCh[index]; ok {
 				close(ch)
