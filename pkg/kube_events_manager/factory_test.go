@@ -86,6 +86,53 @@ func Test_FactoryStore_SharedInformer_SurvivesFirstConsumerCancel(t *testing.T) 
 		"shared informer must keep delivering to consumer B after consumer A is stopped")
 }
 
+// Test_FactoryStore_WaitStopped_BlocksUntilInformerExits guards the graceful
+// shutdown barrier. Before the fix WaitStopped read a per-index stoppedCh that
+// was never populated, so it built a pre-closed channel and returned
+// immediately — monitor.Wait() never actually waited for informers to stop.
+// The fix waits on the factory's own done channel, which is closed only when
+// the informer's Run goroutine exits.
+func Test_FactoryStore_WaitStopped_BlocksUntilInformerExits(t *testing.T) {
+	g := NewWithT(t)
+
+	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
+	createNsWithLabels(fc, "default", nil)
+
+	baseCtx, baseCancel := context.WithCancel(context.Background())
+	defer baseCancel()
+
+	store := NewFactoryStore(baseCtx)
+	index := configMapIndex()
+	errH := newWatchErrorHandler("test", "ConfigMap", nil, metric.NewStorageMock(t), log.NewNop())
+
+	// WaitStopped on an unknown index must return immediately.
+	g.Eventually(func() bool { store.WaitStopped(index); return true }, "1s", "10ms").
+		Should(BeTrue(), "WaitStopped must not block when no factory exists for the index")
+
+	handler := cache.ResourceEventHandlerFuncs{AddFunc: func(_ interface{}) {}}
+	ctx, cancel := context.WithCancel(baseCtx)
+	g.Expect(store.Start(ctx, "consumer", fc.Client.Dynamic(), index, handler, errH)).
+		ShouldNot(HaveOccurred())
+
+	var returned atomic.Bool
+	go func() {
+		store.WaitStopped(index)
+		returned.Store(true)
+	}()
+
+	// The informer is still running, so WaitStopped must keep blocking.
+	g.Consistently(returned.Load, "500ms", "20ms").Should(BeFalse(),
+		"WaitStopped must block while the shared informer is still running")
+
+	// Stopping the last consumer cancels the factory; its Run goroutine exits
+	// and closes done, which must release WaitStopped.
+	cancel()
+	store.Stop("consumer", index)
+
+	g.Eventually(returned.Load, "5s", "10ms").Should(BeTrue(),
+		"WaitStopped must return once the shared informer has stopped")
+}
+
 // Test_Factory_isDead covers the liveness predicate (defect #2).
 func Test_Factory_isDead(t *testing.T) {
 	g := NewWithT(t)

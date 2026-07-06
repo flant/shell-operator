@@ -48,15 +48,13 @@ type FactoryStore struct {
 	// the transient context of whichever consumer happened to register first.
 	// Otherwise cancelling one consumer's context would tear down the shared
 	// informer for every other consumer still using it.
-	baseCtx   context.Context
-	stoppedCh map[FactoryIndex]chan struct{}
+	baseCtx context.Context
 }
 
 func NewFactoryStore(ctx context.Context) *FactoryStore {
 	fs := &FactoryStore{
-		data:      make(map[FactoryIndex]*Factory),
-		baseCtx:   ctx,
-		stoppedCh: make(map[FactoryIndex]chan struct{}),
+		data:    make(map[FactoryIndex]*Factory),
+		baseCtx: ctx,
 	}
 	return fs
 }
@@ -65,7 +63,6 @@ func (c *FactoryStore) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.data = make(map[FactoryIndex]*Factory)
-	c.stoppedCh = make(map[FactoryIndex]chan struct{})
 }
 
 func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
@@ -249,41 +246,43 @@ func (c *FactoryStore) Stop(informerId string, index FactoryIndex) {
 				log.Debug("Factory store: deleted factory",
 					slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 			}
-
-			if ch, ok := c.stoppedCh[index]; ok {
-				close(ch)
-				delete(c.stoppedCh, index)
-			}
 		}
 	}
 
 	c.mu.Unlock()
 }
 
-// WaitStopped blocks until there is no factory for the index or timeout
+// WaitStopped blocks until the shared informer for the index has stopped (its
+// Run goroutine has exited) or FactoryShutdownTimeout elapses.
+//
+// The stop signal is taken from the factory's own done channel rather than a
+// separate per-index channel: the informer's lifetime belongs to the factory
+// instance, so a factory that is concurrently rebuilt under the same index
+// (see get/Stop) gets its own done and cannot be falsely signalled as stopped
+// by a previous instance's teardown.
 func (c *FactoryStore) WaitStopped(index FactoryIndex) {
 	c.mu.Lock()
-
-	if _, ok := c.data[index]; !ok {
+	f, ok := c.data[index]
+	if !ok {
+		// No factory for the index: it was never created, or it has already
+		// stopped and been removed. Nothing to wait for.
 		c.mu.Unlock()
 		return
 	}
-
-	ch, ok := c.stoppedCh[index]
-	if !ok {
-		ch = make(chan struct{})
-		close(ch)
-	}
-
+	done := f.done
 	c.mu.Unlock()
 
-	for {
-		select {
-		case <-ch:
-			return
-		case <-time.After(FactoryShutdownTimeout):
-			log.Warn("timeout waiting for factory to stop",
-				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
-		}
+	if done == nil {
+		// The informer goroutine was never launched (no handler ever
+		// registered), so there is nothing running to wait for.
+		return
+	}
+
+	select {
+	case <-done:
+		return
+	case <-time.After(FactoryShutdownTimeout):
+		log.Warn("timeout waiting for factory to stop",
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 	}
 }
