@@ -52,6 +52,10 @@ type FactoryStore struct {
 }
 
 func NewFactoryStore(ctx context.Context) *FactoryStore {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	fs := &FactoryStore{
 		data:    make(map[FactoryIndex]*Factory),
 		baseCtx: ctx,
