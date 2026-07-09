@@ -2,6 +2,8 @@ package shell_operator
 
 import (
 	"context"
+	"log/slog"
+	"runtime/debug"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 
@@ -73,12 +75,16 @@ func (m *ManagerEventsHandler) Start() {
 			select {
 			case crontab := <-m.scheduleManager.Ch():
 				if m.scheduleCb != nil {
-					tailTasks = m.scheduleCb(ctx, crontab)
+					tailTasks = runEventCb(logEntry, "schedule", func() []task.Task {
+						return m.scheduleCb(ctx, crontab)
+					})
 				}
 
 			case kubeEvent := <-m.kubeEventsManager.Ch():
 				if m.kubeEventCb != nil {
-					tailTasks = m.kubeEventCb(ctx, kubeEvent)
+					tailTasks = runEventCb(logEntry, "kubernetes", func() []task.Task {
+						return m.kubeEventCb(ctx, kubeEvent)
+					})
 				}
 
 			case <-m.ctx.Done():
@@ -89,4 +95,23 @@ func (m *ManagerEventsHandler) Start() {
 			m.taskQueues.AddTailTasks(tailTasks...)
 		}
 	}()
+}
+
+// runEventCb invokes an event callback with panic isolation, mirroring the
+// recover in TaskQueue.processOne: a panicking hook dispatch must not kill
+// the events goroutine and with it the whole process. On panic the event's
+// tail tasks are dropped and nil is returned.
+func runEventCb(logEntry *log.Logger, binding string, cb func() []task.Task) []task.Task {
+	defer func() {
+		if r := recover(); r != nil {
+			logEntry.Warn(
+				"panic recovered in ManagerEventsHandler",
+				slog.String(pkg.LogKeyBinding, binding),
+				slog.Any(pkg.LogKeyError, r),
+				slog.String(pkg.LogKeyStack, string(debug.Stack())),
+			)
+		}
+	}()
+
+	return cb()
 }
