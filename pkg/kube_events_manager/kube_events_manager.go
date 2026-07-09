@@ -75,7 +75,7 @@ func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *lo
 		ctx:          cctx,
 		cancel:       cancel,
 		KubeClient:   client,
-		factoryStore: NewFactoryStore(),
+		factoryStore: NewFactoryStore(cctx),
 		m:            sync.RWMutex{},
 		Monitors:     make(map[string]Monitor),
 		KubeEventCh:  make(chan kemtypes.KubeEvent, 1),

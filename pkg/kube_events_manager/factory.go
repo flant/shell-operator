@@ -2,6 +2,7 @@ package kubeeventsmanager
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -40,13 +41,24 @@ type Factory struct {
 }
 
 type FactoryStore struct {
-	mu        sync.Mutex
+	mu sync.Mutex
+	// baseCtx bounds the lifetime of every shared informer in the store. The store
+	// (via its owning kubeEventsManager) is the owner of the shared factories, so
+	// their contexts must derive from the owner's context — never from the context
+	// of whichever consumer happened to create a factory first, or stopping that
+	// consumer would kill the shared informer for every other consumer.
+	baseCtx   context.Context
 	data      map[FactoryIndex]*Factory
 	stoppedCh map[FactoryIndex]chan struct{}
 }
 
-func NewFactoryStore() *FactoryStore {
+func NewFactoryStore(ctx context.Context) *FactoryStore {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	fs := &FactoryStore{
+		baseCtx:   ctx,
 		data:      make(map[FactoryIndex]*Factory),
 		stoppedCh: make(map[FactoryIndex]chan struct{}),
 	}
@@ -56,12 +68,17 @@ func NewFactoryStore() *FactoryStore {
 func (c *FactoryStore) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// Stop informer goroutines before dropping the references, otherwise they
+	// keep running detached forever.
+	for _, f := range c.data {
+		f.cancel()
+	}
 	c.data = make(map[FactoryIndex]*Factory)
 	c.stoppedCh = make(map[FactoryIndex]chan struct{})
 }
 
-func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
-	ctx, cancel := context.WithCancel(ctx)
+func (c *FactoryStore) add(index FactoryIndex, f dynamicinformer.DynamicSharedInformerFactory) {
+	ctx, cancel := context.WithCancel(c.baseCtx)
 	c.data[index] = &Factory{
 		shared:               f,
 		handlerRegistrations: make(map[string]cache.ResourceEventHandlerRegistration),
@@ -74,7 +91,7 @@ func (c *FactoryStore) add(ctx context.Context, index FactoryIndex, f dynamicinf
 		slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
 }
 
-func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index FactoryIndex) *Factory {
+func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) *Factory {
 	f, ok := c.data[index]
 	if ok {
 		log.Debug("Factory store: the factory with index found",
@@ -98,26 +115,49 @@ func (c *FactoryStore) get(ctx context.Context, client dynamic.Interface, index 
 		client, resyncPeriod, index.Namespace, tweakListOptions)
 	factory.ForResource(index.GVR)
 
-	c.add(ctx, index, factory)
+	c.add(index, factory)
 
 	return c.data[index]
 }
 
 func (c *FactoryStore) Start(ctx context.Context, informerId string, client dynamic.Interface, index FactoryIndex, handler cache.ResourceEventHandler, errorHandler *WatchErrorHandler) error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
-	factory := c.get(ctx, client, index)
+	factory := c.get(client, index)
+
+	// A factory whose informer goroutine has already exited is unusable: event
+	// handlers can no longer be added and no events will ever be delivered, while
+	// HasSynced() on the stopped informer still returns true. Reusing it would
+	// hand the consumer a snapshot that silently never updates. Drop the corpse
+	// and build a fresh factory instead.
+	if factory.done != nil {
+		select {
+		case <-factory.done:
+			log.Warn("Factory store: informer for index is stopped, recreating factory",
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()))
+
+			factory.cancel()
+			delete(c.data, index)
+			factory = c.get(client, index)
+		default:
+		}
+	}
 
 	informer := factory.shared.ForResource(index.GVR).Informer()
-	// Add error handler, ignore "already started" error.
-	_ = informer.SetWatchErrorHandler(errorHandler.handler)
+	// SetWatchErrorHandler fails only on an already started informer — harmless
+	// here, the handler set by the first consumer stays in effect.
+	if err := informer.SetWatchErrorHandler(errorHandler.handler); err != nil {
+		log.Debug("Factory store: watch error handler wasn't set",
+			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
+			log.Err(err))
+	}
 
 	registration, err := informer.AddEventHandler(handler)
 	if err != nil {
-		log.Warn("Factory store: couldn't add event handler to the factory's informer",
-			slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
-			log.Err(err))
+		// A consumer without a registered handler would run with a snapshot that
+		// never updates — fail the start instead of degrading silently.
+		c.mu.Unlock()
+		return fmt.Errorf("add event handler for %s: %w", index.GVR.String(), err)
 	}
 
 	factory.handlerRegistrations[informerId] = registration
@@ -140,6 +180,11 @@ func (c *FactoryStore) Start(ctx context.Context, informerId string, client dyna
 		}()
 	}
 
+	c.mu.Unlock()
+
+	// Wait for the cache sync outside the store lock: a slow initial LIST of one
+	// resource must not serialize Start/Stop of every other informer (same
+	// unlock-before-wait pattern as in Stop).
 	if !informer.HasSynced() {
 		if err := wait.PollUntilContextCancel(ctx, DefaultSyncTime, true, func(_ context.Context) (bool, error) {
 			return informer.HasSynced(), nil
