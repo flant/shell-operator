@@ -287,7 +287,7 @@ func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []kemtyp
 			// hook still runs successfully — this is exactly how a lost/never-started monitor
 			// silently feeds empty values into a hook. Make it observable instead of silent;
 			// EnableKubernetesBindings repairs the state on the next module run.
-			c.logger.Error("no monitor for configured kubernetes binding, snapshot is empty",
+			c.logger.Warn("no monitor for configured kubernetes binding, snapshot is empty",
 				slog.String(pkg.LogKeyBinding, bindingName),
 				slog.String("monitorID", monitorID))
 			return nil
