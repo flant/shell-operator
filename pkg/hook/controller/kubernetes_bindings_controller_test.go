@@ -8,8 +8,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/flant/kube-client/fake"
+	pkg "github.com/flant/shell-operator/pkg"
 	"github.com/flant/shell-operator/pkg/hook/config"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
+	"github.com/flant/shell-operator/pkg/metric"
+	"github.com/flant/shell-operator/pkg/metrics"
 )
 
 const twoBindingsHookConfig = `
@@ -86,4 +89,44 @@ func TestEnableKubernetesBindings_SelfHealsMissingMonitor(t *testing.T) {
 	_, err = hc.KubernetesController.EnableKubernetesBindings()
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(mgr.HasMonitor(victim)).To(BeTrue(), "missing monitor must be repaired on next EnableKubernetesBindings")
+}
+
+// TestSnapshotsFor_MissingMonitorIsCounted ensures the empty-snapshot state is
+// observable: reading a snapshot for a configured binding whose monitor is not
+// running must increment binding_monitor_missing_total with the binding label.
+func TestSnapshotsFor_MissingMonitorIsCounted(t *testing.T) {
+	g := NewWithT(t)
+
+	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
+	mgr := kubeeventsmanager.NewKubeEventsManager(context.Background(), fc.Client, log.NewNop())
+
+	var (
+		calls     int
+		gotMetric string
+		gotValue  float64
+		gotLabels map[string]string
+	)
+	storage := metric.NewStorageMock(t)
+	storage.CounterAddMock.Set(func(name string, value float64, labels map[string]string) {
+		calls++
+		gotMetric, gotValue, gotLabels = name, value, labels
+	})
+	// The storage must be set before InitKubernetesBindings: the controller
+	// captures it from the manager at init time.
+	mgr.WithMetricStorage(storage)
+
+	cfg := &config.HookConfig{}
+	g.Expect(cfg.LoadAndValidate([]byte(twoBindingsHookConfig))).ShouldNot(HaveOccurred())
+
+	hc := NewHookController()
+	hc.InitKubernetesBindings(cfg.OnKubernetesEvents, mgr, log.NewNop())
+
+	// Bindings are configured but never enabled: no monitor is running.
+	binding := cfg.OnKubernetesEvents[0].BindingName
+	g.Expect(hc.KubernetesController.SnapshotsFor(binding)).To(BeNil())
+
+	g.Expect(calls).To(Equal(1))
+	g.Expect(gotMetric).To(Equal(metrics.BindingMonitorMissingTotal))
+	g.Expect(gotValue).To(Equal(1.0))
+	g.Expect(gotLabels).To(Equal(map[string]string{pkg.MetricKeyBinding: binding}))
 }

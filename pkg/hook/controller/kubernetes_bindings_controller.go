@@ -7,12 +7,14 @@ import (
 	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/pkg"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metrics"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -49,6 +51,8 @@ type kubernetesBindingsController struct {
 
 	// dependencies
 	kubeEventsManager kubeeventsmanager.KubeEventsSource
+	// optional, only for the binding_monitor_missing_total counter
+	metricStorage metricsstorage.Storage
 
 	logger *log.Logger
 
@@ -74,6 +78,12 @@ func (c *kubernetesBindingsController) WithKubernetesBindings(bindings []htypes.
 
 func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager kubeeventsmanager.KubeEventsSource) {
 	c.kubeEventsManager = kubeEventsManager
+}
+
+// WithMetricStorage sets an optional storage for the binding_monitor_missing_total
+// counter. Without it the missing-monitor state is still logged, just not counted.
+func (c *kubernetesBindingsController) WithMetricStorage(mstor metricsstorage.Storage) {
+	c.metricStorage = mstor
 }
 
 // EnableKubernetesBindings adds a monitor for each 'kubernetes' binding. This method
@@ -287,9 +297,13 @@ func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []kemtyp
 			// hook still runs successfully — this is exactly how a lost/never-started monitor
 			// silently feeds empty values into a hook. Make it observable instead of silent;
 			// EnableKubernetesBindings repairs the state on the next module run.
-			c.logger.Warn("no monitor for configured kubernetes binding, snapshot is empty",
+			c.logger.Error("no monitor for configured kubernetes binding, snapshot is empty",
 				slog.String(pkg.LogKeyBinding, bindingName),
-				slog.String("monitorID", monitorID))
+				slog.String(pkg.LogKeyMonitorID, monitorID))
+			if c.metricStorage != nil {
+				c.metricStorage.CounterAdd(metrics.BindingMonitorMissingTotal, 1.0,
+					map[string]string{pkg.MetricKeyBinding: bindingName})
+			}
 			return nil
 		}
 	}
