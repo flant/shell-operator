@@ -75,7 +75,7 @@ func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *lo
 		ctx:          cctx,
 		cancel:       cancel,
 		KubeClient:   client,
-		factoryStore: NewFactoryStore(),
+		factoryStore: NewFactoryStore(cctx),
 		m:            sync.RWMutex{},
 		Monitors:     make(map[string]Monitor),
 		KubeEventCh:  make(chan kemtypes.KubeEvent, 1),
@@ -86,6 +86,7 @@ func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *lo
 
 func (mgr *kubeEventsManager) WithMetricStorage(mstor metricsstorage.Storage) {
 	mgr.metricStorage = mstor
+	mgr.factoryStore.WithMetricStorage(mstor)
 }
 
 // AddMonitor creates a monitor with informers and return a KubeEvent with existing objects.

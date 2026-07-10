@@ -92,6 +92,10 @@ var (
 	// monitors (e.g. a Disable/Enable race) until the next EnableKubernetesBindings
 	// repairs them.
 	BindingMonitorMissingTotal = "{PREFIX}binding_monitor_missing_total"
+	// FactoryInformerDeadTotal counts dead shared informer factories detected and
+	// recreated by FactoryStore.Start. Non-zero values mean some consumers lived
+	// with a frozen snapshot until the recreation.
+	FactoryInformerDeadTotal = "{PREFIX}factory_informer_dead_total"
 )
 
 // ReplacePrefix replaces the {PREFIX} placeholder in a metric name with the provided prefix.
@@ -128,6 +132,7 @@ type Names struct {
 	KubeEventDurationSeconds                string
 	KubernetesClientWatchErrorsTotal        string
 	BindingMonitorMissingTotal              string
+	FactoryInformerDeadTotal                string
 }
 
 // NewNames builds a *Names with prefix substituted into every metric template.
@@ -170,6 +175,7 @@ func NewNames(prefix string) *Names {
 		KubeEventDurationSeconds:                tpl(KubeEventDurationSeconds, "kube_event_duration_seconds"),
 		KubernetesClientWatchErrorsTotal:        tpl(KubernetesClientWatchErrorsTotal, "kubernetes_client_watch_errors_total"),
 		BindingMonitorMissingTotal:              tpl(BindingMonitorMissingTotal, "binding_monitor_missing_total"),
+		FactoryInformerDeadTotal:                tpl(FactoryInformerDeadTotal, "factory_informer_dead_total"),
 	}
 }
 
@@ -220,6 +226,7 @@ func InitMetrics(prefix string) {
 	KubeEventDurationSeconds = ReplacePrefix(KubeEventDurationSeconds, prefix)
 	KubernetesClientWatchErrorsTotal = ReplacePrefix(KubernetesClientWatchErrorsTotal, prefix)
 	BindingMonitorMissingTotal = ReplacePrefix(BindingMonitorMissingTotal, prefix)
+	FactoryInformerDeadTotal = ReplacePrefix(FactoryInformerDeadTotal, prefix)
 }
 
 // ============================================================================
@@ -507,6 +514,15 @@ func RegisterKubeEventsManagerMetrics(metricStorage metricsstorage.Storage, labe
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register %s: %w", BindingMonitorMissingTotal, err)
+	}
+
+	// Register dead informer factory counter
+	_, err = metricStorage.RegisterCounter(
+		FactoryInformerDeadTotal, []string{"gvr", "namespace"},
+		options.WithHelp("Counter of dead shared informer factories detected and recreated on Start"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register %s: %w", FactoryInformerDeadTotal, err)
 	}
 
 	return nil
