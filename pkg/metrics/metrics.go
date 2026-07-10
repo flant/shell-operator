@@ -86,6 +86,16 @@ var (
 	KubeEventDurationSeconds = "{PREFIX}kube_event_duration_seconds"
 	// KubernetesClientWatchErrorsTotal counts Kubernetes client watch errors
 	KubernetesClientWatchErrorsTotal = "{PREFIX}kubernetes_client_watch_errors_total"
+	// BindingMonitorMissingTotal counts snapshot reads for a configured kubernetes
+	// binding whose monitor is not running: the hook receives an empty snapshot
+	// instead of real cluster state. Non-zero values indicate lost or never-started
+	// monitors (e.g. a Disable/Enable race) until the next EnableKubernetesBindings
+	// repairs them.
+	BindingMonitorMissingTotal = "{PREFIX}binding_monitor_missing_total"
+	// FactoryInformerDeadTotal counts dead shared informer factories detected and
+	// recreated by FactoryStore.Start. Non-zero values mean some consumers lived
+	// with a frozen snapshot until the recreation.
+	FactoryInformerDeadTotal = "{PREFIX}factory_informer_dead_total"
 )
 
 // ReplacePrefix replaces the {PREFIX} placeholder in a metric name with the provided prefix.
@@ -121,6 +131,8 @@ type Names struct {
 	KubeJqFilterDurationSeconds             string
 	KubeEventDurationSeconds                string
 	KubernetesClientWatchErrorsTotal        string
+	BindingMonitorMissingTotal              string
+	FactoryInformerDeadTotal                string
 }
 
 // NewNames builds a *Names with prefix substituted into every metric template.
@@ -162,6 +174,8 @@ func NewNames(prefix string) *Names {
 		KubeJqFilterDurationSeconds:             tpl(KubeJqFilterDurationSeconds, "kube_jq_filter_duration_seconds"),
 		KubeEventDurationSeconds:                tpl(KubeEventDurationSeconds, "kube_event_duration_seconds"),
 		KubernetesClientWatchErrorsTotal:        tpl(KubernetesClientWatchErrorsTotal, "kubernetes_client_watch_errors_total"),
+		BindingMonitorMissingTotal:              tpl(BindingMonitorMissingTotal, "binding_monitor_missing_total"),
+		FactoryInformerDeadTotal:                tpl(FactoryInformerDeadTotal, "factory_informer_dead_total"),
 	}
 }
 
@@ -211,6 +225,8 @@ func InitMetrics(prefix string) {
 	KubeJqFilterDurationSeconds = ReplacePrefix(KubeJqFilterDurationSeconds, prefix)
 	KubeEventDurationSeconds = ReplacePrefix(KubeEventDurationSeconds, prefix)
 	KubernetesClientWatchErrorsTotal = ReplacePrefix(KubernetesClientWatchErrorsTotal, prefix)
+	BindingMonitorMissingTotal = ReplacePrefix(BindingMonitorMissingTotal, prefix)
+	FactoryInformerDeadTotal = ReplacePrefix(FactoryInformerDeadTotal, prefix)
 }
 
 // ============================================================================
@@ -489,6 +505,24 @@ func RegisterKubeEventsManagerMetrics(metricStorage metricsstorage.Storage, labe
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register %s: %w", KubernetesClientWatchErrorsTotal, err)
+	}
+
+	// Register missing binding monitor counter
+	_, err = metricStorage.RegisterCounter(
+		BindingMonitorMissingTotal, []string{"binding"},
+		options.WithHelp("Counter of snapshot reads for a configured kubernetes binding without a live monitor (the hook got an empty snapshot)"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register %s: %w", BindingMonitorMissingTotal, err)
+	}
+
+	// Register dead informer factory counter
+	_, err = metricStorage.RegisterCounter(
+		FactoryInformerDeadTotal, []string{"gvr", "namespace"},
+		options.WithHelp("Counter of dead shared informer factories detected and recreated on Start"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register %s: %w", FactoryInformerDeadTotal, err)
 	}
 
 	return nil

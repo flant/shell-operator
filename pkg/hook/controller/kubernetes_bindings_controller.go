@@ -7,12 +7,14 @@ import (
 	"sync"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 
 	"github.com/flant/shell-operator/pkg"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 	htypes "github.com/flant/shell-operator/pkg/hook/types"
 	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
 	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
+	"github.com/flant/shell-operator/pkg/metrics"
 	utils "github.com/flant/shell-operator/pkg/utils/labels"
 )
 
@@ -49,6 +51,8 @@ type kubernetesBindingsController struct {
 
 	// dependencies
 	kubeEventsManager kubeeventsmanager.KubeEventsSource
+	// optional, only for the binding_monitor_missing_total counter
+	metricStorage metricsstorage.Storage
 
 	logger *log.Logger
 
@@ -76,34 +80,47 @@ func (c *kubernetesBindingsController) WithKubeEventsManager(kubeEventsManager k
 	c.kubeEventsManager = kubeEventsManager
 }
 
+// WithMetricStorage sets an optional storage for the binding_monitor_missing_total
+// counter. Without it the missing-monitor state is still logged, just not counted.
+func (c *kubernetesBindingsController) WithMetricStorage(mstor metricsstorage.Storage) {
+	c.metricStorage = mstor
+}
+
 // EnableKubernetesBindings adds a monitor for each 'kubernetes' binding. This method
 // returns an array of BindingExecutionInfo to help construct initial tasks to run hooks.
 // Informers in each monitor are started immediately to keep up the "fresh" state of object caches.
+//
+// The method is idempotent and self-healing: per-binding monitor creation is guarded so a
+// second call does not create duplicate monitors, and a binding whose link exists but whose
+// monitor is missing (e.g. a monitor stopped out of band by DisableKubernetesBindings racing
+// with this call) is repaired by re-adding and re-starting the monitor. A Synchronization
+// BindingExecutionInfo is always returned for every binding, so a repeat call after a partial
+// failure never silently drops the Synchronization run that populates hook snapshots.
 func (c *kubernetesBindingsController) EnableKubernetesBindings() ([]BindingExecutionInfo, error) {
 	res := make([]BindingExecutionInfo, 0)
 
-	c.l.RLock()
-	alreadyEnabled := len(c.BindingMonitorLinks) == len(c.KubernetesBindings)
-	c.l.RUnlock()
-	if alreadyEnabled {
-		return res, nil
-	}
-
 	for _, config := range c.KubernetesBindings {
-		if _, found := c.getBindingMonitorLinksById(config.Monitor.Metadata.MonitorId); !found {
+		monitorID := config.Monitor.Metadata.MonitorId
+
+		_, linked := c.getBindingMonitorLinksById(monitorID)
+		// Add the monitor when there is no link yet, or when the link exists but the
+		// monitor is gone — the latter is the state a Disable/Enable race leaves behind
+		// and, without repair here, every later snapshot read for this binding returns
+		// empty while the hook still "succeeds".
+		if !linked || !c.kubeEventsManager.HasMonitor(monitorID) {
 			if err := c.kubeEventsManager.AddMonitor(config.Monitor); err != nil {
 				return nil, fmt.Errorf("run monitor: %s", err)
 			}
-			c.setBindingMonitorLinks(config.Monitor.Metadata.MonitorId, &KubernetesBindingToMonitorLink{
-				MonitorId:     config.Monitor.Metadata.MonitorId,
+			c.setBindingMonitorLinks(monitorID, &KubernetesBindingToMonitorLink{
+				MonitorId:     monitorID,
 				BindingConfig: config,
 			})
 			// Start monitor's informers to fill the cache.
-			c.kubeEventsManager.StartMonitor(config.Monitor.Metadata.MonitorId)
+			c.kubeEventsManager.StartMonitor(monitorID)
 		}
 
 		synchronizationInfo := c.HandleEvent(context.TODO(), kemtypes.KubeEvent{
-			MonitorId: config.Monitor.Metadata.MonitorId,
+			MonitorId: monitorID,
 			Type:      kemtypes.TypeSynchronization,
 		})
 		res = append(res, synchronizationInfo)
@@ -275,6 +292,19 @@ func (c *kubernetesBindingsController) SnapshotsFor(bindingName string) []kemtyp
 			if c.kubeEventsManager.HasMonitor(monitorID) {
 				return c.kubeEventsManager.GetMonitor(monitorID).Snapshot()
 			}
+
+			// A configured binding without a live monitor yields an empty snapshot while the
+			// hook still runs successfully — this is exactly how a lost/never-started monitor
+			// silently feeds empty values into a hook. Make it observable instead of silent;
+			// EnableKubernetesBindings repairs the state on the next module run.
+			c.logger.Error("no monitor for configured kubernetes binding, snapshot is empty",
+				slog.String(pkg.LogKeyBinding, bindingName),
+				slog.String(pkg.LogKeyMonitorID, monitorID))
+			if c.metricStorage != nil {
+				c.metricStorage.CounterAdd(metrics.BindingMonitorMissingTotal, 1.0,
+					map[string]string{pkg.MetricKeyBinding: bindingName})
+			}
+			return nil
 		}
 	}
 
