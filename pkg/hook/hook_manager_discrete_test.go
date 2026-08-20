@@ -1,6 +1,7 @@
 package hook
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -68,6 +69,43 @@ func TestLoadHook_allHooksHaveNonNilConfig(t *testing.T) {
 		h := hm.GetHook(hookName)
 		assert.NotNil(t, h.Config, "Config must be non-nil after loadHook")
 	}
+}
+
+// TestInit_skipInvalidHooks verifies that when SkipInvalidHooks is true, a hook
+// that fails --config is silently skipped while valid hooks are still registered.
+func TestInit_skipInvalidHooks(t *testing.T) {
+	conversionManager := conversion.NewWebhookManager()
+	conversionManager.Settings = conversion.DefaultSettings
+	admissionManager := admission.NewWebhookManager(nil)
+	admissionManager.Settings = admission.DefaultSettings
+
+	// Use the existing valid hook from testdata alongside a nonexistent binary.
+	// WorkingDir must be the testdata dir so filepath.Rel produces "hook.sh" as the name.
+	workingDir, _ := filepath.Abs("testdata/hook_manager")
+	validHookPath := filepath.Join(workingDir, "hook.sh")
+	cfg := &ManagerConfig{
+		WorkingDir:               workingDir,
+		TempDir:                  t.TempDir(),
+		AdmissionWebhookManager:  admissionManager,
+		ConversionWebhookManager: conversionManager,
+		SkipInvalidHooks:         true,
+		HookDiscovery:            staticHookDiscovery{paths: []string{validHookPath, "/nonexistent-binary"}},
+		Logger:                   log.NewNop(),
+	}
+	hm := NewHookManager(cfg)
+
+	err := hm.Init()
+	require.NoError(t, err, "Init should not fail when SkipInvalidHooks is true")
+	assert.Equal(t, []string{"hook.sh"}, hm.GetHookNames(), "only the valid hook should be registered")
+}
+
+// staticHookDiscovery is a HookDiscovery stub that returns a fixed list of paths.
+type staticHookDiscovery struct {
+	paths []string
+}
+
+func (s staticHookDiscovery) Discover(_ string) ([]string, error) {
+	return s.paths, nil
 }
 
 // TestFetchHookConfig_returnsErrorForNonExecutable verifies that fetchHookConfig
