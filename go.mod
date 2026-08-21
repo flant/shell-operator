@@ -7,10 +7,10 @@ require (
 	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0
 	github.com/flant/kube-client v1.7.0
 	github.com/go-chi/chi/v5 v5.3.0
-	github.com/go-openapi/spec v0.19.8
+	github.com/go-openapi/spec v0.22.1
 	github.com/go-openapi/strfmt v0.26.2
 	github.com/go-openapi/swag v0.26.0 // indirect
-	github.com/go-openapi/validate v0.19.12
+	github.com/go-openapi/validate v0.25.1
 	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kennygrant/sanitize v1.2.4
@@ -37,7 +37,7 @@ replace github.com/go-openapi/validate => github.com/flant/go-openapi-validate v
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/deckhouse/module-sdk v0.10.12
+	github.com/deckhouse/module-sdk v0.10.14-0.20260821105417-2b743d3140e9
 	github.com/go-openapi/swag/yamlutils v0.26.0
 	github.com/goccy/go-json v0.10.6
 	github.com/gojuno/minimock/v3 v3.4.7
@@ -65,12 +65,12 @@ require (
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-openapi/analysis v0.19.10 // indirect
+	github.com/go-openapi/analysis v0.24.1 // indirect
 	github.com/go-openapi/errors v0.22.7 // indirect
 	github.com/go-openapi/jsonpointer v0.22.1 // indirect
 	github.com/go-openapi/jsonreference v0.21.3 // indirect
-	github.com/go-openapi/loads v0.19.5 // indirect
-	github.com/go-openapi/runtime v0.19.16 // indirect
+	github.com/go-openapi/loads v0.23.2 // indirect
+	github.com/go-openapi/runtime v0.29.2 // indirect
 	github.com/go-openapi/swag/cmdutils v0.26.0 // indirect
 	github.com/go-openapi/swag/conv v0.26.0 // indirect
 	github.com/go-openapi/swag/fileutils v0.26.0 // indirect
@@ -111,6 +111,7 @@ require (
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
@@ -124,7 +125,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
 	golang.org/x/mod v0.38.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
