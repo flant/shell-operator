@@ -31,7 +31,6 @@ func (c *CrdClientConfig) PatchConversion(ctx context.Context) error {
 	var (
 		retryTimeout = 15 * time.Second
 		retryBudget  = 60 // 60 times * 15 sec = 15 min
-		client       = c.KubeClient
 	)
 
 	conv, err := json.Marshal(&extv1.CustomResourceConversion{
@@ -57,7 +56,7 @@ func (c *CrdClientConfig) PatchConversion(ctx context.Context) error {
 	// The CRD is often absent when a hook registers its conversion bindings, so the
 	// patch is retried on the budget the Get used to hold.
 	for {
-		_, err = client.ApiExt().CustomResourceDefinitions().Patch(ctx, c.CrdName, types.JSONPatchType, patch, pkg.DefaultPatchOptions())
+		_, err = c.KubeClient.ApiExt().CustomResourceDefinitions().Patch(ctx, c.CrdName, types.JSONPatchType, patch, pkg.DefaultPatchOptions())
 		if err == nil {
 			return nil
 		}
