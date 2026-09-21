@@ -107,6 +107,9 @@ type ShellOperator struct {
 	// can wait for them to drain.
 	wg sync.WaitGroup
 
+	// reloadMu serialises ReloadHooks calls.
+	reloadMu sync.Mutex
+
 	// startOnce / shutdownOnce make Start and Shutdown idempotent.
 	startOnce    sync.Once
 	startErr     error
