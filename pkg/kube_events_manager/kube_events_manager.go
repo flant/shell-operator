@@ -42,6 +42,7 @@ type KubeEventsManager interface {
 	KubeEventsSource
 	WithMetricStorage(mstor metricsstorage.Storage)
 	MetricStorage() metricsstorage.Storage
+	Synced(ctx context.Context) bool
 	Stop()
 	Wait()
 }
@@ -167,6 +168,19 @@ func (mgr *kubeEventsManager) StopMonitor(monitorID string) error {
 // Ch returns a channel to receive KubeEvent objects.
 func (mgr *kubeEventsManager) Ch() chan kemtypes.KubeEvent {
 	return mgr.KubeEventCh
+}
+
+// Synced reports whether all monitors have handled every watch event emitted so far.
+// It lists objects on each call and is meant for the fake cluster in tests.
+func (mgr *kubeEventsManager) Synced(ctx context.Context) bool {
+	mgr.m.RLock()
+	defer mgr.m.RUnlock()
+	for _, mon := range mgr.Monitors {
+		if !mon.Synced(ctx) {
+			return false
+		}
+	}
+	return true
 }
 
 // Stop the kube events manager and all the informers inside monitors.

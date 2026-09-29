@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/flant/shell-operator/pkg/hook"
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
 )
 
@@ -475,4 +478,94 @@ metadata:
 	g.Expect(err).ShouldNot(HaveOccurred())
 	parsedBindingContexts = parseContexts(contexts.Rendered)
 	g.Expect(parsedBindingContexts[0].Snapshots["selected_pods"]).To(HaveLen(2))
+}
+
+// A slow filter stands in for a loaded CI runner: events must not be cut off by a timer.
+func Test_ChangeState_SlowEvents(t *testing.T) {
+	g := NewWithT(t)
+
+	h, err := hook.NewHook("test", "test", false, false, "", log.NewNop()).LoadConfig([]byte(`
+configVersion: v1
+kubernetes:
+- apiVersion: v1
+  kind: Pod
+  name: pods
+  includeSnapshotsFrom: [pods]
+`))
+	g.Expect(err).ShouldNot(HaveOccurred())
+	h.GetConfig().OnKubernetesEvents[0].Monitor.FilterFunc = func(obj *unstructured.Unstructured) (interface{}, error) {
+		time.Sleep(50 * time.Millisecond)
+		return obj.GetName(), nil
+	}
+
+	c := NewBindingContextController("", log.NewNop())
+	c.WithHook(h)
+	defer c.Stop()
+
+	_, err = c.Run(``)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	contexts, err := c.ChangeState(`
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod3
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts := parseContexts(contexts.Rendered)
+	g.Expect(parsedBindingContexts).To(HaveLen(3))
+	g.Expect(parsedBindingContexts[2].Snapshots["pods"]).To(HaveLen(3))
+
+	contexts, err = c.ChangeState(``)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts = parseContexts(contexts.Rendered)
+	g.Expect(parsedBindingContexts).To(HaveLen(3))
+	g.Expect(parsedBindingContexts[2].Snapshots["pods"]).To(BeEmpty())
+}
+
+// Objects the filter fails on are never cached, ChangeState must not wait for them.
+func Test_ChangeState_FilterError(t *testing.T) {
+	g := NewWithT(t)
+
+	c := NewBindingContextController(`
+configVersion: v1
+kubernetes:
+- apiVersion: v1
+  kind: Pod
+  name: pods
+  includeSnapshotsFrom: [pods]
+  jqFilter: 'if .metadata.name == "bad" then error("boom") else .metadata.name end'
+`, log.NewNop())
+	defer c.Stop()
+
+	_, err := c.Run(``)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	contexts, err := c.ChangeState(`
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: good
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts := parseContexts(contexts.Rendered)
+	g.Expect(parsedBindingContexts).To(HaveLen(1))
+	g.Expect(parsedBindingContexts[0].Snapshots["pods"]).To(HaveLen(1))
 }

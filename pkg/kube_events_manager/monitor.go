@@ -25,6 +25,7 @@ type Monitor interface {
 	EnableKubeEventCb()
 	GetConfig() *MonitorConfig
 	SnapshotOperations() (total *CachedObjectsInfo, last *CachedObjectsInfo)
+	Synced(ctx context.Context) bool
 }
 
 // Monitor holds informers for resources and a namespace informer
@@ -294,6 +295,20 @@ func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 	sort.Sort(kemtypes.ByNamespaceAndName(objects))
 
 	return objects
+}
+
+// Synced reports whether all informers have handled every watch event emitted so far.
+func (m *monitor) Synced(ctx context.Context) bool {
+	synced := true
+	for _, informer := range m.ResourceInformers {
+		synced = synced && informer.synced(ctx)
+	}
+	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
+		for _, informer := range value {
+			synced = synced && informer.synced(ctx)
+		}
+	})
+	return synced
 }
 
 // EnableKubeEventCb allows execution of event callback for all informers.
