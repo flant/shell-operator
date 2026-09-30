@@ -140,6 +140,12 @@ func (b *BindingContextController) ChangeState(newState string) (GeneratedBindin
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	// Synced is not a part of the KubeEventsManager interface: it is meant for the fake cluster only.
+	mgr, ok := b.KubeEventsManager.(interface{ Synced(context.Context) bool })
+	if !ok {
+		return GeneratedBindingContexts{}, fmt.Errorf("KubeEventsManager %T cannot report handled events", b.KubeEventsManager)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
@@ -159,7 +165,7 @@ func (b *BindingContextController) ChangeState(newState string) (GeneratedBindin
 				cc.AddBindingContext(types.OnKubernetesEvent, info)
 			})
 		case <-tick.C:
-			if b.KubeEventsManager.Synced(ctx) && len(b.KubeEventsManager.Ch()) == 0 {
+			if mgr.Synced(ctx) && len(b.KubeEventsManager.Ch()) == 0 {
 				return cc.CombinedAndUpdated(b.HookCtrl)
 			}
 		case <-ctx.Done():

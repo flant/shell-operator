@@ -325,7 +325,20 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
 			slog.String(pkg.LogKeyEventType, string(eventType)),
 			log.Err(err))
-		return
+		if eventType != kemtypes.WatchEventDeleted {
+			return
+		}
+		// A deleted object must leave the cache even if the filter fails on its last state:
+		// reuse the cached filter result.
+		ei.cacheLock.RLock()
+		cached, ok := ei.cachedObjects[resourceId]
+		ei.cacheLock.RUnlock()
+		if !ok {
+			return
+		}
+		res := *cached
+		res.Object = obj
+		objFilterRes = &res
 	}
 
 	if !ei.Monitor.KeepFullObjectsInMemory {

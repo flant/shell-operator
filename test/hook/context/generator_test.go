@@ -569,3 +569,46 @@ metadata:
 	g.Expect(parsedBindingContexts).To(HaveLen(1))
 	g.Expect(parsedBindingContexts[0].Snapshots["pods"]).To(HaveLen(1))
 }
+
+// A cached object must leave the snapshot on delete even if the filter fails on its last state.
+func Test_ChangeState_FilterErrorOnDelete(t *testing.T) {
+	g := NewWithT(t)
+
+	c := NewBindingContextController(`
+configVersion: v1
+kubernetes:
+- apiVersion: v1
+  kind: Pod
+  name: pods
+  includeSnapshotsFrom: [pods]
+  jqFilter: 'if .metadata.labels.state == "bad" then error("boom") else .metadata.name end'
+`, log.NewNop())
+	defer c.Stop()
+
+	_, err := c.Run(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p1
+  labels:
+    state: good
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	_, err = c.ChangeState(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p1
+  labels:
+    state: bad
+`)
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	contexts, err := c.ChangeState(``)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	parsedBindingContexts := parseContexts(contexts.Rendered)
+	g.Expect(parsedBindingContexts).To(HaveLen(1))
+	g.Expect(parsedBindingContexts[0].WatchEvent).To(BeEquivalentTo("Deleted"))
+	g.Expect(parsedBindingContexts[0].Snapshots["pods"]).To(BeEmpty())
+}
