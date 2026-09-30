@@ -34,8 +34,8 @@ github.com/deckhouse/deckhouse/pkg/log v0.2.0 h1:6tmZQLwNb1o/hP1gzJQBjcwfA/bubbg
 github.com/deckhouse/deckhouse/pkg/log v0.2.0/go.mod h1:pbAxTSDcPmwyl3wwKDcEB3qdxHnRxqTV+J0K+sha8bw=
 github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0 h1:xZvbKuexrSQGEw6CB4n3UC7XbOb9QNLbm8UhcGZ2R1I=
 github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0/go.mod h1:Rz++SzCLkFW03WGgftnn91TimGU2shiKb5S/YuxcBuE=
-github.com/deckhouse/module-sdk v0.12.6-0.20260831111027-abc8316e2a44 h1:ul5vAOV0lYiO8ZVJClwZAw/mIZaiTakTqFDCOgq5g08=
-github.com/deckhouse/module-sdk v0.12.6-0.20260831111027-abc8316e2a44/go.mod h1:tdxodxZQvlHG2vSIHs3LtUPtcWtJR5VYuZoV8gudDE8=
+github.com/deckhouse/module-sdk v0.13.0 h1:z7GJZkP8e3MvK2BgTwRthd8bjI4tDesztmMZSvyiVws=
+github.com/deckhouse/module-sdk v0.13.0/go.mod h1:tdxodxZQvlHG2vSIHs3LtUPtcWtJR5VYuZoV8gudDE8=
 github.com/docker/go-units v0.4.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/emicklei/go-restful/v3 v3.13.0 h1:C4Bl2xDndpU6nJ4bc1jXd+uTmYPVUwkD6bFY/oTyCes=
 github.com/emicklei/go-restful/v3 v3.13.0/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
@@ -46,12 +46,17 @@ github.com/evanphx/json-patch/v5 v5.9.11/go.mod h1:3j+LviiESTElxA4p3EMKAB9HXj3/X
 github.com/flant/go-openapi-validate v0.19.12-flant.0 h1:xk6kvc9fHKMgUdB6J7kbpbLR5vJOUzKAK8p3nrD7mDk=
 github.com/flant/go-openapi-validate v0.19.12-flant.0/go.mod h1:Rzou8hA/CBw8donlS6WNEUQupNvUZ0waH08tGe6kAQ4=
 <<<<<<< HEAD
+<<<<<<< HEAD
 github.com/flant/kube-client v1.9.2 h1:LA/RC4fvdyRcoJeXwmRZSDo/L0yoQ024BuaVqbDb5nA=
 github.com/flant/kube-client v1.9.2/go.mod h1:Q3rdJPkSlTZUaWGHX16g3/Fk3vDbl0Pr4EXf+j+UmgY=
 =======
 github.com/flant/kube-client v1.9.2-0.20260901070720-9c496e4c5ad6 h1:BpozcAAIzNZ3JvP/UXrRHvmyGnquMJxRPbpabfYSj4Q=
 github.com/flant/kube-client v1.9.2-0.20260901070720-9c496e4c5ad6/go.mod h1:KOaTG+1iLMIGToSczxtzbACBDVdWPK5UqMqyWjd0nsQ=
 >>>>>>> 57e0afd ([shell-operator] chore(deps): update k8s.io dependencies to v0.35.8)
+=======
+github.com/flant/kube-client v1.10.0 h1:PcS+44RhssIL2t2XrZ+Qxq8u3lMgVxfMbHl+O5a9sPM=
+github.com/flant/kube-client v1.10.0/go.mod h1:KOaTG+1iLMIGToSczxtzbACBDVdWPK5UqMqyWjd0nsQ=
+>>>>>>> 52cad54 (chore: upgrade kube client and module sdk)
 github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh78=
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/gkampitakis/ciinfo v0.3.2 h1:JcuOPk8ZU7nZQjdUhctuhQofk7BGHuIy0c9Ez8BNhXs=
