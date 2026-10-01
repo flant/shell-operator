@@ -296,6 +296,20 @@ func (m *monitor) Snapshot() []kemtypes.ObjectAndFilterResult {
 	return objects
 }
 
+// synced reports whether all informers have handled every watch event emitted so far.
+func (m *monitor) synced(ctx context.Context) bool {
+	synced := true
+	for _, informer := range m.ResourceInformers {
+		synced = synced && informer.synced(ctx)
+	}
+	m.VaryingInformers.RangeValue(func(value []*resourceInformer) {
+		for _, informer := range value {
+			synced = synced && informer.synced(ctx)
+		}
+	})
+	return synced
+}
+
 // EnableKubeEventCb allows execution of event callback for all informers.
 // Also executes eventCb for events accumulated during "Synchronization" phase.
 func (m *monitor) EnableKubeEventCb() {
