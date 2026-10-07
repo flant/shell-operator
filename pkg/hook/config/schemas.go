@@ -230,6 +230,11 @@ properties:
         timeoutSeconds:
           type: integer
           example: 10
+        reinvocationPolicy:
+          type: string
+          enum:
+          - Never
+          - IfNeeded
         matchConditions:
           type: array
           items:

@@ -83,6 +83,9 @@ type KubernetesAdmissionConfigV1 struct {
 	SideEffects          *v1.SideEffectClass      `json:"sideEffects"`
 	TimeoutSeconds       *int32                   `json:"timeoutSeconds,omitempty"`
 	MatchConditions      []v1.MatchCondition      `json:"matchConditions,omitempty"`
+	// ReinvocationPolicy is honored only for kubernetesMutating; the schema
+	// rejects it on kubernetesValidating (the k8s type has no such field).
+	ReinvocationPolicy *v1.ReinvocationPolicyType `json:"reinvocationPolicy,omitempty"`
 }
 
 // version 1 of kubernetes conversion configuration
@@ -517,6 +520,8 @@ func convertMutating(cfgV1 KubernetesAdmissionConfigV1) htypes.MutatingConfig {
 	}
 
 	webhook.MatchConditions = cfgV1.MatchConditions
+
+	webhook.ReinvocationPolicy = cfgV1.ReinvocationPolicy
 
 	cfg.Webhook = &admission.MutatingWebhookConfig{
 		MutatingWebhook: webhook,
