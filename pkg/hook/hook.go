@@ -53,6 +53,9 @@ type Hook struct {
 
 	Logger *log.Logger
 
+	// runner runs the hook for an event. Nil means executor.ProcessRunner.
+	runner executor.Runner
+
 	// ioProvider prepares and cleans up temporary files for hook execution.
 	// Defaults to hookIOProvider. Tests may inject a stub.
 	ioProvider IOProvider
@@ -74,6 +77,12 @@ func NewHook(name, path string, keepTemporaryHookFiles bool, logProxyHookJSON bo
 	h.ioProvider = &hookIOProvider{hook: h}
 	h.responseParser = &hookResponseParser{hook: h}
 	return h
+}
+
+// WithRunner sets how the hook is run for an event. The --config call made
+// while loading the hook always starts a process.
+func (h *Hook) WithRunner(runner executor.Runner) {
+	h.runner = runner
 }
 
 func (h *Hook) WithTmpDir(dir string) {
@@ -131,6 +140,7 @@ func (h *Hook) Run(ctx context.Context, _ htypes.BindingType, context []bctx.Bin
 		h.Path,
 		[]string{},
 		env.Envs()).
+		WithRunner(h.runner).
 		WithLogProxyHookJSON(h.LogProxyHookJSON).
 		WithLogProxyHookJSONKey(h.LogProxyHookJSONKey).
 		WithLogger(h.Logger.Named("executor"))
