@@ -94,9 +94,9 @@ func (m *WebhookManager) Start() error {
 	}
 
 	for _, clientCfg := range m.ClientConfigs {
-		err = clientCfg.Update(ctx)
+		err = clientCfg.PatchConversion(ctx)
 		if err != nil {
-			return fmt.Errorf("update CRD: %w", err)
+			return fmt.Errorf("patch CRD conversion: %w", err)
 		}
 	}
 

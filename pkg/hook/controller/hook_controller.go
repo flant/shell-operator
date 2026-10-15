@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	bctx "github.com/flant/shell-operator/pkg/hook/binding_context"
@@ -64,6 +65,11 @@ func (hc *HookController) InitKubernetesBindings(bindings []htypes.OnKubernetesE
 	bindingCtrl := NewKubernetesBindingsController(logger)
 	bindingCtrl.WithKubeEventsManager(kubeEventMgr)
 	bindingCtrl.WithKubernetesBindings(bindings)
+	// KubeEventsSource is a narrow interface; recover the metric storage from the
+	// real manager when available so the controller can count missing monitors.
+	if mgr, ok := kubeEventMgr.(interface{ MetricStorage() metricsstorage.Storage }); ok {
+		bindingCtrl.WithMetricStorage(mgr.MetricStorage())
+	}
 	hc.KubernetesController = bindingCtrl
 	hc.kubernetesBindings = bindings
 	hc.logger = logger

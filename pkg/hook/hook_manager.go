@@ -45,6 +45,7 @@ type Manager struct {
 	keepTemporaryHookFiles bool
 	logProxyHookJSON       bool
 	logProxyHookJSONKey    string
+	hookRunner             executor.Runner
 
 	// indexMu protects hookNamesInOrder, hooksByName and hooksInOrder so that
 	// Init() (which fully rebuilds the indices) does not race with concurrent
@@ -82,6 +83,10 @@ type ManagerConfig struct {
 	LogProxyHookJSON       bool
 	LogProxyHookJSONKey    string
 
+	// HookRunner runs hooks for events. When nil, every hook is started as a
+	// child process (executor.ProcessRunner).
+	HookRunner executor.Runner
+
 	Logger *log.Logger
 }
 
@@ -107,6 +112,7 @@ func NewHookManager(config *ManagerConfig) *Manager {
 		keepTemporaryHookFiles: config.KeepTemporaryHookFiles,
 		logProxyHookJSON:       config.LogProxyHookJSON,
 		logProxyHookJSONKey:    config.LogProxyHookJSONKey,
+		hookRunner:             config.HookRunner,
 
 		logger: config.Logger,
 	}
@@ -270,6 +276,7 @@ func (hm *Manager) wireHookController(hook *Hook) {
 	hookCtrl.InitAdmissionBindings(hook.GetConfig().KubernetesValidating, hook.GetConfig().KubernetesMutating, hm.admissionWebhookManager)
 	hook.WithHookController(hookCtrl)
 	hook.WithTmpDir(hm.TempDir())
+	hook.WithRunner(hm.hookRunner)
 }
 
 func (hm *Manager) execCommandOutput(hookName string, dir string, entrypoint string, envs []string, args []string) ([]byte, error) {
