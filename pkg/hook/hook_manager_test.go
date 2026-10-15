@@ -2,6 +2,7 @@ package hook
 
 import (
 	"context"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/deckhouse/deckhouse/pkg/log"
 	. "github.com/onsi/gomega"
 
+	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook/controller"
 	"github.com/flant/shell-operator/pkg/hook/types"
 	"github.com/flant/shell-operator/pkg/webhook/admission"
@@ -447,4 +449,37 @@ func Test_ManagerConfig_RenamedFields_CompileCheck(t *testing.T) {
 	if cfg.ScheduleManager != nil {
 		t.Fatal("expected nil ScheduleManager")
 	}
+}
+
+type recordingRunner struct {
+	paths []string
+	envs  [][]string
+}
+
+func (r *recordingRunner) Run(_ context.Context, cmd *exec.Cmd) (*executor.CmdUsage, error) {
+	r.paths = append(r.paths, cmd.Path)
+	r.envs = append(r.envs, cmd.Env)
+
+	return &executor.CmdUsage{}, nil
+}
+
+func Test_ManagerConfig_HookRunner_RunsHooks(t *testing.T) {
+	g := NewWithT(t)
+
+	hm := newHookManager(t, "testdata/hook_manager")
+	runner := &recordingRunner{}
+	hm.hookRunner = runner
+
+	// --config is still fetched by starting the hook as a process.
+	g.Expect(hm.Init()).To(Succeed())
+	g.Expect(runner.paths).To(BeEmpty())
+
+	h := hm.GetHook("configMapHooks/hook.sh")
+	g.Expect(h).NotTo(BeNil())
+
+	_, err := h.Run(context.Background(), types.OnKubernetesEvent, nil, map[string]string{})
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(runner.paths).To(Equal([]string{h.Path}))
+	g.Expect(runner.envs[0]).To(ContainElement(HavePrefix("BINDING_CONTEXT_PATH=")))
 }

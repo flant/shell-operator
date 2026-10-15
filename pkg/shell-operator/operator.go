@@ -29,6 +29,7 @@ import (
 
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
+	"github.com/flant/shell-operator/pkg/executor"
 	"github.com/flant/shell-operator/pkg/hook"
 	bindingcontext "github.com/flant/shell-operator/pkg/hook/binding_context"
 	"github.com/flant/shell-operator/pkg/hook/controller"
@@ -96,6 +97,9 @@ type ShellOperator struct {
 	// as a field so extenders can substitute a custom factory if needed.
 	taskFactory HookTaskFactory
 
+	// hookRunner runs hooks for events; nil starts each hook as a process.
+	hookRunner executor.Runner
+
 	// MetricNames is a per-instance snapshot of resolved metric names.
 	// Library callers may consult it to avoid relying on the package-level
 	// metrics globals. NewShellOperator populates it from cfg's prefix; the
@@ -135,6 +139,14 @@ func WithLogger(logger *log.Logger) Option {
 func WithMetricStorage(ms metricsstorage.Storage) Option {
 	return func(operator *ShellOperator) {
 		operator.MetricStorage = ms
+	}
+}
+
+// WithHookRunner sets how hooks are run for events. By default every hook is
+// started as a child process; see executor.Runner.
+func WithHookRunner(runner executor.Runner) Option {
+	return func(operator *ShellOperator) {
+		operator.hookRunner = runner
 	}
 }
 

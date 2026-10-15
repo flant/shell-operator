@@ -19,7 +19,7 @@ jobs:
       run_publish: ${{ steps.check.outputs.run_publish }}
       build_multi_arch: ${{ steps.check.outputs.build_multi_arch }}
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         id: check
         with:
           script: |
@@ -66,7 +66,7 @@ jobs:
       - check
     if: needs.check.outputs.run_publish == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Prepare environment
         env:
           BUILD_MULTI_ARCH: ${{ needs.check.outputs.build_multi_arch }}
@@ -92,7 +92,7 @@ jobs:
           echo "========================================="
       - name: Set up QEMU
         if: needs.check.outputs.build_multi_arch == 'true'
-        uses: docker/setup-qemu-action@v3.6.0
+        uses: docker/setup-qemu-action@v4.2.0
         with:
           platforms: "${{ env.QEMU_PLATFORMS }}"
       - name: Set up Docker Buildx
@@ -101,7 +101,7 @@ jobs:
         with:
           version: latest
       - name: Login to Github Container Registry
-        uses: docker/login-action@v4.2.0
+        uses: docker/login-action@v4.4.0
         with:
           registry: ghcr.io
           username: ${{ secrets.GHCR_IO_USER }}

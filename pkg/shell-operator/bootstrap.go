@@ -318,6 +318,7 @@ func (op *ShellOperator) setupHookManagers(cfg *app.Config, hooksDir string, tem
 		KeepTemporaryHookFiles:   cfg.Debug.KeepTempFiles,
 		LogProxyHookJSON:         cfg.Log.ProxyHookJSON,
 		LogProxyHookJSONKey:      app.ProxyJsonLogKey,
+		HookRunner:               op.hookRunner,
 		Logger:                   op.logger.Named("hook-manager"),
 	}
 	op.HookManager = hook.NewHookManager(hookCfg)
