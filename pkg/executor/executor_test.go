@@ -470,3 +470,77 @@ func TestGlobalRegistry_RunAndLogLines_FailedStart(t *testing.T) {
 	_, err := ex.RunAndLogLines(context.Background(), map[string]string{})
 	assert.Error(t, err)
 }
+
+// fakeRunner stands in for a Runner that does not start a process: it writes
+// what a hook would have printed and reports the configured result.
+type fakeRunner struct {
+	stdout, stderr string
+	usage          *CmdUsage
+	err            error
+
+	gotCmd *exec.Cmd
+}
+
+func (r *fakeRunner) Run(_ context.Context, cmd *exec.Cmd) (*CmdUsage, error) {
+	r.gotCmd = cmd
+	_, _ = io.WriteString(cmd.Stdout, r.stdout)
+	_, _ = io.WriteString(cmd.Stderr, r.stderr)
+
+	return r.usage, r.err
+}
+
+func TestRunAndLogLines_WithRunner(t *testing.T) {
+	logger := log.NewLogger()
+	logger.SetLevel(log.LevelInfo)
+
+	var buf bytes.Buffer
+	logger.SetOutput(&buf)
+
+	t.Run("runner gets the command and its output is logged", func(t *testing.T) {
+		buf.Reset()
+		runner := &fakeRunner{stdout: "from runner\n", usage: &CmdUsage{User: time.Second}}
+
+		ex := NewExecutor("/hooks", "/hooks/hook.py", []string{"arg"}, []string{"FOO=bar"}).
+			WithRunner(runner).
+			WithLogger(logger)
+
+		usage, err := ex.RunAndLogLines(context.Background(), map[string]string{})
+		require.NoError(t, err)
+
+		assert.Equal(t, &CmdUsage{User: time.Second}, usage)
+		assert.Equal(t, []string{"/hooks/hook.py", "arg"}, runner.gotCmd.Args)
+		assert.Equal(t, "/hooks", runner.gotCmd.Dir)
+		assert.Contains(t, runner.gotCmd.Env, "FOO=bar")
+		assert.Contains(t, buf.String(), `"msg":"from runner"`)
+	})
+
+	t.Run("failure with stderr is a StderrError", func(t *testing.T) {
+		runner := &fakeRunner{stderr: "boom", err: fmt.Errorf("exit status 1")}
+
+		ex := NewExecutor("", "hook", nil, nil).WithRunner(runner).WithLogger(logger)
+
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{})
+
+		var stderrErr *StderrError
+		require.ErrorAs(t, err, &stderrErr)
+		assert.Equal(t, "boom", stderrErr.Message)
+	})
+
+	t.Run("failure without stderr keeps the runner error", func(t *testing.T) {
+		runnerErr := fmt.Errorf("runner is gone")
+		runner := &fakeRunner{err: runnerErr}
+
+		ex := NewExecutor("", "hook", nil, nil).WithRunner(runner).WithLogger(logger)
+
+		_, err := ex.RunAndLogLines(context.Background(), map[string]string{})
+		assert.ErrorIs(t, err, runnerErr)
+	})
+
+	t.Run("nil runner keeps starting a process", func(t *testing.T) {
+		ex := NewExecutor("", "sh", []string{"-c", "exit 0"}, nil).WithRunner(nil).WithLogger(logger)
+
+		usage, err := ex.RunAndLogLines(context.Background(), map[string]string{})
+		require.NoError(t, err)
+		assert.NotNil(t, usage)
+	})
+}

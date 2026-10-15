@@ -51,11 +51,71 @@ func (e *StderrError) Error() string {
 	return e.Message
 }
 
+// Runner starts a prepared hook command and waits for it to finish.
+//
+// cmd carries what the hook is run with: Path, Args, Env, Dir, and the
+// writers its stdout and stderr go to. A Runner must leave the other fields
+// alone. Run returns an error when the hook could not be run or exited with a
+// non-zero code; whatever the hook wrote to stderr is turned into a
+// StderrError by the caller.
+//
+// ProcessRunner, the default, starts cmd as a child process. An application
+// embedding shell-operator may supply its own Runner, for example one that
+// hands the command to a long-lived interpreter instead of starting a fresh
+// one for every event, and fall back to ProcessRunner for the rest.
+type Runner interface {
+	Run(ctx context.Context, cmd *exec.Cmd) (*CmdUsage, error)
+}
+
+// ProcessRunner runs a hook command as a child process. The context is not
+// used to stop the process: a hook runs to completion, as it always has.
+type ProcessRunner struct{}
+
+func (ProcessRunner) Run(_ context.Context, cmd *exec.Cmd) (*CmdUsage, error) {
+	if err := startAndRegister(cmd); err != nil {
+		return nil, fmt.Errorf("cmd start: %w", err)
+	}
+	defer unregisterPID(cmd.Process.Pid)
+
+	if err := cmd.Wait(); err != nil {
+		return nil, fmt.Errorf("cmd run: %w", err)
+	}
+
+	if cmd.ProcessState == nil {
+		return nil, nil
+	}
+
+	usage := &CmdUsage{
+		Sys:  cmd.ProcessState.SystemTime(),
+		User: cmd.ProcessState.UserTime(),
+	}
+
+	// FIXME Maxrss is Unix specific.
+	sysUsage := cmd.ProcessState.SysUsage()
+	if v, ok := sysUsage.(*syscall.Rusage); ok {
+		// v.Maxrss is int32 on arm/v7
+		usage.MaxRss = int64(v.Maxrss) //nolint:unconvert
+	}
+
+	return usage, nil
+}
+
 type Executor struct {
 	cmd              *exec.Cmd
+	runner           Runner
 	logProxyHookJSON bool
 	proxyJsonKey     string
 	logger           *log.Logger
+}
+
+// WithRunner sets how RunAndLogLines runs the command. A nil runner keeps
+// ProcessRunner. Output, used for the --config call, always starts a process.
+func (e *Executor) WithRunner(runner Runner) *Executor {
+	if runner != nil {
+		e.runner = runner
+	}
+
+	return e
 }
 
 func (e *Executor) WithLogProxyHookJSON(logProxyHookJSON bool) *Executor {
@@ -111,6 +171,7 @@ func NewExecutor(dir string, entrypoint string, args []string, envs []string) *E
 
 	ex := &Executor{
 		cmd:          cmd,
+		runner:       ProcessRunner{},
 		proxyJsonKey: "proxyJsonLog",
 		logger:       log.NewLogger().Named("auto-executor"),
 	}
@@ -190,33 +251,13 @@ func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]stri
 	e.cmd.Stdout = plo
 	e.cmd.Stderr = io.MultiWriter(ple, stdErr)
 
-	if err := startAndRegister(e.cmd); err != nil {
-		return nil, fmt.Errorf("cmd start: %w", err)
-	}
-	defer unregisterPID(e.cmd.Process.Pid)
-
-	err := e.cmd.Wait()
+	usage, err := e.runner.Run(ctx, e.cmd)
 	if err != nil {
 		if len(stdErr.Bytes()) > 0 {
 			return nil, &StderrError{Message: stdErr.String()}
 		}
 
-		return nil, fmt.Errorf("cmd run: %w", err)
-	}
-
-	var usage *CmdUsage
-	if e.cmd.ProcessState != nil {
-		usage = &CmdUsage{
-			Sys:  e.cmd.ProcessState.SystemTime(),
-			User: e.cmd.ProcessState.UserTime(),
-		}
-
-		// FIXME Maxrss is Unix specific.
-		sysUsage := e.cmd.ProcessState.SysUsage()
-		if v, ok := sysUsage.(*syscall.Rusage); ok {
-			// v.Maxrss is int32 on arm/v7
-			usage.MaxRss = int64(v.Maxrss) //nolint:unconvert
-		}
+		return nil, err
 	}
 
 	return usage, nil

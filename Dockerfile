@@ -36,7 +36,7 @@ RUN GOOS=linux \
 FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:8fa8cf713bf8cfc9038901e5b2fbc97d0403794d834dc4a619e9e81312a6feef
 
 ARG TARGETPLATFORM
-ARG kubectlVersion=v1.34.8
+ARG kubectlVersion=v1.35.8
 
 # Install runtime dependencies
 RUN apk --no-cache add \
