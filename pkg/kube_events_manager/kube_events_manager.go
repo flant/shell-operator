@@ -169,6 +169,20 @@ func (mgr *kubeEventsManager) Ch() chan kemtypes.KubeEvent {
 	return mgr.KubeEventCh
 }
 
+// Synced reports whether all monitors have handled every watch event emitted so far.
+// It lists objects on each call and is meant for the fake cluster in tests,
+// so it is not a part of the KubeEventsManager interface.
+func (mgr *kubeEventsManager) Synced(ctx context.Context) bool {
+	mgr.m.RLock()
+	defer mgr.m.RUnlock()
+	for _, mon := range mgr.Monitors {
+		if m, ok := mon.(*monitor); ok && !m.synced(ctx) {
+			return false
+		}
+	}
+	return true
+}
+
 // Stop the kube events manager and all the informers inside monitors.
 func (mgr *kubeEventsManager) Stop() {
 	mgr.cancel()

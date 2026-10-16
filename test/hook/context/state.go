@@ -3,12 +3,9 @@ package context
 import (
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/flant/kube-client/fake"
 	"github.com/flant/kube-client/manifest"
-	kubeeventsmanager "github.com/flant/shell-operator/pkg/kube_events_manager"
-	"github.com/flant/shell-operator/pkg/kube_events_manager/types"
 )
 
 // if we use default, then we are not able to emulate global resources due to fake cluster limitations
@@ -19,19 +16,14 @@ var defaultNamespace = "" //nolint:gochecknoglobals
 type StateController struct {
 	CurrentState map[string]manifest.Manifest
 	fakeCluster  *fake.Cluster
-
-	stopCh chan<- types.KubeEvent
 }
 
 // NewStateController creates controller to apply state changes
-func NewStateController(fc *fake.Cluster, ev kubeeventsmanager.KubeEventsManager) *StateController {
-	c := &StateController{
+func NewStateController(fc *fake.Cluster) *StateController {
+	return &StateController{
 		CurrentState: make(map[string]manifest.Manifest),
 		fakeCluster:  fc,
-		stopCh:       ev.Ch(),
 	}
-
-	return c
 }
 
 func (c *StateController) SetInitialState(initialState string) error {
@@ -93,11 +85,6 @@ func (c *StateController) ChangeState(newRawState string) error {
 			delete(c.CurrentState, currID)
 		}
 	}
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		c.stopCh <- types.KubeEvent{MonitorId: "STOP_EVENTS"}
-	}()
 
 	return nil
 }

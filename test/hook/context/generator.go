@@ -71,7 +71,7 @@ func NewBindingContextController(config string, logger *log.Logger, version ...f
 
 	b.ScheduleManager = schedulemanager.NewScheduleManager(ctx, b.logger.Named("schedule-manager"))
 
-	b.Controller = NewStateController(fc, b.KubeEventsManager)
+	b.Controller = NewStateController(fc)
 
 	return b
 }
@@ -140,6 +140,12 @@ func (b *BindingContextController) ChangeState(newState string) (GeneratedBindin
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	// Synced is not a part of the KubeEventsManager interface: it is meant for the fake cluster only.
+	mgr, ok := b.KubeEventsManager.(interface{ Synced(context.Context) bool })
+	if !ok {
+		return GeneratedBindingContexts{}, fmt.Errorf("KubeEventsManager %T cannot report handled events", b.KubeEventsManager)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
@@ -149,23 +155,23 @@ func (b *BindingContextController) ChangeState(newState string) (GeneratedBindin
 		return GeneratedBindingContexts{}, fmt.Errorf("error while changing BindingContextGenerator state: %v", err)
 	}
 
-outer:
+	// Collect events until informers have handled every change and the last sent event is received.
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
 	for {
 		select {
 		case ev := <-b.KubeEventsManager.Ch():
-			switch ev.MonitorId {
-			case "STOP_EVENTS":
-				break outer
-			default:
-				b.HookCtrl.HandleKubeEvent(context.TODO(), ev, func(info controller.BindingExecutionInfo) {
-					cc.AddBindingContext(types.OnKubernetesEvent, info)
-				})
+			b.HookCtrl.HandleKubeEvent(context.TODO(), ev, func(info controller.BindingExecutionInfo) {
+				cc.AddBindingContext(types.OnKubernetesEvent, info)
+			})
+		case <-tick.C:
+			if mgr.Synced(ctx) && len(b.KubeEventsManager.Ch()) == 0 {
+				return cc.CombinedAndUpdated(b.HookCtrl)
 			}
 		case <-ctx.Done():
 			return GeneratedBindingContexts{}, fmt.Errorf("timeout occurred while waiting for binding contexts")
 		}
 	}
-	return cc.CombinedAndUpdated(b.HookCtrl)
 }
 
 func (b *BindingContextController) RunSchedule(ctx context.Context, crontab string) (GeneratedBindingContexts, error) {
