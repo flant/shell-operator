@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"runtime/trace"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -13,6 +14,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 
@@ -64,6 +66,9 @@ type resourceInformer struct {
 
 	// a flag to stop handle events after Stop()
 	stopped bool
+
+	// Number of watch events being handled right now, see synced.
+	inFlight atomic.Int32
 
 	logger *log.Logger
 }
@@ -280,6 +285,9 @@ func (ei *resourceInformer) OnDelete(obj interface{}) {
 // TODO add delay to merge Added and Modified events (node added and then labels applied — one hook run on Added+Modified is enough)
 // func (ei *resourceInformer) HandleKubeEvent(obj *unstructured.Unstructured, objectId string, filterResult string, newChecksum string, eventType WatchEventType) {
 func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemtypes.WatchEventType) {
+	ei.inFlight.Add(1)
+	defer ei.inFlight.Add(-1)
+
 	// check if stop
 	if ei.stopped {
 		log.Debug("received WATCH for stopped informer",
@@ -317,7 +325,20 @@ func (ei *resourceInformer) handleWatchEvent(object interface{}, eventType kemty
 			slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName),
 			slog.String(pkg.LogKeyEventType, string(eventType)),
 			log.Err(err))
-		return
+		if eventType != kemtypes.WatchEventDeleted {
+			return
+		}
+		// A deleted object must leave the cache even if the filter fails on its last state:
+		// reuse the cached filter result.
+		ei.cacheLock.RLock()
+		cached, ok := ei.cachedObjects[resourceId]
+		ei.cacheLock.RUnlock()
+		if !ok {
+			return
+		}
+		res := *cached
+		res.Object = obj
+		objFilterRes = &res
 	}
 
 	if !ei.Monitor.KeepFullObjectsInMemory {
@@ -470,6 +491,56 @@ func (ei *resourceInformer) start() {
 	}
 
 	log.Debug("informer is ready", slog.String(pkg.LogKeyDebugName, ei.Monitor.Metadata.DebugName))
+}
+
+// synced reports whether the informer has handled every watch event emitted so far:
+// the cache matches the objects in the cluster and no event is being handled.
+// It lists objects on each call and is meant for the fake cluster in tests.
+// The fake cluster ignores selectors in watches, so objects are listed without them.
+func (ei *resourceInformer) synced(ctx context.Context) bool {
+	if ei.ctx == nil || ei.ctx.Err() != nil {
+		// Not started or stopped: no events to wait for.
+		return true
+	}
+	if ei.inFlight.Load() > 0 {
+		return false
+	}
+	selector, err := labels.Parse(ei.ListOptions.LabelSelector)
+	if err != nil {
+		return true
+	}
+	list, err := ei.KubeClient.Dynamic().Resource(ei.GroupVersionResource).Namespace(ei.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return true
+	}
+
+	ei.cacheLock.RLock()
+	defer ei.cacheLock.RUnlock()
+	found := 0
+	for i := range list.Items {
+		obj := &list.Items[i]
+		cached, ok := ei.cachedObjects[resourceId(obj)]
+		if !ok && !selector.Matches(labels.Set(obj.GetLabels())) {
+			// Objects outside the label selector are cached only after their first watch event.
+			continue
+		}
+		if ok {
+			found++
+		}
+		res, err := applyFilter(ei.Monitor.CompiledJqFilter, ei.Monitor.JqFilter, ei.Monitor.FilterFunc, obj)
+		if err != nil {
+			// handleWatchEvent drops objects the filter fails on: never cached, or cached in an old state.
+			continue
+		}
+		if !ok || res.Metadata.Checksum != cached.Metadata.Checksum {
+			// Pending Added or Modified event.
+			return false
+		}
+	}
+
+	// A cached object missing from the cluster is a pending Deleted event.
+	// Check inFlight after the cache: the cache is updated before the event is sent.
+	return found == len(ei.cachedObjects) && ei.inFlight.Load() == 0
 }
 
 // wait blocks until the underlying shared informer for this FactoryIndex is stopped
