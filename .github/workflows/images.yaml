@@ -1,4 +1,4 @@
-name: Container images
+name: Base image architecture checks
 on:
   pull_request:
     types: [opened, synchronize]
@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   changes:
-    name: Check base images
+    name: Detect base image changes
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.check.outputs.build }}
@@ -26,7 +26,7 @@ jobs:
           AFTER_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
-            echo "Manual run: building all platforms."
+            echo "▶️ Manual run requested: building and checking all platforms."
             echo "build=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -37,10 +37,11 @@ jobs:
           git show "$AFTER_SHA:Dockerfile" | awk 'toupper($1) == "FROM" { $1=$1; print }' > "$RUNNER_TEMP/base-images-after"
 
           if cmp -s "$RUNNER_TEMP/base-images-before" "$RUNNER_TEMP/base-images-after"; then
-            echo "Base images unchanged: skipping container builds."
+            echo "⏭️ Base images unchanged. Skipping builds and architecture checks."
             echo "build=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Base images changed: building all platforms."
+            echo "🔄 Base image changes detected."
+            echo "🚀 Full build and architecture checks requested for all platforms."
             echo "build=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -66,6 +67,7 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
+          echo "🏗️ Building $PLATFORM image with architecture verification enabled."
           docker buildx build \
             --platform "$PLATFORM" \
             --build-arg appVersion=ci \

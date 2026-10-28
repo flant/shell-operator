@@ -49,6 +49,8 @@ case "$platform" in
         ;;
 esac
 
+printf '🔍 %s: starting architecture consistency checks for the base image and built binaries.\n' "$platform"
+
 actual_arch=$(apk --print-arch)
 if [ "$actual_arch" != "$apk_arch" ]; then
     report_architecture_error "Alpine base image" \
