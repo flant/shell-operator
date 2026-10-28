@@ -1,3 +1,6 @@
+# - Detect base-image changes in Dockerfile FROM instructions.
+# - Build amd64, arm64 and arm/v7 only when bases change or on manual runs.
+# - Check base-image and binary architectures and run smoke tests without publishing images.
 name: Base image architecture checks
 on:
   pull_request:
