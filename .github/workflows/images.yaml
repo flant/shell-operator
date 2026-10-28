@@ -1,0 +1,34 @@
+name: Container images
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64, linux/arm/v7]
+    steps:
+      - name: Check out shell-operator code
+        uses: actions/checkout@v7
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4.2.0
+        with:
+          platforms: arm64,arm
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build and verify image
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker buildx build \
+            --platform "$PLATFORM" \
+            --build-arg appVersion=ci \
+            --output type=cacheonly \
+            .

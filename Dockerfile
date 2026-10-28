@@ -1,8 +1,4 @@
-# Prebuilt jq from deckhouse base images (v1.0.40).
-FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:4b36dcf53c35b50e0afbc445232713aff15f788a61b832cd720bf9e88fc9fba8 AS libjq
-
-# Go builder stage (builder/golang-alpine, Go 1.26.4 on alpine 3.22).
-FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:193e8ed6cd7fc19015ab615ccf92d0fe02471e66e3e5abf560b3a87fb05bdb62 AS builder
+FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.26.4-alpine3.23@sha256:18b460dd17542c2ba43299a633cf6ebfc1115101509531471d7cfce1019af083 AS builder
 
 ARG appVersion=latest
 
@@ -32,8 +28,7 @@ RUN GOOS=linux \
     -o shell-operator \
     ./cmd/shell-operator
 
-# Final runtime image (builder/alpine 3.22 from deckhouse base images v1.0.40).
-FROM --platform=${TARGETPLATFORM:-linux/amd64} registry.deckhouse.io/container-factory@sha256:8fa8cf713bf8cfc9038901e5b2fbc97d0403794d834dc4a619e9e81312a6feef
+FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.23@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
 
 ARG TARGETPLATFORM
 ARG kubectlVersion=v1.35.8
@@ -44,6 +39,7 @@ RUN apk --no-cache add \
     bash \
     sed \
     tini \
+    jq \
     curl
 
 # Determine kubectl architecture and download
@@ -58,8 +54,13 @@ RUN mkdir /hooks
 # Copy necessary files
 ADD frameworks/shell /frameworks/shell
 ADD shell_lib.sh /
-COPY --from=libjq /usr/bin/jq /usr/bin/jq
 COPY --from=builder /app/shell-operator /
+
+# Reject incorrect architectures before the image can be published.
+RUN --mount=type=bind,source=scripts/ci/verify-image.sh,target=/tmp/verify-image.sh \
+    apk add --no-cache --virtual .image-verification file && \
+    sh /tmp/verify-image.sh "${TARGETPLATFORM:-linux/amd64}" && \
+    apk del .image-verification
 
 # Set working directory
 WORKDIR /
