@@ -37,7 +37,7 @@ jobs:
           git show "$AFTER_SHA:Dockerfile" | awk 'toupper($1) == "FROM" { $1=$1; print }' > "$RUNNER_TEMP/base-images-after"
 
           if cmp -s "$RUNNER_TEMP/base-images-before" "$RUNNER_TEMP/base-images-after"; then
-            echo "⏭️ Base images unchanged. Skipping builds and architecture checks."
+            echo "⏭️ Base images unchanged. Skipping architecture checks."
             echo "build=false" >> "$GITHUB_OUTPUT"
           else
             echo "🔄 Base image changes detected."
