@@ -2,12 +2,51 @@ name: Container images
 on:
   pull_request:
     types: [opened, synchronize]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Check base images
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - name: Check out shell-operator code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+      - name: Decide whether to build images
+        id: check
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before || github.event.pull_request.base.sha }}
+          AFTER_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            echo "Manual run: building all platforms."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Compare this push so unrelated commits do not repeat the full build.
+          git fetch --no-tags --depth=1 origin "$BEFORE_SHA" "$AFTER_SHA"
+          git show "$BEFORE_SHA:Dockerfile" | awk 'toupper($1) == "FROM" { $1=$1; print }' > "$RUNNER_TEMP/base-images-before"
+          git show "$AFTER_SHA:Dockerfile" | awk 'toupper($1) == "FROM" { $1=$1; print }' > "$RUNNER_TEMP/base-images-after"
+
+          if cmp -s "$RUNNER_TEMP/base-images-before" "$RUNNER_TEMP/base-images-after"; then
+            echo "Base images unchanged: skipping container builds."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Base images changed: building all platforms."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     name: Build and verify (${{ matrix.platform }})
     runs-on: ubuntu-latest
     strategy:
