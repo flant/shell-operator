@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v6
         with:
-          python-version: 3.8
+          python-version: "3.12"
       - name: Check out addon-operator code
         uses: actions/checkout@v7
       - name: Run codespell
