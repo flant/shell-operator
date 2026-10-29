@@ -2,6 +2,7 @@
 docs
 examples
 scripts
+!scripts/ci/verify-image.sh
 test
 libjq
 
