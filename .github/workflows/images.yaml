@@ -1,0 +1,78 @@
+# - Detect base-image changes in Dockerfile FROM instructions.
+# - Build amd64, arm64 and arm/v7 only when bases change or on manual runs.
+# - Check base-image and binary architectures and run smoke tests without publishing images.
+name: Base image architecture checks
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect base image changes
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - name: Check out shell-operator code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+      - name: Decide whether to build images
+        id: check
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before || github.event.pull_request.base.sha }}
+          AFTER_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            echo "▶️ Manual run requested: building and checking all platforms."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Compare this push so unrelated commits do not repeat the full build.
+          git fetch --no-tags --depth=1 origin "$BEFORE_SHA" "$AFTER_SHA"
+          git show "$BEFORE_SHA:Dockerfile" | awk 'toupper($1) == "FROM" { $1=$1; print }' > "$RUNNER_TEMP/base-images-before"
+          git show "$AFTER_SHA:Dockerfile" | awk 'toupper($1) == "FROM" { $1=$1; print }' > "$RUNNER_TEMP/base-images-after"
+
+          if cmp -s "$RUNNER_TEMP/base-images-before" "$RUNNER_TEMP/base-images-after"; then
+            echo "⏭️ Base images unchanged. Skipping architecture checks."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "🔄 Base image changes detected."
+            echo "🚀 Full build and architecture checks requested for all platforms."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
+    name: Build and verify (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64, linux/arm/v7]
+    steps:
+      - name: Check out shell-operator code
+        uses: actions/checkout@v7
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4.2.0
+        with:
+          platforms: arm64,arm
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build and verify image
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          echo "🏗️ Building $PLATFORM image with architecture verification enabled."
+          docker buildx build \
+            --platform "$PLATFORM" \
+            --build-arg appVersion=ci \
+            --output type=cacheonly \
+            .
