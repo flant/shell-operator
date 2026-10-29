@@ -6,7 +6,7 @@ require (
 	github.com/deckhouse/deckhouse/pkg/log v0.2.1
 	github.com/deckhouse/deckhouse/pkg/metrics-storage v0.3.0
 	github.com/flant/kube-client v1.10.0
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.4.0
 	github.com/go-openapi/spec v0.22.1
 	github.com/go-openapi/strfmt v0.26.2
 	github.com/go-openapi/swag v0.26.0 // indirect
