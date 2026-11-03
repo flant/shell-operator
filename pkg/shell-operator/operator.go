@@ -26,6 +26,7 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/otel"
+	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
@@ -100,6 +101,10 @@ type ShellOperator struct {
 	// hookRunner runs hooks for events; nil starts each hook as a process.
 	hookRunner executor.Runner
 
+	// objectTransform is applied to every Kubernetes object before it is
+	// cached and filtered; nil keeps objects as is.
+	objectTransform cache.TransformFunc
+
 	// MetricNames is a per-instance snapshot of resolved metric names.
 	// Library callers may consult it to avoid relying on the package-level
 	// metrics globals. NewShellOperator populates it from cfg's prefix; the
@@ -154,6 +159,16 @@ func WithHookRunner(runner executor.Runner) Option {
 func WithHookMetricStorage(ms metricsstorage.Storage) Option {
 	return func(operator *ShellOperator) {
 		operator.HookMetricStorage = ms
+	}
+}
+
+// WithObjectTransform sets a function applied to every Kubernetes object before
+// the informers cache it and the hooks filter it. Use it to drop fields no hook
+// reads, e.g. metadata.managedFields, to save memory. The function must be
+// idempotent. By default objects are kept as is.
+func WithObjectTransform(fn cache.TransformFunc) Option {
+	return func(operator *ShellOperator) {
+		operator.objectTransform = fn
 	}
 }
 
