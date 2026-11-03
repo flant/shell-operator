@@ -282,8 +282,10 @@ func (op *ShellOperator) SetupEventManagers() {
 	op.ScheduleManager = schedulemanager.NewScheduleManager(op.ctx, op.logger.Named("schedule-manager"))
 
 	// Initialize kubernetes events manager.
-	op.KubeEventsManager = kubeeventsmanager.NewKubeEventsManager(op.ctx, op.KubeClient, op.logger.Named("kube-events-manager"))
-	op.KubeEventsManager.WithMetricStorage(op.MetricStorage)
+	kubeEventsManager := kubeeventsmanager.NewKubeEventsManager(op.ctx, op.KubeClient, op.logger.Named("kube-events-manager"))
+	kubeEventsManager.WithMetricStorage(op.MetricStorage)
+	kubeEventsManager.WithObjectTransform(op.objectTransform)
+	op.KubeEventsManager = kubeEventsManager
 
 	// Initialize events handler that emit tasks to run hooks
 	cfg := &managerEventsHandlerConfig{
