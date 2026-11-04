@@ -1,0 +1,132 @@
+suite: deployment
+templates:
+  - deployment.yaml
+  - configmap.yaml
+tests:
+  - it: runs a single non-root replica with a read-only root filesystem
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+  - it: uses the appVersion as the default tag
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/flant/shell-operator:v1.21.4
+  - it: pins the image by digest when set
+    template: deployment.yaml
+    set:
+      image.digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "@sha256:0{64}$"
+  - it: does not mount a hooks volume when hooks come from the image
+    template: deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: hooks
+          any: true
+  - it: mounts inline hooks and rolls the pod when they change
+    template: deployment.yaml
+    set:
+      hooks.files:
+        hook.sh: "#!/bin/sh\necho hi"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: hooks
+            configMap:
+              name: RELEASE-NAME-shell-operator-hooks
+              defaultMode: 365
+      - exists:
+          path: spec.template.metadata.annotations["checksum/hooks"]
+  - it: renders inline hooks into a ConfigMap
+    template: configmap.yaml
+    set:
+      hooks.files:
+        hook.sh: "#!/bin/sh\necho hi"
+    asserts:
+      - equal:
+          path: data["hook.sh"]
+          value: "#!/bin/sh\necho hi"
+  - it: mounts an existing ConfigMap
+    template: deployment.yaml
+    set:
+      hooks.existingConfigMap: my-hooks
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: hooks
+            configMap:
+              name: my-hooks
+              defaultMode: 365
+  - it: rejects inline hooks together with an existing ConfigMap
+    template: deployment.yaml
+    set:
+      hooks.existingConfigMap: my-hooks
+      hooks.files:
+        hook.sh: echo
+    asserts:
+      - failedTemplate:
+          errorMessage: hooks.files and hooks.existingConfigMap are mutually exclusive
+  - it: wires the validating webhook
+    template: deployment.yaml
+    set:
+      webhooks.validating.enabled: true
+      webhooks.validating.certSecretName: tls
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VALIDATING_WEBHOOK_SERVICE_NAME
+            value: RELEASE-NAME-shell-operator-validating
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: validating-certs
+            mountPath: /validating-certs
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: validating-certs
+            secret:
+              secretName: tls
+  - it: requires a certificate Secret for the validating webhook
+    template: deployment.yaml
+    set:
+      webhooks.validating.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: webhooks.validating.enabled requires webhooks.validating.certSecretName
+  - it: requires a certificate Secret for the conversion webhook
+    template: deployment.yaml
+    set:
+      webhooks.conversion.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: webhooks.conversion.enabled requires webhooks.conversion.certSecretName

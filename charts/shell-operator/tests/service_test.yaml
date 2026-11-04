@@ -1,0 +1,47 @@
+suite: services
+templates:
+  - service.yaml
+  - servicemonitor.yaml
+tests:
+  - it: exposes only the metrics port by default
+    template: service.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 9115
+  - it: adds a Service per enabled webhook
+    template: service.yaml
+    set:
+      webhooks.validating.enabled: true
+      webhooks.validating.certSecretName: tls
+      webhooks.conversion.enabled: true
+      webhooks.conversion.certSecretName: tls
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-shell-operator-validating
+        documentIndex: 1
+      - equal:
+          path: spec.ports[0].targetPort
+          value: conversion
+        documentIndex: 2
+  - it: scrapes operator and hook metrics
+    template: servicemonitor.yaml
+    set:
+      metrics.serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[1].path
+          value: /metrics/hooks
+  - it: needs the metrics Service for a ServiceMonitor
+    template: servicemonitor.yaml
+    set:
+      metrics.service.enabled: false
+      metrics.serviceMonitor.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: metrics.serviceMonitor.enabled requires metrics.service.enabled
