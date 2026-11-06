@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/flant/kube-client/fake"
+	kemtypes "github.com/flant/shell-operator/pkg/kube_events_manager/types"
 	"github.com/flant/shell-operator/pkg/metric"
 	"github.com/flant/shell-operator/pkg/metrics"
 )
@@ -155,4 +156,63 @@ func TestFactoryStore_RecreatesDeadFactory(t *testing.T) {
 		"gvr":       index.GVR.String(),
 		"namespace": index.Namespace,
 	}))
+}
+
+// TestFactoryStore_TransformsObjects checks that the store transform reaches both
+// the initial list and the watch events, so hooks never see the dropped fields.
+func TestFactoryStore_TransformsObjects(t *testing.T) {
+	g := NewWithT(t)
+
+	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
+	createNsWithLabels(fc, "default", map[string]string{})
+	createCM(fc, "default", testCM("listed"))
+
+	store := NewFactoryStore(context.Background())
+	store.WithTransform(func(obj interface{}) (interface{}, error) {
+		if u, ok := obj.(*unstructured.Unstructured); ok {
+			unstructured.RemoveNestedField(u.Object, "data")
+		}
+		return obj, nil
+	})
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(string, float64, map[string]string, []float64) {})
+	metricStorage.GaugeSetMock.Set(func(string, float64, map[string]string) {})
+
+	monitorCfg := &MonitorConfig{
+		ApiVersion: "v1",
+		Kind:       "ConfigMap",
+		EventTypes: []kemtypes.WatchEventType{kemtypes.WatchEventAdded},
+		NamespaceSelector: &kemtypes.NamespaceSelector{
+			NameSelector: &kemtypes.NameSelector{MatchNames: []string{"default"}},
+		},
+		KeepFullObjectsInMemory: true,
+	}
+
+	var mu sync.Mutex
+	var fromEvents []kemtypes.ObjectAndFilterResult
+	mon := NewMonitor(context.Background(), fc.Client, metricStorage, store, monitorCfg, func(ev kemtypes.KubeEvent) {
+		mu.Lock()
+		fromEvents = append(fromEvents, ev.Objects...)
+		mu.Unlock()
+	}, log.NewNop())
+
+	// CreateInformers lists existing objects itself, before the informers start.
+	g.Expect(mon.CreateInformers()).To(Succeed())
+	snapshot := mon.Snapshot()
+	g.Expect(snapshot).To(HaveLen(1))
+	g.Expect(snapshot[0].Object.Object).NotTo(HaveKey("data"), "initial list must be transformed")
+
+	mon.Start(context.TODO())
+	mon.EnableKubeEventCb()
+	createCM(fc, "default", testCM("watched"))
+
+	g.Eventually(func() []kemtypes.ObjectAndFilterResult {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]kemtypes.ObjectAndFilterResult(nil), fromEvents...)
+	}, "5s", "10ms").Should(ContainElement(Satisfy(func(o kemtypes.ObjectAndFilterResult) bool {
+		_, hasData := o.Object.Object["data"]
+		return o.Object.GetName() == "watched" && !hasData
+	})), "watch events must be transformed")
 }

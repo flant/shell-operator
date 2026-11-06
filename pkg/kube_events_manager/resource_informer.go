@@ -227,16 +227,18 @@ func (ei *resourceInformer) loadExistedObjects() error {
 	filteredObjects := make(map[string]*kemtypes.ObjectAndFilterResult)
 
 	for _, item := range objList.Items {
-		// copy loop var to avoid duplication of pointer in filteredObjects
-		obj := item
+		// item is a per-iteration variable, so each pointer in filteredObjects is unique
+		obj, err := ei.factoryStore.transformObject(&item)
+		if err != nil {
+			return fmt.Errorf("transform '%s/%s': %w", ei.Monitor.Metadata.DebugName, item.GetName(), err)
+		}
 
 		var objFilterRes *kemtypes.ObjectAndFilterResult
-		var err error
 		func() {
 			defer measure.Duration(func(d time.Duration) {
 				ei.metricStorage.HistogramObserve(metrics.KubeJqFilterDurationSeconds, d.Seconds(), ei.Monitor.Metadata.MetricLabels, nil)
 			})()
-			objFilterRes, err = applyFilter(ei.Monitor.CompiledJqFilter, ei.Monitor.JqFilter, ei.Monitor.FilterFunc, &obj)
+			objFilterRes, err = applyFilter(ei.Monitor.CompiledJqFilter, ei.Monitor.JqFilter, ei.Monitor.FilterFunc, obj)
 		}()
 
 		if err != nil {
