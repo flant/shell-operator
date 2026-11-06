@@ -1,0 +1,57 @@
+{{- if .Values.metrics.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "shell-operator.fullname" . }}
+  labels:
+    {{- include "shell-operator.labels" . | nindent 4 }}
+  {{- with .Values.metrics.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "shell-operator.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      port: {{ .Values.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+{{- end }}
+{{- if .Values.webhooks.validating.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "shell-operator.validatingServiceName" . }}
+  labels:
+    {{- include "shell-operator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "shell-operator.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: https
+      port: 443
+      targetPort: validating
+      protocol: TCP
+{{- end }}
+{{- if .Values.webhooks.conversion.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "shell-operator.conversionServiceName" . }}
+  labels:
+    {{- include "shell-operator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "shell-operator.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: https
+      port: 443
+      targetPort: conversion
+      protocol: TCP
+{{- end }}

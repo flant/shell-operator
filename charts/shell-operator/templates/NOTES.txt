@@ -1,0 +1,15 @@
+shell-operator is running in namespace {{ .Release.Namespace }}.
+
+Follow the hook runs:
+
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "shell-operator.fullname" . }} -f
+{{- if not (or .Values.hooks.files .Values.hooks.existingConfigMap) }}
+
+No hooks were mounted. Either set hooks.files / hooks.existingConfigMap or use an
+image that already has hooks under {{ .Values.hooks.mountPath }}.
+{{- end }}
+{{- if and .Values.rbac.create (not .Values.rbac.rules) }}
+
+rbac.rules is empty, so hooks cannot read anything from the API server yet. Add
+get/list/watch rules for the kinds your hooks subscribe to.
+{{- end }}

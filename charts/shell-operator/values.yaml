@@ -1,0 +1,160 @@
+# -- Overrides the chart name used in resource names and labels.
+nameOverride: ""
+# -- Overrides the fully qualified resource name.
+fullnameOverride: ""
+
+image:
+  # -- Image repository. Use your own image when hooks are baked into it.
+  repository: ghcr.io/flant/shell-operator
+  # -- Image tag. Defaults to the chart appVersion.
+  tag: ""
+  # -- Image digest. Takes precedence over the tag when set.
+  digest: ""
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+
+# -- Secrets used to pull the image.
+imagePullSecrets: []
+
+# -- Extra labels added to every resource.
+commonLabels: {}
+# -- Extra annotations added to the pod.
+podAnnotations: {}
+# -- Extra labels added to the pod.
+podLabels: {}
+
+serviceAccount:
+  # -- Create a ServiceAccount.
+  create: true
+  # -- ServiceAccount name. Generated when empty.
+  name: ""
+  # -- ServiceAccount annotations.
+  annotations: {}
+
+rbac:
+  # -- Create the RBAC objects that bind `rbac.rules` to the ServiceAccount.
+  create: true
+  # -- Use a ClusterRole and ClusterRoleBinding. Set to false to grant the rules only in the release namespace with a Role and RoleBinding.
+  clusterWide: true
+  # -- Rules the hooks need, for example get/list/watch on the kinds they subscribe to. The chart adds the webhook rules on its own.
+  rules: []
+  # - apiGroups: [""]
+  #   resources: ["namespaces"]
+  #   verbs: ["get", "list", "watch"]
+
+hooks:
+  # -- Hook files rendered into a ConfigMap and mounted at `hooks.mountPath`. Keys are file names, values are the file contents.
+  files: {}
+  # -- Mount an existing ConfigMap with hook files instead of `hooks.files`.
+  existingConfigMap: ""
+  # -- Directory shell-operator loads hooks from. Leave as is when hooks are baked into the image.
+  mountPath: /hooks
+  # -- File mode of the mounted hook files. Hooks must be executable.
+  defaultMode: 0555
+
+# -- Log level: debug, info or error.
+logLevel: info
+# -- Log format: json, text or color.
+logType: json
+
+# -- Extra environment variables, see https://flant.github.io/shell-operator/RUNNING.html for the full list.
+env: []
+# -- Environment from ConfigMaps or Secrets.
+envFrom: []
+
+# -- Pod level security context.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container level security context.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# -- CPU and memory for the operator and the hooks it runs.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+# -- Size limit of the writable emptyDir mounted at /tmp. shell-operator keeps binding contexts there.
+tmpVolumeSizeLimit: 256Mi
+
+metrics:
+  # -- Port that serves /metrics and /metrics/hooks.
+  port: 9115
+  service:
+    # -- Create a Service for the metrics port.
+    enabled: true
+    # -- Service annotations.
+    annotations: {}
+  serviceMonitor:
+    # -- Create a Prometheus Operator ServiceMonitor.
+    enabled: false
+    # -- Scrape interval.
+    interval: 30s
+    # -- Scrape timeout.
+    scrapeTimeout: 10s
+    # -- Extra labels, for example the one your Prometheus selects on.
+    labels: {}
+
+probes:
+  liveness:
+    # -- Enable the liveness probe on the metrics port.
+    enabled: true
+    # -- Seconds between checks.
+    periodSeconds: 10
+    # -- Failures before the container is restarted.
+    failureThreshold: 3
+  readiness:
+    # -- Enable the readiness probe on the metrics port.
+    enabled: true
+    # -- Seconds between checks.
+    periodSeconds: 10
+    # -- Failures before the pod is marked unready.
+    failureThreshold: 3
+
+webhooks:
+  validating:
+    # -- Serve validating webhooks declared by hooks. shell-operator creates the ValidatingWebhookConfiguration itself.
+    enabled: false
+    # -- Secret with tls.crt, tls.key and ca.crt, for example issued by cert-manager.
+    certSecretName: ""
+    # -- Name of the ValidatingWebhookConfiguration. Defaults to the release fullname.
+    configurationName: ""
+    # -- Default failure policy: Fail or Ignore.
+    failurePolicy: Fail
+    # -- Container port of the HTTPS server.
+    port: 9680
+  conversion:
+    # -- Serve CRD conversion webhooks declared by hooks. shell-operator patches the CRDs itself.
+    enabled: false
+    # -- Secret with tls.crt, tls.key and ca.crt.
+    certSecretName: ""
+    # -- Container port of the HTTPS server.
+    port: 9681
+
+# -- Grace period for running hooks to finish on shutdown.
+terminationGracePeriodSeconds: 30
+# -- Priority class of the pod.
+priorityClassName: ""
+# -- Node selector.
+nodeSelector: {}
+# -- Tolerations.
+tolerations: []
+# -- Affinity rules.
+affinity: {}
+# -- Extra volumes.
+extraVolumes: []
+# -- Extra volume mounts.
+extraVolumeMounts: []

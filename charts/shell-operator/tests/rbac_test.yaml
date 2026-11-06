@@ -1,0 +1,80 @@
+suite: rbac
+templates:
+  - rbac.yaml
+tests:
+  - it: renders nothing without rules
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: binds the hook rules cluster wide by default
+    set:
+      rbac.rules:
+        - apiGroups: [""]
+          resources: [namespaces]
+          verbs: [get, list, watch]
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ClusterRole
+        documentIndex: 0
+      - equal:
+          path: rules[0].resources
+          value: [namespaces]
+        documentIndex: 0
+      - isKind:
+          of: ClusterRoleBinding
+        documentIndex: 1
+      - equal:
+          path: subjects[0].namespace
+          value: NAMESPACE
+        documentIndex: 1
+  - it: uses a Role in the release namespace when not cluster wide
+    set:
+      rbac.clusterWide: false
+      rbac.rules:
+        - apiGroups: [""]
+          resources: [configmaps]
+          verbs: [get, list, watch]
+    asserts:
+      - isKind:
+          of: Role
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+        documentIndex: 0
+      - isKind:
+          of: RoleBinding
+        documentIndex: 1
+  - it: adds the rules the webhooks need
+    set:
+      webhooks.validating.enabled: true
+      webhooks.validating.certSecretName: tls
+      webhooks.conversion.enabled: true
+      webhooks.conversion.certSecretName: tls
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: [admissionregistration.k8s.io]
+            resources: [validatingwebhookconfigurations]
+            verbs: [create, list, update]
+        documentIndex: 0
+      - contains:
+          path: rules
+          content:
+            apiGroups: [apiextensions.k8s.io]
+            resources: [customresourcedefinitions]
+            verbs: [get, list, update]
+        documentIndex: 0
+  - it: skips RBAC when disabled
+    set:
+      rbac.create: false
+      rbac.rules:
+        - apiGroups: [""]
+          resources: [namespaces]
+          verbs: [get]
+    asserts:
+      - hasDocuments:
+          count: 0
