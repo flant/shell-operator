@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -196,6 +197,8 @@ func (e *Executor) RunAndLogLines(ctx context.Context, logLabels map[string]stri
 	defer unregisterPID(e.cmd.Process.Pid)
 
 	err := e.cmd.Wait()
+	plo.flush()
+	ple.flush()
 	if err != nil {
 		if len(stdErr.Bytes()) > 0 {
 			return nil, &StderrError{Message: stdErr.String()}
@@ -229,93 +232,105 @@ type proxyLogger struct {
 	proxyJsonLogKey  string
 	logger           *log.Logger
 	buf              []byte
+	jsonBuf          []byte
 }
 
 func (pl *proxyLogger) Write(p []byte) (int, error) {
-	if !pl.logProxyHookJSON {
-		pl.writerScanner(p)
-
-		return len(p), nil
-	}
-
-	// join all parts of json
 	pl.buf = append(pl.buf, p...)
-
-	var line interface{}
-	err := json.Unmarshal(pl.buf, &line)
-	if err != nil {
-		if err.Error() == "unexpected end of JSON input" {
-			return len(p), nil
+	for len(pl.buf) > 0 {
+		end := bytes.IndexByte(pl.buf, '\n') + 1
+		// Plain output is bounded even when a hook never writes a newline.
+		if (end == 0 || end > bufio.MaxScanTokenSize) && len(pl.buf) >= bufio.MaxScanTokenSize && !pl.canBufferJSON() {
+			end = bufio.MaxScanTokenSize
 		}
-
-		pl.logger.Debug("output is not json", log.Err(err))
-		pl.writerScanner(p)
-
-		return len(p), nil
+		if end == 0 {
+			break
+		}
+		pl.writeLine(pl.buf[:end])
+		pl.buf = pl.buf[end:]
 	}
-
-	logMap, ok := line.(map[string]interface{})
-	defer func() {
-		pl.buf = pl.buf[:0]
-	}()
-
-	if !ok {
-		pl.logger.Debug("json log line not map[string]interface{}", slog.Any(pkg.LogKeyLine, line))
-
-		// fall back to using the logger
-		pl.logger.Info(string(p))
-
-		return len(p), nil
-	}
-
-	pl.mergeAndLogInputLog(pl.ctx, logMap, "hook")
 
 	return len(p), nil
 }
 
-func (pl *proxyLogger) writerScanner(p []byte) {
-	scanner := bufio.NewScanner(bytes.NewReader(p))
-	scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize)
-
-	var jsonBuf []string
-	// Split large entries into chunks
-	chunkSize := bufio.MaxScanTokenSize // 64KB
-	splitFunc := func(data []byte, atEOF bool) (int, []byte, error) {
-		if len(data) >= chunkSize {
-			return chunkSize, data[:chunkSize], nil
-		}
-		return bufio.ScanLines(data, atEOF)
+func (pl *proxyLogger) canBufferJSON() bool {
+	if !pl.logProxyHookJSON {
+		return false
 	}
-	scanner.Split(splitFunc)
-	// Scan the input and write it to the logger using the specified print function
-	for scanner.Scan() {
-		// Prevent empty logging
-		line := strings.TrimSpace(scanner.Text())
+	if len(pl.jsonBuf) > 0 {
+		return true
+	}
+	line := bytes.TrimSpace(pl.buf)
+	return len(line) > 0 && (line[0] == '{' || line[0] == '[')
+}
+
+func (pl *proxyLogger) flush() {
+	if len(pl.buf) > 0 {
+		pl.writeLine(pl.buf)
+		pl.buf = nil
+	}
+	if len(pl.jsonBuf) > 0 {
+		pl.logPlainLines(pl.jsonBuf)
+		pl.jsonBuf = nil
+	}
+}
+
+func (pl *proxyLogger) writeLine(line []byte) {
+	trimmed := bytes.TrimSpace(line)
+	if len(trimmed) == 0 {
+		return
+	}
+
+	if len(pl.jsonBuf) > 0 || trimmed[0] == '{' || pl.logProxyHookJSON && trimmed[0] == '[' {
+		pl.jsonBuf = append(pl.jsonBuf, line...)
+		var value interface{}
+		if err := json.Unmarshal(pl.jsonBuf, &value); err != nil {
+			var raw stdjson.RawMessage
+			decodeErr := stdjson.NewDecoder(bytes.NewReader(pl.jsonBuf)).Decode(&raw)
+			if errors.Is(decodeErr, io.ErrUnexpectedEOF) &&
+				(pl.logProxyHookJSON || len(pl.jsonBuf) < bufio.MaxScanTokenSize) {
+				return
+			}
+			pl.logger.Debug("output is not json", log.Err(err))
+			pl.logPlainLines(pl.jsonBuf)
+		} else {
+			pl.logJSON(value, pl.jsonBuf)
+		}
+		pl.jsonBuf = nil
+		return
+	}
+
+	if pl.logProxyHookJSON {
+		var value interface{}
+		if err := json.Unmarshal(line, &value); err == nil {
+			pl.logJSON(value, line)
+			return
+		}
+	} else if err := pl.tryLogJSON(string(trimmed)); err == nil {
+		return
+	}
+	pl.logPlainLines(line)
+}
+
+func (pl *proxyLogger) logJSON(value interface{}, raw []byte) {
+	if logMap, ok := value.(map[string]interface{}); ok {
+		pl.mergeAndLogInputLog(pl.ctx, logMap, "hook")
+		return
+	}
+	pl.logger.Debug("json log line not map[string]interface{}", slog.Any(pkg.LogKeyLine, value))
+	pl.logger.Info(string(raw))
+}
+
+func (pl *proxyLogger) logPlainLines(data []byte) {
+	for _, part := range bytes.Split(data, []byte{'\n'}) {
+		line := strings.TrimSpace(string(part))
 		if line == "" {
 			continue
 		}
-
-		if len(jsonBuf) > 0 || strings.HasPrefix(line, "{") {
-			jsonBuf = append(jsonBuf, line)
-			joined := strings.Join(jsonBuf, "\n")
-			if err := pl.tryLogJSON(joined); err == nil {
-				jsonBuf = nil
-			}
-			continue
-		}
-
 		if len(line) > 10000 {
 			line = fmt.Sprintf("%s:truncated", line[:10000])
 		}
-
-		if err := pl.tryLogJSON(line); err == nil {
-			continue
-		}
 		pl.logger.Info(line)
-	}
-	// If there was an error while scanning the input, log an error
-	if err := scanner.Err(); err != nil {
-		pl.logger.Error("reading from scanner", log.Err(err))
 	}
 }
 

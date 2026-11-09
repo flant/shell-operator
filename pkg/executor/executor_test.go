@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -241,6 +242,179 @@ plain text
 
 		buf.Reset()
 	})
+}
+
+func TestProxyLoggerWriteSplitJSON(t *testing.T) {
+	input := "{\"before\":true}\nplain text\n{\n\"a\":\"b\",\n\"c\":\"d\"\n}\n{\"after\":true}\n"
+	for split := 1; split < len(input); split++ {
+		t.Run(fmt.Sprintf("split_%d", split), func(t *testing.T) {
+			var output bytes.Buffer
+			logger := log.NewLogger()
+			logger.SetLevel(log.LevelInfo)
+			logger.SetOutput(&output)
+			proxy := &proxyLogger{
+				ctx:              context.Background(),
+				logProxyHookJSON: true,
+				proxyJsonLogKey:  "proxyJsonLog",
+				logger:           logger,
+			}
+			for _, chunk := range []string{input[:split], input[split:]} {
+				n, err := proxy.Write([]byte(chunk))
+				require.NoError(t, err)
+				require.Equal(t, len(chunk), n)
+			}
+
+			lines := strings.Split(strings.TrimSpace(output.String()), "\n")
+			require.Len(t, lines, 4)
+			expected := []map[string]interface{}{
+				{"msg": "hook result", "hook_before": true, "proxyJsonLog": true},
+				{"msg": "plain text"},
+				{"msg": "hook result", "hook_a": "b", "hook_c": "d", "proxyJsonLog": true},
+				{"msg": "hook result", "hook_after": true, "proxyJsonLog": true},
+			}
+			for i, line := range lines {
+				var entry map[string]interface{}
+				require.NoError(t, json.Unmarshal([]byte(line), &entry))
+				delete(entry, "level")
+				delete(entry, "time")
+				assert.Equal(t, expected[i], entry)
+			}
+		})
+	}
+}
+
+func TestProxyLoggerFlush(t *testing.T) {
+	tests := []struct {
+		name     string
+		chunks   []string
+		expected []map[string]interface{}
+	}{
+		{
+			name:     "partial text",
+			chunks:   []string{"plain ", "text"},
+			expected: []map[string]interface{}{{"msg": "plain text"}},
+		},
+		{
+			name:     "json without newline",
+			chunks:   []string{"{\"a\":", "\"b\"}"},
+			expected: []map[string]interface{}{{"msg": "hook result", "hook_a": "b", "proxyJsonLog": true}},
+		},
+		{
+			name:     "blank lines in multiline json",
+			chunks:   []string{"{\n", strings.Repeat("\n", bufio.MaxScanTokenSize), "\"a\":\"b\"\n}\n"},
+			expected: []map[string]interface{}{{"msg": "hook result", "hook_a": "b", "proxyJsonLog": true}},
+		},
+		{
+			name:     "incomplete json at eof",
+			chunks:   []string{"{\n", "\"a\":"},
+			expected: []map[string]interface{}{{"msg": "{"}, {"msg": "\"a\":"}},
+		},
+		{
+			name:   "malformed json followed by valid json",
+			chunks: []string{"{\"bad\":nope}\n{\"good\":true}\n"},
+			expected: []map[string]interface{}{
+				{"msg": "{\"bad\":nope}"},
+				{"msg": "hook result", "hook_good": true, "proxyJsonLog": true},
+			},
+		},
+		{
+			name:   "invalid final character followed by valid json",
+			chunks: []string{"{\"bad\":true,", "}\n{\"good\":true}\n"},
+			expected: []map[string]interface{}{
+				{"msg": "{\"bad\":true,}"},
+				{"msg": "hook result", "hook_good": true, "proxyJsonLog": true},
+			},
+		},
+		{
+			name:   "newline inside json string followed by valid json",
+			chunks: []string{"{\"bad\":\"unterminated\n", "{\"good\":true}\n"},
+			expected: []map[string]interface{}{
+				{"msg": "{\"bad\":\"unterminated"},
+				{"msg": "hook result", "hook_good": true, "proxyJsonLog": true},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			logger := log.NewLogger()
+			logger.SetLevel(log.LevelInfo)
+			logger.SetOutput(&output)
+			proxy := &proxyLogger{
+				ctx:              context.Background(),
+				logProxyHookJSON: true,
+				proxyJsonLogKey:  "proxyJsonLog",
+				logger:           logger,
+			}
+			for _, chunk := range tt.chunks {
+				n, err := proxy.Write([]byte(chunk))
+				require.NoError(t, err)
+				require.Equal(t, len(chunk), n)
+			}
+			proxy.flush()
+			lines := strings.Split(strings.TrimSpace(output.String()), "\n")
+			require.Len(t, lines, len(tt.expected))
+			for i, line := range lines {
+				var entry map[string]interface{}
+				require.NoError(t, json.Unmarshal([]byte(line), &entry))
+				delete(entry, "level")
+				delete(entry, "time")
+				assert.Equal(t, tt.expected[i], entry)
+			}
+			flushed := output.String()
+			proxy.flush()
+			assert.Equal(t, flushed, output.String())
+		})
+	}
+}
+
+func TestProxyLoggerDefaultModeBoundsJSON(t *testing.T) {
+	for _, input := range []string{
+		"{not json" + strings.Repeat("x", bufio.MaxScanTokenSize),
+		"{\n\"payload\":\"" + strings.Repeat("x", bufio.MaxScanTokenSize),
+	} {
+		var output bytes.Buffer
+		logger := log.NewLogger()
+		logger.SetLevel(log.LevelInfo)
+		logger.SetOutput(&output)
+		proxy := &proxyLogger{ctx: context.Background(), logger: logger}
+		_, err := proxy.Write([]byte(input))
+		require.NoError(t, err)
+		require.NotEmpty(t, output.String(), "default mode must log oversized records before process exit")
+		assert.Less(t, len(proxy.buf)+len(proxy.jsonBuf), bufio.MaxScanTokenSize)
+	}
+}
+
+func TestRunAndLogLinesFlushOnExit(t *testing.T) {
+	for _, exitCode := range []int{0, 7} {
+		t.Run(fmt.Sprintf("exit_%d", exitCode), func(t *testing.T) {
+			var output bytes.Buffer
+			logger := log.NewLogger()
+			logger.SetLevel(log.LevelInfo)
+			logger.SetOutput(&output)
+			command := fmt.Sprintf("printf 'stdout tail'; printf 'stderr tail' >&2; exit %d", exitCode)
+			ex := NewExecutor("", "sh", []string{"-c", command}, nil).
+				WithLogProxyHookJSON(true).
+				WithLogger(logger)
+			_, err := ex.RunAndLogLines(context.Background(), nil)
+			if exitCode == 0 {
+				require.NoError(t, err)
+			} else {
+				var stderrErr *StderrError
+				require.ErrorAs(t, err, &stderrErr)
+				assert.Equal(t, "stderr tail", stderrErr.Message)
+			}
+			lines := strings.Split(strings.TrimSpace(output.String()), "\n")
+			require.Len(t, lines, 2)
+			messages := make(map[string]string)
+			for _, line := range lines {
+				var entry map[string]interface{}
+				require.NoError(t, json.Unmarshal([]byte(line), &entry))
+				messages[entry["output"].(string)] = entry["msg"].(string)
+			}
+			assert.Equal(t, map[string]string{"stdout": "stdout tail", "stderr": "stderr tail"}, messages)
+		})
+	}
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
