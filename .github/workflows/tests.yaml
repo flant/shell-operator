@@ -7,7 +7,8 @@ on:
 jobs:
   run_unit_tests:
     name: Run unit tests
-    runs-on: ubuntu-latest
+    # Pinned: newer runner images cause a regression because of their system binaries.
+    runs-on: ubuntu-24.04
     steps:
       - name: Set up Go
         uses: actions/setup-go@v6
