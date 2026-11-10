@@ -24,6 +24,7 @@ import (
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
 	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/otel"
+	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
 	pkg "github.com/flant/shell-operator/pkg"
@@ -83,6 +84,10 @@ type ShellOperator struct {
 	// taskHandlerRegistry maps task types to their executor functions.
 	// Extenders (addon-operator) may register additional task types.
 	taskHandlerRegistry *TaskHandlerRegistry
+
+	// objectTransform is applied to every Kubernetes object before it is
+	// cached and filtered; nil keeps objects as is.
+	objectTransform cache.TransformFunc
 }
 
 type Option func(operator *ShellOperator)
@@ -90,6 +95,16 @@ type Option func(operator *ShellOperator)
 func WithLogger(logger *log.Logger) Option {
 	return func(operator *ShellOperator) {
 		operator.logger = logger
+	}
+}
+
+// WithObjectTransform sets a function applied to every Kubernetes object before
+// the informers cache it and the hooks filter it. Use it to drop fields no hook
+// reads, e.g. metadata.managedFields, to save memory. The function must be
+// idempotent. By default objects are kept as is.
+func WithObjectTransform(fn cache.TransformFunc) Option {
+	return func(operator *ShellOperator) {
+		operator.objectTransform = fn
 	}
 }
 
