@@ -9,6 +9,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metricsstorage "github.com/deckhouse/deckhouse/pkg/metrics-storage"
+	"k8s.io/client-go/tools/cache"
 
 	klient "github.com/flant/kube-client/client"
 	"github.com/flant/shell-operator/pkg"
@@ -86,6 +87,12 @@ func NewKubeEventsManager(ctx context.Context, client *klient.Client, logger *lo
 
 func (mgr *kubeEventsManager) WithMetricStorage(mstor metricsstorage.Storage) {
 	mgr.metricStorage = mstor
+}
+
+// WithObjectTransform sets a function applied to every object before the
+// informers cache it and the hooks filter it. Call it before adding monitors.
+func (mgr *kubeEventsManager) WithObjectTransform(fn cache.TransformFunc) {
+	mgr.factoryStore.WithTransform(fn)
 }
 
 // AddMonitor creates a monitor with informers and return a KubeEvent with existing objects.

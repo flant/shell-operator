@@ -9,6 +9,7 @@ import (
 
 	"github.com/deckhouse/deckhouse/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -50,6 +51,8 @@ type FactoryStore struct {
 	baseCtx   context.Context
 	data      map[FactoryIndex]*Factory
 	stoppedCh map[FactoryIndex]chan struct{}
+	// optional, applied to every object before it is cached and filtered
+	transform cache.TransformFunc
 }
 
 func NewFactoryStore(ctx context.Context) *FactoryStore {
@@ -63,6 +66,40 @@ func NewFactoryStore(ctx context.Context) *FactoryStore {
 		stoppedCh: make(map[FactoryIndex]chan struct{}),
 	}
 	return fs
+}
+
+// WithTransform sets a function applied to every object before the informers
+// cache it and the hooks filter it, e.g. to drop fields no hook reads. It must be
+// idempotent, as client-go may apply it to an object again. Set it before the
+// first Start: informers that are already running keep their objects as is.
+func (c *FactoryStore) WithTransform(fn cache.TransformFunc) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.transform = fn
+}
+
+// transformObject applies the transform to an object listed outside the informers,
+// so its filter result and checksum match the ones of later watch events.
+func (c *FactoryStore) transformObject(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	c.mu.Lock()
+	transform := c.transform
+	c.mu.Unlock()
+
+	if transform == nil {
+		return obj, nil
+	}
+
+	res, err := transform(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	transformed, ok := res.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("transform returned %T instead of *unstructured.Unstructured", res)
+	}
+
+	return transformed, nil
 }
 
 func (c *FactoryStore) Reset() {
@@ -113,7 +150,16 @@ func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) *Factor
 
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
 		client, resyncPeriod, index.Namespace, tweakListOptions)
-	factory.ForResource(index.GVR)
+	informer := factory.ForResource(index.GVR).Informer()
+
+	if c.transform != nil {
+		// Fails only on a started informer, and this one is brand new.
+		if err := informer.SetTransform(c.transform); err != nil {
+			log.Warn("Factory store: transform wasn't set",
+				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
+				log.Err(err))
+		}
+	}
 
 	c.add(index, factory)
 
