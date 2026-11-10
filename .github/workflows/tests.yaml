@@ -7,7 +7,8 @@ on:
 jobs:
   run_unit_tests:
     name: Run unit tests
-    runs-on: ubuntu-latest
+    # Pinned: on newer images echo writes multi-line output in parts and the hook log test fails.
+    runs-on: ubuntu-24.04
     steps:
       - name: Set up Go
         uses: actions/setup-go@v6
