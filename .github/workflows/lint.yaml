@@ -35,12 +35,11 @@ jobs:
           ./golangci-lint run --build-tags integration,test
   codespell:
     name: Run codespell
-    # Pinned: Python 3.8 is not published for newer runner images.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.8
+          python-version: "3.12"
       - name: Check out addon-operator code
         uses: actions/checkout@v4
       - name: Run codespell
