@@ -61,7 +61,7 @@ jobs:
       - name: Check out shell-operator code
         uses: actions/checkout@v7
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4.2.0
+        uses: docker/setup-qemu-action@v4.4.0
         with:
           platforms: arm64,arm
       - name: Set up Docker Buildx
