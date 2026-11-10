@@ -7,7 +7,7 @@ on:
 jobs:
   run_unit_tests:
     name: Run unit tests
-    # Pinned: on newer images echo writes multi-line output in parts and the hook log test fails.
+    # Pinned: newer runner images cause a regression because of their system binaries.
     runs-on: ubuntu-24.04
     steps:
       - name: Set up Go
