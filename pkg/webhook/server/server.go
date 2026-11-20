@@ -45,10 +45,7 @@ func NewWebhookServer(settings *Settings, namespace string, router chi.Router, l
 // means the server failed to bind or load TLS material. Once Start returns nil,
 // the only way the server stops is via Shutdown.
 func (s *WebhookServer) Start() error {
-	keyPair, err := tls.LoadX509KeyPair(
-		s.Settings.ServerCertPath,
-		s.Settings.ServerKeyPath,
-	)
+	reloader, err := newCertReloader(s.Settings.ServerCertPath, s.Settings.ServerKeyPath, s.Logger)
 	if err != nil {
 		return fmt.Errorf("load TLS certs: %v", err)
 	}
@@ -59,8 +56,8 @@ func (s *WebhookServer) Start() error {
 	)
 
 	tlsConf := &tls.Config{
-		Certificates: []tls.Certificate{keyPair},
-		ServerName:   host,
+		GetCertificate: reloader.getCertificate,
+		ServerName:     host,
 	}
 
 	if len(s.Settings.ClientCAPaths) > 0 {
