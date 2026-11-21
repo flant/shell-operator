@@ -615,6 +615,72 @@ kubernetesValidating:
 			},
 		},
 		{
+			"v1 kubernetesMutating reinvocationPolicy",
+			`
+configVersion: v1
+kubernetesMutating:
+- name: default.example.com
+  rules:
+  - apiVersions: ["v1"]
+    apiGroups: ["crd-domain.io"]
+    resources: ["MyCustomResource"]
+    operations: ["*"]
+- name: reinvoke.example.com
+  reinvocationPolicy: IfNeeded
+  rules:
+  - apiVersions: ["v1"]
+    apiGroups: ["crd-domain.io"]
+    resources: ["MyCustomResource"]
+    operations: ["*"]
+`,
+			func() {
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(hookConfig.KubernetesMutating).Should(HaveLen(2))
+
+				// Unset: nil, so apiserver defaults to Never.
+				g.Expect(hookConfig.KubernetesMutating[0].Webhook.ReinvocationPolicy).Should(BeNil())
+
+				// Set: passed through.
+				rp := hookConfig.KubernetesMutating[1].Webhook.ReinvocationPolicy
+				g.Expect(rp).ShouldNot(BeNil())
+				g.Expect(*rp).To(Equal(v1.IfNeededReinvocationPolicy))
+			},
+		},
+		{
+			"v1 kubernetesMutating reinvocationPolicy invalid",
+			`
+configVersion: v1
+kubernetesMutating:
+- name: bad.example.com
+  reinvocationPolicy: Sometimes
+  rules:
+  - apiVersions: ["v1"]
+    apiGroups: ["crd-domain.io"]
+    resources: ["MyCustomResource"]
+    operations: ["*"]
+`,
+			func() {
+				g.Expect(err).Should(HaveOccurred())
+			},
+		},
+		{
+			"v1 kubernetesValidating rejects reinvocationPolicy",
+			`
+configVersion: v1
+kubernetesValidating:
+- name: nope.example.com
+  reinvocationPolicy: Never
+  rules:
+  - apiVersions: ["v1"]
+    apiGroups: ["crd-domain.io"]
+    resources: ["MyCustomResource"]
+    operations: ["*"]
+`,
+			func() {
+				g.Expect(err).Should(HaveOccurred())
+			},
+		},
+		{
 			"v1 kubernetesValidating name error",
 			`
 configVersion: v1
