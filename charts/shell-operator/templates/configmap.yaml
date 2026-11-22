@@ -1,0 +1,13 @@
+{{- if .Values.hooks.files }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shell-operator.hooksConfigMapName" . }}
+  labels:
+    {{- include "shell-operator.labels" . | nindent 4 }}
+data:
+  {{- range $name, $content := .Values.hooks.files }}
+  {{ $name }}: |-
+    {{- $content | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,189 @@
+{{- include "shell-operator.validate" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shell-operator.fullname" . }}
+  labels:
+    {{- include "shell-operator.labels" . | nindent 4 }}
+spec:
+  {{- /* shell-operator has no leader election: run exactly one replica and never two at once. */}}
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "shell-operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if .Values.hooks.files }}
+        checksum/hooks: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "shell-operator.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "shell-operator.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: shell-operator
+          image: {{ include "shell-operator.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: SHELL_OPERATOR_HOOKS_DIR
+              value: {{ .Values.hooks.mountPath | quote }}
+            - name: SHELL_OPERATOR_TMP_DIR
+              value: /tmp/shell-operator
+            - name: SHELL_OPERATOR_LISTEN_PORT
+              value: {{ .Values.metrics.port | quote }}
+            - name: SHELL_OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            - name: LOG_TYPE
+              value: {{ .Values.logType | quote }}
+            - name: HOME
+              value: /tmp
+            {{- with .Values.webhooks.validating }}
+            {{- if .enabled }}
+            - name: VALIDATING_WEBHOOK_SERVICE_NAME
+              value: {{ include "shell-operator.validatingServiceName" $ }}
+            - name: VALIDATING_WEBHOOK_CONFIGURATION_NAME
+              value: {{ .configurationName | default (include "shell-operator.fullname" $) }}
+            - name: VALIDATING_WEBHOOK_FAILURE_POLICY
+              value: {{ .failurePolicy }}
+            - name: VALIDATING_WEBHOOK_LISTEN_PORT
+              value: {{ .port | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.webhooks.conversion }}
+            {{- if .enabled }}
+            - name: CONVERSION_WEBHOOK_SERVICE_NAME
+              value: {{ include "shell-operator.conversionServiceName" $ }}
+            - name: CONVERSION_WEBHOOK_LISTEN_PORT
+              value: {{ .port | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- if .Values.webhooks.validating.enabled }}
+            - name: validating
+              containerPort: {{ .Values.webhooks.validating.port }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.webhooks.conversion.enabled }}
+            - name: conversion
+              containerPort: {{ .Values.webhooks.conversion.port }}
+              protocol: TCP
+            {{- end }}
+          {{- with .Values.probes.liveness }}
+          {{- if .enabled }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: metrics
+            periodSeconds: {{ .periodSeconds }}
+            failureThreshold: {{ .failureThreshold }}
+          {{- end }}
+          {{- end }}
+          {{- with .Values.probes.readiness }}
+          {{- if .enabled }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: metrics
+            periodSeconds: {{ .periodSeconds }}
+            failureThreshold: {{ .failureThreshold }}
+          {{- end }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /var/run/shell-operator
+            {{- if or .Values.hooks.files .Values.hooks.existingConfigMap }}
+            - name: hooks
+              mountPath: {{ .Values.hooks.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.webhooks.validating.enabled }}
+            - name: validating-certs
+              mountPath: /validating-certs
+              readOnly: true
+            {{- end }}
+            {{- if .Values.webhooks.conversion.enabled }}
+            - name: conversion-certs
+              mountPath: /conversion-certs
+              readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.tmpVolumeSizeLimit }}
+        - name: run
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        {{- if or .Values.hooks.files .Values.hooks.existingConfigMap }}
+        - name: hooks
+          configMap:
+            name: {{ include "shell-operator.hooksConfigMapName" . }}
+            defaultMode: {{ .Values.hooks.defaultMode }}
+        {{- end }}
+        {{- if .Values.webhooks.validating.enabled }}
+        - name: validating-certs
+          secret:
+            secretName: {{ .Values.webhooks.validating.certSecretName }}
+        {{- end }}
+        {{- if .Values.webhooks.conversion.enabled }}
+        - name: conversion-certs
+          secret:
+            secretName: {{ .Values.webhooks.conversion.certSecretName }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

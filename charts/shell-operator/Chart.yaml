@@ -1,0 +1,16 @@
+apiVersion: v2
+name: shell-operator
+description: Run event-driven shell (or any executable) hooks in a Kubernetes cluster.
+type: application
+version: 0.1.0
+appVersion: "v1.21.4"
+kubeVersion: ">=1.25.0-0"
+keywords:
+  - operator
+  - hooks
+  - shell
+home: https://github.com/flant/shell-operator
+sources:
+  - https://github.com/flant/shell-operator
+annotations:
+  artifacthub.io/license: Apache-2.0

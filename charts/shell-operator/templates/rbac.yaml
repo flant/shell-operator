@@ -1,0 +1,33 @@
+{{- $rules := include "shell-operator.rules" . | fromYamlArray -}}
+{{- if and .Values.rbac.create $rules }}
+{{- $kind := ternary "ClusterRole" "Role" .Values.rbac.clusterWide }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: {{ $kind }}
+metadata:
+  name: {{ include "shell-operator.fullname" . }}
+  {{- if not .Values.rbac.clusterWide }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+    {{- include "shell-operator.labels" . | nindent 4 }}
+rules:
+  {{- toYaml $rules | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: {{ $kind }}Binding
+metadata:
+  name: {{ include "shell-operator.fullname" . }}
+  {{- if not .Values.rbac.clusterWide }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+    {{- include "shell-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: {{ $kind }}
+  name: {{ include "shell-operator.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "shell-operator.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

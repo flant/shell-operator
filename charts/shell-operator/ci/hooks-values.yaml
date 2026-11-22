@@ -1,0 +1,23 @@
+rbac:
+  rules:
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "list", "watch"]
+hooks:
+  files:
+    namespace-hook.sh: |
+      #!/usr/bin/env bash
+      if [[ $1 == "--config" ]]; then
+        cat <<CONFIG
+      configVersion: v1
+      kubernetes:
+      - apiVersion: v1
+        kind: Namespace
+        executeHookOnEvent: ["Added", "Deleted"]
+        executeHookOnSynchronization: false
+      CONFIG
+      else
+        type=$(jq -r '.[0].type' "$BINDING_CONTEXT_PATH")
+        name=$(jq -r '.[0].object.metadata.name' "$BINDING_CONTEXT_PATH")
+        echo "Namespace $name event: $type"
+      fi

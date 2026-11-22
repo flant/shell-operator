@@ -1,0 +1,70 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
+
+{{ template "chart.description" . }}
+
+The chart runs a single shell-operator replica (it has no leader election, so the Deployment uses the `Recreate` strategy) as a non-root user with a read-only root filesystem. Hooks can come from three places:
+
+- `hooks.files`: hook files written inline in values and mounted from a ConfigMap. Good for small shell hooks.
+- `hooks.existingConfigMap`: a ConfigMap you manage yourself.
+- your own image built `FROM ghcr.io/flant/shell-operator` with hooks under `/hooks`. Set `image.repository` and `image.tag` and leave both options above empty.
+
+ConfigMap keys cannot contain `/`, so hooks that need a directory tree (or extra binaries) belong in a custom image.
+
+## Install
+
+```console
+helm install shell-operator ./charts/shell-operator \
+  --namespace shell-operator --create-namespace \
+  -f my-values.yaml
+```
+
+## Example
+
+Log every namespace that is created or deleted:
+
+```yaml
+rbac:
+  rules:
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "list", "watch"]
+hooks:
+  files:
+    namespace-hook.sh: |
+      #!/usr/bin/env bash
+      if [[ $1 == "--config" ]]; then
+        cat <<CONFIG
+      configVersion: v1
+      kubernetes:
+      - apiVersion: v1
+        kind: Namespace
+        executeHookOnEvent: ["Added", "Deleted"]
+        executeHookOnSynchronization: false
+      CONFIG
+      else
+        type=$(jq -r '.[0].type' "$BINDING_CONTEXT_PATH")
+        name=$(jq -r '.[0].object.metadata.name' "$BINDING_CONTEXT_PATH")
+        echo "Namespace $name event: $type"
+      fi
+```
+
+## RBAC
+
+`rbac.rules` is empty by default: list what your hooks subscribe to or change. The rules are bound with a ClusterRole, or with a Role in the release namespace when `rbac.clusterWide=false`. When a webhook is enabled the chart adds the rule shell-operator needs to manage the ValidatingWebhookConfiguration or to patch CRDs.
+
+## Webhooks
+
+Hooks can serve [validating](https://flant.github.io/shell-operator/BINDING_VALIDATING.html) and [conversion](https://flant.github.io/shell-operator/BINDING_CONVERSION.html) webhooks. Enable them and point the chart at a Secret holding `tls.crt`, `tls.key` and `ca.crt`, such as one issued by cert-manager. The certificate must be valid for `<fullname>-validating.<namespace>.svc` or `<fullname>-conversion.<namespace>.svc`.
+
+```yaml
+webhooks:
+  validating:
+    enabled: true
+    certSecretName: shell-operator-validating-tls
+```
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
