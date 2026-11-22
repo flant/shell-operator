@@ -29,9 +29,15 @@ type stubHookManager struct {
 	handleAdmissionEventFunc     func(ctx context.Context, event admission.Event, createTaskFn func(*hook.Hook, controller.BindingExecutionInfo))
 	findConversionChainFunc      func(crdName string, rule conversion.Rule) []conversion.Rule
 	handleConversionEventFunc    func(ctx context.Context, crdName string, request *v1.ConversionRequest, rule conversion.Rule, createTaskFn func(*hook.Hook, controller.BindingExecutionInfo))
+	initFunc                     func() error
 }
 
-func (s *stubHookManager) Init() error                    { return nil }
+func (s *stubHookManager) Init() error {
+	if s.initFunc != nil {
+		return s.initFunc()
+	}
+	return nil
+}
 func (s *stubHookManager) GetHook(name string) *hook.Hook { return nil }
 func (s *stubHookManager) GetHookNames() []string         { return nil }
 func (s *stubHookManager) GetHooksInOrder(htypes.BindingType) ([]string, error) {
