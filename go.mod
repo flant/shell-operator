@@ -43,7 +43,7 @@ require (
 	github.com/gojuno/minimock/v3 v3.4.7
 	github.com/itchyny/gojq v0.12.19
 	github.com/muesli/termenv v0.16.0
-	github.com/onsi/ginkgo/v2 v2.31.0
+	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	go.uber.org/goleak v1.3.0
