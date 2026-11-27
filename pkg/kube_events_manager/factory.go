@@ -32,6 +32,9 @@ type FactoryIndex struct {
 	Namespace     string
 	FieldSelector string
 	LabelSelector string
+	// KeepManagedFields separates the informer of monitors that need
+	// metadata.managedFields from the shared one, which the transform may strip.
+	KeepManagedFields bool
 }
 
 type Factory struct {
@@ -92,9 +95,9 @@ func (c *FactoryStore) WithTransform(fn cache.TransformFunc) {
 
 // transformObject applies the transform to an object listed outside the informers,
 // so its filter result and checksum match the ones of later watch events.
-func (c *FactoryStore) transformObject(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (c *FactoryStore) transformObject(obj *unstructured.Unstructured, keepManagedFields bool) (*unstructured.Unstructured, error) {
 	c.mu.Lock()
-	transform := c.transform
+	transform := c.transformFor(keepManagedFields)
 	c.mu.Unlock()
 
 	if transform == nil {
@@ -112,6 +115,41 @@ func (c *FactoryStore) transformObject(obj *unstructured.Unstructured) (*unstruc
 	}
 
 	return transformed, nil
+}
+
+// transformFor returns the transform for an informer, or nil if there is none.
+// The caller holds c.mu.
+func (c *FactoryStore) transformFor(keepManagedFields bool) cache.TransformFunc {
+	if c.transform == nil || !keepManagedFields {
+		return c.transform
+	}
+
+	return withManagedFields(c.transform)
+}
+
+// withManagedFields wraps a transform so that the object keeps metadata.managedFields.
+func withManagedFields(transform cache.TransformFunc) cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return transform(obj)
+		}
+
+		managedFields, found, _ := unstructured.NestedFieldNoCopy(u.Object, "metadata", "managedFields")
+
+		res, err := transform(obj)
+		if err != nil || !found {
+			return res, err
+		}
+
+		if out, ok := res.(*unstructured.Unstructured); ok {
+			if metadata, ok := out.Object["metadata"].(map[string]interface{}); ok {
+				metadata["managedFields"] = managedFields
+			}
+		}
+
+		return res, nil
+	}
 }
 
 func (c *FactoryStore) Reset() {
@@ -164,9 +202,9 @@ func (c *FactoryStore) get(client dynamic.Interface, index FactoryIndex) *Factor
 		client, resyncPeriod, index.Namespace, tweakListOptions)
 	informer := factory.ForResource(index.GVR).Informer()
 
-	if c.transform != nil {
+	if transform := c.transformFor(index.KeepManagedFields); transform != nil {
 		// Fails only on a started informer, and this one is brand new.
-		if err := informer.SetTransform(c.transform); err != nil {
+		if err := informer.SetTransform(transform); err != nil {
 			log.Warn("Factory store: transform wasn't set",
 				slog.String(pkg.LogKeyNamespace, index.Namespace), slog.String(pkg.LogKeyGVR, index.GVR.String()),
 				log.Err(err))
