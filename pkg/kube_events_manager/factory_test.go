@@ -2,6 +2,7 @@ package kubeeventsmanager
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -215,4 +216,101 @@ func TestFactoryStore_TransformsObjects(t *testing.T) {
 		_, hasData := o.Object.Object["data"]
 		return o.Object.GetName() == "watched" && !hasData
 	})), "watch events must be transformed")
+}
+
+func testCMWithManagedFields(name string) string {
+	return fmt.Sprintf(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "%s"
+  managedFields:
+  - manager: test-manager
+    operation: Update
+    apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:data:
+        f:foo: {}
+data:
+  foo: "bar"
+`, name)
+}
+
+// TestFactoryStore_KeepManagedFields checks that a monitor with KeepManagedFields
+// gets its own informer whose objects keep metadata.managedFields both in the
+// initial list and in watch events, while the shared informer of the same resource
+// still gets them stripped by the store transform.
+func TestFactoryStore_KeepManagedFields(t *testing.T) {
+	g := NewWithT(t)
+
+	fc := fake.NewFakeCluster(fake.ClusterVersionV121)
+	createNsWithLabels(fc, "default", map[string]string{})
+	createCM(fc, "default", testCMWithManagedFields("listed"))
+
+	store := NewFactoryStore(context.Background())
+	store.WithTransform(func(obj interface{}) (interface{}, error) {
+		if u, ok := obj.(*unstructured.Unstructured); ok {
+			unstructured.RemoveNestedField(u.Object, "metadata", "managedFields")
+		}
+		return obj, nil
+	})
+
+	metricStorage := metric.NewStorageMock(t)
+	metricStorage.HistogramObserveMock.Set(func(string, float64, map[string]string, []float64) {})
+	metricStorage.GaugeSetMock.Set(func(string, float64, map[string]string) {})
+
+	hasManagedFields := func(o kemtypes.ObjectAndFilterResult) bool {
+		return len(o.Object.GetManagedFields()) > 0
+	}
+
+	startMonitor := func(keepManagedFields bool) ([]kemtypes.ObjectAndFilterResult, func() []kemtypes.ObjectAndFilterResult) {
+		var mu sync.Mutex
+		var fromEvents []kemtypes.ObjectAndFilterResult
+
+		mon := NewMonitor(context.Background(), fc.Client, metricStorage, store, &MonitorConfig{
+			ApiVersion: "v1",
+			Kind:       "ConfigMap",
+			EventTypes: []kemtypes.WatchEventType{kemtypes.WatchEventAdded},
+			NamespaceSelector: &kemtypes.NamespaceSelector{
+				NameSelector: &kemtypes.NameSelector{MatchNames: []string{"default"}},
+			},
+			KeepFullObjectsInMemory: true,
+			KeepManagedFields:       keepManagedFields,
+		}, func(ev kemtypes.KubeEvent) {
+			mu.Lock()
+			fromEvents = append(fromEvents, ev.Objects...)
+			mu.Unlock()
+		}, log.NewNop())
+
+		g.Expect(mon.CreateInformers()).To(Succeed())
+		mon.Start(context.TODO())
+		mon.EnableKubeEventCb()
+
+		return mon.Snapshot(), func() []kemtypes.ObjectAndFilterResult {
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]kemtypes.ObjectAndFilterResult(nil), fromEvents...)
+		}
+	}
+
+	sharedSnapshot, sharedEvents := startMonitor(false)
+	keptSnapshot, keptEvents := startMonitor(true)
+
+	store.mu.Lock()
+	factories := len(store.data)
+	store.mu.Unlock()
+	g.Expect(factories).To(Equal(2), "a monitor with KeepManagedFields must get its own informer")
+
+	g.Expect(sharedSnapshot).To(ConsistOf(Not(Satisfy(hasManagedFields))), "initial list of the shared informer must be transformed")
+	g.Expect(keptSnapshot).To(ConsistOf(Satisfy(hasManagedFields)), "initial list must keep managedFields")
+
+	createCM(fc, "default", testCMWithManagedFields("watched"))
+
+	g.Eventually(keptEvents, "5s", "10ms").Should(ContainElement(Satisfy(func(o kemtypes.ObjectAndFilterResult) bool {
+		return o.Object.GetName() == "watched" && hasManagedFields(o)
+	})), "watch events must keep managedFields")
+	g.Eventually(sharedEvents, "5s", "10ms").Should(ContainElement(Satisfy(func(o kemtypes.ObjectAndFilterResult) bool {
+		return o.Object.GetName() == "watched" && !hasManagedFields(o)
+	})), "watch events of the shared informer must be transformed")
 }

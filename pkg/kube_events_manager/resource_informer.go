@@ -148,10 +148,11 @@ func (ei *resourceInformer) createSharedInformer() error {
 	}
 
 	ei.FactoryIndex = FactoryIndex{
-		GVR:           ei.GroupVersionResource,
-		Namespace:     ei.Namespace,
-		FieldSelector: ei.ListOptions.FieldSelector,
-		LabelSelector: ei.ListOptions.LabelSelector,
+		GVR:               ei.GroupVersionResource,
+		Namespace:         ei.Namespace,
+		FieldSelector:     ei.ListOptions.FieldSelector,
+		LabelSelector:     ei.ListOptions.LabelSelector,
+		KeepManagedFields: ei.Monitor.KeepManagedFields,
 	}
 
 	if err = ei.loadExistedObjects(); err != nil {
@@ -228,7 +229,7 @@ func (ei *resourceInformer) loadExistedObjects() error {
 
 	for _, item := range objList.Items {
 		// item is a per-iteration variable, so each pointer in filteredObjects is unique
-		obj, err := ei.factoryStore.transformObject(&item)
+		obj, err := ei.factoryStore.transformObject(&item, ei.FactoryIndex.KeepManagedFields)
 		if err != nil {
 			return fmt.Errorf("transform '%s/%s': %w", ei.Monitor.Metadata.DebugName, item.GetName(), err)
 		}

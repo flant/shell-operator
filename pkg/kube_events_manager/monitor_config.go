@@ -33,7 +33,11 @@ type MonitorConfig struct {
 	Logger                  *log.Logger
 	Mode                    kemtypes.KubeEventMode
 	KeepFullObjectsInMemory bool
-	FilterFunc              func(*unstructured.Unstructured) (interface{}, error)
+	// KeepManagedFields keeps metadata.managedFields of the objects even if the
+	// store-wide transform (FactoryStore.WithTransform) drops them. Such a monitor
+	// gets its own informer, so set it only when the filter reads managedFields.
+	KeepManagedFields bool
+	FilterFunc        func(*unstructured.Unstructured) (interface{}, error)
 }
 
 // WithJqFilter sets the JQ filter expression and compiles it for reuse on every
